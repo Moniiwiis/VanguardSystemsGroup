@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 170" width="520" height="170" fill="none">
+  <!-- Escudo Oficial de La Serena -->
+  <g stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Borde exterior del escudo -->
+    <path d="M6 6H154V100C154 140 120 164 80 164C40 164 6 140 6 100V6Z" stroke-width="5.5" fill="none" />
+    
+    <!-- Letras 'F' históricas en la orla -->
+    <text x="80" y="24" fill="#FFFFFF" font-size="17" font-weight="900" text-anchor="middle" font-family="Georgia, serif" stroke="none">F</text>
+    <text x="80" y="157" fill="#FFFFFF" font-size="17" font-weight="900" text-anchor="middle" font-family="Georgia, serif" stroke="none">F</text>
+    <text x="18" y="91" fill="#FFFFFF" font-size="17" font-weight="900" text-anchor="middle" font-family="Georgia, serif" stroke="none">F</text>
+    <text x="142" y="91" fill="#FFFFFF" font-size="17" font-weight="900" text-anchor="middle" font-family="Georgia, serif" stroke="none">F</text>
+    
+    <!-- Manojos de 3 flechas en las 4 esquinas -->
+    <g stroke-width="2.2" stroke="#FFFFFF">
+      <line x1="18" y1="32" x2="18" y2="52" /><polyline points="15,47 18,52 21,47" /><line x1="14" y1="35" x2="14" y2="49" /><line x1="22" y1="35" x2="22" y2="49" />
+      <line x1="142" y1="32" x2="142" y2="52" /><polyline points="139,47 142,52 145,47" /><line x1="138" y1="35" x2="138" y2="49" /><line x1="146" y1="35" x2="146" y2="49" />
+      <line x1="22" y1="110" x2="22" y2="130" /><polyline points="19,115 22,110 25,115" /><line x1="18" y1="113" x2="18" y2="127" /><line x1="26" y1="113" x2="26" y2="127" />
+      <line x1="138" y1="110" x2="138" y2="130" /><polyline points="135,115 138,110 141,115" /><line x1="134" y1="113" x2="134" y2="127" /><line x1="142" y1="113" x2="142" y2="127" />
+    </g>
+    
+    <!-- Borde interior del escudo -->
+    <path d="M30 30H130V95C130 122 108 142 80 142C52 142 30 122 30 95V30Z" stroke-width="3" stroke="#FFFFFF" fill="none" />
+    <line x1="32" y1="102" x2="128" y2="102" stroke-width="3" stroke="#FFFFFF" />
+    
+    <!-- Castillo con 3 torres -->
+    <rect x="42" y="62" width="76" height="40" stroke-width="3" stroke="#FFFFFF" fill="none" />
+    <rect x="44" y="48" width="22" height="14" stroke-width="2.5" stroke="#FFFFFF" fill="none" />
+    <rect x="50" y="70" width="10" height="14" stroke-width="2" stroke="#FFFFFF" fill="none" />
+    <rect x="94" y="48" width="22" height="14" stroke-width="2.5" stroke="#FFFFFF" fill="none" />
+    <rect x="100" y="70" width="10" height="14" stroke-width="2" stroke="#FFFFFF" fill="none" />
+    <rect x="68" y="40" width="24" height="22" stroke-width="2.5" stroke="#FFFFFF" fill="none" />
+    <rect x="75" y="50" width="10" height="10" stroke-width="2" stroke="#FFFFFF" fill="none" />
+    <path d="M73 102V84C73 80 76 77 80 77C84 77 87 80 87 84V102H73Z" stroke-width="2.5" stroke="#FFFFFF" fill="none" />
+    
+    <!-- Llamas de fuego arriba de las torres -->
+    <g stroke-width="1.8" stroke="#FFFFFF" fill="none">
+      <path d="M80 32C80 32 83 36 80 38C78 37 78 35 80 32Z" />
+      <path d="M49 42C49 42 51 45 49 47C48 46 48 44 49 42Z" />
+      <path d="M60 42C60 42 62 45 60 47C59 46 59 44 60 42Z" />
+      <path d="M100 42C100 42 102 45 100 47C99 46 99 44 100 42Z" />
+      <path d="M111 42C111 42 113 45 111 47C110 46 110 44 111 42Z" />
+    </g>
+  </g>
+
+  <!-- Texto Institucional Oficial -->
+  <text x="185" y="86" fill="#FFFFFF" font-size="56" font-weight="900" font-family="'Times New Roman', Georgia, serif" letter-spacing="4">LA SERENA</text>
+  <text x="187" y="128" fill="#FFFFFF" font-size="22" font-weight="700" font-family="system-ui, -apple-system, sans-serif" letter-spacing="7">ILUSTRE MUNICIPALIDAD</text>
+</svg>
