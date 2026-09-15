@@ -1,0 +1,16 @@
+# Entornos virtuales y secretos
+.env
+.venv/
+venv/
+
+# Archivos de base de datos local y temporales
+db.sqlite3
+*.log
+*.tmp
+__pycache__/
+
+# Archivos del sistema operativo y editor
+.DS_Store
+.vscode/
+.idea/
+*.py[cod]
