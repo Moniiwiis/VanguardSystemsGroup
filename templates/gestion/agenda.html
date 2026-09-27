@@ -78,6 +78,7 @@
             <th class="p-4">Territorio</th>
             <th class="p-4">Fecha Comprometida</th>
             <th class="p-4">Estado</th>
+            <th class="p-4 text-center">Acciones (CRUD)</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -89,6 +90,70 @@
             <td class="p-4">{{ comp.fecha_comprometida|date:"d/m/Y" }}</td>
             <td class="p-4">
               <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800">{{ comp.estado }}</span>
+            </td>
+            <td class="p-4 text-center">
+              <div class="flex items-center justify-center gap-1.5">
+                <button onclick="document.getElementById('modal-edit-comp-{{ comp.id }}').showModal()" class="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors" title="Editar">
+                  <i data-lucide="edit" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="document.getElementById('modal-del-comp-{{ comp.id }}').showModal()" class="p-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors" title="Eliminar">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+              <!-- Modal Editar Compromiso -->
+              <dialog id="modal-edit-comp-{{ comp.id }}" class="rounded-3xl p-6 max-w-md w-full text-left bg-white shadow-2xl backdrop:bg-slate-900/40 border border-amber-100">
+                <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
+                  <h3 class="font-display font-extrabold text-sm text-amber-800 flex items-center gap-2">
+                    <i data-lucide="edit" class="w-4 h-4 text-amber-600"></i> Editar Compromiso: {{ comp.solicitante }}
+                  </h3>
+                  <button onclick="document.getElementById('modal-edit-comp-{{ comp.id }}').close()" class="text-slate-400 font-bold">&times;</button>
+                </div>
+                <form action="{% url 'gestion_agenda_editar' comp.id %}" method="POST" class="space-y-3 text-xs font-bold">
+                  {% csrf_token %}
+                  <div>
+                    <label class="block text-slate-700 mb-1">Solicitante</label>
+                    <input type="text" name="solicitante" value="{{ comp.solicitante }}" required class="w-full p-2.5 rounded-xl border border-slate-200" />
+                  </div>
+                  <div>
+                    <label class="block text-slate-700 mb-1">Territorio</label>
+                    <input type="text" name="territorio" value="{{ comp.territorio|default:'' }}" class="w-full p-2.5 rounded-xl border border-slate-200" />
+                  </div>
+                  <div>
+                    <label class="block text-slate-700 mb-1">Estado</label>
+                    <select name="estado" class="w-full p-2.5 rounded-xl border border-slate-200">
+                      <option value="Ingresado" {% if comp.estado == 'Ingresado' %}selected{% endif %}>Ingresado</option>
+                      <option value="Pendiente" {% if comp.estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
+                      <option value="En proceso" {% if comp.estado == 'En proceso' %}selected{% endif %}>En proceso</option>
+                      <option value="Realizado" {% if comp.estado == 'Realizado' %}selected{% endif %}>Realizado</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-slate-700 mb-1">Observaciones</label>
+                    <textarea name="observacion" rows="2" class="w-full p-2.5 rounded-xl border border-slate-200">{{ comp.observacion|default:'' }}</textarea>
+                  </div>
+                  <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="document.getElementById('modal-edit-comp-{{ comp.id }}').close()" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-600">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 rounded-xl bg-amber-600 text-white font-extrabold">Actualizar</button>
+                  </div>
+                </form>
+              </dialog>
+
+              <!-- Modal Eliminar Compromiso -->
+              <dialog id="modal-del-comp-{{ comp.id }}" class="rounded-3xl p-6 max-w-sm w-full text-left bg-white shadow-2xl backdrop:bg-slate-900/40 border border-red-100">
+                <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-3">
+                  <h3 class="font-display font-extrabold text-sm text-red-700 flex items-center gap-2">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 text-red-600"></i> Confirmar Eliminación
+                  </h3>
+                  <button onclick="document.getElementById('modal-del-comp-{{ comp.id }}').close()" class="text-slate-400 font-bold">&times;</button>
+                </div>
+                <p class="text-xs text-slate-600 mb-4">¿Estás seguro de eliminar el compromiso de <strong>{{ comp.solicitante }}</strong>?</p>
+                <form action="{% url 'gestion_agenda_eliminar' comp.id %}" method="POST" class="flex justify-end gap-2">
+                  {% csrf_token %}
+                  <button type="button" onclick="document.getElementById('modal-del-comp-{{ comp.id }}').close()" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-600">Cancelar</button>
+                  <button type="submit" class="px-4 py-2 rounded-xl bg-red-600 text-white font-extrabold">Sí, Eliminar</button>
+                </form>
+              </dialog>
             </td>
           </tr>
           {% empty %}

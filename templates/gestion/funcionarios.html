@@ -119,6 +119,7 @@
             <th class="p-4">Delegación Municipal</th>
             <th class="p-4">Roles SGR</th>
             <th class="p-4">Estado</th>
+            <th class="p-4 text-center">Acciones (CRUD)</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -156,6 +157,77 @@
                   <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Inactivo
                 </span>
               {% endif %}
+            </td>
+            <td class="p-4 text-center">
+              <div class="flex items-center justify-center gap-1.5">
+                <button onclick="document.getElementById('modal-edit-funcionario-{{ f.id }}').showModal()" class="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors" title="Editar">
+                  <i data-lucide="edit" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="document.getElementById('modal-del-funcionario-{{ f.id }}').showModal()" class="p-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors" title="Eliminar (Soft Delete)">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+              <!-- Modal Editar -->
+              <dialog id="modal-edit-funcionario-{{ f.id }}" class="rounded-3xl p-6 max-w-md w-full text-left bg-white shadow-2xl backdrop:bg-slate-900/40 border border-amber-100">
+                <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
+                  <h3 class="font-display font-extrabold text-sm text-amber-800 flex items-center gap-2">
+                    <i data-lucide="edit" class="w-4 h-4 text-amber-600"></i> Editar Funcionario: {{ f.user.username }}
+                  </h3>
+                  <button onclick="document.getElementById('modal-edit-funcionario-{{ f.id }}').close()" class="text-slate-400 font-bold">&times;</button>
+                </div>
+                <form action="{% url 'gestion_funcionarios_editar' f.id %}" method="POST" class="space-y-3 text-xs font-bold">
+                  {% csrf_token %}
+                  <div>
+                    <label class="block text-slate-700 mb-1">Identificador / RUT</label>
+                    <input type="text" name="identificador_institucional" value="{{ f.identificador_institucional }}" required class="w-full p-2.5 rounded-xl border border-slate-200" />
+                  </div>
+                  <div>
+                    <label class="block text-slate-700 mb-1">Cargo</label>
+                    <select name="cargo_id" required class="w-full p-2.5 rounded-xl border border-slate-200">
+                      {% for c in cargos %}
+                        <option value="{{ c.id }}" {% if c.id == f.cargo.id %}selected{% endif %}>{{ c.nombre_cargo }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-slate-700 mb-1">Delegación</label>
+                    <select name="delegacion_id" class="w-full p-2.5 rounded-xl border border-slate-200">
+                      <option value="">-- Sin Asignar --</option>
+                      {% for d in delegaciones %}
+                        <option value="{{ d.id }}" {% if f.delegacion and d.id == f.delegacion.id %}selected{% endif %}>{{ d.nombre }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-slate-700 mb-1">Estado</label>
+                    <select name="estado" class="w-full p-2.5 rounded-xl border border-slate-200">
+                      <option value="Activo" {% if f.estado == 'Activo' %}selected{% endif %}>Activo</option>
+                      <option value="Inactivo" {% if f.estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
+                    </select>
+                  </div>
+                  <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="document.getElementById('modal-edit-funcionario-{{ f.id }}').close()" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-600">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 rounded-xl bg-amber-600 text-white font-extrabold">Actualizar</button>
+                  </div>
+                </form>
+              </dialog>
+
+              <!-- Modal Eliminar -->
+              <dialog id="modal-del-funcionario-{{ f.id }}" class="rounded-3xl p-6 max-w-sm w-full text-left bg-white shadow-2xl backdrop:bg-slate-900/40 border border-red-100">
+                <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-3">
+                  <h3 class="font-display font-extrabold text-sm text-red-700 flex items-center gap-2">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 text-red-600"></i> Confirmar Eliminación
+                  </h3>
+                  <button onclick="document.getElementById('modal-del-funcionario-{{ f.id }}').close()" class="text-slate-400 font-bold">&times;</button>
+                </div>
+                <p class="text-xs text-slate-600 mb-4">¿Estás seguro de eliminar a <strong>{{ f.user.username }}</strong>? Se aplicará Soft Delete (borrado lógico auditado).</p>
+                <form action="{% url 'gestion_funcionarios_eliminar' f.id %}" method="POST" class="flex justify-end gap-2">
+                  {% csrf_token %}
+                  <button type="button" onclick="document.getElementById('modal-del-funcionario-{{ f.id }}').close()" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-600">Cancelar</button>
+                  <button type="submit" class="px-4 py-2 rounded-xl bg-red-600 text-white font-extrabold">Sí, Eliminar</button>
+                </form>
+              </dialog>
             </td>
           </tr>
           {% empty %}

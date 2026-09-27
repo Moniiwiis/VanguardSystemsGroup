@@ -1,19 +1,3 @@
-"""
-URL configuration for config project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/6.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
 from django.urls import path
 from core import views
@@ -22,11 +6,27 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.gestion_inicio, name='gestion_inicio'),
     path('gestion/', views.gestion_inicio, name='gestion_inicio_alt'),
+
+    # Funcionarios CRUD
     path('gestion/funcionarios/', views.gestion_funcionarios, name='gestion_funcionarios'),
+    path('gestion/funcionarios/<int:funcionario_id>/editar/', views.gestion_funcionarios_editar, name='gestion_funcionarios_editar'),
+    path('gestion/funcionarios/<int:funcionario_id>/eliminar/', views.gestion_funcionarios_eliminar, name='gestion_funcionarios_eliminar'),
+
+    # Actividades CRUD
     path('gestion/actividades/', views.gestion_actividades, name='gestion_actividades'),
+    path('gestion/actividades/<int:actividad_id>/editar/', views.gestion_actividades_editar, name='gestion_actividades_editar'),
+    path('gestion/actividades/<int:actividad_id>/eliminar/', views.gestion_actividades_eliminar, name='gestion_actividades_eliminar'),
+
+    # Agenda CRUD
     path('gestion/agenda/', views.gestion_agenda, name='gestion_agenda'),
+    path('gestion/agenda/<int:compromiso_id>/editar/', views.gestion_agenda_editar, name='gestion_agenda_editar'),
+    path('gestion/agenda/<int:compromiso_id>/eliminar/', views.gestion_agenda_eliminar, name='gestion_agenda_eliminar'),
+
+    # Configuracion CRUD
     path('gestion/configuracion/', views.gestion_configuracion, name='gestion_configuracion'),
+    path('gestion/configuracion/<int:meta_id>/editar/', views.gestion_configuracion_editar, name='gestion_configuracion_editar'),
+    path('gestion/configuracion/<int:meta_id>/eliminar/', views.gestion_configuracion_eliminar, name='gestion_configuracion_eliminar'),
+
+    # Reportes
     path('gestion/reportes/', views.gestion_reportes, name='gestion_reportes'),
 ]
-
-

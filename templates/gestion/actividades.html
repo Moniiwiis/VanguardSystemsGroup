@@ -99,6 +99,7 @@
             <th class="p-4">Funcionario</th>
             <th class="p-4">Ítem Medición</th>
             <th class="p-4">Validación SGR</th>
+            <th class="p-4 text-center">Acciones (CRUD)</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -116,6 +117,71 @@
               {% else %}
                 <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800">Pendiente</span>
               {% endif %}
+            </td>
+            <td class="p-4 text-center">
+              <div class="flex items-center justify-center gap-1.5">
+                <button onclick="document.getElementById('modal-edit-act-{{ act.id }}').showModal()" class="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors" title="Editar">
+                  <i data-lucide="edit" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="document.getElementById('modal-del-act-{{ act.id }}').showModal()" class="p-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors" title="Eliminar">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+              <!-- Modal Editar Actividad -->
+              <dialog id="modal-edit-act-{{ act.id }}" class="rounded-3xl p-6 max-w-lg w-full text-left bg-white shadow-2xl backdrop:bg-slate-900/40 border border-amber-100">
+                <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
+                  <h3 class="font-display font-extrabold text-sm text-amber-800 flex items-center gap-2">
+                    <i data-lucide="edit" class="w-4 h-4 text-amber-600"></i> Editar Actividad: {{ act.codigo_evidencia_unico }}
+                  </h3>
+                  <button onclick="document.getElementById('modal-edit-act-{{ act.id }}').close()" class="text-slate-400 font-bold">&times;</button>
+                </div>
+                <form action="{% url 'gestion_actividades_editar' act.id %}" method="POST" class="space-y-3 text-xs font-bold">
+                  {% csrf_token %}
+                  <div>
+                    <label class="block text-slate-700 mb-1">Fecha Actividad</label>
+                    <input type="date" name="fecha_actividad" value="{{ act.fecha_actividad|date:'Y-m-d' }}" required class="w-full p-2.5 rounded-xl border border-slate-200" />
+                  </div>
+                  <div>
+                    <label class="block text-slate-700 mb-1">Descripción de Solicitud</label>
+                    <textarea name="descripcion_solicitud" required rows="2" class="w-full p-2.5 rounded-xl border border-slate-200">{{ act.descripcion_solicitud }}</textarea>
+                  </div>
+                  <div>
+                    <label class="block text-slate-700 mb-1">Acción Ejecutada</label>
+                    <textarea name="accion_ejecutada" required rows="2" class="w-full p-2.5 rounded-xl border border-slate-200">{{ act.accion_ejecutada }}</textarea>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <label class="block text-slate-700 mb-1">Contacto Nombre</label>
+                      <input type="text" name="contacto_nombre" value="{{ act.contacto_nombre|default:'' }}" class="w-full p-2.5 rounded-xl border border-slate-200" />
+                    </div>
+                    <div>
+                      <label class="block text-slate-700 mb-1">Contacto Teléfono</label>
+                      <input type="text" name="contacto_telefono" value="{{ act.contacto_telefono|default:'' }}" class="w-full p-2.5 rounded-xl border border-slate-200" />
+                    </div>
+                  </div>
+                  <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="document.getElementById('modal-edit-act-{{ act.id }}').close()" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-600">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 rounded-xl bg-amber-600 text-white font-extrabold">Actualizar Actividad</button>
+                  </div>
+                </form>
+              </dialog>
+
+              <!-- Modal Eliminar Actividad -->
+              <dialog id="modal-del-act-{{ act.id }}" class="rounded-3xl p-6 max-w-sm w-full text-left bg-white shadow-2xl backdrop:bg-slate-900/40 border border-red-100">
+                <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-3">
+                  <h3 class="font-display font-extrabold text-sm text-red-700 flex items-center gap-2">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 text-red-600"></i> Confirmar Eliminación
+                  </h3>
+                  <button onclick="document.getElementById('modal-del-act-{{ act.id }}').close()" class="text-slate-400 font-bold">&times;</button>
+                </div>
+                <p class="text-xs text-slate-600 mb-4">¿Estás seguro de eliminar la actividad <strong>{{ act.codigo_evidencia_unico }}</strong>?</p>
+                <form action="{% url 'gestion_actividades_eliminar' act.id %}" method="POST" class="flex justify-end gap-2">
+                  {% csrf_token %}
+                  <button type="button" onclick="document.getElementById('modal-del-act-{{ act.id }}').close()" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-600">Cancelar</button>
+                  <button type="submit" class="px-4 py-2 rounded-xl bg-red-600 text-white font-extrabold">Sí, Eliminar</button>
+                </form>
+              </dialog>
             </td>
           </tr>
           {% empty %}
