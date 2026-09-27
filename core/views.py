@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.models import User
 from activities.models import Actividad, ValidacionEvidencia
@@ -6,6 +6,7 @@ from agenda.models import CompromisoAgenda
 from configuration.models import ConfiguracionMeta, Periodo, ItemMedicion, CatalogoActividad
 from accounts.models import Funcionario, Cargo, Delegacion
 
+# --- INICIO ---
 def gestion_inicio(request):
     metas = ConfiguracionMeta.objects.select_related('periodo', 'item').all()
     if metas.exists():
@@ -22,6 +23,8 @@ def gestion_inicio(request):
     }
     return render(request, 'gestion/inicio.html', context)
 
+
+# --- FUNCIONARIOS (CRUD) ---
 def gestion_funcionarios(request):
     if request.method == 'POST':
         username = request.POST.get('username')
@@ -65,6 +68,30 @@ def gestion_funcionarios(request):
     }
     return render(request, 'gestion/funcionarios.html', context)
 
+def gestion_funcionarios_editar(request, funcionario_id):
+    funcionario = get_object_or_404(Funcionario, id=funcionario_id)
+    if request.method == 'POST':
+        funcionario.identificador_institucional = request.POST.get('identificador_institucional', funcionario.identificador_institucional)
+        cargo_id = request.POST.get('cargo_id')
+        if cargo_id:
+            funcionario.cargo_id = cargo_id
+        delegacion_id = request.POST.get('delegacion_id')
+        funcionario.delegacion_id = delegacion_id if delegacion_id else None
+        funcionario.estado = request.POST.get('estado', funcionario.estado)
+        funcionario.save()
+        messages.success(request, f"Funcionario '{funcionario.user.username}' actualizado exitosamente.")
+    return redirect('gestion_funcionarios')
+
+def gestion_funcionarios_eliminar(request, funcionario_id):
+    funcionario = get_object_or_404(Funcionario, id=funcionario_id)
+    if request.method == 'POST':
+        username = funcionario.user.username
+        funcionario.delete() # Ejecuta Soft Delete definido en BaseModel
+        messages.success(request, f"Funcionario '{username}' eliminado correctamente (borrado lógico).")
+    return redirect('gestion_funcionarios')
+
+
+# --- ACTIVIDADES (CRUD) ---
 def gestion_actividades(request):
     if request.method == 'POST':
         fecha = request.POST.get('fecha_actividad')
@@ -105,6 +132,28 @@ def gestion_actividades(request):
     }
     return render(request, 'gestion/actividades.html', context)
 
+def gestion_actividades_editar(request, actividad_id):
+    actividad = get_object_or_404(Actividad, id=actividad_id)
+    if request.method == 'POST':
+        actividad.fecha_actividad = request.POST.get('fecha_actividad', actividad.fecha_actividad)
+        actividad.descripcion_solicitud = request.POST.get('descripcion_solicitud', actividad.descripcion_solicitud)
+        actividad.accion_ejecutada = request.POST.get('accion_ejecutada', actividad.accion_ejecutada)
+        actividad.contacto_nombre = request.POST.get('contacto_nombre', actividad.contacto_nombre)
+        actividad.contacto_telefono = request.POST.get('contacto_telefono', actividad.contacto_telefono)
+        actividad.save()
+        messages.success(request, f"Actividad '{actividad.codigo_evidencia_unico}' actualizada exitosamente.")
+    return redirect('gestion_actividades')
+
+def gestion_actividades_eliminar(request, actividad_id):
+    actividad = get_object_or_404(Actividad, id=actividad_id)
+    if request.method == 'POST':
+        codigo = actividad.codigo_evidencia_unico
+        actividad.delete()
+        messages.success(request, f"Actividad '{codigo}' eliminada del sistema.")
+    return redirect('gestion_actividades')
+
+
+# --- AGENDA (CRUD) ---
 def gestion_agenda(request):
     if request.method == 'POST':
         solicitante = request.POST.get('solicitante')
@@ -138,6 +187,27 @@ def gestion_agenda(request):
     }
     return render(request, 'gestion/agenda.html', context)
 
+def gestion_agenda_editar(request, compromiso_id):
+    compromiso = get_object_or_404(CompromisoAgenda, id=compromiso_id)
+    if request.method == 'POST':
+        compromiso.solicitante = request.POST.get('solicitante', compromiso.solicitante)
+        compromiso.territorio = request.POST.get('territorio', compromiso.territorio)
+        compromiso.estado = request.POST.get('estado', compromiso.estado)
+        compromiso.observacion = request.POST.get('observacion', compromiso.observacion)
+        compromiso.save()
+        messages.success(request, f"Compromiso de '{compromiso.solicitante}' actualizado.")
+    return redirect('gestion_agenda')
+
+def gestion_agenda_eliminar(request, compromiso_id):
+    compromiso = get_object_or_404(CompromisoAgenda, id=compromiso_id)
+    if request.method == 'POST':
+        solic = compromiso.solicitante
+        compromiso.delete()
+        messages.success(request, f"Compromiso de '{solic}' eliminado.")
+    return redirect('gestion_agenda')
+
+
+# --- CONFIGURACION DE METAS (CRUD) ---
 def gestion_configuracion(request):
     if request.method == 'POST':
         item_id = request.POST.get('item_id')
@@ -176,6 +246,24 @@ def gestion_configuracion(request):
     }
     return render(request, 'gestion/configuracion.html', context)
 
+def gestion_configuracion_editar(request, meta_id):
+    meta = get_object_or_404(ConfiguracionMeta, id=meta_id)
+    if request.method == 'POST':
+        meta.valor_objetivo = request.POST.get('valor_objetivo', meta.valor_objetivo)
+        meta.ponderacion = request.POST.get('ponderacion', meta.ponderacion)
+        meta.save()
+        messages.success(request, "Configuración de meta actualizada exitosamente.")
+    return redirect('gestion_configuracion')
+
+def gestion_configuracion_eliminar(request, meta_id):
+    meta = get_object_or_404(ConfiguracionMeta, id=meta_id)
+    if request.method == 'POST':
+        meta.delete()
+        messages.success(request, "Meta eliminada correctamente.")
+    return redirect('gestion_configuracion')
+
+
+# --- REPORTES ---
 def gestion_reportes(request):
     metas = ConfiguracionMeta.objects.select_related('periodo', 'item').all()
     verdes = sum(1 for m in metas if m.estado_semaforo() == 'VERDE')
@@ -195,4 +283,3 @@ def gestion_reportes(request):
         'pct_pendientes': pct_pendientes,
     }
     return render(request, 'gestion/reportes.html', context)
-
