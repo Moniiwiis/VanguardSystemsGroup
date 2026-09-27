@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block title %}Actividades y Evidencias — Ilustre Municipalidad de La Serena{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- Header de Módulo -->
+  <div class="bg-white p-6 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div>
+      <h2 class="font-display text-xl font-extrabold text-[#8B1D19]">Módulo: Actividades y Evidencias</h2>
+      <p class="text-xs text-slate-500 mt-1">Control de evidencias únicas, validaciones de terreno y trazabilidad.</p>
+    </div>
+    <button onclick="document.getElementById('modal-actividad').showModal()" class="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-[#C41230] text-white hover:bg-[#8B1D19] shadow-md transition-all flex items-center gap-2 cursor-pointer">
+      <i data-lucide="plus-circle" class="w-4 h-4"></i>
+      <span>+ Nueva Actividad</span>
+    </button>
+  </div>
+
+  <!-- Modal Nueva Actividad -->
+  <dialog id="modal-actividad" class="rounded-3xl p-6 max-w-lg w-full bg-white shadow-2xl backdrop:bg-slate-900/40 border border-red-100">
+    <div class="flex justify-between items-center pb-4 border-b border-slate-100 mb-4">
+      <h3 class="font-display font-extrabold text-base text-[#8B1D19] flex items-center gap-2">
+        <i data-lucide="clipboard-list" class="w-5 h-5 text-[#C41230]"></i> Registrar Nueva Actividad
+      </h3>
+      <button onclick="document.getElementById('modal-actividad').close()" class="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
+    </div>
+    <form method="POST" class="space-y-4 text-xs font-bold">
+      {% csrf_token %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-slate-700 mb-1">Fecha Actividad *</label>
+          <input type="date" name="fecha_actividad" required class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+        </div>
+        <div>
+          <label class="block text-slate-700 mb-1">Funcionario Responsable *</label>
+          <select name="funcionario_id" required class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal">
+            <option value="">-- Seleccionar --</option>
+            {% for f in funcionarios %}
+              <option value="{{ f.id }}">{{ f }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-slate-700 mb-1">Ítem de Medición SGR *</label>
+        <select name="item_id" required class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal">
+          <option value="">-- Seleccionar Ítem --</option>
+          {% for it in items %}
+            <option value="{{ it.id }}">{{ it.nombre_item }} ({{ it.cargo.nombre_cargo }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-slate-700 mb-1">Período de Medición *</label>
+        <select name="periodo_id" required class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal">
+          <option value="">-- Seleccionar Período --</option>
+          {% for p in periodos %}
+            <option value="{{ p.id }}">{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-slate-700 mb-1">Descripción de la Solicitud / Problema *</label>
+        <textarea name="descripcion_solicitud" required rows="2" placeholder="ej: Vecinos solicitan retiro extraordinario de escombros" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal"></textarea>
+      </div>
+      <div>
+        <label class="block text-slate-700 mb-1">Acción Ejecutada en Terreno *</label>
+        <textarea name="accion_ejecutada" required rows="2" placeholder="ej: Cuadrilla realizó retiro de 15m3 de escombros con camión tolva" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal"></textarea>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-slate-700 mb-1">Contacto Nombre</label>
+          <input type="text" name="contacto_nombre" placeholder="ej: María Elena Soto" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+        </div>
+        <div>
+          <label class="block text-slate-700 mb-1">Contacto Teléfono</label>
+          <input type="text" name="contacto_telefono" placeholder="ej: +56 9 1234 5678" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
+        <button type="button" onclick="document.getElementById('modal-actividad').close()" class="px-4 py-2.5 rounded-2xl bg-slate-100 text-slate-600 hover:bg-slate-200">Cancelar</button>
+        <button type="submit" class="px-5 py-2.5 rounded-2xl bg-[#C41230] text-white hover:bg-[#8B1D19] shadow-md">Guardar Actividad</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Tabla de Actividades -->
+  <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden">
+    <div class="p-4 border-b border-red-100 bg-red-50/40 flex items-center justify-between">
+      <h3 class="font-extrabold text-xs uppercase tracking-widest text-[#8B1D19]">Registro de Actividades Recientes</h3>
+      <span class="text-[11px] font-bold text-slate-400">Protegido por auditoría</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs text-slate-600">
+        <thead class="bg-slate-50 text-slate-700 font-extrabold border-b border-slate-200 uppercase tracking-wider">
+          <tr>
+            <th class="p-4">Código Evidencia</th>
+            <th class="p-4">Fecha</th>
+            <th class="p-4">Funcionario</th>
+            <th class="p-4">Ítem Medición</th>
+            <th class="p-4">Validación SGR</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for act in actividades %}
+          <tr class="hover:bg-red-50/30 transition-colors">
+            <td class="p-4 font-mono font-bold text-[#C41230]">{{ act.codigo_evidencia_unico }}</td>
+            <td class="p-4">{{ act.fecha_actividad|date:"d/m/Y" }}</td>
+            <td class="p-4 font-bold text-slate-900">{{ act.funcionario }}</td>
+            <td class="p-4">{{ act.item }}</td>
+            <td class="p-4">
+              {% if act.estado_validacion == 'Aprobado' %}
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800">Aprobado</span>
+              {% elif act.estado_validacion == 'Rechazado' %}
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-red-100 text-red-800">Rechazado</span>
+              {% else %}
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800">Pendiente</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="p-8 text-center text-slate-400">
+              <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+              No hay actividades registradas en el sistema.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+

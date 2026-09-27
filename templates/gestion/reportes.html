@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}Analítica e Informes — Ilustre Municipalidad de La Serena{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- Header de Módulo -->
+  <div class="bg-white p-6 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm">
+    <h2 class="font-display text-xl font-extrabold text-[#8B1D19]">Módulo: Analítica e Informes de Desempeño</h2>
+    <p class="text-xs text-slate-500 mt-1">Consolidado de cumplimiento de gestión municipal por delegación y funcionario SGR.</p>
+  </div>
+
+  <!-- Tarjetas de Reporte y Métricas de Auditoría -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="bg-white p-6 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm space-y-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-red-50 text-[#C41230] flex items-center justify-center font-bold">
+          <i data-lucide="award" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="font-extrabold text-slate-900 text-sm">Resumen de Semáforos SGR</h3>
+          <p class="text-xs text-slate-500">Clasificación de avance respecto a la meta esperada al día</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-3 pt-2 text-center font-bold">
+        <div class="bg-emerald-50 p-3 rounded-2xl border border-emerald-100">
+          <span class="block text-xl text-emerald-700 font-extrabold">{{ verdes }}</span>
+          <span class="text-[10px] text-emerald-800 uppercase tracking-wider font-extrabold">Verde</span>
+        </div>
+        <div class="bg-amber-50 p-3 rounded-2xl border border-amber-100">
+          <span class="block text-xl text-amber-700 font-extrabold">{{ ambares }}</span>
+          <span class="text-[10px] text-amber-800 uppercase tracking-wider font-extrabold">Ámbar</span>
+        </div>
+        <div class="bg-red-50 p-3 rounded-2xl border border-red-100">
+          <span class="block text-xl text-red-700 font-extrabold">{{ rojos }}</span>
+          <span class="text-[10px] text-red-800 uppercase tracking-wider font-extrabold">Rojo</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm space-y-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+          <i data-lucide="file-check" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="font-extrabold text-slate-900 text-sm">Informe de Audibilidad y Evidencias</h3>
+          <p class="text-xs text-slate-500">Evidencias validadas vs en proceso</p>
+        </div>
+      </div>
+      <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-xs">
+        <div class="flex justify-between items-center">
+          <span class="text-slate-700 font-bold">Validaciones Aprobadas</span>
+          <span class="font-extrabold text-emerald-600 font-mono">{{ pct_aprobadas }}%</span>
+        </div>
+        <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+          <div class="bg-emerald-500 h-full rounded-full" style="width: {{ pct_aprobadas }}%"></div>
+        </div>
+        <div class="flex justify-between items-center pt-1">
+          <span class="text-slate-700 font-bold">Pendientes de Revisión</span>
+          <span class="font-extrabold text-amber-600 font-mono">{{ pct_pendientes }}%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

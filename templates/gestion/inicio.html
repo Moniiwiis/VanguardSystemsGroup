@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Inicio — Ilustre Municipalidad de La Serena{% endblock %}
+
+{% block content %}
+<!-- Banner Hero Principal (Alineado con Hero Banner de index.html) -->
+<section class="rounded-3xl p-8 md:p-12 relative overflow-hidden shadow-xl text-white" 
+         style="background: linear-gradient(135deg, #8B1D19 0%, #C41230 50%, #DB3334 100%);">
+  <div class="absolute inset-0 opacity-15" style="background: repeating-linear-gradient(115deg, transparent, transparent 26px, rgba(255,255,255,0.25) 26px, rgba(255,255,255,0.25) 27px);"></div>
+  <div class="relative max-w-2xl space-y-4">
+    <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold tracking-wide uppercase shadow-sm bg-white/20 border border-white/30 backdrop-blur-sm">
+      <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+      Ilustre Municipalidad de La Serena
+    </div>
+    <h1 class="font-display text-3xl md:text-4xl font-extrabold leading-tight">
+      Innovación, Transparencia y Eficiencia para nuestra Comuna
+    </h1>
+    <p class="text-sm md:text-base opacity-95 leading-relaxed">
+      Plataforma oficial de seguimiento de gestión municipal (SGR), control de actividades, compromisos de agenda e informes territoriales.
+    </p>
+    <div class="flex flex-wrap gap-3 pt-2">
+      <a href="{% url 'gestion_actividades' %}" class="px-6 py-3 rounded-2xl text-xs font-extrabold bg-white text-[#8B1D19] shadow-lg transition-all hover:bg-red-50 active:scale-95 flex items-center gap-2">
+        <span>Ver Actividades</span>
+        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+      </a>
+      <a href="/admin/" target="_blank" class="px-6 py-3 rounded-2xl text-xs font-extrabold bg-white/15 text-white border border-white/30 hover:bg-white/25 transition-all">
+        Administración Django Admin
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Paleta Oficial de Colores Institucionales (Idéntica a index.html) -->
+<section class="bg-white rounded-3xl p-6 shadow-sm border border-[rgba(196,18,48,0.18)] space-y-4">
+  <div class="flex items-center gap-2">
+    <i data-lucide="sparkles" class="w-5 h-5 text-[#C41230]"></i>
+    <h2 class="font-display text-base font-extrabold text-slate-900">Colores Institucionales — Ilustre Municipalidad de La Serena</h2>
+  </div>
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="rounded-2xl p-5 text-white flex flex-col justify-between h-32 shadow-md transition-transform hover:scale-[1.02]" style="background: #DB3334;">
+      <span class="font-extrabold text-sm">Rojo Luminoso</span>
+      <div class="text-xs opacity-90 font-mono leading-relaxed">
+        HEX: #DB3334<br />RGB: 219, 51, 52<br />Pantone: 200 C
+      </div>
+    </div>
+    <div class="rounded-2xl p-5 text-white flex flex-col justify-between h-32 shadow-md transition-transform hover:scale-[1.02]" style="background: #C41230;">
+      <span class="font-extrabold text-sm">Rojo Heráldico</span>
+      <div class="text-xs opacity-90 font-mono leading-relaxed">
+        HEX: #C41230<br />RGB: 196, 18, 48<br />Pantone: 200 C
+      </div>
+    </div>
+    <div class="rounded-2xl p-5 text-white flex flex-col justify-between h-32 shadow-md transition-transform hover:scale-[1.02]" style="background: #8B1D19;">
+      <span class="font-extrabold text-sm">Rojo Oscuro</span>
+      <div class="text-xs opacity-90 font-mono leading-relaxed">
+        HEX: #8B1D19<br />RGB: 139, 29, 25<br />Pantone: 200 C
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tarjetas de Métricas Clave SGR (Alineado con KPIs de index.html) -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  <div class="bg-white p-5 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex items-center justify-between">
+    <div>
+      <p class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Actividades Totales</p>
+      <h3 class="text-2xl font-extrabold text-slate-900 mt-1 font-display">{{ total_actividades|default:"124" }}</h3>
+      <span class="text-xs text-emerald-600 font-bold flex items-center gap-1 mt-1">
+        <i data-lucide="trending-up" class="w-3.5 h-3.5"></i> Registro activo
+      </span>
+    </div>
+    <div class="w-12 h-12 rounded-2xl bg-red-50 text-[#C41230] flex items-center justify-center">
+      <i data-lucide="clipboard-check" class="w-6 h-6"></i>
+    </div>
+  </div>
+
+  <div class="bg-white p-5 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex items-center justify-between">
+    <div>
+      <p class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Compromisos Agenda</p>
+      <h3 class="text-2xl font-extrabold text-slate-900 mt-1 font-display">{{ total_compromisos|default:"38" }}</h3>
+      <span class="text-xs text-amber-600 font-bold flex items-center gap-1 mt-1">
+        <i data-lucide="clock" class="w-3.5 h-3.5"></i> Pendientes de cierre
+      </span>
+    </div>
+    <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+      <i data-lucide="calendar" class="w-6 h-6"></i>
+    </div>
+  </div>
+
+  <div class="bg-white p-5 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex items-center justify-between">
+    <div>
+      <p class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Cumplimiento Ponderado</p>
+      <h3 class="text-2xl font-extrabold text-slate-900 mt-1 font-display">{{ promedio_meta|default:"87.5" }}%</h3>
+      <span class="text-xs text-emerald-600 font-bold flex items-center gap-1 mt-1">
+        <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Sobre umbral (80%)
+      </span>
+    </div>
+    <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+      <i data-lucide="target" class="w-6 h-6"></i>
+    </div>
+  </div>
+
+  <div class="bg-white p-5 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex items-center justify-between">
+    <div>
+      <p class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Funcionarios Activos</p>
+      <h3 class="text-2xl font-extrabold text-slate-900 mt-1 font-display">{{ total_funcionarios|default:"45" }}</h3>
+      <span class="text-xs text-slate-500 font-bold flex items-center gap-1 mt-1">
+        <i data-lucide="users" class="w-3.5 h-3.5"></i> Delegaciones La Serena
+      </span>
+    </div>
+    <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+      <i data-lucide="user-check" class="w-6 h-6"></i>
+    </div>
+  </div>
+</div>
+{% endblock %}
