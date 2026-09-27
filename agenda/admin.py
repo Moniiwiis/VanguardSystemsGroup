@@ -1,8 +1,9 @@
 from django.contrib import admin
+from core.admin import BaseScopedModelAdmin
 from .models import CompromisoAgenda, AjusteDesempenio
 
 @admin.register(CompromisoAgenda)
-class CompromisoAgendaAdmin(admin.ModelAdmin):
+class CompromisoAgendaAdmin(BaseScopedModelAdmin):
     list_display = ('solicitante', 'responsable', 'fecha_comprometida', 'estado', 'territorio')
     search_fields = ('solicitante', 'responsable__user__username', 'territorio')
     list_filter = ('estado', 'fecha_comprometida')
@@ -29,7 +30,7 @@ class CompromisoAgendaAdmin(admin.ModelAdmin):
         return qs
 
 @admin.register(AjusteDesempenio)
-class AjusteDesempenioAdmin(admin.ModelAdmin):
+class AjusteDesempenioAdmin(BaseScopedModelAdmin):
     list_display = ('funcionario', 'periodo', 'concepto', 'valor_porcentaje', 'autorizador')
     list_filter = ('periodo', 'concepto')
     list_select_related = ('funcionario__user', 'periodo', 'autorizador__user')
@@ -40,4 +41,4 @@ class AjusteDesempenioAdmin(admin.ModelAdmin):
             return qs
         if hasattr(request.user, 'funcionario') and request.user.funcionario.delegacion:
             return qs.filter(funcionario__delegacion=request.user.funcionario.delegacion)
-        return qs
+        return qs
