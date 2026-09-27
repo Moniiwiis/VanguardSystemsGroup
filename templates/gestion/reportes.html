@@ -54,7 +54,7 @@
           <span class="font-extrabold text-emerald-600 font-mono">{{ pct_aprobadas }}%</span>
         </div>
         <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-          <div class="bg-emerald-500 h-full rounded-full" style="width: {{ pct_aprobadas }}%"></div>
+          <div class="bg-emerald-500 h-full rounded-full" style="--progress: {{ pct_aprobadas }}%; width: var(--progress);"></div>
         </div>
         <div class="flex justify-between items-center pt-1">
           <span class="text-slate-700 font-bold">Pendientes de Revisión</span>
@@ -63,6 +63,70 @@
       </div>
     </div>
   </div>
+
+  <!-- Detalle Consolidado de Metas y Reportes SGR -->
+  <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden">
+    <div class="p-4 border-b border-red-100 bg-red-50/40 flex items-center justify-between">
+      <h3 class="font-extrabold text-xs uppercase tracking-widest text-[#8B1D19]">Consolidado de Indicadores y Metas SGR</h3>
+      <span class="text-[11px] font-bold text-slate-400">Reportabilidad Institucional</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs text-slate-600">
+        <thead class="bg-slate-50 text-slate-700 font-extrabold border-b border-slate-200 uppercase tracking-wider">
+          <tr>
+            <th class="p-4">Ítem de Medición</th>
+            <th class="p-4">Período</th>
+            <th class="p-4">Asignación</th>
+            <th class="p-4 text-center">Meta Objetivo</th>
+            <th class="p-4 text-center">Ponderación</th>
+            <th class="p-4 text-center">% Cumplimiento</th>
+            <th class="p-4 text-center">Cumplimiento Ponderado</th>
+            <th class="p-4 text-center">Estado Semáforo</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for m in metas %}
+          <tr class="hover:bg-red-50/30 transition-colors">
+            <td class="p-4 font-bold text-slate-900">{{ m.item }}</td>
+            <td class="p-4">{{ m.periodo }}</td>
+            <td class="p-4">
+              {% if m.funcionario %}
+                <span class="font-bold text-slate-900">{{ m.funcionario }}</span>
+              {% else %}
+                <span class="italic text-slate-400">Global Cargo</span>
+              {% endif %}
+            </td>
+            <td class="p-4 text-center font-mono font-bold">{{ m.valor_objetivo }}</td>
+            <td class="p-4 text-center font-bold text-[#C41230]">{{ m.ponderacion }}%</td>
+            <td class="p-4 text-center font-bold text-slate-800">{{ m.porcentaje_cumplimiento }}%</td>
+            <td class="p-4 text-center font-extrabold text-slate-900 font-mono">{{ m.cumplimiento_ponderado }}%</td>
+            <td class="p-4 text-center">
+              {% if m.estado_semaforo == 'VERDE' %}
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 inline-flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500"></span> VERDE
+                </span>
+              {% elif m.estado_semaforo == 'AMBAR' %}
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 inline-flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full bg-amber-500"></span> ÁMBAR
+                </span>
+              {% else %}
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-red-100 text-red-800 inline-flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full bg-red-500"></span> ROJO
+                </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="p-8 text-center text-slate-400">
+              <i data-lucide="bar-chart-3" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+              No hay metas para generar reportes analíticos.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 {% endblock %}
-
