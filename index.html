@@ -191,7 +191,7 @@ const AI_ROUTES = [
   { kw: ["noticia", "alerta", "publicar", "contenido"], role: "admin", screen: "CONTENIDO", hi: "contenido-card" },
   { kw: ["presupuesto", "bodega", "stock"], role: "admin", screen: "PRESUPUESTO", hi: "presupuesto-card" },
   { kw: ["auditoria interna", "corrupcion", "corrupción", "hash", "log"], role: "admin", screen: "CONTROL", hi: "control-card" },
-  { kw: ["sensor", "iot", "satelital"], role: "admin", screen: "IOT", hi: "iot-card" },
+  { kw: ["gps", "ubicacion", "ubicación", "terreno", "donde esta", "dónde está", "cumple", "asistio", "asistió"], role: "admin", screen: "GPS", hi: "gps-card" },
   { kw: ["reporte", "cuenta publica", "cuenta pública", "informe"], role: "admin", screen: "REPORTES", hi: "reportes-card" },
 ];
 
@@ -299,23 +299,148 @@ const CONTROL_LOG = [
   { fecha: "30-08-2026 11:45", actor: "Sistema (IA)", accion: "Bloqueó automáticamente al RUT 15.902.114-K por reincidencia", hash: "0x1c9aa4…77e3" },
   { fecha: "29-08-2026 08:30", actor: "Supervisor K. Solís", accion: "Cambió el estado de la solicitud N.º 20487 a Programada", hash: "0x9fd302…e61a" },
 ];
-const SENSORES = [
-  { tipo: "Contenedor de basura", lugar: "Plaza Los Álamos", nivel: 100, estado: "Cuadrilla despachada automáticamente", icon: Trash2, key: "red" },
-  { tipo: "Sensor de caudal", lugar: "Canal Municipal Norte", nivel: 72, estado: "Riesgo moderado de desborde", icon: Waves, key: "gold" },
-  { tipo: "Contenedor de basura", lugar: "Av. Circunvalación", nivel: 45, estado: "Nivel normal", icon: Trash2, key: "sage" },
-];
 const HASHES = ["0x2f9a1e…", "0x71cdb4…", "0x9e044f…", "0x33ab90…", "0x6f12aa…", "0xd0871c…"];
+/* Solicitudes del vecino conectado */
+const SOLICITUDES_VECINO = [
+  { id: "20487", titulo: "Retiro de escombros", depto: "Aseo, Ornato y Medio Ambiente", direccion: "Los Aromos 482", fecha: "29-08-2026", estado: "En tránsito", paso: 4, activa: true, cuadrilla: "Pedro Ilabaca R.", eta: "Jueves entre 14:00 y 16:30 hrs", key: "gold" },
+  { id: "20502", titulo: "Poda de árbol en la vereda", depto: "Aseo, Ornato y Medio Ambiente", direccion: "Los Aromos 482", fecha: "01-09-2026", estado: "Programada", paso: 3, activa: true, cuadrilla: "Por asignar", eta: "Semana del 15 de septiembre", key: "teal" },
+  { id: "20455", titulo: "Caja de alimentos", depto: "Desarrollo Social (DIDECO)", direccion: "Los Aromos 482", fecha: "24-08-2026", estado: "Finalizada", paso: 6, activa: false, cuadrilla: "Sofía Núñez A.", eta: "Entregada el 26-08-2026", key: "sage" },
+];
+
+/* Establecimientos municipales para la postulación a Kínder */
+const COLEGIOS_MUNICIPALES = [
+  { nombre: "Escuela José Manuel Balmaceda", direccion: "Av. Balmaceda 1240, Centro", distancia: "1,2 km de tu casa", vacantes: 28, jornada: "Jornada Escolar Completa", sello: "Ciencias y medio ambiente", pie: true },
+  { nombre: "Escuela República de Siria", direccion: "Los Carrera 880, Las Compañías", distancia: "2,4 km de tu casa", vacantes: 15, jornada: "Media jornada (mañana)", sello: "Artes y música", pie: true },
+  { nombre: "Escuela Gabriela Mistral", direccion: "Pje. Los Olivos 55, La Antena", distancia: "3,1 km de tu casa", vacantes: 6, jornada: "Jornada Escolar Completa", sello: "Deportes", pie: false },
+  { nombre: "Escuela Pedro Aguirre Cerda", direccion: "Camino Real 320, La Pampa", distancia: "4,0 km de tu casa", vacantes: 32, jornada: "Jornada Escolar Completa", sello: "Inglés intensivo", pie: true },
+];
+
 const AGENDA_TRABAJADOR = [
   { hora: "09:00", direccion: "Los Aromos 482", tarea: "Retiro de escombros" },
   { hora: "10:15", direccion: "Pje. Las Camelias 55", tarea: "Entrega de sacos de arena" },
   { hora: "11:30", direccion: "Av. Circunvalación 1420", tarea: "Poda de árbol" },
 ];
-const DEPTS_HEADS = ["Aseo y Ornato", "DIDECO", "Seguridad y Fiscalización"];
+const DEPTS_SECCIONES = [
+  {
+    titulo: "Delegaciones Municipales de La Serena",
+    items: ["Las Compañías", "La Antena", "La Pampa", "Avenida del Mar", "Centro", "Rural"],
+  },
+  {
+    titulo: "Áreas de Gestión Interna y Soporte",
+    items: [
+      "Dirección de Gestión de Personas (RR.HH.)",
+      "Dirección de Administración y Finanzas (DAF)",
+      "Dirección de Asesoría Jurídica",
+      "Secretaría Comunal de Planificación (SECPLAN)",
+    ],
+  },
+  {
+    titulo: "Áreas de Servicio Público y Operativas",
+    items: [
+      "Dirección de Obras Municipales (DOM)",
+      "Dirección de Tránsito y Transporte Público",
+      "Dirección de Aseo y Ornato",
+      "Dirección de Seguridad Ciudadana",
+    ],
+  },
+  {
+    titulo: "Áreas Sociales, Comunitarias y de Control",
+    items: ["Dirección de Desarrollo Comunitario (DIDECO)", "Secretaría Municipal", "Dirección de Control"],
+  },
+];
+const DEPTS_HEADS = DEPTS_SECCIONES.flatMap((s) => s.items);
 const CHAT_SEED = {
-  "Aseo y Ornato": [{ from: "jefe", texto: "Buenas tardes alcalde, tres cuadrillas reforzando el sector norte por la acumulación de basura." }, { from: "alcalde", texto: "Perfecto, mantenme informado cada 2 horas." }],
-  "DIDECO": [{ from: "jefe", texto: "Ya distribuimos 620 de los 1.000 sacos de arena programados para este temporal." }],
-  "Seguridad y Fiscalización": [{ from: "jefe", texto: "Sin incidentes mayores durante la noche, dos patrullajes reforzados en el sector poniente." }],
+  "Las Compañías": [{ from: "jefe", texto: "Alcaldesa, la delegación Las Compañías reporta buena asistencia en la ronda de organizaciones comunitarias de esta semana." }],
+  "La Antena": [{ from: "jefe", texto: "Buenas tardes alcaldesa, en La Antena avanzamos con la revisión de carpetas de funcionarios, sin incidentes." }],
+  "La Pampa": [{ from: "jefe", texto: "Alcaldesa, se realizó la mantención de la red de la delegación La Pampa según lo programado." }],
+  "Avenida del Mar": [{ from: "jefe", texto: "Reporte de la delegación Avenida del Mar: fiscalización de comercio ambulante sin novedades." }],
+  "Centro": [{ from: "jefe", texto: "Alcaldesa, la delegación Centro registra alta demanda de atención vecinal esta semana." }],
+  "Rural": [{ from: "jefe", texto: "Buenas tardes alcaldesa, se realizó reunión con la JJVV del sector El Romero en el territorio rural." }],
+  "Dirección de Gestión de Personas (RR.HH.)": [{ from: "jefe", texto: "Alcaldesa, quedó cerrado el proceso de evaluación de clima laboral en las delegaciones." }],
+  "Dirección de Administración y Finanzas (DAF)": [{ from: "jefe", texto: "Se actualizó el estado de ejecución presupuestaria del mes, disponible para su revisión." }],
+  "Dirección de Asesoría Jurídica": [{ from: "jefe", texto: "Alcaldesa, quedan pendientes dos informes jurídicos por firmar esta semana." }],
+  "Secretaría Comunal de Planificación (SECPLAN)": [{ from: "jefe", texto: "Avanza la formulación del plan de inversión municipal para el próximo periodo." }],
+  "Dirección de Obras Municipales (DOM)": [{ from: "jefe", texto: "Alcaldesa, se aprobaron 8 permisos de edificación esta semana, sin observaciones críticas." }],
+  "Dirección de Tránsito y Transporte Público": [{ from: "jefe", texto: "Se instalará nueva señalética en el sector poniente durante los próximos días." }],
+  "Dirección de Aseo y Ornato": [{ from: "jefe", texto: "Buenas tardes alcaldesa, tres cuadrillas reforzando el sector norte por la acumulación de basura." }, { from: "alcaldesa", texto: "Perfecto, mantenme informada cada 2 horas." }],
+  "Dirección de Seguridad Ciudadana": [{ from: "jefe", texto: "Sin incidentes mayores durante la noche, dos patrullajes reforzados en el sector poniente." }],
+  "Dirección de Desarrollo Comunitario (DIDECO)": [{ from: "jefe", texto: "Ya distribuimos 620 de los 1.000 sacos de arena programados para este temporal." }],
+  "Secretaría Municipal": [{ from: "jefe", texto: "Alcaldesa, el acta de la última sesión de concejo quedó lista para su firma." }],
+  "Dirección de Control": [{ from: "jefe", texto: "Se realizó la auditoría interna trimestral; el informe está disponible para su revisión." }],
 };
+
+/* ---------------------------------------------------------------------
+   TRABAJADOR ACTUAL · CHATS INTERNOS · GPS DE TERRENO
+--------------------------------------------------------------------- */
+const TRABAJADOR_ACTUAL = { nombre: "Pedro Ilabaca R.", rut: "9.876.543-2", cuadrilla: "Aseo y Ornato", supervisor: "Marcela Tapia V." };
+const ADMIN_ACTUAL = { nombre: "Marcela Tapia V.", cargo: "Administradora · Encargada de asignación de tareas" };
+
+/* Chat directo Trabajador <-> Administrador encargado de asignarle tareas */
+const CHAT_TRABAJADORES_SEED = {
+  "Pedro Ilabaca R.": [
+    { from: "admin", texto: "Pedro, te asigné el retiro de escombros en Los Aromos 482 a las 09:00.", hora: "08:42" },
+    { from: "trabajador", texto: "Recibido. Voy en camino con la cuadrilla.", hora: "08:45" },
+  ],
+  "Katherine Solís V.": [
+    { from: "admin", texto: "Katherine, fiscalización de ruidos en Av. Los Pinos 120 a las 11:30.", hora: "10:55" },
+    { from: "trabajador", texto: "Llegué al punto pero el local está cerrado, ¿qué hago?", hora: "11:38" },
+  ],
+  "Jorge Peralta M.": [
+    { from: "trabajador", texto: "Se rompió la manguera del camión, no puedo continuar la ruta.", hora: "10:12" },
+  ],
+  "Sofía Núñez A.": [
+    { from: "admin", texto: "Sofía, confirma la entrega de sacos de arena en Las Camelias 55.", hora: "09:30" },
+    { from: "trabajador", texto: "Entregados los 10 sacos, foto del antes y después ya subida.", hora: "10:20" },
+  ],
+};
+
+/* Chat directo Administrador <-> Alcaldesa */
+const CHAT_ADMIN_ALCALDESA_SEED = [
+  { from: "admin", texto: "Alcaldesa, buenos días. El reporte de cumplimiento de terreno de hoy está al 82%.", hora: "08:30" },
+  { from: "alcaldesa", texto: "Gracias Marcela. ¿Qué pasó con el trabajador que no marcó llegada?", hora: "08:50" },
+];
+
+/* Posiciones GPS y cumplimiento de trabajadores con tareas asignadas */
+const GPS_TRABAJADORES = [
+  {
+    nombre: "Pedro Ilabaca R.", rut: "9.876.543-2", cuadrilla: "Aseo y Ornato", delegacion: "Centro",
+    tarea: "Retiro de escombros", direccion: "Los Aromos 482", horaAsignada: "09:00", horaLlegada: "09:07",
+    estado: "En sitio", cumple: true, distancia: "12 m del punto asignado", bateria: 78, senal: "hace 1 min",
+    x: 22, y: 64, evidenciaAntes: true, evidenciaDespues: false,
+  },
+  {
+    nombre: "Sofía Núñez A.", rut: "16.884.220-5", cuadrilla: "Aseo y Ornato", delegacion: "Las Compañías",
+    tarea: "Entrega de sacos de arena", direccion: "Pje. Las Camelias 55", horaAsignada: "10:15", horaLlegada: "10:11",
+    estado: "Finalizada", cumple: true, distancia: "5 m del punto asignado", bateria: 64, senal: "hace 3 min",
+    x: 44, y: 38, evidenciaAntes: true, evidenciaDespues: true,
+  },
+  {
+    nombre: "Katherine Solís V.", rut: "14.221.098-7", cuadrilla: "Seguridad Ciudadana", delegacion: "Centro",
+    tarea: "Fiscalización de ruidos molestos", direccion: "Av. Los Pinos 120", horaAsignada: "11:30", horaLlegada: "11:38",
+    estado: "En sitio", cumple: true, distancia: "28 m del punto asignado", bateria: 41, senal: "hace 2 min",
+    x: 67, y: 52, evidenciaAntes: true, evidenciaDespues: false,
+  },
+  {
+    nombre: "Jorge Peralta M.", rut: "13.004.771-9", cuadrilla: "Aseo y Ornato", delegacion: "La Antena",
+    tarea: "Poda de árbol", direccion: "Av. Circunvalación 1420", horaAsignada: "11:30", horaLlegada: null,
+    estado: "En ruta", cumple: null, distancia: "1,8 km del punto asignado", bateria: 55, senal: "hace 4 min",
+    x: 80, y: 26, evidenciaAntes: false, evidenciaDespues: false,
+  },
+  {
+    nombre: "Luis Andrade M.", rut: "11.457.309-K", cuadrilla: "Aseo y Ornato", delegacion: "La Pampa",
+    tarea: "Retiro de microbasural", direccion: "Los Boldos 233", horaAsignada: "09:30", horaLlegada: null,
+    estado: "No asistió", cumple: false, distancia: "Sin registro en el punto", bateria: 12, senal: "hace 2 h 40 min",
+    x: 12, y: 22, evidenciaAntes: false, evidenciaDespues: false,
+  },
+  {
+    nombre: "Rodrigo Vera C.", rut: "15.330.882-4", cuadrilla: "Tránsito", delegacion: "Avenida del Mar",
+    tarea: "Reposición de señalética", direccion: "Av. del Mar 2100", horaAsignada: "10:00", horaLlegada: "10:02",
+    estado: "Fuera de zona", cumple: false, distancia: "3,4 km fuera del polígono asignado", bateria: 88, senal: "hace 1 min",
+    x: 56, y: 78, evidenciaAntes: false, evidenciaDespues: false,
+  },
+];
+
+const GPS_COLOR_ESTADO = { "En sitio": "sage", "Finalizada": "ocean", "En ruta": "gold", "No asistió": "red", "Fuera de zona": "red" };
 
 /* ---------------------------------------------------------------------
    MATRIZ SGR — Seguimiento de Gestión y Resultados (Delegaciones)
@@ -453,6 +578,7 @@ function App() {
   const [vecinoScreen, setVecinoScreen] = useState("A");
   const [adminScreen, setAdminScreen] = useState("EMPLEADOS");
   const [trabajadorScreen, setTrabajadorScreen] = useState("FICHAJE");
+  const [alcaldesaVista, setAlcaldesaVista] = useState("RESUMEN");
   const [activeDept, setActiveDept] = useState(null);
   const [tramiteActivo, setTramiteActivo] = useState(null);
   const [handsFree, setHandsFree] = useState(false);
@@ -463,6 +589,14 @@ function App() {
 
   const [contenidos, setContenidos] = useState(SEED_CONTENIDOS);
   const [incidentes, setIncidentes] = useState(SEED_INCIDENTES);
+
+  /* Chats compartidos entre paneles: lo que se escribe en uno se ve en el otro */
+  const [chatTrabajadores, setChatTrabajadores] = useState(CHAT_TRABAJADORES_SEED);
+  const [chatAdminAlcaldesa, setChatAdminAlcaldesa] = useState(CHAT_ADMIN_ALCALDESA_SEED);
+  const [chatDirecciones, setChatDirecciones] = useState(CHAT_SEED);
+
+  /* Tareas creadas por el asistente IA (aparecen en Asignación del admin) */
+  const [asignacionesIA, setAsignacionesIA] = useState([]);
 
   const runCopilot = useCallback((raw) => {
     const q = (raw || copilotText).toLowerCase().trim();
@@ -505,7 +639,8 @@ function App() {
       `}</style>
 
       {role === "inicio" && <PaginaInicio T={T} theme={theme} setTheme={setTheme} contenidos={contenidos} onLogin={() => setRole("login")} onVerTransparencia={() => setRole("transparencia")} />}
-      {role === "login" && <PaginaLogin T={T} theme={theme} setTheme={setTheme} onLogin={doLogin} onBack={() => setRole("inicio")} />}
+      {role === "login" && <PaginaLogin T={T} theme={theme} setTheme={setTheme} onLogin={doLogin} onBack={() => setRole("inicio")} onClaveUnica={() => setRole("claveunica")} />}
+      {role === "claveunica" && <PaginaClaveUnica T={T} theme={theme} setTheme={setTheme} onLogin={doLogin} onBack={() => setRole("login")} />}
 
       {authenticated && (
         <>
@@ -521,12 +656,24 @@ function App() {
                 <VecinoPortal T={T} screen={vecinoScreen} setScreen={setVecinoScreen} highlightId={highlightId}
                   contenidos={contenidos} activeDept={activeDept} goDept={goDept} goForm={goForm} tramiteActivo={tramiteActivo} />
               )}
-              {role === "trabajador" && <TrabajadorPortal T={T} screen={trabajadorScreen} setScreen={setTrabajadorScreen} />}
+              {role === "trabajador" && (
+                <TrabajadorPortal T={T} screen={trabajadorScreen} setScreen={setTrabajadorScreen}
+                  chatTrabajadores={chatTrabajadores} setChatTrabajadores={setChatTrabajadores} />
+              )}
               {role === "admin" && (
                 <AdminPanel T={T} screen={adminScreen} setScreen={setAdminScreen} highlightId={highlightId}
-                  contenidos={contenidos} setContenidos={setContenidos} incidentes={incidentes} setIncidentes={setIncidentes} />
+                  contenidos={contenidos} setContenidos={setContenidos} incidentes={incidentes} setIncidentes={setIncidentes}
+                  chatTrabajadores={chatTrabajadores} setChatTrabajadores={setChatTrabajadores}
+                  chatAdminAlcaldesa={chatAdminAlcaldesa} setChatAdminAlcaldesa={setChatAdminAlcaldesa}
+                  asignacionesIA={asignacionesIA} />
               )}
-              {role === "alcalde" && <AlcaldePanel T={T} />}
+              {role === "alcalde" && (
+                <AlcaldePanel T={T} contenidos={contenidos} incidentes={incidentes}
+                  vista={alcaldesaVista} setVista={setAlcaldesaVista}
+                  chatDirecciones={chatDirecciones} setChatDirecciones={setChatDirecciones}
+                  chatTrabajadores={chatTrabajadores}
+                  chatAdminAlcaldesa={chatAdminAlcaldesa} setChatAdminAlcaldesa={setChatAdminAlcaldesa} />
+              )}
               {role === "transparencia" && <TransparenciaWall T={T} />}
             </main>
           )}
@@ -535,6 +682,22 @@ function App() {
             <MobileTabBar T={T} screen={vecinoScreen} setScreen={setVecinoScreen} />
           )}
           {role === "trabajador" && <TrabajadorTabBar T={T} screen={trabajadorScreen} setScreen={setTrabajadorScreen} />}
+
+          {role !== "transparencia" && !handsFree && (
+            <AsistenteIA
+              T={T}
+              role={role}
+              chatTrabajadores={chatTrabajadores}
+              chatAdminAlcaldesa={chatAdminAlcaldesa}
+              agregarAsignacionIA={(t) => { setAsignacionesIA((a) => [t, ...a]); setAdminScreen("ASIGNACION"); }}
+              irA={(destino) => {
+                if (role === "trabajador") setTrabajadorScreen(destino);
+                else if (role === "admin") setAdminScreen(destino);
+                else if (role === "vecino") setVecinoScreen(destino);
+                else if (role === "alcalde") setAlcaldesaVista(destino);
+              }}
+            />
+          )}
         </>
       )}
     </div>
@@ -737,13 +900,13 @@ function PaginaInicio({ T, theme, setTheme, contenidos, onLogin, onVerTransparen
 /* ---------------------------------------------------------------------
    LOGIN Y RECUPERACIÓN
 --------------------------------------------------------------------- */
-function PaginaLogin({ T, theme, setTheme, onLogin, onBack }) {
+function PaginaLogin({ T, theme, setTheme, onLogin, onBack, onClaveUnica }) {
   const [step, setStep] = useState("form"); // form | roles | recover-rut | recover-otp | recover-new | recover-done
   const roles = [
     { id: "vecino", label: "Vecino", icon: Home, desc: "Solicita ayuda y sigue tus trámites" },
     { id: "trabajador", label: "Trabajador municipal", icon: Wrench, desc: "Cuadrillas y fichaje de terreno" },
     { id: "admin", label: "Administrador", icon: ShieldCheck, desc: "Jefe de departamento / supervisor" },
-    { id: "alcalde", label: "Alcalde", icon: Landmark, desc: "Panel estratégico y de auditoría" },
+    { id: "alcalde", label: "Alcaldesa", icon: Landmark, desc: "Panel estratégico y de auditoría" },
   ];
 
   return (
@@ -763,7 +926,7 @@ function PaginaLogin({ T, theme, setTheme, onLogin, onBack }) {
 
         {step === "form" && (
           <>
-            <button className="rounded-2xl py-3.5 font-bold text-[14px] flex items-center justify-center gap-2" style={{ background: "#2B5876", color: "#fff" }}>
+            <button onClick={onClaveUnica} className="rounded-2xl py-3.5 font-bold text-[14px] flex items-center justify-center gap-2" style={{ background: "#2B5876", color: "#fff" }}>
               <IdCard size={18} /> Ingresar con ClaveÚnica
             </button>
             <div className="flex items-center gap-3"><div className="h-px flex-1" style={{ background: T.border }} /><span style={{ fontSize: 11, color: T.inkFaint }}>o con tu clave local</span><div className="h-px flex-1" style={{ background: T.border }} /></div>
@@ -827,6 +990,138 @@ function PaginaLogin({ T, theme, setTheme, onLogin, onBack }) {
 }
 
 /* ---------------------------------------------------------------------
+   PÁGINA CLAVE ÚNICA (autenticación del Estado)
+--------------------------------------------------------------------- */
+function PaginaClaveUnica({ T, theme, setTheme, onLogin, onBack }) {
+  const [paso, setPaso] = useState("credenciales"); // credenciales | verificando | autorizar | roles
+  const [rut, setRut] = useState("");
+  const [clave, setClave] = useState("");
+  const [error, setError] = useState("");
+  const AZUL = "#0F69B4", AZUL_OSC = "#0B4E85";
+
+  const roles = [
+    { id: "vecino", label: "Vecino", icon: Home, desc: "Solicita ayuda y sigue tus trámites" },
+    { id: "trabajador", label: "Trabajador municipal", icon: Wrench, desc: "Cuadrillas y fichaje de terreno" },
+    { id: "admin", label: "Administrador", icon: ShieldCheck, desc: "Jefe de departamento / supervisor" },
+    { id: "alcalde", label: "Alcaldesa", icon: Landmark, desc: "Panel estratégico y de auditoría" },
+  ];
+
+  const continuar = () => {
+    if (!rut.trim() || !clave.trim()) { setError("Debes ingresar tu RUN y tu ClaveÚnica."); return; }
+    if (!validarRutChileno(rut)) { setError("El RUN ingresado no es válido. Revisa el dígito verificador."); return; }
+    setError(""); setPaso("verificando");
+    setTimeout(() => setPaso("autorizar"), 1400);
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col" style={{ background: theme === "light" ? "#F3F6FA" : T.bg }}>
+      {/* Barra superior estilo Gobierno de Chile */}
+      <div className="w-full px-4 md:px-8 py-3 flex items-center justify-between" style={{ background: AZUL_OSC, color: "#fff" }}>
+        <div className="flex items-center gap-2.5">
+          <IdCard size={22} />
+          <div>
+            <p style={{ fontSize: 15, fontWeight: 800, letterSpacing: -0.2 }}>ClaveÚnica</p>
+            <p style={{ fontSize: 10.5, opacity: 0.85 }}>Gobierno de Chile · Identidad digital</p>
+          </div>
+        </div>
+        <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.15)", color: "#fff" }}>
+          {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
+        </button>
+      </div>
+
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-3xl p-7 md:p-9 flex flex-col gap-5" style={{ background: T.surface, border: `1.5px solid ${T.border}`, boxShadow: "0 10px 40px rgba(11,78,133,0.10)" }}>
+          <button onClick={paso === "credenciales" ? onBack : () => { setPaso("credenciales"); setError(""); }} className="flex items-center gap-1.5 w-fit" style={{ color: T.inkSoft, fontSize: 12.5, fontWeight: 600 }}>
+            <ChevronLeft size={15} /> Volver
+          </button>
+
+          {paso === "credenciales" && (
+            <>
+              <div className="flex flex-col items-center gap-2 text-center">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: AZUL, color: "#fff" }}><IdCard size={26} /></div>
+                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 700 }}>Ingresa con tu ClaveÚnica</h2>
+                <p style={{ fontSize: 12.5, color: T.inkSoft }}>La Municipalidad de La Serena solicita verificar tu identidad para acceder a la plataforma.</p>
+              </div>
+
+              <div className="flex flex-col gap-2.5">
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft }}>RUN</label>
+                  <input value={rut} onChange={(e) => setRut(formatRut(e.target.value))} placeholder="12.345.678-9" maxLength={12}
+                    className="mt-1 w-full rounded-xl px-3.5 py-3 text-[14px] outline-none" style={{ background: T.surfaceAlt, border: `1px solid ${error ? T.red : T.border}`, color: T.ink }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft }}>ClaveÚnica</label>
+                  <input type="password" value={clave} onChange={(e) => setClave(e.target.value)} placeholder="Tu ClaveÚnica"
+                    className="mt-1 w-full rounded-xl px-3.5 py-3 text-[14px] outline-none" style={{ background: T.surfaceAlt, border: `1px solid ${error ? T.red : T.border}`, color: T.ink }} />
+                </div>
+              </div>
+
+              {error && <div className="rounded-xl p-3 flex items-start gap-2" style={{ background: T.redSoft, color: T.red }}><AlertCircle size={15} className="shrink-0 mt-0.5" /><p style={{ fontSize: 12, fontWeight: 600 }}>{error}</p></div>}
+
+              <button onClick={continuar} className="rounded-2xl py-3.5 font-bold text-[14px]" style={{ background: AZUL, color: "#fff" }}>Continuar</button>
+
+              <div className="flex flex-col gap-1.5 text-center">
+                <button style={{ fontSize: 12.5, fontWeight: 600, color: AZUL }}>¿Olvidaste tu ClaveÚnica?</button>
+                <button style={{ fontSize: 12.5, fontWeight: 600, color: T.inkSoft }}>Solicitar ClaveÚnica en ChileAtiende</button>
+              </div>
+
+              <div className="rounded-2xl p-3 flex items-start gap-2" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}` }}>
+                <Lock size={14} className="shrink-0 mt-0.5" color={T.sage} />
+                <p style={{ fontSize: 11, color: T.inkSoft, lineHeight: 1.4 }}>Conexión cifrada. La Municipalidad no almacena tu ClaveÚnica: sólo recibe la confirmación de tu identidad.</p>
+              </div>
+            </>
+          )}
+
+          {paso === "verificando" && (
+            <div className="py-10 flex flex-col items-center gap-4 text-center">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mic-pulse" style={{ background: AZUL, color: "#fff" }}><Fingerprint size={28} /></div>
+              <p style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600 }}>Verificando tu identidad…</p>
+              <p style={{ fontSize: 12.5, color: T.inkSoft }}>Consultando el Registro Civil e Identificación</p>
+            </div>
+          )}
+
+          {paso === "autorizar" && (
+            <>
+              <div className="flex flex-col items-center gap-2 text-center">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: T.sageSoft, color: T.sage }}><CheckCircle2 size={26} /></div>
+                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 700 }}>Identidad verificada</h2>
+                <p style={{ fontSize: 12.5, color: T.inkSoft }}>RUN {rut} · Autoriza los datos que se compartirán con la Municipalidad de La Serena.</p>
+              </div>
+              <div className="rounded-2xl p-4 flex flex-col gap-2.5" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}` }}>
+                {["Nombre completo y RUN", "Correo electrónico registrado", "Comuna de residencia"].map((d, i) => (
+                  <div key={i} className="flex items-center gap-2"><Check size={14} color={T.sage} className="shrink-0" /><span style={{ fontSize: 12.5 }}>{d}</span></div>
+                ))}
+              </div>
+              <button onClick={() => setPaso("roles")} className="rounded-2xl py-3.5 font-bold text-[14px]" style={{ background: AZUL, color: "#fff" }}>Autorizar y continuar</button>
+              <button onClick={onBack} className="rounded-2xl py-3 font-bold text-[13px]" style={{ background: "transparent", border: `1.5px solid ${T.border}`, color: T.inkSoft }}>Cancelar</button>
+            </>
+          )}
+
+          {paso === "roles" && (
+            <>
+              <p style={{ fontSize: 12.5, color: T.inkSoft }}>Tu RUN tiene más de un perfil asociado en la Municipalidad. Elige con cuál continuar:</p>
+              <div className="flex flex-col gap-2.5">
+                {roles.map((r) => {
+                  const Icon = r.icon; return (
+                    <button key={r.id} onClick={() => onLogin(r.id)} className="rounded-2xl p-4 flex items-center gap-3 text-left" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}` }}>
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: T.copperSoft, color: T.copperInk }}><Icon size={17} /></div>
+                      <div className="flex-1"><p style={{ fontSize: 13.5, fontWeight: 700 }}>{r.label}</p><p style={{ fontSize: 11.5, color: T.inkSoft }}>{r.desc}</p></div>
+                      <ChevronRight size={16} color={T.inkFaint} />
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="px-4 py-4 text-center"><p style={{ fontSize: 11, color: T.inkFaint }}>ClaveÚnica es el sistema de identidad digital del Estado de Chile · Demostración académica</p></div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------
    TOP BAR (autenticado)
 --------------------------------------------------------------------- */
 function TopBar({ T, theme, setTheme, role, setRole, copilotText, setCopilotText, runCopilot, handsFree, setHandsFree, showCopilot }) {
@@ -865,7 +1160,7 @@ function TopBar({ T, theme, setTheme, role, setRole, copilotText, setCopilotText
 }
 
 function RoleSwitch({ T, role, setRole }) {
-  const items = [{ id: "vecino", label: "Vecino" }, { id: "trabajador", label: "Trabajador" }, { id: "admin", label: "Admin" }, { id: "alcalde", label: "Alcalde" }, { id: "transparencia", label: "Transparencia" }];
+  const items = [{ id: "vecino", label: "Vecino" }, { id: "trabajador", label: "Trabajador" }, { id: "admin", label: "Admin" }, { id: "alcalde", label: "Alcaldesa" }, { id: "transparencia", label: "Transparencia" }];
   return (
     <select value={role} onChange={(e) => setRole(e.target.value)} className="hidden md:block rounded-full px-4 py-2 text-[13px] font-semibold outline-none cursor-pointer" style={{ background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.3)", color: "#FFFFFF" }}>
       {items.map((it) => <option key={it.id} value={it.id} style={{ background: "#25121A", color: "#FFFFFF" }}>{it.label}</option>)}
@@ -889,7 +1184,7 @@ function MobileTabBar({ T, screen, setScreen }) {
 }
 
 function TrabajadorTabBar({ T, screen, setScreen }) {
-  const tabs = [{ id: "FICHAJE", label: "Fichaje", icon: Fingerprint }, { id: "AGENDA", label: "Mi agenda", icon: Navigation }, { id: "TAREA", label: "Tarea activa", icon: ClipboardList }, { id: "CIERRE", label: "Cerrar tarea", icon: PenTool }];
+  const tabs = [{ id: "FICHAJE", label: "Fichaje", icon: Fingerprint }, { id: "AGENDA", label: "Agenda", icon: Navigation }, { id: "TAREA", label: "Tarea", icon: ClipboardList }, { id: "EVIDENCIA", label: "Fotos", icon: Camera }, { id: "CHAT", label: "Chat", icon: MessageCircle }, { id: "CIERRE", label: "Cerrar", icon: PenTool }];
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex items-stretch justify-around px-2 pt-1" style={{ background: T.surface, borderTop: `1px solid ${T.border}`, paddingBottom: "max(6px, env(safe-area-inset-bottom))" }}>
       {tabs.map((t) => {
@@ -947,7 +1242,7 @@ function VecinoPortal({ T, screen, setScreen, highlightId, contenidos, activeDep
         </div>
       )}
 
-      {screen === "A" && <PantallaDashboard T={T} highlightId={highlightId} contenidos={contenidos} goDept={goDept} />}
+      {screen === "A" && <PantallaDashboard T={T} highlightId={highlightId} contenidos={contenidos} goDept={goDept} goScreen={setScreen} />}
       {screen === "DEPT" && activeDept && <PantallaDepartamento T={T} dept={activeDept} onBack={() => setScreen("A")} onServicio={(s) => goForm(activeDept, s)} />}
       {screen === "B" && <PantallaFormulario T={T} highlightId={highlightId} tramiteActivo={tramiteActivo} />}
       {screen === "C" && <PantallaSeguimiento T={T} highlightId={highlightId} />}
@@ -955,6 +1250,9 @@ function VecinoPortal({ T, screen, setScreen, highlightId, contenidos, activeDep
       {screen === "MAS" && <PantallaMas T={T} setScreen={setScreen} />}
       {screen === "COMUNIDAD" && <PantallaComunidad T={T} />}
       {screen === "FICHA" && <PantallaMiFicha T={T} />}
+      {screen === "ACTIVAS" && <PantallaSolicitudesActivas T={T} onVolver={() => setScreen("A")} onSeguir={() => setScreen("C")} />}
+      {screen === "COLEGIOS" && <PantallaColegios T={T} onVolver={() => setScreen("A")} />}
+      {screen === "LICENCIA" && <PantallaLicencia T={T} onVolver={() => setScreen("A")} />}
     </div>
   );
 }
@@ -977,11 +1275,11 @@ function PantallaMas({ T, setScreen }) {
 }
 
 /* ---- Pantalla A: Dashboard ---- */
-function PantallaDashboard({ T, highlightId, contenidos, goDept }) {
+function PantallaDashboard({ T, highlightId, contenidos, goDept, goScreen }) {
   const [geo, setGeo] = useState(false);
   const sugerencias = [
-    { icon: GraduationCap, color: "copper", texto: "Detectamos que un menor de tu hogar está en edad de ingresar a Kínder 2027.", cta: "Ver colegios municipales" },
-    { icon: Car, color: "ocean", texto: "Tu licencia de conducir vence en 2 meses.", cta: "Renovar ahora" },
+    { icon: GraduationCap, color: "copper", texto: "Detectamos que un menor de tu hogar está en edad de ingresar a Kínder 2027.", cta: "Ver colegios municipales", ir: "COLEGIOS" },
+    { icon: Car, color: "ocean", texto: "Tu licencia de conducir vence en 2 meses.", cta: "Renovar ahora", ir: "LICENCIA" },
   ];
   return (
     <div className="flex flex-col gap-6">
@@ -998,7 +1296,7 @@ function PantallaDashboard({ T, highlightId, contenidos, goDept }) {
           <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 600, lineHeight: 1.1 }}>María Elena Soto Pardo</h1>
           <p style={{ opacity: 0.9, fontSize: 13, marginTop: 6 }}>RUT 12.345.678-9 · Los Aromos 482, Villa Las Compañías</p>
         </div>
-        <div className="flex items-center gap-2 rounded-2xl px-4 py-3 self-start" style={{ background: "rgba(255,255,255,0.16)" }}><Bell size={18} /><span style={{ fontSize: 13.5, fontWeight: 600 }}>2 solicitudes activas</span></div>
+        <button onClick={() => goScreen("ACTIVAS")} className="flex items-center gap-2 rounded-2xl px-4 py-3 self-start transition-transform active:scale-95" style={{ background: "rgba(255,255,255,0.16)" }}><Bell size={18} /><span style={{ fontSize: 13.5, fontWeight: 600 }}>{SOLICITUDES_VECINO.filter((x) => x.activa).length} solicitudes activas</span><ChevronRight size={16} /></button>
       </section>
 
       <section className="flex flex-col gap-2.5">
@@ -1007,7 +1305,7 @@ function PantallaDashboard({ T, highlightId, contenidos, goDept }) {
             <div key={i} className="rounded-2xl p-4 flex items-center gap-3.5" style={{ background: accentSoft }}>
               <Icon size={20} color={accent} className="shrink-0" />
               <p style={{ fontSize: 12.5, color: accent, fontWeight: 600, flex: 1 }}>{s.texto}</p>
-              <button className="px-3 py-1.5 rounded-full text-[11.5px] font-bold whitespace-nowrap" style={{ background: accent, color: T.surface }}>{s.cta}</button>
+              <button onClick={() => goScreen(s.ir)} className="px-3 py-1.5 rounded-full text-[11.5px] font-bold whitespace-nowrap" style={{ background: accent, color: T.surface }}>{s.cta}</button>
             </div>
           );
         })}
@@ -1044,6 +1342,246 @@ function PantallaDashboard({ T, highlightId, contenidos, goDept }) {
           })}
         </div>
       </section>
+    </div>
+  );
+}
+
+/* ---- Vecino: mis solicitudes activas ---- */
+function PantallaSolicitudesActivas({ T, onVolver, onSeguir }) {
+  const [filtro, setFiltro] = useState("activas");
+  const pasos = ["Recibida", "En revisión", "Aceptada", "Programada", "En tránsito", "Finalizada"];
+  const lista = filtro === "activas" ? SOLICITUDES_VECINO.filter((s) => s.activa) : SOLICITUDES_VECINO;
+
+  return (
+    <div className="flex flex-col gap-5 max-w-2xl">
+      <button onClick={onVolver} className="flex items-center gap-1.5 w-fit" style={{ color: T.inkSoft, fontSize: 13, fontWeight: 600 }}><ChevronLeft size={16} /> Volver al inicio</button>
+
+      <div>
+        <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 600 }}>Mis solicitudes</h1>
+        <p style={{ fontSize: 12.5, color: T.inkSoft, marginTop: 4 }}>Aquí ves en qué va cada trámite que pediste a la Municipalidad.</p>
+      </div>
+
+      <div className="flex gap-1.5">
+        {[{ id: "activas", label: "Activas" }, { id: "todas", label: "Todas" }].map((f) => (
+          <button key={f.id} onClick={() => setFiltro(f.id)} className="px-4 py-2 rounded-full text-[12.5px] font-bold" style={{ background: filtro === f.id ? T.copper : T.surfaceAlt, color: filtro === f.id ? T.surface : T.inkSoft, border: `1px solid ${T.border}` }}>{f.label}</button>
+        ))}
+      </div>
+
+      {lista.map((sol) => (
+        <div key={sol.id} className="rounded-3xl p-5 flex flex-col gap-4" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <p style={{ fontSize: 11.5, fontWeight: 700, color: T.copper }}>Solicitud N.º {sol.id}</p>
+              <p style={{ fontSize: 16, fontWeight: 700, fontFamily: FONT_DISPLAY }}>{sol.titulo}</p>
+              <p style={{ fontSize: 12, color: T.inkSoft }}>{sol.depto} · ingresada el {sol.fecha}</p>
+            </div>
+            <span className="px-3 py-1.5 rounded-full shrink-0" style={{ background: T[`${sol.key}Soft`], color: T[sol.key], fontSize: 11.5, fontWeight: 800 }}>{sol.estado}</span>
+          </div>
+
+          {/* Mini línea de tiempo */}
+          <div className="flex items-center gap-1">
+            {pasos.map((ps, i) => (
+              <React.Fragment key={ps}>
+                <div className="flex flex-col items-center gap-1" style={{ minWidth: "fit-content" }}>
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background: i < sol.paso ? T.copper : T.surfaceAlt, border: `1.5px solid ${i < sol.paso ? T.copper : T.border}`, color: T.surface }}>
+                    {i < sol.paso && <Check size={11} />}
+                  </div>
+                  <span style={{ fontSize: 8.5, color: i < sol.paso ? T.ink : T.inkFaint, textAlign: "center", width: 48, lineHeight: 1.2 }}>{ps}</span>
+                </div>
+                {i < pasos.length - 1 && <div className="flex-1 h-[2px] mb-4" style={{ background: i < sol.paso - 1 ? T.copper : T.border }} />}
+              </React.Fragment>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="rounded-2xl p-3.5" style={{ background: T.surfaceAlt }}>
+              <p style={{ fontSize: 10.5, color: T.inkFaint, fontWeight: 700 }}>DIRECCIÓN</p>
+              <p style={{ fontSize: 12.5, fontWeight: 600 }}>{sol.direccion}</p>
+            </div>
+            <div className="rounded-2xl p-3.5" style={{ background: T.surfaceAlt }}>
+              <p style={{ fontSize: 10.5, color: T.inkFaint, fontWeight: 700 }}>CUADRILLA A CARGO</p>
+              <p style={{ fontSize: 12.5, fontWeight: 600 }}>{sol.cuadrilla}</p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl p-3.5 flex items-center gap-2.5" style={{ background: T[`${sol.key}Soft`], color: T[sol.key] }}>
+            <Clock size={16} className="shrink-0" />
+            <span style={{ fontSize: 12.5, fontWeight: 700 }}>{sol.eta}</span>
+          </div>
+
+          {sol.activa && (
+            <button onClick={onSeguir} className="self-start rounded-2xl px-5 py-2.5 text-[12.5px] font-bold flex items-center gap-1.5" style={{ background: T.copper, color: T.surface }}>
+              Ver seguimiento detallado <ArrowRight size={14} />
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---- Vecino: colegios municipales (Kínder 2027) ---- */
+function PantallaColegios({ T, onVolver }) {
+  const [postulados, setPostulados] = useState([]);
+  const [jornadaFiltro, setJornadaFiltro] = useState("Todas");
+
+  const lista = jornadaFiltro === "Todas" ? COLEGIOS_MUNICIPALES : COLEGIOS_MUNICIPALES.filter((c) => c.jornada.startsWith(jornadaFiltro));
+
+  return (
+    <div className="flex flex-col gap-5 max-w-2xl">
+      <button onClick={onVolver} className="flex items-center gap-1.5 w-fit" style={{ color: T.inkSoft, fontSize: 13, fontWeight: 600 }}><ChevronLeft size={16} /> Volver al inicio</button>
+
+      <div className="rounded-3xl p-6 flex items-start gap-4" style={{ background: `linear-gradient(120deg, ${T.copperSoft}, ${T.surface})`, border: `1.5px solid ${T.border}` }}>
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ background: T.copper, color: T.surface }}><GraduationCap size={22} /></div>
+        <div>
+          <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600 }}>Colegios municipales · Kínder 2027</h1>
+          <p style={{ fontSize: 12.5, color: T.inkSoft, marginTop: 3 }}>Detectamos que un menor de tu hogar está en edad de ingresar a Kínder. Aquí puedes revisar los establecimientos con vacantes y manifestar tu interés.</p>
+        </div>
+      </div>
+
+      {/* Plazos */}
+      <div className="rounded-3xl p-5 flex flex-col gap-3" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+        <p style={{ fontSize: 13.5, fontWeight: 700 }}>Fechas del proceso</p>
+        {[
+          { f: "01 al 30 de septiembre 2026", t: "Postulación en el Sistema de Admisión Escolar", activo: true },
+          { f: "Noviembre 2026", t: "Publicación de resultados", activo: false },
+          { f: "Diciembre 2026", t: "Matrícula en el establecimiento asignado", activo: false },
+        ].map((e, i) => (
+          <div key={i} className="flex items-start gap-3">
+            <div className="w-2.5 h-2.5 rounded-full mt-1.5 shrink-0" style={{ background: e.activo ? T.sage : T.border }} />
+            <div><p style={{ fontSize: 12.5, fontWeight: 700 }}>{e.t}</p><p style={{ fontSize: 11.5, color: T.inkSoft }}>{e.f}{e.activo && " · en curso"}</p></div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
+        {["Todas", "Jornada", "Media"].map((j) => (
+          <button key={j} onClick={() => setJornadaFiltro(j)} className="px-3.5 py-2 rounded-full text-[12px] font-bold whitespace-nowrap" style={{ background: jornadaFiltro === j ? T.copper : T.surfaceAlt, color: jornadaFiltro === j ? T.surface : T.inkSoft, border: `1px solid ${T.border}` }}>
+            {j === "Todas" ? "Todas las jornadas" : j === "Jornada" ? "Jornada completa" : "Media jornada"}
+          </button>
+        ))}
+      </div>
+
+      {lista.map((c) => {
+        const post = postulados.includes(c.nombre);
+        const pocas = c.vacantes <= 10;
+        return (
+          <div key={c.nombre} className="rounded-3xl p-5 flex flex-col gap-3.5" style={{ background: T.surface, border: `1.5px solid ${post ? T.sage : T.border}` }}>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <p style={{ fontSize: 15, fontWeight: 700 }}>{c.nombre}</p>
+                <p style={{ fontSize: 12, color: T.inkSoft }}>{c.direccion}</p>
+                <p style={{ fontSize: 11.5, color: T.inkFaint, marginTop: 2 }}>{c.distancia}</p>
+              </div>
+              <span className="px-2.5 py-1 rounded-full shrink-0" style={{ background: pocas ? T.goldSoft : T.sageSoft, color: pocas ? T.gold : T.sage, fontSize: 11, fontWeight: 700 }}>
+                {c.vacantes} vacantes{pocas && " · pocas"}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              <TagChip T={T} icon={Clock} text={c.jornada} color="ocean" />
+              <TagChip T={T} icon={Sparkles} text={c.sello} color="copper" />
+              {c.pie && <TagChip T={T} icon={HeartHandshake} text="Programa de Integración (PIE)" color="sage" />}
+            </div>
+
+            {post ? (
+              <div className="rounded-2xl p-3.5 flex items-center gap-2" style={{ background: T.sageSoft, color: T.sage }}>
+                <CheckCircle2 size={16} /><span style={{ fontSize: 12.5, fontWeight: 700 }}>Interés registrado. Te contactaremos con los pasos de postulación.</span>
+              </div>
+            ) : (
+              <button onClick={() => setPostulados((a) => [...a, c.nombre])} className="self-start rounded-2xl px-5 py-2.5 text-[12.5px] font-bold" style={{ background: T.copper, color: T.surface }}>
+                Me interesa este colegio
+              </button>
+            )}
+          </div>
+        );
+      })}
+
+      <div className="rounded-2xl p-4 flex items-start gap-2.5" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}` }}>
+        <Info size={15} color={T.inkFaint} className="shrink-0 mt-0.5" />
+        <p style={{ fontSize: 11.5, color: T.inkSoft, lineHeight: 1.45 }}>Manifestar interés aquí no reemplaza la postulación oficial en el Sistema de Admisión Escolar, pero la Municipalidad te acompañará en el trámite y te avisará de los plazos.</p>
+      </div>
+    </div>
+  );
+}
+
+/* ---- Vecino: renovación de licencia de conducir ---- */
+function PantallaLicencia({ T, onVolver }) {
+  const [paso, setPaso] = useState(0);
+  const [hora, setHora] = useState(null);
+  const [listo, setListo] = useState(false);
+
+  const requisitos = [
+    { t: "Cédula de identidad vigente", ok: true, nota: "Validada con el Registro Civil" },
+    { t: "Licencia actual (clase B)", ok: true, nota: "Vence el 16-11-2026" },
+    { t: "Certificado de antecedentes", ok: true, nota: "Obtenido automáticamente" },
+    { t: "Examen médico y psicotécnico", ok: false, nota: "Se realiza el día de tu hora" },
+    { t: "Sin multas de tránsito impagas", ok: true, nota: "Sin deudas registradas" },
+  ];
+
+  const horas = ["Lun 21 · 09:00", "Lun 21 · 11:30", "Mar 22 · 08:30", "Mié 23 · 15:00", "Jue 24 · 10:00", "Vie 25 · 12:00"];
+
+  return (
+    <div className="flex flex-col gap-5 max-w-2xl">
+      <button onClick={onVolver} className="flex items-center gap-1.5 w-fit" style={{ color: T.inkSoft, fontSize: 13, fontWeight: 600 }}><ChevronLeft size={16} /> Volver al inicio</button>
+
+      <div className="rounded-3xl p-6 flex items-start gap-4" style={{ background: `linear-gradient(120deg, ${T.oceanSoft}, ${T.surface})`, border: `1.5px solid ${T.border}` }}>
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ background: T.ocean, color: "#fff" }}><Car size={22} /></div>
+        <div>
+          <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600 }}>Renovación de licencia de conducir</h1>
+          <p style={{ fontSize: 12.5, color: T.inkSoft, marginTop: 3 }}>Tu licencia clase B vence el <b>16 de noviembre de 2026</b>. Puedes renovarla desde 90 días antes del vencimiento.</p>
+        </div>
+      </div>
+
+      {/* Cuenta regresiva */}
+      <div className="rounded-3xl p-5 flex items-center gap-4" style={{ background: T.surface, border: `1.5px solid ${T.gold}` }}>
+        <Clock size={22} color={T.gold} className="shrink-0" />
+        <div className="flex-1"><p style={{ fontSize: 13.5, fontWeight: 700 }}>Quedan 2 meses</p><p style={{ fontSize: 12, color: T.inkSoft }}>Si conduces con la licencia vencida arriesgas multa y retiro del vehículo.</p></div>
+      </div>
+
+      {/* Requisitos */}
+      <div className="rounded-3xl p-5 flex flex-col gap-3" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+        <p style={{ fontSize: 13.5, fontWeight: 700 }}>Requisitos</p>
+        {requisitos.map((r, i) => (
+          <div key={i} className="flex items-start gap-2.5">
+            <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: r.ok ? T.sageSoft : T.goldSoft, color: r.ok ? T.sage : T.gold }}>
+              {r.ok ? <Check size={11} /> : <Clock size={11} />}
+            </div>
+            <div><p style={{ fontSize: 12.5, fontWeight: 600 }}>{r.t}</p><p style={{ fontSize: 11, color: T.inkFaint }}>{r.nota}</p></div>
+          </div>
+        ))}
+      </div>
+
+      {/* Costo */}
+      <div className="rounded-3xl p-5 flex flex-col gap-2" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+        <p style={{ fontSize: 13.5, fontWeight: 700 }}>Costo del trámite</p>
+        <div className="flex justify-between"><span style={{ fontSize: 12.5, color: T.inkSoft }}>Derecho municipal</span><span style={{ fontSize: 12.5, fontWeight: 700 }}>1,0 UTM aprox.</span></div>
+        <div className="flex justify-between"><span style={{ fontSize: 12.5, color: T.inkSoft }}>Examen médico</span><span style={{ fontSize: 12.5, fontWeight: 700 }}>Incluido</span></div>
+        <p style={{ fontSize: 11, color: T.inkFaint, marginTop: 2 }}>El valor exacto se confirma en la Dirección de Tránsito el día de tu hora. Puedes pagar en caja o con tarjeta.</p>
+      </div>
+
+      {/* Agendar */}
+      {!listo ? (
+        <div className="rounded-3xl p-5 flex flex-col gap-3.5" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+          <p style={{ fontSize: 13.5, fontWeight: 700 }}>Elige tu hora en la Dirección de Tránsito</p>
+          <p style={{ fontSize: 11.5, color: T.inkSoft }}>Av. Francisco de Aguirre 300, Centro · atención de lunes a viernes</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {horas.map((h) => (
+              <button key={h} onClick={() => setHora(h)} className="rounded-xl py-2.5 text-[12px] font-bold" style={{ background: hora === h ? T.copper : T.surfaceAlt, color: hora === h ? T.surface : T.ink, border: `1px solid ${hora === h ? T.copper : T.border}` }}>{h}</button>
+            ))}
+          </div>
+          <button disabled={!hora} onClick={() => setListo(true)} className="rounded-2xl py-3.5 font-bold text-[14px]" style={{ background: T.copper, color: T.surface, opacity: hora ? 1 : 0.45 }}>
+            Confirmar hora
+          </button>
+        </div>
+      ) : (
+        <div className="rounded-3xl p-6 flex flex-col items-center text-center gap-3" style={{ background: T.sageSoft }}>
+          <CheckCircle2 size={32} color={T.sage} />
+          <p style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, color: T.sage }}>Hora confirmada</p>
+          <p style={{ fontSize: 12.5, color: T.inkSoft }}>{hora} hrs · Dirección de Tránsito, Av. Francisco de Aguirre 300. Te enviamos el comprobante y un recordatorio el día anterior.</p>
+          <button onClick={onVolver} className="rounded-2xl px-5 py-2.5 text-[12.5px] font-bold" style={{ background: T.sage, color: T.surface }}>Volver al inicio</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1288,11 +1826,11 @@ function PantallaMiFicha({ T }) {
 /* ---------------------------------------------------------------------
    PORTAL DEL TRABAJADOR
 --------------------------------------------------------------------- */
-function TrabajadorPortal({ T, screen, setScreen }) {
+function TrabajadorPortal({ T, screen, setScreen, chatTrabajadores, setChatTrabajadores }) {
   return (
     <div className="pt-5 md:pt-7">
-      <div className="hidden md:flex gap-1.5 mb-6 rounded-full p-1 w-fit" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}` }}>
-        {[{ id: "FICHAJE", label: "Fichaje" }, { id: "AGENDA", label: "Mi agenda" }, { id: "TAREA", label: "Tarea activa" }, { id: "CIERRE", label: "Cierre de tarea" }].map((t) => {
+      <div className="hidden md:flex flex-wrap gap-1.5 mb-6 rounded-full p-1 w-fit" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}` }}>
+        {[{ id: "FICHAJE", label: "Fichaje" }, { id: "AGENDA", label: "Mi agenda" }, { id: "TAREA", label: "Tarea activa" }, { id: "EVIDENCIA", label: "Fotos antes/después" }, { id: "CHAT", label: "Chat con mi jefatura" }, { id: "CIERRE", label: "Cierre de tarea" }].map((t) => {
           const active = screen === t.id; return (
             <button key={t.id} onClick={() => setScreen(t.id)} className="px-4 py-2 rounded-full text-[13px] font-semibold" style={{ background: active ? T.copper : "transparent", color: active ? T.surface : T.inkSoft }}>{t.label}</button>
           );
@@ -1301,7 +1839,182 @@ function TrabajadorPortal({ T, screen, setScreen }) {
       {screen === "FICHAJE" && <PantallaFichaje T={T} />}
       {screen === "AGENDA" && <PantallaAgenda T={T} />}
       {screen === "TAREA" && <PantallaTareaActiva T={T} />}
+      {screen === "EVIDENCIA" && <PantallaEvidenciaFotos T={T} />}
+      {screen === "CHAT" && <PantallaChatTrabajador T={T} chatTrabajadores={chatTrabajadores} setChatTrabajadores={setChatTrabajadores} />}
       {screen === "CIERRE" && <PantallaCierreTarea T={T} />}
+    </div>
+  );
+}
+
+/* ---- Trabajador: cámara de evidencia ANTES / DESPUÉS ---- */
+function PantallaEvidenciaFotos({ T }) {
+  const [tareaIdx, setTareaIdx] = useState(0);
+  const [capturas, setCapturas] = useState(AGENDA_TRABAJADOR.map(() => ({ antes: null, despues: null })));
+  const [camara, setCamara] = useState(null); // null | "antes" | "despues"
+  const [flash, setFlash] = useState(false);
+
+  const tarea = AGENDA_TRABAJADOR[tareaIdx];
+  const actual = capturas[tareaIdx];
+
+  const disparar = () => {
+    setFlash(true);
+    setTimeout(() => {
+      const sello = { hora: new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }), gps: "-29.9027, -71.2519", dir: tarea.direccion };
+      setCapturas((c) => c.map((v, i) => (i === tareaIdx ? { ...v, [camara]: sello } : v)));
+      setFlash(false); setCamara(null);
+    }, 420);
+  };
+
+  const completas = actual.antes && actual.despues;
+
+  return (
+    <div className="max-w-2xl flex flex-col gap-5">
+      <div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600 }}>Fotos del antes y el después</h2>
+        <p style={{ fontSize: 12.5, color: T.inkSoft, marginTop: 4 }}>Esta pantalla sólo permite tomar fotos con la cámara: no se pueden subir imágenes de la galería. Cada foto queda sellada con hora y GPS para que tu jefatura y la Alcaldesa puedan verificar el trabajo.</p>
+      </div>
+
+      {/* Selector de tarea */}
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1">
+        {AGENDA_TRABAJADOR.map((a, i) => {
+          const act = tareaIdx === i; const c = capturas[i];
+          const listo = c.antes && c.despues;
+          return (
+            <button key={i} onClick={() => setTareaIdx(i)} className="px-3.5 py-2 rounded-full text-[12px] font-bold whitespace-nowrap flex items-center gap-1.5" style={{ background: act ? T.copper : T.surfaceAlt, color: act ? T.surface : T.inkSoft, border: `1px solid ${T.border}` }}>
+              {listo && <CheckCircle2 size={12} />} {a.hora} · {a.tarea}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="rounded-3xl p-5 flex flex-col gap-4" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: T.copperSoft, color: T.copperInk }}><ClipboardList size={18} /></div>
+          <div className="flex-1"><p style={{ fontSize: 14, fontWeight: 700 }}>{tarea.tarea}</p><p style={{ fontSize: 12, color: T.inkSoft }}>{tarea.direccion} · {tarea.hora} hrs</p></div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[{ k: "antes", label: "ANTES del trabajo", color: "gold" }, { k: "despues", label: "DESPUÉS del trabajo", color: "sage" }].map((slot) => {
+            const foto = actual[slot.k]; const accent = T[slot.color]; const accentSoft = T[`${slot.color}Soft`];
+            const bloqueado = slot.k === "despues" && !actual.antes;
+            return (
+              <div key={slot.k} className="rounded-2xl overflow-hidden flex flex-col" style={{ border: `1.5px solid ${foto ? accent : T.border}` }}>
+                <div className="px-3 py-2 flex items-center gap-1.5" style={{ background: accentSoft, color: accent }}>
+                  <Camera size={13} /><span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.3 }}>{slot.label}</span>
+                </div>
+                {foto ? (
+                  <div className="p-3 flex flex-col gap-2">
+                    {/* Miniatura simulada de la foto capturada */}
+                    <div className="h-28 rounded-xl relative overflow-hidden flex items-end" style={{ background: `linear-gradient(160deg, ${accentSoft}, ${T.surfaceAlt})` }}>
+                      <div className="absolute inset-0 flex items-center justify-center"><ImageIcon size={26} color={accent} /></div>
+                      <div className="relative w-full px-2 py-1" style={{ background: "rgba(0,0,0,0.55)" }}>
+                        <p style={{ fontSize: 9.5, color: "#fff", fontWeight: 700 }}>{foto.hora} hrs · GPS {foto.gps}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5"><ShieldCheck size={12} color={T.sage} /><span style={{ fontSize: 10.5, color: T.sage, fontWeight: 700 }}>Foto sellada, no editable</span></div>
+                    <button onClick={() => setCamara(slot.k)} className="rounded-xl py-2 text-[11.5px] font-bold" style={{ background: T.surfaceAlt, color: T.inkSoft, border: `1px solid ${T.border}` }}>Repetir foto</button>
+                  </div>
+                ) : (
+                  <button disabled={bloqueado} onClick={() => setCamara(slot.k)} className="h-[152px] flex flex-col items-center justify-center gap-2 px-3" style={{ background: T.surfaceAlt, opacity: bloqueado ? 0.5 : 1 }}>
+                    <Camera size={24} color={T.inkFaint} />
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: T.inkFaint, textAlign: "center" }}>{bloqueado ? "Primero toma la foto del ANTES" : "Abrir cámara y tomar foto"}</span>
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {completas ? (
+          <div className="rounded-2xl p-3.5 flex items-center gap-2" style={{ background: T.sageSoft, color: T.sage }}>
+            <CheckCircle2 size={17} /><span style={{ fontSize: 12.5, fontWeight: 700 }}>Evidencia completa enviada a tu jefatura. Visible también para la Alcaldesa.</span>
+          </div>
+        ) : (
+          <p style={{ fontSize: 11.5, color: T.inkFaint }}>Debes tomar ambas fotos para que la tarea pueda cerrarse.</p>
+        )}
+      </div>
+
+      {/* Visor de cámara */}
+      {camara && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "#0B0B0C" }}>
+          <div className="px-4 py-3 flex items-center justify-between" style={{ color: "#fff" }}>
+            <button onClick={() => setCamara(null)} className="flex items-center gap-1.5" style={{ fontSize: 13, fontWeight: 600 }}><X size={17} /> Cerrar</button>
+            <span className="px-2.5 py-1 rounded-full" style={{ background: camara === "antes" ? "#A6791F" : "#4F7452", fontSize: 11, fontWeight: 800 }}>{camara === "antes" ? "FOTO ANTES" : "FOTO DESPUÉS"}</span>
+          </div>
+          <div className="flex-1 relative flex items-center justify-center" style={{ background: "#161618" }}>
+            {/* Simulación del visor */}
+            <div className="absolute inset-6 rounded-2xl" style={{ border: "2px solid rgba(255,255,255,0.25)" }} />
+            <div className="text-center flex flex-col items-center gap-2" style={{ color: "rgba(255,255,255,0.65)" }}>
+              <Camera size={40} />
+              <p style={{ fontSize: 12.5 }}>Encuadra el lugar del trabajo</p>
+            </div>
+            <div className="absolute bottom-4 left-4 right-4 rounded-xl px-3 py-2" style={{ background: "rgba(0,0,0,0.6)" }}>
+              <p style={{ fontSize: 11, color: "#fff", fontWeight: 700 }}>{tarea.direccion}</p>
+              <p style={{ fontSize: 10, color: "rgba(255,255,255,0.7)" }}>GPS -29.9027, -71.2519 · {new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })} hrs</p>
+            </div>
+            {flash && <div className="absolute inset-0" style={{ background: "#fff", opacity: 0.85 }} />}
+          </div>
+          <div className="py-7 flex items-center justify-center" style={{ background: "#0B0B0C" }}>
+            <button onClick={disparar} className="w-[74px] h-[74px] rounded-full flex items-center justify-center" style={{ background: "#fff", border: "5px solid rgba(255,255,255,0.35)" }}>
+              <span className="w-14 h-14 rounded-full" style={{ background: "#fff", border: "2px solid #0B0B0C" }} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---- Trabajador: chat directo con el administrador que le asigna tareas ---- */
+function PantallaChatTrabajador({ T, chatTrabajadores, setChatTrabajadores }) {
+  const [msg, setMsg] = useState("");
+  const yo = TRABAJADOR_ACTUAL.nombre;
+  const hilo = chatTrabajadores[yo] || [];
+  const finRef = useRef(null);
+  useEffect(() => { finRef.current?.scrollIntoView({ behavior: "smooth" }); }, [hilo.length]);
+
+  const enviar = (texto) => {
+    const t = (texto ?? msg).trim(); if (!t) return;
+    const hora = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+    setChatTrabajadores((c) => ({ ...c, [yo]: [...(c[yo] || []), { from: "trabajador", texto: t, hora }] }));
+    setMsg("");
+  };
+
+  const rapidas = ["No puedo acceder al lugar", "Se me averió el equipo", "El vecino no está en casa", "Necesito apoyo de otra cuadrilla", "Tarea terminada"];
+
+  return (
+    <div className="max-w-2xl flex flex-col gap-4">
+      <div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600 }}>Chat directo con mi jefatura</h2>
+        <p style={{ fontSize: 12.5, color: T.inkSoft, marginTop: 4 }}>Escríbele directamente a quien te asigna las tareas si ocurre cualquier imprevisto en terreno. La Alcaldesa también puede ver esta conversación.</p>
+      </div>
+
+      <div className="rounded-3xl overflow-hidden flex flex-col" style={{ background: T.surface, border: `1.5px solid ${T.border}`, height: 460 }}>
+        <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: `1px solid ${T.border}` }}>
+          <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: T.copperSoft, color: T.copperInk, fontWeight: 700, fontSize: 12 }}>{initials(ADMIN_ACTUAL.nombre)}</div>
+          <div className="flex-1"><p style={{ fontSize: 13.5, fontWeight: 700 }}>{ADMIN_ACTUAL.nombre}</p><p style={{ fontSize: 11, color: T.inkSoft }}>{ADMIN_ACTUAL.cargo}</p></div>
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: T.sageSoft, color: T.sage, fontSize: 10.5, fontWeight: 700 }}><span className="w-1.5 h-1.5 rounded-full blink-dot" style={{ background: T.sage }} /> En línea</span>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2.5">
+          {hilo.map((m, i) => (
+            <div key={i} className="max-w-[78%] rounded-2xl px-3.5 py-2.5" style={{ alignSelf: m.from === "trabajador" ? "flex-end" : "flex-start", background: m.from === "trabajador" ? T.copper : T.surfaceAlt, color: m.from === "trabajador" ? T.surface : T.ink }}>
+              <p style={{ fontSize: 13 }}>{m.texto}</p>
+              {m.hora && <p style={{ fontSize: 9.5, opacity: 0.7, marginTop: 3, textAlign: "right" }}>{m.hora}</p>}
+            </div>
+          ))}
+          <div ref={finRef} />
+        </div>
+
+        <div className="px-3 pt-2 flex gap-1.5 overflow-x-auto scrollbar-none">
+          {rapidas.map((r) => <button key={r} onClick={() => enviar(r)} className="px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0" style={{ background: T.surfaceAlt, color: T.inkSoft, border: `1px solid ${T.border}` }}>{r}</button>)}
+        </div>
+
+        <form onSubmit={(e) => { e.preventDefault(); enviar(); }} className="p-3 flex gap-2" style={{ borderTop: `1px solid ${T.border}` }}>
+          <input value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Escribe lo que está ocurriendo…" className="flex-1 rounded-xl px-3.5 py-2.5 text-[13px] outline-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+          <button className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: T.copper, color: T.surface }}><MessageCircle size={16} /></button>
+        </form>
+      </div>
     </div>
   );
 }
@@ -2795,7 +3508,7 @@ function PantallaDiagramasSGR({ T }) {
 }
 
 
-function AdminPanel({ T, screen, setScreen, highlightId, contenidos, setContenidos, incidentes, setIncidentes }) {
+function AdminPanel({ T, screen, setScreen, highlightId, contenidos, setContenidos, incidentes, setIncidentes, chatTrabajadores, setChatTrabajadores, chatAdminAlcaldesa, setChatAdminAlcaldesa, asignacionesIA }) {
   const [openKpi, setOpenKpi] = useState(null);
   const [empleados, setEmpleados] = useState(SEED_EMPLEADOS);
   const [empSeleccionado, setEmpSeleccionado] = useState(null);
@@ -2805,8 +3518,10 @@ function AdminPanel({ T, screen, setScreen, highlightId, contenidos, setContenid
     { id: "EMPLEADOS", label: "Gestión Empleados" },
     
     { id: "SGR", label: "Matriz SGR" },
-    { id: "ASIGNACION", label: "Asignación" }, { id: "CUADRILLAS", label: "Trabajadores" }, { id: "E", label: "Anti-fraude" },
-    { id: "F", label: "Auditoría calidad" }, { id: "G", label: "Crisis" }, { id: "IOT", label: "Sensores IoT" },
+    { id: "ASIGNACION", label: "Asignación" }, { id: "CUADRILLAS", label: "Trabajadores" },
+    { id: "GPS", label: "GPS en terreno" }, { id: "CHAT", label: "Chat interno" },
+    { id: "E", label: "Anti-fraude" },
+    { id: "F", label: "Auditoría calidad" }, { id: "G", label: "Crisis" },
     { id: "USUARIOS", label: "Usuarios" }, { id: "CONTENIDO", label: "Noticias/alertas" }, { id: "PRESUPUESTO", label: "Presupuesto" },
     { id: "CONTROL", label: "Auditoría interna" }, { id: "REPORTES", label: "Reportes IA" }, { id: "SISTEMA", label: "Sistema" },
   ];
@@ -2898,12 +3613,17 @@ function AdminPanel({ T, screen, setScreen, highlightId, contenidos, setContenid
       )}
       
       {screen === "SGR" && <PantallaSGR T={T} highlightId={highlightId} />}
-      {screen === "ASIGNACION" && <PantallaAsignacion T={T} highlightId={highlightId} />}
+      {screen === "ASIGNACION" && <PantallaAsignacion T={T} highlightId={highlightId} asignacionesIA={asignacionesIA} setChatTrabajadores={setChatTrabajadores} />}
       {screen === "CUADRILLAS" && <PantallaCuadrillas T={T} highlightId={highlightId} />}
       {screen === "E" && <PantallaFraude T={T} highlightId={highlightId} />}
       {screen === "F" && <PantallaAuditoria T={T} highlightId={highlightId} />}
       {screen === "G" && <PantallaCrisis T={T} highlightId={highlightId} incidentes={incidentes} setIncidentes={setIncidentes} setContenidos={setContenidos} />}
-      {screen === "IOT" && <PantallaIoT T={T} highlightId={highlightId} />}
+      {screen === "GPS" && <PantallaGPSTerreno T={T} />}
+      {screen === "CHAT" && (
+        <PantallaChatAdmin T={T}
+          chatTrabajadores={chatTrabajadores} setChatTrabajadores={setChatTrabajadores}
+          chatAdminAlcaldesa={chatAdminAlcaldesa} setChatAdminAlcaldesa={setChatAdminAlcaldesa} />
+      )}
       {screen === "USUARIOS" && <PantallaUsuarios T={T} highlightId={highlightId} />}
       {screen === "CONTENIDO" && <PantallaContenido T={T} highlightId={highlightId} contenidos={contenidos} setContenidos={setContenidos} />}
       {screen === "PRESUPUESTO" && <PantallaPresupuesto T={T} highlightId={highlightId} />}
@@ -2936,37 +3656,115 @@ function ModalListado({ T, title, onClose, rows }) {
 }
 
 /* ---- Asignación (con despacho autónomo) ---- */
-function PantallaAsignacion({ T, highlightId }) {
+function PantallaAsignacion({ T, highlightId, asignacionesIA, setChatTrabajadores }) {
   const [asignaciones, setAsignaciones] = useState({});
+  const [form, setForm] = useState({});
+
+  const campo = (id, k, v) => setForm((f) => ({ ...f, [id]: { ...(f[id] || {}), [k]: v } }));
+  const datos = (id) => form[id] || { w: "", f: "2026-09-04", h: "15:00", instrucciones: "", materiales: "", prioridad: "Normal" };
+
+  const asignar = (p) => {
+    const d = datos(p.id);
+    if (!d.w || !d.instrucciones.trim()) return;
+    setAsignaciones((s) => ({ ...s, [p.id]: { ...d } }));
+    // El trabajador recibe la instrucción en su chat
+    if (setChatTrabajadores) {
+      const hora = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+      const texto = `Nueva tarea asignada (N.º ${p.id}) en ${p.direccion}, el ${d.f} a las ${d.h} hrs. Instrucciones: ${d.instrucciones}` + (d.materiales ? ` Materiales: ${d.materiales}.` : "");
+      setChatTrabajadores((c) => ({ ...c, [d.w]: [...(c[d.w] || []), { from: "admin", texto, hora }] }));
+    }
+  };
+
   const autoDespacho = () => {
     const nuevo = {};
-    PENDIENTES_ASIGNACION.forEach((p, i) => { nuevo[p.id] = { w: WORKERS_PERFIL[i % WORKERS_PERFIL.length].nombre, f: "2026-09-04", h: "15:00", auto: true }; });
+    PENDIENTES_ASIGNACION.forEach((p, i) => {
+      const w = WORKERS_PERFIL[i % WORKERS_PERFIL.length].nombre;
+      nuevo[p.id] = { w, f: "2026-09-04", h: "15:00", auto: true, prioridad: "Normal", materiales: "Según catálogo del servicio", instrucciones: `Atender la solicitud N.º ${p.id} de ${p.vecino} en ${p.direccion}. Tomar foto del antes y del después y registrar el cierre en la app.` };
+    });
     setAsignaciones(nuevo);
   };
+
+  const todas = [...PENDIENTES_ASIGNACION, ...(asignacionesIA || [])];
+
   return (
     <div className={`flex flex-col gap-3.5 ${highlightId === "asignacion-card" ? "copilot-pulse rounded-3xl" : ""}`}>
       <div className="rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center gap-3 justify-between" style={{ background: `linear-gradient(120deg, ${T.copperInk}, ${T.copper})`, color: T.surface }}>
-        <div><p style={{ fontSize: 14.5, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}><Bolt size={17} /> Despacho automático por IA (Zero-Touch)</p><p style={{ fontSize: 12, opacity: 0.9, marginTop: 3 }}>Evalúa habilidades, inventario, cercanía geográfica y prioridad social para armar la agenda en segundos.</p></div>
+        <div><p style={{ fontSize: 14.5, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}><Bolt size={17} /> Despacho automático por IA (Zero-Touch)</p><p style={{ fontSize: 12, opacity: 0.9, marginTop: 3 }}>Evalúa habilidades, inventario, cercanía geográfica y prioridad social, y redacta las instrucciones base para cada cuadrilla.</p></div>
         <button onClick={autoDespacho} className="px-4 py-2.5 rounded-2xl text-[12.5px] font-bold whitespace-nowrap" style={{ background: T.surface, color: T.copperInk }}>Ejecutar despacho automático</button>
       </div>
-      <p style={{ fontSize: 12.5, color: T.inkSoft }}>Solicitudes aceptadas, pendientes de asignar a una cuadrilla.</p>
-      {PENDIENTES_ASIGNACION.map((p) => {
+
+      <p style={{ fontSize: 12.5, color: T.inkSoft }}>Solicitudes pendientes de asignar. Debes indicar por escrito qué tiene que hacer el trabajador: ese texto le llega directo a su chat y a su tarea del día.</p>
+
+      {todas.map((p) => {
         const asignado = asignaciones[p.id];
+        const d = datos(p.id);
+        const listo = d.w && d.instrucciones.trim();
         return (
-          <div key={p.id} className="rounded-3xl p-5 flex flex-col md:flex-row md:items-center gap-3.5" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
-            <div className="md:w-56 shrink-0"><p style={{ fontSize: 13.5, fontWeight: 700 }}>N.º {p.id} · {p.vecino}</p><p style={{ fontSize: 12, color: T.inkSoft }}>{p.depto}</p><p style={{ fontSize: 11.5, color: T.inkFaint, marginTop: 2 }}>{p.direccion}</p></div>
+          <div key={p.id} className="rounded-3xl p-5 flex flex-col gap-4" style={{ background: T.surface, border: `1.5px solid ${p.creadaPorIA ? T.copper : T.border}` }}>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <p style={{ fontSize: 13.5, fontWeight: 700 }}>N.º {p.id} · {p.vecino}</p>
+                <p style={{ fontSize: 12, color: T.inkSoft }}>{p.depto}</p>
+                <p style={{ fontSize: 11.5, color: T.inkFaint, marginTop: 2 }}>{p.direccion}</p>
+              </div>
+              {p.creadaPorIA && <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: T.copperSoft, color: T.copperInk, fontSize: 10.5, fontWeight: 700 }}><Sparkles size={11} /> Creada por el asistente IA</span>}
+            </div>
+
             {!asignado ? (
-              <div className="flex flex-1 flex-col sm:flex-row gap-2.5">
-                <select id={`w-${p.id}`} defaultValue="" className="rounded-xl px-3 py-2.5 text-[13px] flex-1" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }}>
-                  <option value="" disabled>Elegir trabajador</option>
-                  {WORKERS_PERFIL.map((w) => <option key={w.rut} value={w.nombre}>{w.nombre} — {w.especialidad}</option>)}
-                </select>
-                <input id={`f-${p.id}`} type="date" defaultValue="2026-09-04" className="rounded-xl px-3 py-2.5 text-[13px]" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
-                <input id={`h-${p.id}`} type="time" defaultValue="15:00" className="rounded-xl px-3 py-2.5 text-[13px]" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
-                <button onClick={() => { const w = document.getElementById(`w-${p.id}`).value, f = document.getElementById(`f-${p.id}`).value, h = document.getElementById(`h-${p.id}`).value; if (w) setAsignaciones((s) => ({ ...s, [p.id]: { w, f, h } })); }} className="rounded-xl px-4 py-2.5 text-[12.5px] font-bold whitespace-nowrap" style={{ background: T.copper, color: T.surface }}>Asignar</button>
+              <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                  <select value={d.w} onChange={(e) => campo(p.id, "w", e.target.value)} className="rounded-xl px-3 py-2.5 text-[13px] sm:col-span-2" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }}>
+                    <option value="" disabled>Elegir trabajador</option>
+                    {WORKERS_PERFIL.map((w) => <option key={w.rut} value={w.nombre}>{w.nombre} — {w.especialidad}</option>)}
+                    {GPS_TRABAJADORES.map((g) => <option key={g.rut} value={g.nombre}>{g.nombre} — {g.cuadrilla}</option>)}
+                  </select>
+                  <input type="date" value={d.f} onChange={(e) => campo(p.id, "f", e.target.value)} className="rounded-xl px-3 py-2.5 text-[13px]" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+                  <input type="time" value={d.h} onChange={(e) => campo(p.id, "h", e.target.value)} className="rounded-xl px-3 py-2.5 text-[13px]" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft }}>¿Qué tiene que hacer el trabajador? *</label>
+                  <textarea
+                    value={d.instrucciones}
+                    onChange={(e) => campo(p.id, "instrucciones", e.target.value)}
+                    rows={3}
+                    placeholder="Ej: Retirar los escombros del antejardín, cargarlos en el camión tolva y dejar la vereda barrida. Tocar el timbre fuerte, el vecino es adulto mayor."
+                    className="mt-1.5 w-full rounded-xl px-3.5 py-2.5 text-[13px] outline-none resize-none"
+                    style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft }}>Materiales o herramientas</label>
+                    <input value={d.materiales} onChange={(e) => campo(p.id, "materiales", e.target.value)} placeholder="Ej: 10 sacos de arena, 2 palas" className="mt-1.5 w-full rounded-xl px-3.5 py-2.5 text-[13px] outline-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft }}>Prioridad</label>
+                    <select value={d.prioridad} onChange={(e) => campo(p.id, "prioridad", e.target.value)} className="mt-1.5 w-full rounded-xl px-3 py-2.5 text-[13px]" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }}>
+                      <option>Normal</option><option>Alta</option><option>Urgente</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button onClick={() => asignar(p)} disabled={!listo} className="self-start rounded-xl px-5 py-2.5 text-[12.5px] font-bold" style={{ background: T.copper, color: T.surface, opacity: listo ? 1 : 0.45 }}>
+                  Asignar y enviar instrucciones
+                </button>
+                {!listo && <p style={{ fontSize: 11, color: T.inkFaint }}>Elige un trabajador y escribe las instrucciones para poder asignar.</p>}
               </div>
             ) : (
-              <div className="flex items-center gap-2 rounded-2xl px-4 py-2.5 flex-1" style={{ background: T.sageSoft, color: T.sage }}><CheckCircle2 size={16} className="shrink-0" /><span style={{ fontSize: 12.5, fontWeight: 700 }}>{asignado.auto && "⚡ "}Asignado a {asignado.w} · {asignado.f} {asignado.h} hrs</span></div>
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-center gap-2 rounded-2xl px-4 py-2.5" style={{ background: T.sageSoft, color: T.sage }}>
+                  <CheckCircle2 size={16} className="shrink-0" />
+                  <span style={{ fontSize: 12.5, fontWeight: 700 }}>{asignado.auto && "⚡ "}Asignado a {asignado.w} · {asignado.f} {asignado.h} hrs · prioridad {asignado.prioridad}</span>
+                </div>
+                <div className="rounded-2xl p-3.5" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}` }}>
+                  <p style={{ fontSize: 11, fontWeight: 800, color: T.inkFaint, letterSpacing: 0.3 }}>INSTRUCCIONES ENVIADAS</p>
+                  <p style={{ fontSize: 12.5, marginTop: 4 }}>{asignado.instrucciones}</p>
+                  {asignado.materiales && <p style={{ fontSize: 11.5, color: T.inkSoft, marginTop: 4 }}>Materiales: {asignado.materiales}</p>}
+                </div>
+                <button onClick={() => setAsignaciones((s) => { const c = { ...s }; delete c[p.id]; return c; })} className="self-start rounded-xl px-4 py-2 text-[11.5px] font-bold" style={{ background: T.surfaceAlt, color: T.inkSoft, border: `1px solid ${T.border}` }}>Editar asignación</button>
+              </div>
             )}
           </div>
         );
@@ -2983,7 +3781,7 @@ function FotoEvidencia({ T, label, verificada }) {
       <div className="p-2.5 flex flex-col gap-1.5">
         <span style={{ fontSize: 11, fontWeight: 700, color: T.inkFaint }}>{label}</span>
         {verificada ? <span className="flex items-center gap-1 px-2 py-1 rounded-full w-fit" style={{ background: T.sageSoft, color: T.sage, fontSize: 10.5, fontWeight: 700 }}><CheckCircle2 size={11} /> Capturada en el momento</span>
-          : <span className="flex items-center gap-1 px-2 py-1 rounded-full w-fit" style={{ background: T.goldSoft, color: T.gold, fontSize: 10.5, fontWeight: 700 }}><AlertTriangle size={11} /> Podría ser de galería</span>}
+          : <span className="flex items-center gap-1 px-2 py-1 rounded-full w-fit" style={{ background: T.goldSoft, color: T.gold, fontSize: 10.5, fontWeight: 700 }}><Clock size={11} /> Pendiente de captura</span>}
       </div>
     </div>
   );
@@ -3138,17 +3936,178 @@ function PantallaFraude({ T, highlightId }) {
   );
 }
 
-function PantallaAuditoria({ T, highlightId }) {
+function PantallaAuditoria({ T, highlightId, soloLectura }) {
+  const [amonestando, setAmonestando] = useState(null);
+  const [emitidas, setEmitidas] = useState({});
+
+  if (amonestando !== null) {
+    return (
+      <PantallaAmonestacion
+        T={T}
+        queja={QUEJAS[amonestando]}
+        onVolver={() => setAmonestando(null)}
+        onEmitir={(datos) => { setEmitidas((e) => ({ ...e, [amonestando]: datos })); setAmonestando(null); }}
+      />
+    );
+  }
+
   return (
     <div className={`flex flex-col gap-4 ${highlightId === "bandeja-auditoria" ? "copilot-pulse rounded-3xl" : ""}`}>
       <div className="flex items-center gap-2.5 rounded-2xl px-4 py-3 w-fit" style={{ background: T.redSoft, color: T.red }}><Lock size={16} /><span style={{ fontSize: 12.5, fontWeight: 700 }}>Bandeja privada — visible solo para supervisores</span></div>
-      {QUEJAS.map((q, i) => (
-        <div key={i} className="rounded-3xl p-5 flex flex-col md:flex-row gap-4 md:items-center" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
-          <div className="flex items-center gap-3 md:w-56 shrink-0"><div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ background: T.surfaceAlt, fontWeight: 700, fontSize: 13 }}>{initials(q.func)}</div><div><p style={{ fontSize: 13.5, fontWeight: 700 }}>{q.func}</p><p style={{ fontSize: 11.5, color: T.inkSoft }}>{q.depto}</p></div></div>
-          <div className="flex-1"><div className="flex gap-0.5 mb-1.5">{Array.from({ length: 5 }, (_, s) => <Star key={s} size={13} color={T.gold} fill={s < q.rating ? T.gold : "transparent"} />)}</div><p style={{ fontSize: 13, color: T.inkSoft, lineHeight: 1.4 }}>“{q.comentario}”</p></div>
-          <button className="px-4 py-2.5 rounded-2xl text-[12.5px] font-bold whitespace-nowrap shrink-0" style={{ background: T.red, color: T.surface }}>Iniciar amonestación / investigar</button>
+      {QUEJAS.map((q, i) => {
+        const emitida = emitidas[i];
+        return (
+          <div key={i} className="rounded-3xl p-5 flex flex-col md:flex-row gap-4 md:items-center" style={{ background: T.surface, border: `1.5px solid ${emitida ? T.red : T.border}` }}>
+            <div className="flex items-center gap-3 md:w-56 shrink-0"><div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ background: T.surfaceAlt, fontWeight: 700, fontSize: 13 }}>{initials(q.func)}</div><div><p style={{ fontSize: 13.5, fontWeight: 700 }}>{q.func}</p><p style={{ fontSize: 11.5, color: T.inkSoft }}>{q.depto}</p></div></div>
+            <div className="flex-1">
+              <div className="flex gap-0.5 mb-1.5">{Array.from({ length: 5 }, (_, s2) => <Star key={s2} size={13} color={T.gold} fill={s2 < q.rating ? T.gold : "transparent"} />)}</div>
+              <p style={{ fontSize: 13, color: T.inkSoft, lineHeight: 1.4 }}>&ldquo;{q.comentario}&rdquo;</p>
+              {emitida && <p style={{ fontSize: 11.5, color: T.red, fontWeight: 700, marginTop: 6 }}>Amonestación {emitida.tipo} emitida el {emitida.fecha} · folio {emitida.folio}</p>}
+            </div>
+            {soloLectura ? (
+              <span className="px-3 py-1.5 rounded-full shrink-0" style={{ background: T.oceanSoft, color: T.ocean, fontSize: 11, fontWeight: 700 }}>Sólo lectura</span>
+            ) : emitida ? (
+              <span className="px-4 py-2.5 rounded-2xl shrink-0 flex items-center gap-1.5" style={{ background: T.redSoft, color: T.red, fontSize: 12, fontWeight: 700 }}><CheckCircle2 size={14} /> Amonestación emitida</span>
+            ) : (
+              <button onClick={() => setAmonestando(i)} className="px-4 py-2.5 rounded-2xl text-[12.5px] font-bold whitespace-nowrap shrink-0" style={{ background: T.red, color: T.surface }}>Iniciar amonestación / investigar</button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---- Página para redactar y emitir una amonestación ---- */
+function PantallaAmonestacion({ T, queja, onVolver, onEmitir }) {
+  const [tipo, setTipo] = useState("Verbal");
+  const [motivo, setMotivo] = useState("");
+  const [hechos, setHechos] = useState("");
+  const [medida, setMedida] = useState("");
+  const [plazoDescargo, setPlazoDescargo] = useState("5");
+  const [notificar, setNotificar] = useState(true);
+  const [adjuntos, setAdjuntos] = useState([]);
+  const [confirmando, setConfirmando] = useState(false);
+
+  const folio = `AM-2026-${String(Math.floor(Math.random() * 900) + 100)}`;
+  const listo = motivo.trim() && hechos.trim() && medida.trim();
+
+  const tipos = [
+    { id: "Verbal", desc: "Queda en la hoja de vida, sin efecto en la remuneración", color: "gold" },
+    { id: "Escrita", desc: "Carta formal con copia a la Dirección de Gestión de Personas", color: "red" },
+    { id: "Investigación", desc: "Abre un sumario interno antes de resolver la sanción", color: "ocean" },
+  ];
+
+  return (
+    <div className="flex flex-col gap-4 max-w-3xl">
+      <button onClick={onVolver} className="flex items-center gap-1.5 w-fit" style={{ color: T.inkSoft, fontSize: 12.5, fontWeight: 600 }}><ChevronLeft size={15} /> Volver a la bandeja</button>
+
+      <div className="rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center gap-4" style={{ background: T.surface, border: `1.5px solid ${T.red}` }}>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style={{ background: T.redSoft, color: T.red }}><AlertTriangle size={26} /></div>
+        <div className="flex-1">
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600 }}>Amonestación a {queja.func}</h2>
+          <p style={{ fontSize: 12.5, color: T.inkSoft, marginTop: 2 }}>{queja.depto} · folio {folio}</p>
         </div>
-      ))}
+      </div>
+
+      {/* Antecedente que origina la amonestación */}
+      <div className="rounded-3xl p-5 flex flex-col gap-2" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+        <p style={{ fontSize: 13.5, fontWeight: 700 }}>Antecedente: calificación del vecino</p>
+        <div className="flex gap-0.5">{Array.from({ length: 5 }, (_, s) => <Star key={s} size={14} color={T.gold} fill={s < queja.rating ? T.gold : "transparent"} />)}</div>
+        <p style={{ fontSize: 12.5, color: T.inkSoft, lineHeight: 1.45 }}>&ldquo;{queja.comentario}&rdquo;</p>
+      </div>
+
+      {/* Tipo de medida */}
+      <div className="rounded-3xl p-5 flex flex-col gap-3" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+        <p style={{ fontSize: 13.5, fontWeight: 700 }}>Tipo de medida</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {tipos.map((t) => {
+            const act = tipo === t.id;
+            return (
+              <button key={t.id} onClick={() => setTipo(t.id)} className="rounded-2xl p-4 text-left" style={{ background: act ? T[`${t.color}Soft`] : T.surfaceAlt, border: `1.5px solid ${act ? T[t.color] : T.border}` }}>
+                <p style={{ fontSize: 13, fontWeight: 700, color: act ? T[t.color] : T.ink }}>{t.id}</p>
+                <p style={{ fontSize: 11, color: T.inkSoft, marginTop: 3, lineHeight: 1.3 }}>{t.desc}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Redacción */}
+      <div className="rounded-3xl p-5 flex flex-col gap-4" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft }}>Motivo (una línea) *</label>
+          <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej: Incumplimiento de ruta de recolección y falta de respuesta al vecino" className="mt-1.5 w-full rounded-xl px-3.5 py-2.5 text-[13px] outline-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+        </div>
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft }}>Descripción de los hechos *</label>
+          <textarea value={hechos} onChange={(e) => setHechos(e.target.value)} rows={4} placeholder="Detalla qué ocurrió, cuándo, dónde y qué evidencia existe (fotos, GPS, registros de la app)." className="mt-1.5 w-full rounded-xl px-3.5 py-2.5 text-[13px] outline-none resize-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+        </div>
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft }}>Medida correctiva solicitada *</label>
+          <textarea value={medida} onChange={(e) => setMedida(e.target.value)} rows={3} placeholder="Ej: Repetir la recolección del sector esta semana y participar en la capacitación de trato al usuario." className="mt-1.5 w-full rounded-xl px-3.5 py-2.5 text-[13px] outline-none resize-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft }}>Plazo para presentar descargos</label>
+            <select value={plazoDescargo} onChange={(e) => setPlazoDescargo(e.target.value)} className="mt-1.5 w-full rounded-xl px-3 py-2.5 text-[13px]" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }}>
+              <option value="3">3 días hábiles</option>
+              <option value="5">5 días hábiles</option>
+              <option value="10">10 días hábiles</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft }}>Evidencia adjunta</label>
+            <div className="mt-1.5 flex gap-2 flex-wrap">
+              {["Fotos del trabajo", "Registro GPS", "Audio de reclamo"].map((a) => {
+                const act = adjuntos.includes(a);
+                return (
+                  <button key={a} onClick={() => setAdjuntos((arr) => act ? arr.filter((x) => x !== a) : [...arr, a])} className="px-3 py-2 rounded-xl text-[11.5px] font-bold" style={{ background: act ? T.copperSoft : T.surfaceAlt, color: act ? T.copperInk : T.inkSoft, border: `1px solid ${act ? T.copper : T.border}` }}>
+                    {act && "✓ "}{a}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <label className="flex items-start gap-3 rounded-2xl p-3.5" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}` }}>
+          <input type="checkbox" checked={notificar} onChange={(e) => setNotificar(e.target.checked)} className="mt-0.5 w-4 h-4 shrink-0" style={{ accentColor: T.copper }} />
+          <span style={{ fontSize: 12, color: T.inkSoft, lineHeight: 1.45 }}>Notificar al trabajador por la app y al correo institucional, y dejar copia en la Dirección de Gestión de Personas.</span>
+        </label>
+      </div>
+
+      {/* Vista previa del documento */}
+      {listo && (
+        <div className="rounded-3xl p-5 flex flex-col gap-2" style={{ background: T.surfaceAlt, border: `1.5px dashed ${T.borderStrong}` }}>
+          <p style={{ fontSize: 11, fontWeight: 800, color: T.inkFaint, letterSpacing: 0.3 }}>VISTA PREVIA DEL DOCUMENTO</p>
+          <p style={{ fontSize: 12.5, lineHeight: 1.55 }}>
+            En La Serena, a {new Date().toLocaleDateString("es-CL")}, la Ilustre Municipalidad de La Serena comunica a <b>{queja.func}</b>, de {queja.depto}, una <b>amonestación {tipo.toLowerCase()}</b> por: {motivo}. Hechos: {hechos} Medida correctiva: {medida} El funcionario dispone de {plazoDescargo} días hábiles para presentar descargos a través de la plataforma.
+          </p>
+          {adjuntos.length > 0 && <p style={{ fontSize: 11.5, color: T.inkSoft }}>Evidencia adjunta: {adjuntos.join(", ")}.</p>}
+        </div>
+      )}
+
+      <div className="flex gap-2.5 flex-wrap">
+        <button onClick={onVolver} className="px-5 py-3 rounded-2xl text-[13px] font-bold" style={{ background: T.surfaceAlt, color: T.inkSoft, border: `1px solid ${T.border}` }}>Cancelar</button>
+        <button disabled={!listo} onClick={() => setConfirmando(true)} className="px-6 py-3 rounded-2xl text-[13px] font-bold" style={{ background: T.red, color: T.surface, opacity: listo ? 1 : 0.45 }}>Emitir amonestación</button>
+      </div>
+      {!listo && <p style={{ fontSize: 11.5, color: T.inkFaint }}>Completa motivo, hechos y medida correctiva para poder emitirla.</p>}
+
+      {confirmando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(12,20,18,0.6)" }} onClick={() => setConfirmando(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-3xl p-6 flex flex-col items-center text-center gap-4" style={{ background: T.surface }}>
+            <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: T.redSoft, color: T.red }}><AlertTriangle size={28} /></div>
+            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 700 }}>Confirmar emisión</h3>
+            <p style={{ fontSize: 12.5, color: T.inkSoft }}>Se emitirá una amonestación {tipo.toLowerCase()} a {queja.func}. Quedará registrada en su hoja de vida y en la auditoría interna con folio {folio}.</p>
+            <div className="flex gap-2.5 w-full">
+              <button onClick={() => setConfirmando(false)} className="flex-1 py-2.5 rounded-2xl text-[12.5px] font-bold" style={{ background: T.surfaceAlt, color: T.inkSoft, border: `1px solid ${T.border}` }}>Volver</button>
+              <button onClick={() => onEmitir({ tipo, motivo, folio, fecha: new Date().toLocaleDateString("es-CL") })} className="flex-1 py-2.5 rounded-2xl text-[12.5px] font-bold" style={{ background: T.red, color: T.surface }}>Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3187,20 +4146,218 @@ function PantallaCrisis({ T, highlightId, incidentes, setIncidentes, setContenid
   );
 }
 
-/* ---- Sensores IoT / satelital ---- */
-function PantallaIoT({ T, highlightId }) {
+/* ---- Seguimiento GPS de terreno y chat interno ---- */
+/* ---- GPS EN TERRENO: seguimiento de trabajadores con tareas asignadas ---- */
+function PantallaGPSTerreno({ T, soloLectura }) {
+  const [sel, setSel] = useState(GPS_TRABAJADORES[0].nombre);
+  const [filtro, setFiltro] = useState("Todos");
+
+  const filtros = ["Todos", "En sitio", "En ruta", "No asistió", "Fuera de zona", "Finalizada"];
+  const lista = filtro === "Todos" ? GPS_TRABAJADORES : GPS_TRABAJADORES.filter((g) => g.estado === filtro);
+  const activo = GPS_TRABAJADORES.find((g) => g.nombre === sel) || GPS_TRABAJADORES[0];
+
+  const cumplen = GPS_TRABAJADORES.filter((g) => g.cumple === true).length;
+  const incumplen = GPS_TRABAJADORES.filter((g) => g.cumple === false).length;
+  const enProceso = GPS_TRABAJADORES.filter((g) => g.cumple === null).length;
+
   return (
-    <div className={`flex flex-col gap-3.5 ${highlightId === "iot-card" ? "copilot-pulse rounded-3xl" : ""}`}>
-      <p style={{ fontSize: 12.5, color: T.inkSoft }}>Capa de sensores IoT municipales: contenedores de basura y sensores de caudal conectados en tiempo real.</p>
-      {SENSORES.map((s, i) => {
-        const Icon = s.icon; const accent = T[s.key]; const accentSoft = T[`${s.key}Soft`]; return (
-          <div key={i} className="rounded-3xl p-4 flex items-center gap-4" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
-            <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: accentSoft, color: accent }}><Icon size={20} /></div>
-            <div className="flex-1"><p style={{ fontSize: 13.5, fontWeight: 700 }}>{s.tipo} — {s.lugar}</p><p style={{ fontSize: 12, color: T.inkSoft }}>{s.estado}</p><div className="mt-1.5 max-w-[220px]"><Bar T={T} pct={s.nivel} color={accent} /></div></div>
-            <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600, color: accent }}>{s.nivel}%</span>
+    <div className="flex flex-col gap-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <p style={{ fontSize: 12.5, color: T.inkSoft, maxWidth: 620 }}>
+          Ubicación en tiempo real de cada trabajador con tarea asignada. Permite verificar si llegó o no al punto, si está dentro de la zona asignada y si cumplió o no con la tarea.
+        </p>
+        {soloLectura && <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full shrink-0" style={{ background: T.oceanSoft, color: T.ocean, fontSize: 11, fontWeight: 700 }}><Eye size={12} /> Sólo lectura</span>}
+      </div>
+
+      {/* Resumen de cumplimiento */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        {[
+          { label: "Cumplen", value: cumplen, color: "sage", icon: CheckCircle2 },
+          { label: "No cumplen", value: incumplen, color: "red", icon: XCircle },
+          { label: "En proceso", value: enProceso, color: "gold", icon: Clock },
+          { label: "Total en terreno", value: GPS_TRABAJADORES.length, color: "ocean", icon: Users },
+        ].map((k, i) => (
+          <div key={i} className="rounded-2xl p-4 flex flex-col gap-1.5" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: T[`${k.color}Soft`], color: T[k.color] }}><k.icon size={15} /></div>
+            <p style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 600, lineHeight: 1 }}>{k.value}</p>
+            <p style={{ fontSize: 11, color: T.inkSoft, fontWeight: 600 }}>{k.label}</p>
           </div>
-        );
-      })}
+        ))}
+      </div>
+
+      {/* Mapa */}
+      <div className="rounded-3xl overflow-hidden" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+        <div className="px-4 py-3 flex items-center justify-between flex-wrap gap-2" style={{ borderBottom: `1px solid ${T.border}` }}>
+          <div className="flex items-center gap-2"><MapPin size={15} color={T.copper} /><p style={{ fontSize: 13, fontWeight: 700 }}>Mapa de La Serena · posiciones en vivo</p></div>
+          <span className="flex items-center gap-1.5" style={{ fontSize: 11, color: T.inkSoft }}><span className="w-1.5 h-1.5 rounded-full blink-dot" style={{ background: T.sage }} /> Actualizado hace 1 min</span>
+        </div>
+        <div className="relative h-72" style={{ background: `repeating-linear-gradient(0deg, ${T.bgAlt}, ${T.bgAlt} 31px, transparent 31px, transparent 32px), repeating-linear-gradient(90deg, ${T.bgAlt}, ${T.bgAlt} 31px, transparent 31px, transparent 32px), ${T.surfaceAlt}` }}>
+          {/* Línea de costa referencial */}
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
+            <path d="M0,88 C18,84 26,94 42,90 C58,86 70,96 100,92 L100,100 L0,100 Z" fill={T.oceanSoft} opacity="0.75" />
+          </svg>
+          {GPS_TRABAJADORES.map((g) => {
+            const color = T[GPS_COLOR_ESTADO[g.estado]];
+            const act = g.nombre === sel;
+            return (
+              <button key={g.rut} onClick={() => setSel(g.nombre)} className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1" style={{ left: `${g.x}%`, top: `${g.y}%` }}>
+                <span className={`rounded-full flex items-center justify-center ${g.estado === "En ruta" ? "blink-dot" : ""}`} style={{ width: act ? 30 : 22, height: act ? 30 : 22, background: color, color: "#fff", border: `2.5px solid ${T.surface}`, boxShadow: act ? `0 0 0 5px ${color}33` : "none", fontSize: 9.5, fontWeight: 800 }}>
+                  {initials(g.nombre)}
+                </span>
+                {act && <span className="px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: T.surface, border: `1px solid ${T.border}`, fontSize: 9.5, fontWeight: 700 }}>{g.nombre}</span>}
+              </button>
+            );
+          })}
+        </div>
+        {/* Leyenda */}
+        <div className="px-4 py-3 flex flex-wrap gap-3" style={{ borderTop: `1px solid ${T.border}` }}>
+          {Object.entries(GPS_COLOR_ESTADO).map(([est, c]) => (
+            <span key={est} className="flex items-center gap-1.5" style={{ fontSize: 11, color: T.inkSoft, fontWeight: 600 }}><span className="w-2.5 h-2.5 rounded-full" style={{ background: T[c] }} /> {est}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* Detalle del trabajador seleccionado */}
+      <div className="rounded-3xl p-5 flex flex-col gap-3.5" style={{ background: T.surface, border: `1.5px solid ${T[GPS_COLOR_ESTADO[activo.estado]]}` }}>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ background: T.surfaceAlt, fontWeight: 700, fontSize: 13 }}>{initials(activo.nombre)}</div>
+            <div>
+              <p style={{ fontSize: 14.5, fontWeight: 700 }}>{activo.nombre}</p>
+              <p style={{ fontSize: 11.5, color: T.inkSoft }}>RUT {activo.rut} · Cuadrilla {activo.cuadrilla} · Delegación {activo.delegacion}</p>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-full" style={{ background: T[`${GPS_COLOR_ESTADO[activo.estado]}Soft`], color: T[GPS_COLOR_ESTADO[activo.estado]], fontSize: 11.5, fontWeight: 800 }}>{activo.estado}</span>
+        </div>
+
+        <div className="rounded-2xl p-3.5" style={{ background: T.surfaceAlt }}>
+          <p style={{ fontSize: 13, fontWeight: 700 }}>{activo.tarea}</p>
+          <p style={{ fontSize: 12, color: T.inkSoft }}>{activo.direccion}</p>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <MiniStat T={T} icon={Clock} label="Hora asignada" value={`${activo.horaAsignada} hrs`} />
+          <MiniStat T={T} icon={MapPin} label="Marcó llegada" value={activo.horaLlegada ? `${activo.horaLlegada} hrs` : "Sin registro"} warn={!activo.horaLlegada} />
+          <MiniStat T={T} icon={Navigation} label="Precisión GPS" value={activo.distancia} warn={activo.cumple === false} />
+          <MiniStat T={T} icon={Radio} label="Última señal" value={activo.senal} warn={activo.senal.includes("h")} />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {activo.cumple === true && <TagChip T={T} icon={CheckCircle2} text="Cumple con la tarea asignada" color="sage" />}
+          {activo.cumple === false && <TagChip T={T} icon={AlertTriangle} text="No cumple — requiere justificación" color="red" />}
+          {activo.cumple === null && <TagChip T={T} icon={Clock} text="En proceso, aún dentro del horario" color="gold" />}
+          <TagChip T={T} icon={Camera} text={activo.evidenciaAntes ? "Foto ANTES recibida" : "Sin foto ANTES"} color={activo.evidenciaAntes ? "sage" : "red"} />
+          <TagChip T={T} icon={Camera} text={activo.evidenciaDespues ? "Foto DESPUÉS recibida" : "Sin foto DESPUÉS"} color={activo.evidenciaDespues ? "sage" : "gold"} />
+          <TagChip T={T} icon={Gauge} text={`Batería ${activo.bateria}%`} color={activo.bateria < 20 ? "red" : "ocean"} />
+        </div>
+      </div>
+
+      {/* Listado con filtros */}
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1">
+        {filtros.map((f) => <button key={f} onClick={() => setFiltro(f)} className="px-3.5 py-2 rounded-full text-[12px] font-bold whitespace-nowrap" style={{ background: filtro === f ? T.copper : T.surfaceAlt, color: filtro === f ? T.surface : T.inkSoft, border: `1px solid ${T.border}` }}>{f}</button>)}
+      </div>
+      <div className="flex flex-col gap-2.5">
+        {lista.map((g) => {
+          const color = T[GPS_COLOR_ESTADO[g.estado]];
+          return (
+            <button key={g.rut} onClick={() => setSel(g.nombre)} className="rounded-2xl p-4 flex items-center gap-3.5 text-left" style={{ background: T.surface, border: `1.5px solid ${sel === g.nombre ? color : T.border}` }}>
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
+              <div className="flex-1 min-w-0">
+                <p style={{ fontSize: 13.5, fontWeight: 700 }}>{g.nombre}</p>
+                <p style={{ fontSize: 11.5, color: T.inkSoft }}>{g.tarea} · {g.direccion}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <p style={{ fontSize: 11.5, fontWeight: 800, color }}>{g.estado}</p>
+                <p style={{ fontSize: 10.5, color: T.inkFaint }}>{g.horaLlegada ? `Llegó ${g.horaLlegada}` : "Sin llegada"}</p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---- CHAT INTERNO DEL ADMINISTRADOR ---- */
+function PantallaChatAdmin({ T, chatTrabajadores, setChatTrabajadores, chatAdminAlcaldesa, setChatAdminAlcaldesa }) {
+  const [canal, setCanal] = useState(Object.keys(chatTrabajadores)[0]);
+  const [msg, setMsg] = useState("");
+  const esAlcaldesa = canal === "__ALCALDESA__";
+  const hilo = esAlcaldesa ? chatAdminAlcaldesa : (chatTrabajadores[canal] || []);
+  const finRef = useRef(null);
+  useEffect(() => { finRef.current?.scrollIntoView({ behavior: "smooth" }); }, [hilo.length, canal]);
+
+  const enviar = () => {
+    const t = msg.trim(); if (!t) return;
+    const hora = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+    if (esAlcaldesa) setChatAdminAlcaldesa((c) => [...c, { from: "admin", texto: t, hora }]);
+    else setChatTrabajadores((c) => ({ ...c, [canal]: [...(c[canal] || []), { from: "admin", texto: t, hora }] }));
+    setMsg("");
+  };
+
+  const nombreCanal = esAlcaldesa ? "Alcaldesa" : canal;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p style={{ fontSize: 12.5, color: T.inkSoft, maxWidth: 640 }}>
+        Comunicación directa con cada trabajador en terreno y con la Alcaldesa. Todas estas conversaciones son visibles para la Alcaldesa, de modo que nada quede oculto.
+      </p>
+
+      <div className="rounded-3xl overflow-hidden flex flex-col sm:flex-row" style={{ background: T.surface, border: `1.5px solid ${T.border}`, height: 500 }}>
+        {/* Canales */}
+        <div className="sm:w-60 shrink-0 overflow-y-auto p-2.5 flex flex-col gap-1" style={{ borderRight: `1px solid ${T.border}` }}>
+          <p className="px-2.5 pt-1 pb-1.5" style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.3, textTransform: "uppercase", color: T.inkFaint }}>Jefatura superior</p>
+          <button onClick={() => setCanal("__ALCALDESA__")} className="text-left px-3 py-2.5 rounded-xl flex items-center gap-2" style={{ background: esAlcaldesa ? T.copper : "transparent", color: esAlcaldesa ? T.surface : T.ink }}>
+            <Landmark size={14} className="shrink-0" />
+            <span style={{ fontSize: 12.5, fontWeight: esAlcaldesa ? 700 : 500 }}>Alcaldesa</span>
+          </button>
+
+          <p className="px-2.5 pt-3 pb-1.5" style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.3, textTransform: "uppercase", color: T.inkFaint }}>Trabajadores en terreno</p>
+          {Object.keys(chatTrabajadores).map((n) => {
+            const act = canal === n;
+            const ultimo = chatTrabajadores[n][chatTrabajadores[n].length - 1];
+            const pendiente = ultimo?.from === "trabajador";
+            return (
+              <button key={n} onClick={() => setCanal(n)} className="text-left px-3 py-2.5 rounded-xl flex items-center gap-2" style={{ background: act ? T.copper : "transparent", color: act ? T.surface : T.ink }}>
+                <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: act ? "rgba(255,255,255,0.22)" : T.surfaceAlt, fontSize: 10, fontWeight: 700 }}>{initials(n)}</span>
+                <span style={{ fontSize: 12.5, fontWeight: act ? 700 : 500, flex: 1, lineHeight: 1.2 }}>{n}</span>
+                {pendiente && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: act ? T.surface : T.red }} />}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Hilo */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="px-4 py-3 flex items-center gap-2.5" style={{ borderBottom: `1px solid ${T.border}` }}>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: T.copperSoft, color: T.copperInk, fontWeight: 700, fontSize: 11.5 }}>{esAlcaldesa ? <Landmark size={15} /> : initials(nombreCanal)}</div>
+            <div className="flex-1">
+              <p style={{ fontSize: 13.5, fontWeight: 700 }}>{nombreCanal}</p>
+              <p style={{ fontSize: 11, color: T.inkSoft }}>{esAlcaldesa ? "Canal directo con la máxima autoridad comunal" : "Trabajador municipal en terreno"}</p>
+            </div>
+            {!esAlcaldesa && <span className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: T.oceanSoft, color: T.ocean, fontSize: 10.5, fontWeight: 700 }}><Eye size={11} /> Visible para la Alcaldesa</span>}
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2.5">
+            {hilo.length === 0 && <p style={{ fontSize: 12.5, color: T.inkFaint, textAlign: "center", marginTop: 20 }}>Sin mensajes en este canal.</p>}
+            {hilo.map((m, i) => {
+              const propio = m.from === "admin";
+              return (
+                <div key={i} className="max-w-[78%] rounded-2xl px-3.5 py-2.5" style={{ alignSelf: propio ? "flex-end" : "flex-start", background: propio ? T.copper : T.surfaceAlt, color: propio ? T.surface : T.ink }}>
+                  <p style={{ fontSize: 13 }}>{m.texto}</p>
+                  {m.hora && <p style={{ fontSize: 9.5, opacity: 0.7, marginTop: 3, textAlign: "right" }}>{m.hora}</p>}
+                </div>
+              );
+            })}
+            <div ref={finRef} />
+          </div>
+
+          <form onSubmit={(e) => { e.preventDefault(); enviar(); }} className="p-3 flex gap-2" style={{ borderTop: `1px solid ${T.border}` }}>
+            <input value={msg} onChange={(e) => setMsg(e.target.value)} placeholder={`Mensaje para ${nombreCanal}`} className="flex-1 rounded-xl px-3.5 py-2.5 text-[13px] outline-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+            <button className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: T.copper, color: T.surface }}><MessageCircle size={16} /></button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
@@ -3462,30 +4619,147 @@ function SGRPersonal({ T }) {
   );
 }
 function SGRTubo({ T }) {
+  const [filas, setFilas] = useState(SGR_TUBO);
+  const [abierto, setAbierto] = useState(false);
+  const vacio = { fecha: "", actividad: "", tipo: "Ext", responsable: "", territorio: "", compromiso: "", area: "", estatus: "Ingresado" };
+  const [nuevo, setNuevo] = useState(vacio);
+  const [editIdx, setEditIdx] = useState(null);
+
+  const set = (k, v) => setNuevo((n) => ({ ...n, [k]: v }));
+  const listo = nuevo.fecha && nuevo.actividad.trim() && nuevo.responsable.trim();
+
+  const guardar = () => {
+    if (!listo) return;
+    if (editIdx !== null) {
+      setFilas((f) => f.map((r, i) => (i === editIdx ? nuevo : r)));
+    } else {
+      setFilas((f) => [nuevo, ...f]);
+    }
+    setNuevo(vacio); setAbierto(false); setEditIdx(null);
+  };
+
+  const editar = (i) => { setNuevo(filas[i]); setEditIdx(i); setAbierto(true); };
+  const eliminar = (i) => setFilas((f) => f.filter((_, j) => j !== i));
+  const cambiarEstado = (i, estatus) => setFilas((f) => f.map((r, j) => (j === i ? { ...r, estatus } : r)));
+
+  const areas = ["Tránsito", "Áreas verdes", "Sección alumbrado", "Diserco", "Diserco / Aseo", "Diserco / Maquinaria", "Área mujeres", "Obras", "DIDECO"];
+
   return (
-    <div className="rounded-3xl overflow-hidden" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
-      <div className="p-4" style={{ borderBottom: `1px solid ${T.border}` }}><p style={{ fontSize: 12, color: T.inkSoft }}>Agenda colectiva de compromisos a futuro: cada solicitud cambia de estado — Ingresado → Pendiente → En proceso → Realizado — para que cualquier funcionario pueda hacer seguimiento.</p></div>
-      <div className="overflow-x-auto">
-        <table className="w-full" style={{ borderCollapse: "collapse" }}>
-          <thead><tr style={{ background: T.surfaceAlt }}>{["Fecha", "Actividad / solicitud", "Territorio", "Responsable", "Compromiso", "Área", "Estado"].map((h) => <th key={h} className="text-left px-4 py-3" style={{ fontSize: 10.5, fontWeight: 700, color: T.inkFaint, whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead>
-          <tbody>{SGR_TUBO.map((r, i) => {
-            const color = SGR_ESTATUS_COLOR[r.estatus] || "gold"; return (
-              <tr key={i} style={{ borderTop: `1px solid ${T.border}` }}>
-                <td className="px-4 py-3" style={{ fontSize: 12, color: T.inkFaint, whiteSpace: "nowrap" }}>{r.fecha}</td>
-                <td className="px-4 py-3" style={{ fontSize: 12.5, maxWidth: 260 }}>{r.actividad}<span style={{ fontSize: 10.5, color: T.inkFaint }}> · {r.tipo}</span></td>
-                <td className="px-4 py-3" style={{ fontSize: 12, color: T.inkFaint, whiteSpace: "nowrap" }}>{r.territorio}</td>
-                <td className="px-4 py-3" style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{r.responsable}</td>
-                <td className="px-4 py-3" style={{ fontSize: 12, color: T.inkFaint, whiteSpace: "nowrap" }}>{r.compromiso}</td>
-                <td className="px-4 py-3" style={{ fontSize: 12, color: T.inkFaint, whiteSpace: "nowrap" }}>{r.area}</td>
-                <td className="px-4 py-3"><span className="px-2.5 py-1 rounded-full inline-block" style={{ background: T[`${color}Soft`], color: T[color], fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>{r.estatus}</span></td>
-              </tr>
-            );
-          })}</tbody>
-        </table>
+    <div className="flex flex-col gap-3.5">
+      <div className="rounded-3xl p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+        <p style={{ fontSize: 12, color: T.inkSoft, flex: 1 }}>Agenda colectiva de compromisos: cada solicitud cambia de estado — Ingresado → Pendiente → En proceso → Realizado. Puedes agregar, editar y cerrar registros aquí mismo.</p>
+        <button onClick={() => { setNuevo(vacio); setEditIdx(null); setAbierto((v) => !v); }} className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-[12.5px] font-bold whitespace-nowrap shrink-0" style={{ background: abierto ? T.surfaceAlt : T.copper, color: abierto ? T.inkSoft : T.surface, border: `1px solid ${abierto ? T.border : T.copper}` }}>
+          {abierto ? <><X size={14} /> Cerrar formulario</> : <><Plus size={15} /> Agregar registro</>}
+        </button>
+      </div>
+
+      {abierto && (
+        <div className="rounded-3xl p-5 flex flex-col gap-3.5" style={{ background: T.surface, border: `1.5px solid ${T.copper}` }}>
+          <p style={{ fontSize: 13.5, fontWeight: 700 }}>{editIdx !== null ? "Editar registro del tubo" : "Nuevo registro del tubo de trabajo"}</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: T.inkSoft }}>Fecha de ingreso *</label>
+              <input type="date" value={nuevo.fecha.includes("/") ? "" : nuevo.fecha} onChange={(e) => set("fecha", e.target.value)} className="mt-1.5 w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: T.inkSoft }}>Tipo</label>
+              <select value={nuevo.tipo} onChange={(e) => set("tipo", e.target.value)} className="mt-1.5 w-full rounded-xl px-3 py-2.5 text-[13px]" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }}>
+                <option value="Ext">Externo (vecino u organización)</option>
+                <option value="Int">Interno (municipal)</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: T.inkSoft }}>Fecha comprometida</label>
+              <input type="date" value={nuevo.compromiso.includes("/") ? "" : nuevo.compromiso} onChange={(e) => set("compromiso", e.target.value)} className="mt-1.5 w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11.5, fontWeight: 700, color: T.inkSoft }}>Actividad o solicitud *</label>
+            <textarea value={nuevo.actividad} onChange={(e) => set("actividad", e.target.value)} rows={2} placeholder="Ej: Solicitud de poda en sector Uruguay con Pasaje Totoral" className="mt-1.5 w-full rounded-xl px-3.5 py-2.5 text-[13px] outline-none resize-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: T.inkSoft }}>Responsable *</label>
+              <input list="sgr-responsables" value={nuevo.responsable} onChange={(e) => set("responsable", e.target.value)} placeholder="Nombre del funcionario" className="mt-1.5 w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+              <datalist id="sgr-responsables">
+                {SGR_SEMAFORO.map((r) => <option key={r.responsable} value={r.responsable} />)}
+                {SGR_FUNCIONARIOS.map((f) => <option key={f.nombre} value={f.nombre} />)}
+              </datalist>
+            </div>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: T.inkSoft }}>Territorio</label>
+              <input list="sgr-territorios" value={nuevo.territorio} onChange={(e) => set("territorio", e.target.value)} placeholder="Ej: Latorre" className="mt-1.5 w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+              <datalist id="sgr-territorios">
+                {SGR_DELEGACIONES.map((d) => <option key={d} value={d} />)}
+              </datalist>
+            </div>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: T.inkSoft }}>Área</label>
+              <select value={nuevo.area} onChange={(e) => set("area", e.target.value)} className="mt-1.5 w-full rounded-xl px-3 py-2.5 text-[13px]" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }}>
+                <option value="">Seleccionar área</option>
+                {areas.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11.5, fontWeight: 700, color: T.inkSoft }}>Estado inicial</label>
+            <div className="mt-1.5 flex gap-1.5 flex-wrap">
+              {Object.keys(SGR_ESTATUS_COLOR).map((e) => {
+                const act = nuevo.estatus === e; const c = SGR_ESTATUS_COLOR[e];
+                return <button key={e} onClick={() => set("estatus", e)} className="px-3.5 py-2 rounded-full text-[12px] font-bold" style={{ background: act ? T[c] : T.surfaceAlt, color: act ? T.surface : T.inkSoft, border: `1px solid ${act ? T[c] : T.border}` }}>{e}</button>;
+              })}
+            </div>
+          </div>
+
+          <div className="flex gap-2.5">
+            <button onClick={() => { setAbierto(false); setEditIdx(null); setNuevo(vacio); }} className="px-5 py-2.5 rounded-2xl text-[12.5px] font-bold" style={{ background: T.surfaceAlt, color: T.inkSoft, border: `1px solid ${T.border}` }}>Cancelar</button>
+            <button onClick={guardar} disabled={!listo} className="px-5 py-2.5 rounded-2xl text-[12.5px] font-bold" style={{ background: T.copper, color: T.surface, opacity: listo ? 1 : 0.45 }}>{editIdx !== null ? "Guardar cambios" : "Agregar al tubo"}</button>
+          </div>
+          {!listo && <p style={{ fontSize: 11, color: T.inkFaint }}>Completa fecha, actividad y responsable.</p>}
+        </div>
+      )}
+
+      <div className="rounded-3xl overflow-hidden" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+        <div className="overflow-x-auto">
+          <table className="w-full" style={{ borderCollapse: "collapse" }}>
+            <thead><tr style={{ background: T.surfaceAlt }}>{["Fecha", "Actividad / solicitud", "Territorio", "Responsable", "Compromiso", "Área", "Estado", "Acciones"].map((h) => <th key={h} className="text-left px-4 py-3" style={{ fontSize: 10.5, fontWeight: 700, color: T.inkFaint, whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead>
+            <tbody>{filas.map((r, i) => {
+              const color = SGR_ESTATUS_COLOR[r.estatus] || "gold"; return (
+                <tr key={i} style={{ borderTop: `1px solid ${T.border}` }}>
+                  <td className="px-4 py-3" style={{ fontSize: 12, color: T.inkFaint, whiteSpace: "nowrap" }}>{r.fecha}</td>
+                  <td className="px-4 py-3" style={{ fontSize: 12.5, maxWidth: 260 }}>{r.actividad}<span style={{ fontSize: 10.5, color: T.inkFaint }}> · {r.tipo}</span></td>
+                  <td className="px-4 py-3" style={{ fontSize: 12, color: T.inkFaint, whiteSpace: "nowrap" }}>{r.territorio}</td>
+                  <td className="px-4 py-3" style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{r.responsable}</td>
+                  <td className="px-4 py-3" style={{ fontSize: 12, color: T.inkFaint, whiteSpace: "nowrap" }}>{r.compromiso}</td>
+                  <td className="px-4 py-3" style={{ fontSize: 12, color: T.inkFaint, whiteSpace: "nowrap" }}>{r.area}</td>
+                  <td className="px-4 py-3">
+                    <select value={r.estatus} onChange={(e) => cambiarEstado(i, e.target.value)} className="px-2.5 py-1 rounded-full outline-none" style={{ background: T[`${color}Soft`], color: T[color], fontSize: 11, fontWeight: 700, border: `1px solid ${T[color]}33` }}>
+                      {Object.keys(SGR_ESTATUS_COLOR).map((e) => <option key={e} value={e} style={{ background: T.surface, color: T.ink }}>{e}</option>)}
+                    </select>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-1.5">
+                      <button onClick={() => editar(i)} title="Editar" className="p-1.5 rounded-lg" style={{ background: T.surfaceAlt, color: T.gold }}><Edit3 size={13} /></button>
+                      <button onClick={() => eliminar(i)} title="Eliminar" className="p-1.5 rounded-lg" style={{ background: T.redSoft, color: T.red }}><Trash2 size={13} /></button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}</tbody>
+          </table>
+        </div>
+        <div className="px-4 py-3" style={{ borderTop: `1px solid ${T.border}`, background: T.surfaceAlt }}>
+          <p style={{ fontSize: 11.5, color: T.inkFaint }}>{filas.length} registros en el tubo de trabajo</p>
+        </div>
       </div>
     </div>
   );
 }
+
 function SGRSemaforo({ T }) {
   const promedio = SGR_SEMAFORO.reduce((a, r) => a + r.avance, 0) / SGR_SEMAFORO.length;
   return (
@@ -3518,24 +4792,254 @@ function SGRSemaforo({ T }) {
 }
 
 /* ---- Escudos finales del sistema ---- */
+const SISTEMA_ITEMS = [
+  { id: "OFFLINE", icon: WifiOff, titulo: "Modo de operación offline", desc: "Activo — 3 trabajadores en terreno sincronizando datos guardados sin señal.", color: "ocean" },
+  { id: "BIOMETRIA", icon: Fingerprint, titulo: "Autenticación biométrica", desc: "Habilitada en la App móvil (FaceID / huella) con cifrado de extremo a extremo.", color: "sage" },
+  { id: "RESPALDO", icon: Cloud, titulo: "Respaldo híbrido", desc: "Nube (AWS/Azure) + respaldo automático cada hora en servidores municipales. Última sincronización: hace 12 min.", color: "gold" },
+];
+
 function PantallaSistema({ T }) {
-  const items = [
-    { icon: WifiOff, titulo: "Modo de operación offline", desc: "Activo — 3 trabajadores en terreno sincronizando datos guardados sin señal.", color: "ocean" },
-    { icon: Fingerprint, titulo: "Autenticación biométrica", desc: "Habilitada en la App móvil (FaceID / huella) con cifrado de extremo a extremo.", color: "sage" },
-    { icon: Cloud, titulo: "Respaldo híbrido", desc: "Nube (AWS/Azure) + respaldo automático cada hora en servidores municipales. Última sincronización: hace 12 min.", color: "gold" },
-  ];
+  const [detalle, setDetalle] = useState(null);
+
+  if (detalle === "OFFLINE") return <SistemaOffline T={T} onVolver={() => setDetalle(null)} />;
+  if (detalle === "BIOMETRIA") return <SistemaBiometria T={T} onVolver={() => setDetalle(null)} />;
+  if (detalle === "RESPALDO") return <SistemaRespaldo T={T} onVolver={() => setDetalle(null)} />;
+
   return (
     <div className="flex flex-col gap-3.5 max-w-2xl">
-      <p style={{ fontSize: 12.5, color: T.inkSoft }}>Componentes invisibles para el vecino, vitales para la resiliencia y seguridad de la plataforma.</p>
-      {items.map((it, i) => {
+      <p style={{ fontSize: 12.5, color: T.inkSoft }}>Componentes invisibles para el vecino, vitales para la resiliencia y seguridad de la plataforma. Toca cada uno para ver su página de detalle.</p>
+      {SISTEMA_ITEMS.map((it) => {
         const Icon = it.icon; const accent = T[it.color]; const accentSoft = T[`${it.color}Soft`]; return (
-          <div key={i} className="rounded-3xl p-5 flex items-center gap-4" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+          <button key={it.id} onClick={() => setDetalle(it.id)} className="rounded-3xl p-5 flex items-center gap-4 text-left" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ background: accentSoft, color: accent }}><Icon size={22} /></div>
             <div className="flex-1"><p style={{ fontSize: 14, fontWeight: 700 }}>{it.titulo}</p><p style={{ fontSize: 12, color: T.inkSoft, marginTop: 2 }}>{it.desc}</p></div>
-            <Server size={16} color={T.inkFaint} className="hidden sm:block" />
-          </div>
+            <ChevronRight size={17} color={T.inkFaint} className="shrink-0" />
+          </button>
         );
       })}
+    </div>
+  );
+}
+
+function SistemaHeader({ T, onVolver, icon: Icon, color, titulo, bajada, estado }) {
+  const accent = T[color], accentSoft = T[`${color}Soft`];
+  return (
+    <div className="flex flex-col gap-4">
+      <button onClick={onVolver} className="flex items-center gap-1.5 w-fit" style={{ color: T.inkSoft, fontSize: 12.5, fontWeight: 600 }}><ChevronLeft size={15} /> Volver a Sistema</button>
+      <div className="rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center gap-4" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style={{ background: accentSoft, color: accent }}><Icon size={26} /></div>
+        <div className="flex-1">
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600 }}>{titulo}</h2>
+          <p style={{ fontSize: 12.5, color: T.inkSoft, marginTop: 3 }}>{bajada}</p>
+        </div>
+        <span className="px-3 py-1.5 rounded-full w-fit shrink-0" style={{ background: accentSoft, color: accent, fontSize: 11.5, fontWeight: 800 }}>{estado}</span>
+      </div>
+    </div>
+  );
+}
+
+function SistemaCard({ T, children, titulo }) {
+  return (
+    <div className="rounded-3xl p-5 flex flex-col gap-3" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+      {titulo && <p style={{ fontSize: 13.5, fontWeight: 700 }}>{titulo}</p>}
+      {children}
+    </div>
+  );
+}
+
+/* ---- Página 1: Modo de operación offline ---- */
+function SistemaOffline({ T, onVolver }) {
+  const enTerreno = [
+    { nombre: "Pedro Ilabaca R.", zona: "Los Aromos 482", pendientes: 4, desde: "09:12", estado: "Sin señal" },
+    { nombre: "Jorge Peralta M.", zona: "Sector rural El Romero", pendientes: 7, desde: "08:40", estado: "Sin señal" },
+    { nombre: "Luis Andrade M.", zona: "Quebrada La Pampa", pendientes: 2, desde: "10:05", estado: "Señal intermitente" },
+  ];
+  const totalPend = enTerreno.reduce((s, t) => s + t.pendientes, 0);
+  return (
+    <div className="flex flex-col gap-4 max-w-3xl">
+      <SistemaHeader T={T} onVolver={onVolver} icon={WifiOff} color="ocean" titulo="Modo de operación offline"
+        bajada="La aplicación de terreno sigue funcionando sin cobertura: guarda fichajes, fotos y formularios en el teléfono y los sincroniza apenas recupera señal."
+        estado="Activo" />
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <MiniStat T={T} icon={Users} label="Trabajadores offline" value={enTerreno.length} />
+        <MiniStat T={T} icon={Package} label="Registros en cola" value={totalPend} warn={totalPend > 10} />
+        <MiniStat T={T} icon={Clock} label="Máx. tiempo sin señal" value="2 h 35 min" />
+        <MiniStat T={T} icon={CheckCircle2} label="Sincronizaciones hoy" value="47 de 47" />
+      </div>
+
+      <SistemaCard T={T} titulo="Trabajadores operando sin señal">
+        {enTerreno.map((t, i) => (
+          <div key={i} className="rounded-2xl p-3.5 flex items-center gap-3" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}` }}>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: T.surface, fontWeight: 700, fontSize: 11 }}>{initials(t.nombre)}</div>
+            <div className="flex-1 min-w-0">
+              <p style={{ fontSize: 13, fontWeight: 700 }}>{t.nombre}</p>
+              <p style={{ fontSize: 11.5, color: T.inkSoft }}>{t.zona} · sin conexión desde las {t.desde} hrs</p>
+            </div>
+            <div className="text-right shrink-0">
+              <p style={{ fontSize: 12, fontWeight: 800, color: T.ocean }}>{t.pendientes}</p>
+              <p style={{ fontSize: 10, color: T.inkFaint }}>en cola</p>
+            </div>
+          </div>
+        ))}
+      </SistemaCard>
+
+      <SistemaCard T={T} titulo="Qué se guarda sin conexión">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {["Fichaje de entrada, colación y salida", "Fotos del antes y el después con GPS y hora", "Formularios de cierre y firma del vecino", "Registro de imprevistos en terreno"].map((d, i) => (
+            <div key={i} className="flex items-start gap-2"><Check size={14} color={T.sage} className="shrink-0 mt-0.5" /><span style={{ fontSize: 12.5 }}>{d}</span></div>
+          ))}
+        </div>
+      </SistemaCard>
+
+      <SistemaCard T={T} titulo="Cómo funciona la sincronización">
+        {[
+          { n: 1, t: "Captura local cifrada", d: "El dato se guarda en el teléfono con cifrado AES-256 y un sello de hora que no puede modificarse." },
+          { n: 2, t: "Cola de envío ordenada", d: "Cada registro entra a una cola en el orden en que ocurrió, para que la trazabilidad no se altere." },
+          { n: 3, t: "Reconexión automática", d: "Al detectar señal, la app envía la cola en segundo plano sin que el trabajador tenga que hacer nada." },
+          { n: 4, t: "Confirmación y verificación", d: "El servidor responde con un hash de confirmación que queda registrado en la auditoría interna." },
+        ].map((p) => (
+          <div key={p.n} className="flex items-start gap-3">
+            <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: T.oceanSoft, color: T.ocean, fontSize: 12, fontWeight: 800 }}>{p.n}</span>
+            <div><p style={{ fontSize: 13, fontWeight: 700 }}>{p.t}</p><p style={{ fontSize: 12, color: T.inkSoft }}>{p.d}</p></div>
+          </div>
+        ))}
+      </SistemaCard>
+    </div>
+  );
+}
+
+/* ---- Página 2: Autenticación biométrica ---- */
+function SistemaBiometria({ T, onVolver }) {
+  const [faceId, setFaceId] = useState(true);
+  const [huella, setHuella] = useState(true);
+  const [doblePaso, setDoblePaso] = useState(true);
+
+  const registros = [
+    { quien: "Pedro Ilabaca R.", metodo: "Huella dactilar", hora: "08:42", disp: "Android · Motorola G54", ok: true },
+    { quien: "Marcela Tapia V.", metodo: "FaceID", hora: "08:15", disp: "iPhone 13", ok: true },
+    { quien: "Katherine Solís V.", metodo: "Huella dactilar", hora: "07:58", disp: "Android · Samsung A34", ok: true },
+    { quien: "Desconocido", metodo: "Huella no reconocida", hora: "07:31", disp: "Android · dispositivo no registrado", ok: false },
+  ];
+
+  return (
+    <div className="flex flex-col gap-4 max-w-3xl">
+      <SistemaHeader T={T} onVolver={onVolver} icon={Fingerprint} color="sage" titulo="Autenticación biométrica"
+        bajada="El acceso a la App móvil se valida con huella dactilar o reconocimiento facial del propio dispositivo, con cifrado de extremo a extremo."
+        estado="Habilitada" />
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <MiniStat T={T} icon={UserCheck} label="Usuarios inscritos" value="184" />
+        <MiniStat T={T} icon={CheckCircle2} label="Accesos válidos hoy" value="312" />
+        <MiniStat T={T} icon={AlertTriangle} label="Intentos rechazados" value="3" warn />
+        <MiniStat T={T} icon={Lock} label="Cifrado" value="AES-256 E2E" />
+      </div>
+
+      <SistemaCard T={T} titulo="Métodos habilitados">
+        {[
+          { label: "FaceID / reconocimiento facial", desc: "Disponible en dispositivos iOS compatibles", on: faceId, set: setFaceId },
+          { label: "Huella dactilar", desc: "Disponible en dispositivos Android e iOS", on: huella, set: setHuella },
+          { label: "Doble factor para perfiles administrativos", desc: "Biometría + código de 6 dígitos al correo institucional", on: doblePaso, set: setDoblePaso },
+        ].map((m, i) => (
+          <div key={i} className="rounded-2xl p-3.5 flex items-center justify-between gap-3" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}` }}>
+            <div className="flex-1"><p style={{ fontSize: 13, fontWeight: 700 }}>{m.label}</p><p style={{ fontSize: 11.5, color: T.inkSoft }}>{m.desc}</p></div>
+            <button onClick={() => m.set((v) => !v)}><Switch T={T} on={m.on} /></button>
+          </div>
+        ))}
+      </SistemaCard>
+
+      <SistemaCard T={T} titulo="Últimos accesos biométricos">
+        {registros.map((r, i) => (
+          <div key={i} className="rounded-2xl p-3.5 flex items-center gap-3" style={{ background: T.surfaceAlt, border: `1px solid ${r.ok ? T.border : T.red}` }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: r.ok ? T.sageSoft : T.redSoft, color: r.ok ? T.sage : T.red }}>
+              {r.ok ? <Fingerprint size={16} /> : <AlertTriangle size={16} />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p style={{ fontSize: 13, fontWeight: 700 }}>{r.quien}</p>
+              <p style={{ fontSize: 11.5, color: T.inkSoft }}>{r.metodo} · {r.disp}</p>
+            </div>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: T.inkSoft }}>{r.hora}</span>
+          </div>
+        ))}
+      </SistemaCard>
+
+      <SistemaCard T={T} titulo="Protección de los datos biométricos">
+        <div className="flex flex-col gap-2">
+          {[
+            "La huella y el rostro nunca salen del teléfono: el municipio sólo recibe una confirmación firmada.",
+            "No se almacena ninguna imagen ni plantilla biométrica en los servidores municipales.",
+            "Si el dispositivo se pierde, el acceso se revoca desde Usuarios sin afectar la cuenta.",
+          ].map((d, i) => <div key={i} className="flex items-start gap-2"><ShieldCheck size={14} color={T.sage} className="shrink-0 mt-0.5" /><span style={{ fontSize: 12.5 }}>{d}</span></div>)}
+        </div>
+      </SistemaCard>
+    </div>
+  );
+}
+
+/* ---- Página 3: Respaldo híbrido ---- */
+function SistemaRespaldo({ T, onVolver }) {
+  const historial = [
+    { hora: "13:00", destino: "Nube AWS · Región São Paulo", tamano: "1,8 GB", estado: "Correcto" },
+    { hora: "12:00", destino: "Servidor municipal · Sala TI La Serena", tamano: "1,8 GB", estado: "Correcto" },
+    { hora: "11:00", destino: "Nube Azure · Región Brazil South", tamano: "1,7 GB", estado: "Correcto" },
+    { hora: "10:00", destino: "Servidor municipal · Sala TI La Serena", tamano: "1,7 GB", estado: "Correcto" },
+    { hora: "09:00", destino: "Nube AWS · Región São Paulo", tamano: "1,7 GB", estado: "Con reintento" },
+  ];
+  return (
+    <div className="flex flex-col gap-4 max-w-3xl">
+      <SistemaHeader T={T} onVolver={onVolver} icon={Cloud} color="gold" titulo="Respaldo híbrido"
+        bajada="Los datos se respaldan cada hora en la nube (AWS/Azure) y en servidores dentro del municipio, de modo que una falla en uno no implique pérdida de información."
+        estado="Última sincronización: hace 12 min" />
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <MiniStat T={T} icon={Clock} label="Frecuencia" value="Cada 1 hora" />
+        <MiniStat T={T} icon={Database} label="Volumen respaldado" value="1,8 GB" />
+        <MiniStat T={T} icon={CheckCircle2} label="Respaldos correctos (30 d)" value="718 de 720" />
+        <MiniStat T={T} icon={TrendingUp} label="Tiempo de recuperación" value="< 15 min" />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {[
+          { icon: Cloud, color: "ocean", titulo: "Copia en la nube", items: ["AWS · São Paulo (principal)", "Azure · Brazil South (espejo)", "Cifrado en tránsito y en reposo", "Retención de 90 días"] },
+          { icon: Server, color: "sage", titulo: "Copia en servidores municipales", items: ["Sala TI del edificio consistorial", "Copia completa diaria a las 02:00", "Aislada de internet (air-gapped)", "Retención de 30 días"] },
+        ].map((b, i) => (
+          <div key={i} className="rounded-3xl p-5 flex flex-col gap-3" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: T[`${b.color}Soft`], color: T[b.color] }}><b.icon size={18} /></div>
+              <p style={{ fontSize: 13.5, fontWeight: 700 }}>{b.titulo}</p>
+            </div>
+            {b.items.map((it, j) => <div key={j} className="flex items-start gap-2"><Check size={13} color={T[b.color]} className="shrink-0 mt-0.5" /><span style={{ fontSize: 12 }}>{it}</span></div>)}
+          </div>
+        ))}
+      </div>
+
+      <SistemaCard T={T} titulo="Historial de respaldos de hoy">
+        {historial.map((h, i) => {
+          const ok = h.estado === "Correcto";
+          return (
+            <div key={i} className="rounded-2xl p-3.5 flex items-center gap-3" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}` }}>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: ok ? T.sageSoft : T.goldSoft, color: ok ? T.sage : T.gold }}>
+                {ok ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p style={{ fontSize: 12.5, fontWeight: 700 }}>{h.destino}</p>
+                <p style={{ fontSize: 11, color: T.inkSoft }}>{h.hora} hrs · {h.tamano}</p>
+              </div>
+              <span className="px-2.5 py-1 rounded-full shrink-0" style={{ background: ok ? T.sageSoft : T.goldSoft, color: ok ? T.sage : T.gold, fontSize: 10.5, fontWeight: 700 }}>{h.estado}</span>
+            </div>
+          );
+        })}
+      </SistemaCard>
+
+      <SistemaCard T={T} titulo="Plan de recuperación ante desastres">
+        <div className="flex flex-col gap-2">
+          {[
+            "Si cae la nube, el sistema opera desde los servidores municipales sin interrumpir la atención al vecino.",
+            "Si cae la sala TI del municipio, la plataforma sigue funcionando desde la nube.",
+            "Prueba de restauración completa cada trimestre, con acta firmada por la Dirección de Control.",
+          ].map((d, i) => <div key={i} className="flex items-start gap-2"><ShieldCheck size={14} color={T.gold} className="shrink-0 mt-0.5" /><span style={{ fontSize: 12.5 }}>{d}</span></div>)}
+        </div>
+      </SistemaCard>
     </div>
   );
 }
@@ -3543,23 +5047,134 @@ function PantallaSistema({ T }) {
 /* ---------------------------------------------------------------------
    PANEL DEL ALCALDE
 --------------------------------------------------------------------- */
-function AlcaldePanel({ T }) {
-  const [tab, setTab] = useState(DEPTS_HEADS[0]);
-  const [chats, setChats] = useState(CHAT_SEED);
-  const [msg, setMsg] = useState("");
-  const total = PRESUPUESTO.reduce((s, p) => s + p.ejecutado, 0);
-  let acumulado = 0;
+function AlcaldePanel({ T, contenidos, incidentes, chatDirecciones, setChatDirecciones, chatTrabajadores, chatAdminAlcaldesa, setChatAdminAlcaldesa, vista, setVista }) {
 
-  const enviar = () => { if (!msg.trim()) return; setChats((c) => ({ ...c, [tab]: [...c[tab], { from: "alcalde", texto: msg }] })); setMsg(""); };
+  const tabs = [
+    { id: "RESUMEN", label: "Resumen comunal", icon: Gauge },
+    { id: "OPERACION", label: "Vista del Admin", icon: Eye },
+    { id: "TERRENO", label: "Trabajadores en terreno", icon: MapPin },
+    { id: "CHATS", label: "Delegaciones y Direcciones", icon: MessageCircle },
+    { id: "SUPERVISION", label: "Supervisión de chats", icon: ShieldCheck },
+  ];
 
   return (
-    <div className="pt-5 md:pt-7 flex flex-col gap-8">
+    <div className="pt-5 md:pt-7 flex flex-col gap-6">
+      {/* Encabezado */}
+      <div className="rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center gap-4" style={{ background: `linear-gradient(135deg, ${T.copperSoft}, ${T.surface})`, border: `1.5px solid ${T.border}` }}>
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ background: T.copper, color: T.surface }}><Landmark size={22} /></div>
+        <div className="flex-1">
+          <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600 }}>Panel de la Alcaldesa</h1>
+          <p style={{ fontSize: 12.5, color: T.inkSoft, marginTop: 2 }}>Visión completa de la gestión municipal: lo mismo que ve el Administrador, en modo de sólo lectura, más los canales directos con cada delegación, dirección y con el propio Administrador.</p>
+        </div>
+      </div>
+
+      {/* Navegación */}
+      <div className="rounded-3xl p-3 flex flex-wrap gap-2 w-full" style={{ background: T.surfaceAlt, border: `1.5px solid ${T.border}` }}>
+        {tabs.map((t) => {
+          const active = vista === t.id; const Icon = t.icon;
+          return (
+            <button key={t.id} onClick={() => setVista(t.id)}
+              className="px-4 py-2.5 rounded-2xl text-[13px] font-bold flex items-center gap-2 transition-all active:scale-95"
+              style={{ background: active ? T.copper : T.surface, color: active ? T.surface : T.inkSoft, border: `1.5px solid ${active ? T.copper : T.border}`, boxShadow: active ? "0 4px 14px rgba(196,18,48,0.22)" : "none" }}>
+              <Icon size={16} color={active ? T.surface : T.copper} /><span>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {vista === "RESUMEN" && <AlcaldesaResumen T={T} contenidos={contenidos} incidentes={incidentes} />}
+      {vista === "OPERACION" && <AlcaldesaOperacion T={T} incidentes={incidentes} />}
+      {vista === "TERRENO" && <PantallaGPSTerreno T={T} soloLectura />}
+      {vista === "CHATS" && <AlcaldesaChats T={T} chats={chatDirecciones} setChats={setChatDirecciones} />}
+      {vista === "SUPERVISION" && (
+        <AlcaldesaSupervision T={T} chatTrabajadores={chatTrabajadores}
+          chatAdminAlcaldesa={chatAdminAlcaldesa} setChatAdminAlcaldesa={setChatAdminAlcaldesa} />
+      )}
+    </div>
+  );
+}
+
+/* ---- Alcaldesa · Resumen comunal ---- */
+function AlcaldesaResumen({ T, contenidos, incidentes }) {
+  const total = PRESUPUESTO.reduce((s, p) => s + p.ejecutado, 0);
+  let acumulado = 0;
+  const criticos = GPS_TRABAJADORES.filter((g) => g.cumple === false);
+  const alertasCalidad = QUEJAS.length;
+
+  return (
+    <div className="flex flex-col gap-8">
       <section>
         <SectionTitle T={T}>Dashboard macro de la comuna</SectionTitle>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-          <div className="rounded-3xl p-5" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}><p style={{ fontSize: 11.5, color: T.inkFaint, fontWeight: 700 }}>Tiempo promedio de respuesta</p><p style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 600, marginTop: 4 }}>2,4 días</p></div>
-          <div className="rounded-3xl p-5" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}><p style={{ fontSize: 11.5, color: T.inkFaint, fontWeight: 700 }}>Solicitudes resueltas este mes</p><p style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 600, marginTop: 4 }}>87%</p></div>
-          <div className="rounded-3xl p-5" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}><p style={{ fontSize: 11.5, color: T.inkFaint, fontWeight: 700 }}>Satisfacción vecinal</p><p style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 600, marginTop: 4 }}>4,3 ★</p></div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {[
+            { l: "Tiempo promedio de respuesta", v: "2,4 días", quien: `Más lento: ${GPS_TRABAJADORES[4].cuadrilla}` },
+            { l: "Solicitudes resueltas este mes", v: "87%", quien: `Mejor área: ${PRESUPUESTO[1].depto}` },
+            { l: "Satisfacción vecinal", v: "4,3 ★", quien: `Mejor evaluado: ${WORKERS_PERFIL[1].nombre}` },
+            { l: "Trabajadores en terreno", v: GPS_TRABAJADORES.length, quien: GPS_TRABAJADORES.filter((g) => g.estado === "En sitio").map((g) => g.nombre.split(" ")[0]).join(", ") + " en sitio" },
+            { l: "Incumplimientos hoy", v: criticos.length, warn: criticos.length > 0, quien: criticos.map((g) => g.nombre).join(" · ") || "Nadie" },
+            { l: "Alertas de calidad", v: alertasCalidad, warn: alertasCalidad > 0, quien: QUEJAS.map((q) => q.func).join(" · ") },
+          ].map((k, i) => (
+            <div key={i} className="rounded-3xl p-4 flex flex-col" style={{ background: T.surface, border: `1.5px solid ${k.warn ? T.red : T.border}` }}>
+              <p style={{ fontSize: 11, color: T.inkFaint, fontWeight: 700, lineHeight: 1.3 }}>{k.l}</p>
+              <p style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600, marginTop: 4, color: k.warn ? T.red : T.ink }}>{k.v}</p>
+              <p style={{ fontSize: 10.5, color: k.warn ? T.red : T.inkSoft, marginTop: 4, lineHeight: 1.3, fontWeight: 600 }}>{k.quien}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Quién está a cargo de qué */}
+      <section>
+        <SectionTitle T={T}>Quién está a cargo hoy</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className="rounded-3xl p-5 flex items-center gap-3.5" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+            <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ background: T.copperSoft, color: T.copperInk, fontWeight: 700, fontSize: 12 }}>{initials(ADMIN_ACTUAL.nombre)}</div>
+            <div className="flex-1">
+              <p style={{ fontSize: 13.5, fontWeight: 700 }}>{ADMIN_ACTUAL.nombre}</p>
+              <p style={{ fontSize: 11.5, color: T.inkSoft }}>{ADMIN_ACTUAL.cargo}</p>
+            </div>
+            <span className="px-2.5 py-1 rounded-full shrink-0" style={{ background: T.sageSoft, color: T.sage, fontSize: 10.5, fontWeight: 700 }}>En turno</span>
+          </div>
+          {GPS_TRABAJADORES.slice(0, 5).map((g) => {
+            const color = T[GPS_COLOR_ESTADO[g.estado]];
+            return (
+              <div key={g.rut} className="rounded-3xl p-5 flex items-center gap-3.5" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+                <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ background: T.surfaceAlt, fontWeight: 700, fontSize: 12 }}>{initials(g.nombre)}</div>
+                <div className="flex-1 min-w-0">
+                  <p style={{ fontSize: 13.5, fontWeight: 700 }}>{g.nombre}</p>
+                  <p style={{ fontSize: 11.5, color: T.inkSoft }}>{g.tarea} · {g.direccion}</p>
+                  <p style={{ fontSize: 10.5, color: T.inkFaint }}>Delegación {g.delegacion} · cuadrilla {g.cuadrilla}</p>
+                </div>
+                <span className="px-2.5 py-1 rounded-full shrink-0" style={{ background: T[`${GPS_COLOR_ESTADO[g.estado]}Soft`], color, fontSize: 10.5, fontWeight: 700 }}>{g.estado}</span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Alertas que requieren su atención */}
+      <section>
+        <SectionTitle T={T}>Requiere su atención</SectionTitle>
+        <div className="flex flex-col gap-2.5">
+          {criticos.map((g) => (
+            <div key={g.rut} className="rounded-2xl p-4 flex items-start gap-3" style={{ background: T.surface, border: `1.5px solid ${T.red}` }}>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: T.redSoft, color: T.red }}><AlertTriangle size={16} /></div>
+              <div className="flex-1">
+                <p style={{ fontSize: 13.5, fontWeight: 700 }}>{g.nombre} — {g.estado}</p>
+                <p style={{ fontSize: 12, color: T.inkSoft }}>{g.tarea} · {g.direccion} · {g.distancia}</p>
+              </div>
+            </div>
+          ))}
+          {(incidentes || []).filter((i) => !i.publicado).map((i, idx) => (
+            <div key={`inc-${idx}`} className="rounded-2xl p-4 flex items-start gap-3" style={{ background: T.surface, border: `1.5px solid ${T.gold}` }}>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: T.goldSoft, color: T.gold }}><Bolt size={16} /></div>
+              <div className="flex-1">
+                <p style={{ fontSize: 13.5, fontWeight: 700 }}>Incidente sin alerta publicada: {i.tipo}</p>
+                <p style={{ fontSize: 12, color: T.inkSoft }}>{i.lugar} · aún no se comunica a los vecinos</p>
+              </div>
+            </div>
+          ))}
+          {criticos.length === 0 && <p style={{ fontSize: 12.5, color: T.inkSoft }}>Sin alertas críticas en este momento.</p>}
         </div>
       </section>
 
@@ -3576,25 +5191,581 @@ function AlcaldePanel({ T }) {
       </section>
 
       <section>
-        <SectionTitle T={T}>Canal de comunicación con Jefes de Departamento</SectionTitle>
-        <div className="rounded-3xl overflow-hidden flex flex-col" style={{ background: T.surface, border: `1.5px solid ${T.border}`, height: 420 }}>
-          <div className="flex gap-1.5 p-3" style={{ borderBottom: `1px solid ${T.border}` }}>
-            {DEPTS_HEADS.map((d) => <button key={d} onClick={() => setTab(d)} className="px-3.5 py-2 rounded-full text-[12px] font-bold whitespace-nowrap" style={{ background: tab === d ? T.copper : T.surfaceAlt, color: tab === d ? T.surface : T.inkSoft }}>{d}</button>)}
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2.5">
-            {chats[tab].map((m, i) => (
-              <div key={i} className="max-w-[75%] rounded-2xl px-3.5 py-2.5" style={{ alignSelf: m.from === "alcalde" ? "flex-end" : "flex-start", background: m.from === "alcalde" ? T.copper : T.surfaceAlt, color: m.from === "alcalde" ? T.surface : T.ink }}>
-                <p style={{ fontSize: 13 }}>{m.texto}</p>
-              </div>
-            ))}
-          </div>
-          <form onSubmit={(e) => { e.preventDefault(); enviar(); }} className="p-3 flex gap-2" style={{ borderTop: `1px solid ${T.border}` }}>
-            <input value={msg} onChange={(e) => setMsg(e.target.value)} placeholder={`Mensaje para ${tab}`} className="flex-1 rounded-xl px-3.5 py-2.5 text-[13px] outline-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
-            <button className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: T.copper, color: T.surface }}><MessageCircle size={16} /></button>
-          </form>
+        <SectionTitle T={T}>Últimas publicaciones a la comunidad</SectionTitle>
+        <div className="flex flex-col gap-2.5">
+          {(contenidos || []).slice(0, 4).map((c, i) => (
+            <div key={i} className="rounded-2xl p-4 flex items-start gap-3" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+              <span className="px-2.5 py-1 rounded-full shrink-0" style={{ background: T[`${c.tag}Soft`], color: T[c.tag], fontSize: 10.5, fontWeight: 800 }}>{c.tipo}</span>
+              <div className="flex-1"><p style={{ fontSize: 13, fontWeight: 700 }}>{c.titulo}</p><p style={{ fontSize: 11.5, color: T.inkSoft }}>{c.autor}</p></div>
+            </div>
+          ))}
         </div>
       </section>
     </div>
+  );
+}
+
+/* ---- Alcaldesa · Vista espejo del Admin (sólo lectura) ---- */
+function AlcaldesaOperacion({ T, incidentes }) {
+  const [sub, setSub] = useState("SOLICITUDES");
+  const [openKpi, setOpenKpi] = useState(null);
+  const kpiCounts = { revision: 34, aceptados: 128, programados: 61, transito: 19, rechazados: 7, finalizados: 902, auditoria: 5 };
+
+  const subs = [
+    { id: "SOLICITUDES", label: "Solicitudes" },
+    { id: "CUADRILLAS", label: "Trabajadores" },
+    { id: "CALIDAD", label: "Auditoría calidad" },
+    { id: "CRISIS", label: "Crisis" },
+    { id: "PRESUPUESTO", label: "Presupuesto" },
+    { id: "CONTROL", label: "Auditoría interna" },
+  ];
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="rounded-2xl p-4 flex items-start gap-3" style={{ background: T.oceanSoft, border: `1px solid ${T.ocean}33` }}>
+        <Eye size={17} color={T.ocean} className="shrink-0 mt-0.5" />
+        <p style={{ fontSize: 12.5, color: T.ocean, fontWeight: 600 }}>
+          Está viendo exactamente la misma información que maneja el Administrador, en modo de sólo lectura: puede revisarlo todo sin entrar al panel de Admin y sin poder modificar sus registros.
+        </p>
+      </div>
+
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1">
+        {subs.map((s) => (
+          <button key={s.id} onClick={() => setSub(s.id)} className="px-3.5 py-2 rounded-full text-[12px] font-bold whitespace-nowrap" style={{ background: sub === s.id ? T.copper : T.surfaceAlt, color: sub === s.id ? T.surface : T.inkSoft, border: `1px solid ${T.border}` }}>{s.label}</button>
+        ))}
+      </div>
+
+      {sub === "SOLICITUDES" && (
+        <div className="flex flex-col gap-3">
+          <p style={{ fontSize: 12.5, color: T.inkSoft }}>Estado general de todas las solicitudes de la comuna. Toca un estado para ver el listado completo.</p>
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-2">
+            {KPIS.map((k, i) => {
+              const Icon = k.icon; const accent = T[k.key]; const accentSoft = T[`${k.key}Soft`]; return (
+                <React.Fragment key={k.id}>
+                  <button onClick={() => setOpenKpi(k.id)} className="text-left rounded-3xl p-4 flex flex-col gap-2 shrink-0 w-[140px]" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: accentSoft, color: accent }}><Icon size={15} /></div>
+                    <p style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600, lineHeight: 1 }}>{kpiCounts[k.id]}</p>
+                    <p style={{ fontSize: 11, color: T.inkSoft, fontWeight: 600 }}>{k.label}</p>
+                  </button>
+                  {i < KPIS.length - 1 && <ChevronRight size={16} color={T.inkFaint} className="shrink-0" />}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {sub === "CUADRILLAS" && <PantallaCuadrillas T={T} />}
+      {sub === "CALIDAD" && <PantallaAuditoria T={T} soloLectura />}
+      {sub === "CRISIS" && <AlcaldesaCrisisLectura T={T} incidentes={incidentes} />}
+      {sub === "PRESUPUESTO" && <PantallaPresupuesto T={T} />}
+      {sub === "CONTROL" && <PantallaControl T={T} />}
+
+      {openKpi && <ModalListado T={T} title={KPIS.find((k) => k.id === openKpi).label} onClose={() => setOpenKpi(null)} rows={SOLICITUDES_POR_ESTADO[openKpi] || []} />}
+    </div>
+  );
+}
+
+/* Crisis en modo lectura para la Alcaldesa */
+function AlcaldesaCrisisLectura({ T, incidentes }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <p style={{ fontSize: 12.5, color: T.inkSoft }}>Incidentes activos gestionados por el Administrador. Sólo lectura: la publicación de alertas la realiza el equipo municipal.</p>
+      {(incidentes || []).map((i, idx) => (
+        <div key={idx} className="rounded-3xl p-5 flex items-start gap-4" style={{ background: T.surface, border: `1.5px solid ${T.border}` }}>
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: T[`${i.key}Soft`], color: T[i.key] }}>{i.icon ? <i.icon size={19} /> : <AlertTriangle size={19} />}</div>
+          <div className="flex-1">
+            <p style={{ fontSize: 14, fontWeight: 700 }}>{i.tipo} — {i.lugar}</p>
+            <p style={{ fontSize: 12.5, color: T.inkSoft, marginTop: 2 }}>{FUENTE_LABEL[i.fuente]?.texto || "En seguimiento por el equipo de emergencia."}</p>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mt-2" style={{ background: i.publicado ? T.sageSoft : T.goldSoft, color: i.publicado ? T.sage : T.gold, fontSize: 10.5, fontWeight: 700 }}>
+              {i.publicado ? "Alerta publicada a los vecinos" : "Sin alerta publicada"}
+            </span>
+          </div>
+        </div>
+      ))}
+      {(!incidentes || incidentes.length === 0) && <p style={{ fontSize: 12.5, color: T.inkSoft }}>Sin incidentes activos.</p>}
+    </div>
+  );
+}
+
+/* ---- Alcaldesa · Chats con delegaciones y direcciones ---- */
+function AlcaldesaChats({ T, chats, setChats }) {
+  const [tab, setTab] = useState(DEPTS_HEADS[0]);
+  const [seccionAbierta, setSeccionAbierta] = useState(DEPTS_SECCIONES[0].titulo);
+  const [msg, setMsg] = useState("");
+  const finRef = useRef(null);
+  const hilo = chats[tab] || [];
+  useEffect(() => { finRef.current?.scrollIntoView({ behavior: "smooth" }); }, [hilo.length, tab]);
+
+  const enviar = () => {
+    const t = msg.trim(); if (!t) return;
+    const hora = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+    setChats((c) => ({ ...c, [tab]: [...(c[tab] || []), { from: "alcaldesa", texto: t, hora }] }));
+    setMsg("");
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p style={{ fontSize: 12.5, color: T.inkSoft, maxWidth: 680 }}>
+        Cada delegación y dirección tiene su propio chat privado con su encargado o encargada. Usted puede revisar cualquiera en cualquier momento y preguntar directamente qué está ocurriendo.
+      </p>
+
+      <div className="rounded-3xl overflow-hidden flex flex-col sm:flex-row" style={{ background: T.surface, border: `1.5px solid ${T.border}`, height: 520 }}>
+        <div className="sm:w-64 shrink-0 overflow-y-auto p-2.5 flex flex-col gap-1" style={{ borderRight: `1px solid ${T.border}` }}>
+          {DEPTS_SECCIONES.map((sec) => {
+            const abierta = seccionAbierta === sec.titulo;
+            return (
+              <div key={sec.titulo} className="flex flex-col">
+                <button onClick={() => setSeccionAbierta(abierta ? "" : sec.titulo)} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left">
+                  <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.3, textTransform: "uppercase", color: T.inkFaint, lineHeight: 1.3 }}>{sec.titulo}</span>
+                  <ChevronRight size={13} color={T.inkFaint} style={{ transform: abierta ? "rotate(90deg)" : "none", transition: "transform .15s", flexShrink: 0 }} />
+                </button>
+                {abierta && (
+                  <div className="flex flex-col gap-1 pb-1.5">
+                    {sec.items.map((d) => {
+                      const activo = tab === d;
+                      const ultimo = (chats[d] || [])[(chats[d] || []).length - 1];
+                      const pendiente = ultimo?.from === "jefe";
+                      return (
+                        <button key={d} onClick={() => setTab(d)} className="text-left px-3 py-2 rounded-xl flex items-center gap-2" style={{ background: activo ? T.copper : "transparent", color: activo ? T.surface : T.ink }}>
+                          <MessageCircle size={13} style={{ flexShrink: 0, opacity: activo ? 1 : 0.55 }} />
+                          <span style={{ fontSize: 12, fontWeight: activo ? 700 : 500, flex: 1, lineHeight: 1.25 }}>{d}</span>
+                          {pendiente && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: activo ? T.surface : T.sage }} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: `1px solid ${T.border}` }}>
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: T.sage }} />
+            <p style={{ fontSize: 13, fontWeight: 700 }}>{tab}</p>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2.5">
+            {hilo.length === 0 && <p style={{ fontSize: 12.5, color: T.inkFaint, textAlign: "center", marginTop: 20 }}>Sin mensajes todavía en este canal.</p>}
+            {hilo.map((m, i) => {
+              const propio = m.from === "alcaldesa";
+              return (
+                <div key={i} className="max-w-[78%] rounded-2xl px-3.5 py-2.5" style={{ alignSelf: propio ? "flex-end" : "flex-start", background: propio ? T.copper : T.surfaceAlt, color: propio ? T.surface : T.ink }}>
+                  <p style={{ fontSize: 13 }}>{m.texto}</p>
+                  {m.hora && <p style={{ fontSize: 9.5, opacity: 0.7, marginTop: 3, textAlign: "right" }}>{m.hora}</p>}
+                </div>
+              );
+            })}
+            <div ref={finRef} />
+          </div>
+          <form onSubmit={(e) => { e.preventDefault(); enviar(); }} className="p-3 flex gap-2" style={{ borderTop: `1px solid ${T.border}` }}>
+            <input value={msg} onChange={(e) => setMsg(e.target.value)} placeholder={`Preguntar a ${tab}`} className="flex-1 rounded-xl px-3.5 py-2.5 text-[13px] outline-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+            <button className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: T.copper, color: T.surface }}><MessageCircle size={16} /></button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---- Alcaldesa · Supervisión de los chats internos del Admin ---- */
+function AlcaldesaSupervision({ T, chatTrabajadores, chatAdminAlcaldesa, setChatAdminAlcaldesa }) {
+  const nombres = Object.keys(chatTrabajadores);
+  const [sel, setSel] = useState(nombres[0]);
+  const [msg, setMsg] = useState("");
+  const finRef = useRef(null);
+  useEffect(() => { finRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatAdminAlcaldesa.length]);
+
+  const preguntar = (texto) => {
+    const t = (texto ?? msg).trim(); if (!t) return;
+    const hora = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+    setChatAdminAlcaldesa((c) => [...c, { from: "alcaldesa", texto: t, hora }]);
+    setMsg("");
+  };
+
+  const hiloSel = chatTrabajadores[sel] || [];
+  const gpsSel = GPS_TRABAJADORES.find((g) => g.nombre === sel);
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="rounded-2xl p-4 flex items-start gap-3" style={{ background: T.copperSoft, border: `1px solid ${T.copper}33` }}>
+        <ShieldCheck size={17} color={T.copperInk} className="shrink-0 mt-0.5" />
+        <p style={{ fontSize: 12.5, color: T.copperInk, fontWeight: 600 }}>
+          Aquí ve todas las conversaciones entre el Administrador y los trabajadores en terreno. Si ocurre algo, puede leerlo directamente y preguntarle al Administrador qué pasó, sin que nadie pueda ocultarle información.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Chats intervenidos (lectura) */}
+        <div className="rounded-3xl overflow-hidden flex flex-col" style={{ background: T.surface, border: `1.5px solid ${T.border}`, height: 520 }}>
+          <div className="px-4 py-3 flex items-center justify-between gap-2" style={{ borderBottom: `1px solid ${T.border}` }}>
+            <p style={{ fontSize: 13, fontWeight: 700 }}>Chats Administrador ↔ Trabajadores</p>
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: T.oceanSoft, color: T.ocean, fontSize: 10.5, fontWeight: 700 }}><Eye size={11} /> Sólo lectura</span>
+          </div>
+
+          <div className="flex gap-1.5 p-2.5 overflow-x-auto scrollbar-none" style={{ borderBottom: `1px solid ${T.border}` }}>
+            {nombres.map((n) => (
+              <button key={n} onClick={() => setSel(n)} className="px-3 py-1.5 rounded-full text-[11.5px] font-bold whitespace-nowrap shrink-0" style={{ background: sel === n ? T.copper : T.surfaceAlt, color: sel === n ? T.surface : T.inkSoft, border: `1px solid ${T.border}` }}>{n}</button>
+            ))}
+          </div>
+
+          {gpsSel && (
+            <div className="px-4 py-2.5 flex items-center gap-2 flex-wrap" style={{ background: T.surfaceAlt, borderBottom: `1px solid ${T.border}` }}>
+              <span className="w-2 h-2 rounded-full" style={{ background: T[GPS_COLOR_ESTADO[gpsSel.estado]] }} />
+              <span style={{ fontSize: 11, fontWeight: 700 }}>{gpsSel.estado}</span>
+              <span style={{ fontSize: 11, color: T.inkSoft }}>· {gpsSel.tarea} · {gpsSel.horaLlegada ? `llegó ${gpsSel.horaLlegada}` : "sin registro de llegada"}</span>
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2.5">
+            {hiloSel.map((m, i) => (
+              <div key={i} className="max-w-[80%] rounded-2xl px-3.5 py-2.5" style={{ alignSelf: m.from === "admin" ? "flex-end" : "flex-start", background: m.from === "admin" ? T.oceanSoft : T.surfaceAlt, color: T.ink, border: `1px solid ${T.border}` }}>
+                <p style={{ fontSize: 10, fontWeight: 800, color: T.inkFaint, marginBottom: 2 }}>{m.from === "admin" ? "ADMINISTRADOR" : sel.toUpperCase()}</p>
+                <p style={{ fontSize: 12.5 }}>{m.texto}</p>
+                {m.hora && <p style={{ fontSize: 9.5, color: T.inkFaint, marginTop: 3, textAlign: "right" }}>{m.hora}</p>}
+              </div>
+            ))}
+            {hiloSel.length === 0 && <p style={{ fontSize: 12.5, color: T.inkFaint, textAlign: "center", marginTop: 20 }}>Sin mensajes en este canal.</p>}
+          </div>
+
+          <div className="p-3 flex flex-col gap-2" style={{ borderTop: `1px solid ${T.border}` }}>
+            <p style={{ fontSize: 11, color: T.inkFaint }}>No puede escribir en el chat del Administrador con su equipo, pero sí preguntarle directamente:</p>
+            <button onClick={() => preguntar(`Vi el chat con ${sel}. ¿Qué ocurrió exactamente y cómo se resolvió?`)} className="rounded-xl py-2.5 text-[12.5px] font-bold" style={{ background: T.copper, color: T.surface }}>
+              Preguntar al Administrador sobre este caso
+            </button>
+          </div>
+        </div>
+
+        {/* Chat directo con el Administrador */}
+        <div className="rounded-3xl overflow-hidden flex flex-col" style={{ background: T.surface, border: `1.5px solid ${T.border}`, height: 520 }}>
+          <div className="px-4 py-3 flex items-center gap-2.5" style={{ borderBottom: `1px solid ${T.border}` }}>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: T.copperSoft, color: T.copperInk, fontWeight: 700, fontSize: 11.5 }}>{initials(ADMIN_ACTUAL.nombre)}</div>
+            <div className="flex-1"><p style={{ fontSize: 13.5, fontWeight: 700 }}>{ADMIN_ACTUAL.nombre}</p><p style={{ fontSize: 11, color: T.inkSoft }}>{ADMIN_ACTUAL.cargo}</p></div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2.5">
+            {chatAdminAlcaldesa.map((m, i) => {
+              const propio = m.from === "alcaldesa";
+              return (
+                <div key={i} className="max-w-[78%] rounded-2xl px-3.5 py-2.5" style={{ alignSelf: propio ? "flex-end" : "flex-start", background: propio ? T.copper : T.surfaceAlt, color: propio ? T.surface : T.ink }}>
+                  <p style={{ fontSize: 13 }}>{m.texto}</p>
+                  {m.hora && <p style={{ fontSize: 9.5, opacity: 0.7, marginTop: 3, textAlign: "right" }}>{m.hora}</p>}
+                </div>
+              );
+            })}
+            <div ref={finRef} />
+          </div>
+
+          <form onSubmit={(e) => { e.preventDefault(); preguntar(); }} className="p-3 flex gap-2" style={{ borderTop: `1px solid ${T.border}` }}>
+            <input value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Preguntar al Administrador…" className="flex-1 rounded-xl px-3.5 py-2.5 text-[13px] outline-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+            <button className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: T.copper, color: T.surface }}><MessageCircle size={16} /></button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------
+   ASISTENTE IA — disponible para vecino, trabajador, admin y alcaldesa
+--------------------------------------------------------------------- */
+
+/* Base de conocimiento: qué es cada parte de la plataforma, por rol */
+const IA_CONOCIMIENTO = {
+  comun: [
+    { kw: ["que es esta pagina", "qué es esta página", "que es esto", "para que sirve la plataforma", "como funciona la plataforma", "cómo funciona la plataforma"], r: "Es la plataforma municipal de La Serena. Reúne en un solo lugar los trámites del vecino, el trabajo diario de las cuadrillas, la gestión del Administrador y la supervisión de la Alcaldesa. Todo lo que ocurre queda registrado, así que nadie puede ocultar información." },
+    { kw: ["modo oscuro", "cambiar tema", "color"], r: "Arriba a la derecha hay un botón con una luna o un sol: ahí cambias entre modo claro y oscuro." },
+    { kw: ["cerrar sesion", "cerrar sesión", "salir"], r: "El botón con la flecha en la esquina superior derecha cierra tu sesión y te devuelve a la página de inicio." },
+    { kw: ["clave unica", "claveúnica", "clave única"], r: "Puedes entrar con ClaveÚnica, la identidad digital del Estado. En la pantalla de acceso está el botón azul; te pide tu RUN y tu clave, verifica tu identidad con el Registro Civil y luego eliges con qué perfil entrar." },
+    { kw: ["quien eres", "quién eres", "que eres", "qué eres"], r: "Soy el asistente de la plataforma municipal. Te ayudo a encontrar cosas, te aviso de lo pendiente y puedo explicarte para qué sirve cada sección. Pregúntame lo que necesites." },
+  ],
+  vecino: [
+    { kw: ["solicitud", "pedir", "solicitar", "tramite", "trámite"], r: "Para pedir algo entra a “Nueva solicitud”, elige el departamento y el servicio, revisa tus datos y envía. Después puedes seguir el avance en “Seguimiento”." },
+    { kw: ["seguimiento", "en que va", "en qué va", "estado de mi solicitud"], r: "En “Seguimiento” ves la línea de tiempo de tu solicitud: recibida, en revisión, aceptada, programada, en tránsito y finalizada. También aparece quién es el trabajador asignado y la hora estimada de llegada." },
+    { kw: ["colegio", "kinder", "kínder", "matricula", "matrícula", "escuela"], r: "En el inicio aparece la tarjeta de Kínder 2027. Al tocar “Ver colegios municipales” se abre la lista de establecimientos con vacantes, jornada, sello educativo y las fechas del proceso de admisión." },
+    { kw: ["licencia", "conducir", "renovar"], r: "Tu licencia clase B vence el 16 de noviembre. En el inicio, la tarjeta “Renovar ahora” te lleva a los requisitos, el costo y la reserva de hora en la Dirección de Tránsito." },
+    { kw: ["calificar", "evaluar", "estrellas"], r: "Cuando una solicitud termina puedes calificarla con estrellas en la pestaña “Calificación”. Las notas de 1 y 2 estrellas llegan directo a la bandeja de auditoría de la Municipalidad." },
+    { kw: ["ficha", "documentos"], r: "En “Mi ficha” subes tus documentos una sola vez y decides con qué direcciones municipales se comparten. También puedes registrar cargas familiares." },
+    { kw: ["voluntario", "comunidad", "ayudar"], r: "En “Comunidad” puedes inscribirte como voluntario en emergencias; te avisaremos si un vecino cercano necesita ayuda durante un temporal." },
+  ],
+  trabajador: [
+    { kw: ["donde", "dónde", "ir", "direccion", "dirección", "voy"], r: null, dinamico: "ruta" },
+    { kw: ["que tengo que hacer", "qué tengo que hacer", "tarea", "tareas", "pendiente"], r: null, dinamico: "tareas" },
+    { kw: ["mensaje", "chat", "jefatura", "jefe"], r: null, dinamico: "mensajes" },
+    { kw: ["foto", "antes", "despues", "después", "evidencia"], r: "En la pestaña “Fotos antes/después” abres la cámara y tomas la foto del antes y del después. No se puede subir de la galería: solo cámara, y cada foto queda sellada con la hora y el GPS." },
+    { kw: ["fichaje", "marcar", "jornada", "colacion", "colación"], r: "En “Fichaje” marcas el inicio de tu jornada, la pausa de colación y el término. Queda guardada la hora y tu ubicación." },
+    { kw: ["cerrar tarea", "cierre", "firma"], r: "En “Cierre de tarea” tomas la foto del trabajo terminado y pides la firma del vecino. Recién ahí la tarea queda cerrada." },
+    { kw: ["imprevisto", "problema", "no puedo"], r: "Si algo te impide trabajar, avísalo por el chat con tu jefatura o usa “Registrar imprevisto” en la tarea activa. Queda respaldado para que no te perjudique después." },
+  ],
+  admin: [
+    { kw: ["asignar", "asignacion", "asignación", "despacho"], r: "En “Asignación” eliges al trabajador, la fecha y la hora, y debes escribir qué tiene que hacer. Ese texto le llega directo a su chat. También puedes usar el despacho automático para que la IA arme una propuesta." },
+    { kw: ["gps", "terreno", "donde estan", "dónde están", "cumplio", "cumplió"], r: null, dinamico: "gps" },
+    { kw: ["chat", "mensaje", "trabajadores"], r: null, dinamico: "mensajes_admin" },
+    { kw: ["sgr", "matriz", "tubo"], r: "La Matriz SGR mide el desempeño: el resumen por delegación, la ficha personal con ponderadores y metas, el tubo de trabajo (donde agregas, editas y cierras compromisos) y el semáforo de cumplimiento." },
+    { kw: ["amonestacion", "amonestación", "queja", "reclamo", "auditoria calidad", "auditoría calidad"], r: "En “Auditoría calidad” llegan las calificaciones de 1 y 2 estrellas. Al tocar “Iniciar amonestación” se abre la página donde eliges el tipo de medida, describes los hechos, la medida correctiva y el plazo de descargos, y emites el documento con folio." },
+    { kw: ["empleado", "funcionario", "contratar", "registrar"], r: "En “Gestión Empleados” registras, editas, consultas y eliminas funcionarios. El sistema valida el RUT, detecta duplicados y bloquea la eliminación si la persona tiene procesos activos." },
+    { kw: ["fraude", "duplicado"], r: "El centro anti-fraude cruza RUT, dirección y beneficio. Si detecta repeticiones marca la fila en rojo, y desde 3 reincidencias habilita el bloqueo." },
+    { kw: ["crisis", "emergencia", "alerta"], r: "El panel de Crisis muestra los incidentes activos en el mapa y te permite publicar la alerta a los vecinos con un clic." },
+    { kw: ["presupuesto", "bodega", "stock"], r: "En “Presupuesto” ves la ejecución por dirección y el stock de la bodega municipal, con aviso cuando algo baja del 15%." },
+  ],
+  alcalde: [
+    { kw: ["resumen", "como va", "cómo va", "estado de la comuna"], r: null, dinamico: "resumen_alcaldesa" },
+    { kw: ["incumpl", "no cumple", "problema", "alerta"], r: null, dinamico: "alertas_alcaldesa" },
+    { kw: ["chat", "delegacion", "delegación", "direccion", "dirección"], r: "En “Delegaciones y Direcciones” cada unidad tiene su propio chat con su encargado. Puedes leer cualquiera y escribir directamente para preguntar qué está ocurriendo." },
+    { kw: ["supervision", "supervisión", "ocultar", "transparencia"], r: "En “Supervisión de chats” lees las conversaciones entre el Administrador y cada trabajador. Son de sólo lectura, pero con un botón puedes preguntarle al Administrador por cualquier caso. Así nadie puede ocultarle información." },
+    { kw: ["admin", "administrador", "que ve el admin", "qué ve el admin"], r: "En “Vista del Admin” ve la misma información operativa que maneja el Administrador —solicitudes, trabajadores, auditoría de calidad, crisis, presupuesto y auditoría interna— en modo de sólo lectura, sin tener que entrar a su panel." },
+    { kw: ["terreno", "gps", "trabajadores"], r: null, dinamico: "gps" },
+  ],
+};
+
+const IA_SUGERENCIAS = {
+  vecino: ["¿En qué va mi solicitud?", "¿Cómo pido un retiro de escombros?", "Cuéntame de los colegios municipales", "¿Cómo renuevo mi licencia?"],
+  trabajador: ["¿A dónde tengo que ir ahora?", "¿Qué tareas me quedan?", "¿Tengo mensajes?", "¿Cómo tomo la foto del antes?"],
+  admin: ["¿Cómo está el terreno?", "¿Tengo mensajes nuevos?", "Asigna a Pedro entregar sacos en Los Aromos 482", "¿Cómo emito una amonestación?"],
+  alcalde: ["¿Cómo va la comuna hoy?", "¿Hay incumplimientos?", "¿Para qué sirve la supervisión de chats?", "¿Qué veo de lo del Admin?"],
+};
+
+const IA_NOMBRE = { vecino: "Asistente vecinal", trabajador: "Asistente de terreno", admin: "Asistente del Administrador", alcalde: "Asistente de la Alcaldesa" };
+
+function normalizar(t) {
+  return t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function AsistenteIA({ T, role, chatTrabajadores, chatAdminAlcaldesa, agregarAsignacionIA, irA }) {
+  const [abierto, setAbierto] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [vistos, setVistos] = useState(false);
+  const finRef = useRef(null);
+
+  const saludo = {
+    vecino: "Hola, soy tu asistente. Puedo explicarte cómo hacer un trámite, decirte en qué va tu solicitud o guiarte por cualquier parte de la plataforma.",
+    trabajador: `Hola ${TRABAJADOR_ACTUAL.nombre.split(" ")[0]}. Puedo decirte a dónde ir, qué tienes que hacer, si tienes mensajes de tu jefatura o explicarte cualquier parte de la app.`,
+    admin: `Hola ${ADMIN_ACTUAL.nombre.split(" ")[0]}. Puedo asignarle tareas a un trabajador por ti, avisarte de mensajes nuevos, resumirte el estado del terreno o explicarte cualquier sección.`,
+    alcalde: "Buen día, Alcaldesa. Puedo resumirle el estado de la comuna, avisarle de incumplimientos o explicarle cualquier sección del panel.",
+  }[role];
+
+  const [hilo, setHilo] = useState([{ from: "ia", texto: saludo }]);
+
+  /* --- Avisos automáticos según el rol --- */
+  const avisos = React.useMemo(() => {
+    const out = [];
+    if (role === "trabajador") {
+      const mios = chatTrabajadores[TRABAJADOR_ACTUAL.nombre] || [];
+      const ultimo = mios[mios.length - 1];
+      if (ultimo?.from === "admin") out.push({ icon: MessageCircle, color: "copper", texto: `Tienes un mensaje de ${ADMIN_ACTUAL.nombre}: “${ultimo.texto.slice(0, 70)}${ultimo.texto.length > 70 ? "…" : ""}”`, ir: "CHAT" });
+      out.push({ icon: ClipboardList, color: "ocean", texto: `Tienes ${AGENDA_TRABAJADOR.length} tareas para hoy. La próxima es ${AGENDA_TRABAJADOR[0].tarea} en ${AGENDA_TRABAJADOR[0].direccion} a las ${AGENDA_TRABAJADOR[0].hora}.`, ir: "AGENDA" });
+      out.push({ icon: Camera, color: "gold", texto: "Recuerda tomar la foto del antes y del después de cada trabajo, o la tarea no se puede cerrar.", ir: "EVIDENCIA" });
+    }
+    if (role === "admin") {
+      Object.entries(chatTrabajadores).forEach(([nombre, hist]) => {
+        const u = hist[hist.length - 1];
+        if (u?.from === "trabajador") out.push({ icon: MessageCircle, color: "red", texto: `${nombre} te escribió: “${u.texto.slice(0, 70)}${u.texto.length > 70 ? "…" : ""}”`, ir: "CHAT" });
+      });
+      const ua = chatAdminAlcaldesa[chatAdminAlcaldesa.length - 1];
+      if (ua?.from === "alcaldesa") out.push({ icon: Landmark, color: "copper", texto: `La Alcaldesa te preguntó: “${ua.texto.slice(0, 70)}${ua.texto.length > 70 ? "…" : ""}”`, ir: "CHAT" });
+      GPS_TRABAJADORES.filter((g) => g.cumple === false).forEach((g) => {
+        out.push({ icon: AlertTriangle, color: "red", texto: `${g.nombre} figura como “${g.estado}” en ${g.tarea}. Requiere que lo revises.`, ir: "GPS" });
+      });
+    }
+    if (role === "alcalde") {
+      const criticos = GPS_TRABAJADORES.filter((g) => g.cumple === false);
+      if (criticos.length) out.push({ icon: AlertTriangle, color: "red", texto: `Hay ${criticos.length} incumplimientos hoy: ${criticos.map((g) => g.nombre).join(" y ")}.`, ir: "TERRENO" });
+      Object.entries(chatTrabajadores).forEach(([nombre, hist]) => {
+        const u = hist[hist.length - 1];
+        if (u?.from === "trabajador") out.push({ icon: Eye, color: "ocean", texto: `${nombre} reportó algo a la jefatura: “${u.texto.slice(0, 60)}…”. Puede revisarlo en Supervisión de chats.`, ir: "SUPERVISION" });
+      });
+    }
+    if (role === "vecino") {
+      const act = SOLICITUDES_VECINO.filter((x) => x.activa);
+      if (act.length) out.push({ icon: Truck, color: "gold", texto: `Tu solicitud N.º ${act[0].id} (${act[0].titulo}) está ${act[0].estado.toLowerCase()}. Llegada estimada: ${act[0].eta}.`, ir: "ACTIVAS" });
+      out.push({ icon: GraduationCap, color: "copper", texto: "La postulación a Kínder 2027 está abierta hasta el 30 de septiembre.", ir: "COLEGIOS" });
+    }
+    return out;
+  }, [role, chatTrabajadores, chatAdminAlcaldesa]);
+
+  useEffect(() => { if (abierto) finRef.current?.scrollIntoView({ behavior: "smooth" }); }, [hilo.length, abierto]);
+  useEffect(() => { if (abierto) setVistos(true); }, [abierto]);
+
+  /* --- Motor de respuestas --- */
+  const responderDinamico = (clave) => {
+    if (clave === "ruta") {
+      const a = AGENDA_TRABAJADOR[0];
+      return `Tu próxima parada es ${a.direccion}, a las ${a.hora} hrs, para ${a.tarea.toLowerCase()}. En “Mi agenda” tienes la ruta optimizada con las ${AGENDA_TRABAJADOR.length} paradas del día.`;
+    }
+    if (clave === "tareas") {
+      return `Tienes ${AGENDA_TRABAJADOR.length} tareas hoy:\n` + AGENDA_TRABAJADOR.map((a, i) => `${i + 1}. ${a.hora} — ${a.tarea} (${a.direccion})`).join("\n") + "\nRecuerda la foto del antes y del después en cada una.";
+    }
+    if (clave === "mensajes") {
+      const mios = chatTrabajadores[TRABAJADOR_ACTUAL.nombre] || [];
+      const u = mios[mios.length - 1];
+      if (u?.from === "admin") return `Sí. ${ADMIN_ACTUAL.nombre} te escribió: “${u.texto}”. Puedes responderle en la pestaña “Chat con mi jefatura”.`;
+      return "No tienes mensajes nuevos de tu jefatura. Si ocurre algo en terreno, escríbele por el chat y queda registrado.";
+    }
+    if (clave === "mensajes_admin") {
+      const pend = Object.entries(chatTrabajadores).filter(([, h]) => h[h.length - 1]?.from === "trabajador");
+      const ua = chatAdminAlcaldesa[chatAdminAlcaldesa.length - 1];
+      let r = pend.length ? `Tienes ${pend.length} mensajes por responder:\n` + pend.map(([n, h]) => `• ${n}: “${h[h.length - 1].texto}”`).join("\n") : "No hay mensajes de trabajadores sin responder.";
+      if (ua?.from === "alcaldesa") r += `\n\nAdemás, la Alcaldesa le preguntó: “${ua.texto}”`;
+      return r;
+    }
+    if (clave === "gps") {
+      const cumplen = GPS_TRABAJADORES.filter((g) => g.cumple === true).length;
+      const no = GPS_TRABAJADORES.filter((g) => g.cumple === false);
+      const ruta = GPS_TRABAJADORES.filter((g) => g.cumple === null).length;
+      let r = `En terreno hay ${GPS_TRABAJADORES.length} trabajadores: ${cumplen} cumpliendo, ${ruta} en proceso y ${no.length} con problemas.`;
+      if (no.length) r += "\n\nCon problemas:\n" + no.map((g) => `• ${g.nombre} — ${g.estado} (${g.distancia})`).join("\n");
+      return r;
+    }
+    if (clave === "resumen_alcaldesa") {
+      const criticos = GPS_TRABAJADORES.filter((g) => g.cumple === false);
+      return `Hoy: tiempo promedio de respuesta 2,4 días, 87% de solicitudes resueltas y satisfacción vecinal 4,3 estrellas. Hay ${GPS_TRABAJADORES.length} trabajadores en terreno y ${criticos.length} incumplimientos${criticos.length ? ` (${criticos.map((g) => g.nombre).join(", ")})` : ""}. También hay ${QUEJAS.length} calificaciones bajas esperando resolución.`;
+    }
+    if (clave === "alertas_alcaldesa") {
+      const criticos = GPS_TRABAJADORES.filter((g) => g.cumple === false);
+      if (!criticos.length) return "No hay incumplimientos registrados en este momento.";
+      return "Sí, estos casos requieren su atención:\n" + criticos.map((g) => `• ${g.nombre}: ${g.estado} en ${g.tarea} (${g.direccion}). ${g.distancia}.`).join("\n") + "\n\nPuede preguntarle al Administrador desde Supervisión de chats.";
+    }
+    return null;
+  };
+
+  /* Intenta interpretar una orden de asignación (solo admin) */
+  const intentarAsignar = (texto) => {
+    const t = normalizar(texto);
+    const esOrden = ["asigna", "asignar", "agrega", "agregar", "anota", "anotar", "encarga", "manda", "envia", "enviar"].some((v) => t.includes(v));
+    if (!esOrden) return null;
+
+    const candidatos = [...GPS_TRABAJADORES.map((g) => g.nombre), ...WORKERS_PERFIL.map((w) => w.nombre)];
+    let trabajador = candidatos.find((n) => t.includes(normalizar(n.split(" ")[0])));
+    if (!trabajador) return { error: "No reconocí a qué trabajador te refieres. Dime su nombre, por ejemplo: “asigna a Pedro entregar sacos en Los Aromos 482”." };
+
+    // Qué hacer: lo que va después del nombre
+    const idxNombre = t.indexOf(normalizar(trabajador.split(" ")[0]));
+    let resto = texto.slice(idxNombre + trabajador.split(" ")[0].length).trim();
+    resto = resto.replace(/^(que|a|de|para|:)\s+/i, "").trim();
+    if (resto.length < 5) return { error: "Entendí a quién asignar, pero no qué debe hacer. Dime la tarea y el lugar." };
+
+    // Dirección aproximada: lo que va después de "en"
+    let direccion = "Por confirmar";
+    const m = resto.match(/\b(?:en|hacia|hasta)\s+(.{4,60})$/i);
+    if (m) direccion = m[1].trim().replace(/[.]$/, "");
+
+    return { trabajador, tarea: resto, direccion };
+  };
+
+  const responder = (texto) => {
+    const t = normalizar(texto);
+
+    // 1) Orden de asignación (admin)
+    if (role === "admin") {
+      const asign = intentarAsignar(texto);
+      if (asign) {
+        if (asign.error) return asign.error;
+        const id = String(20600 + Math.floor(Math.random() * 99));
+        agregarAsignacionIA({
+          id, vecino: "Solicitud interna", depto: "Asignación directa del Administrador",
+          direccion: asign.direccion, creadaPorIA: true, tareaSugerida: asign.tarea, trabajadorSugerido: asign.trabajador,
+        });
+        return `Listo. Creé la tarea N.º ${id} para ${asign.trabajador}: “${asign.tarea}”${asign.direccion !== "Por confirmar" ? ` en ${asign.direccion}` : ""}. Quedó en la pestaña “Asignación” marcada como creada por el asistente, para que confirmes la fecha, la hora y afines las instrucciones antes de enviarla.`;
+      }
+    }
+
+    // 2) Conocimiento del rol y común
+    const bases = [...(IA_CONOCIMIENTO[role] || []), ...IA_CONOCIMIENTO.comun];
+    for (const b of bases) {
+      if (b.kw.some((k) => t.includes(normalizar(k)))) {
+        if (b.dinamico) { const d = responderDinamico(b.dinamico); if (d) return d; }
+        if (b.r) return b.r;
+      }
+    }
+
+    // 3) Saludos y cortesía
+    if (["hola", "buenas", "buenos dias", "buenas tardes"].some((k) => t.includes(k))) return saludo;
+    if (["gracias", "perfecto", "listo"].some((k) => t.includes(k))) return "Con gusto. Si necesitas algo más, aquí estoy.";
+
+    // 4) Sin coincidencia
+    return "No estoy seguro de haber entendido. Puedo explicarte para qué sirve cada sección, decirte qué tienes pendiente" + (role === "admin" ? ", o asignarle una tarea a un trabajador si me dices a quién, qué debe hacer y dónde" : "") + ". ¿Sobre qué te ayudo?";
+  };
+
+  const enviar = (texto) => {
+    const t = (texto ?? msg).trim(); if (!t) return;
+    setHilo((h) => [...h, { from: "yo", texto: t }]);
+    setMsg("");
+    setTimeout(() => setHilo((h) => [...h, { from: "ia", texto: responder(t) }]), 320);
+  };
+
+  const pendientes = vistos ? 0 : avisos.length;
+
+  return (
+    <>
+      {/* Botón flotante */}
+      {!abierto && (
+        <button onClick={() => setAbierto(true)} className="fixed z-40 flex items-center gap-2 rounded-full shadow-lg transition-transform active:scale-95"
+          style={{ right: 18, bottom: "max(84px, calc(env(safe-area-inset-bottom) + 84px))", background: T.copper, color: T.surface, padding: "13px 18px" }}>
+          <Sparkles size={18} />
+          <span style={{ fontSize: 13, fontWeight: 700 }} className="hidden sm:inline">Asistente</span>
+          {pendientes > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center blink-dot" style={{ background: T.gold, color: "#241016", fontSize: 10.5, fontWeight: 800, border: `2px solid ${T.surface}` }}>{pendientes}</span>
+          )}
+        </button>
+      )}
+
+      {/* Panel */}
+      {abierto && (
+        <div className="fixed z-50 flex flex-col rounded-3xl overflow-hidden shadow-2xl"
+          style={{ right: 12, left: 12, bottom: 12, maxWidth: 420, marginLeft: "auto", height: "min(620px, 82vh)", background: T.surface, border: `1.5px solid ${T.border}` }}>
+
+          {/* Encabezado */}
+          <div className="px-4 py-3 flex items-center gap-2.5" style={{ background: `linear-gradient(120deg, ${T.rojoOscuro}, ${T.rojoHeraldico})`, color: "#fff" }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(255,255,255,0.2)" }}><Sparkles size={17} /></div>
+            <div className="flex-1 min-w-0">
+              <p style={{ fontSize: 13.5, fontWeight: 700 }}>{IA_NOMBRE[role]}</p>
+              <p style={{ fontSize: 10.5, opacity: 0.85 }}>Te avisa lo pendiente y te explica la plataforma</p>
+            </div>
+            <button onClick={() => setAbierto(false)} className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: "rgba(255,255,255,0.18)" }}><X size={16} /></button>
+          </div>
+
+          {/* Avisos */}
+          {avisos.length > 0 && (
+            <div className="px-3 py-2.5 flex flex-col gap-1.5 max-h-[150px] overflow-y-auto" style={{ background: T.surfaceAlt, borderBottom: `1px solid ${T.border}` }}>
+              <p style={{ fontSize: 10, fontWeight: 800, color: T.inkFaint, letterSpacing: 0.3 }}>AVISOS PARA TI</p>
+              {avisos.map((a, i) => {
+                const Icon = a.icon; const accent = T[a.color];
+                return (
+                  <button key={i} onClick={() => { if (irA && a.ir) { irA(a.ir); setAbierto(false); } }} className="rounded-xl p-2.5 flex items-start gap-2 text-left" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+                    <Icon size={13} color={accent} className="shrink-0 mt-0.5" />
+                    <span style={{ fontSize: 11.5, lineHeight: 1.35, flex: 1 }}>{a.texto}</span>
+                    {a.ir && <ChevronRight size={13} color={T.inkFaint} className="shrink-0 mt-0.5" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Conversación */}
+          <div className="flex-1 overflow-y-auto p-3.5 flex flex-col gap-2.5">
+            {hilo.map((m, i) => (
+              <div key={i} className="max-w-[86%] rounded-2xl px-3.5 py-2.5" style={{ alignSelf: m.from === "yo" ? "flex-end" : "flex-start", background: m.from === "yo" ? T.copper : T.surfaceAlt, color: m.from === "yo" ? T.surface : T.ink }}>
+                <p style={{ fontSize: 12.5, lineHeight: 1.5, whiteSpace: "pre-line" }}>{m.texto}</p>
+              </div>
+            ))}
+            <div ref={finRef} />
+          </div>
+
+          {/* Sugerencias */}
+          <div className="px-3 pt-2 flex gap-1.5 overflow-x-auto scrollbar-none">
+            {(IA_SUGERENCIAS[role] || []).map((q) => (
+              <button key={q} onClick={() => enviar(q)} className="px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0" style={{ background: T.surfaceAlt, color: T.inkSoft, border: `1px solid ${T.border}` }}>{q}</button>
+            ))}
+          </div>
+
+          <form onSubmit={(e) => { e.preventDefault(); enviar(); }} className="p-3 flex gap-2" style={{ borderTop: `1px solid ${T.border}` }}>
+            <input value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Escribe o pide algo…" className="flex-1 rounded-xl px-3.5 py-2.5 text-[13px] outline-none" style={{ background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.ink }} />
+            <button className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: T.copper, color: T.surface }}><ArrowRight size={16} /></button>
+          </form>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -3626,6 +5797,7 @@ function SectionTitle({ T, children, noMargin }) { return <h2 style={{ fontFamil
 const root = createRoot(document.getElementById("root"));
 root.render(<App />);
 
+
   </script>
 
   <script>
@@ -3641,7 +5813,21 @@ root.render(<App />);
       }
       try {
         if (!window.Babel) throw new Error("No se pudo cargar Babel desde el CDN (unpkg.com). Revisa tu conexión a internet o si algún bloqueador de anuncios/firewall está impidiendo la carga de https://unpkg.com.");
-        var source = document.getElementById("app-source").textContent;
+
+        // Intenta cargar el código desde app.jsx (fuente real del proyecto).
+        // Si la página se abre con doble clic (file://), el navegador bloquea fetch,
+        // por lo que se usa la copia de respaldo embebida en este mismo archivo.
+        var source = null;
+        try {
+          var resp = await fetch("./app.jsx", { cache: "no-store" });
+          if (resp.ok) {
+            source = await resp.text();
+            console.info("Código cargado desde app.jsx");
+          }
+        } catch (e) {
+          console.info("No se pudo leer app.jsx (probablemente abriste el archivo con doble clic). Usando la copia embebida.");
+        }
+        if (!source) source = document.getElementById("app-source").textContent;
         var result = Babel.transform(source, { presets: [["react", { runtime: "classic" }]], filename: "app.jsx", sourceType: "module" });
         var blob = new Blob([result.code], { type: "text/javascript" });
         var url = URL.createObjectURL(blob);

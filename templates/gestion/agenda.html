@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block title %}Agenda y Compromisos — Ilustre Municipalidad de La Serena{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- Header de Módulo -->
+  <div class="bg-white p-6 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div>
+      <h2 class="font-display text-xl font-extrabold text-[#8B1D19]">Módulo: Agenda y Compromisos Territoriales</h2>
+      <p class="text-xs text-slate-500 mt-1">Seguimiento de compromisos adquiridos en terreno por los funcionarios.</p>
+    </div>
+    <button onclick="document.getElementById('modal-compromiso').showModal()" class="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-[#C41230] text-white hover:bg-[#8B1D19] shadow-md transition-all flex items-center gap-2 cursor-pointer">
+      <i data-lucide="plus-circle" class="w-4 h-4"></i>
+      <span>+ Nuevo Compromiso</span>
+    </button>
+  </div>
+
+  <!-- Modal Nuevo Compromiso -->
+  <dialog id="modal-compromiso" class="rounded-3xl p-6 max-w-md w-full bg-white shadow-2xl backdrop:bg-slate-900/40 border border-red-100">
+    <div class="flex justify-between items-center pb-4 border-b border-slate-100 mb-4">
+      <h3 class="font-display font-extrabold text-base text-[#8B1D19] flex items-center gap-2">
+        <i data-lucide="calendar" class="w-5 h-5 text-[#C41230]"></i> Registrar Nuevo Compromiso
+      </h3>
+      <button onclick="document.getElementById('modal-compromiso').close()" class="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
+    </div>
+    <form method="POST" class="space-y-4 text-xs font-bold">
+      {% csrf_token %}
+      <div>
+        <label class="block text-slate-700 mb-1">Solicitante (Vecino / JJVV / Organización) *</label>
+        <input type="text" name="solicitante" required placeholder="ej: JJVV Doña Gabriela" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+      </div>
+      <div>
+        <label class="block text-slate-700 mb-1">Funcionario Responsable *</label>
+        <select name="responsable_id" required class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal">
+          <option value="">-- Seleccionar Funcionario --</option>
+          {% for f in funcionarios %}
+            <option value="{{ f.id }}">{{ f }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-slate-700 mb-1">Territorio / Sector</label>
+          <input type="text" name="territorio" placeholder="ej: Las Compañías" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+        </div>
+        <div>
+          <label class="block text-slate-700 mb-1">Área de Apoyo</label>
+          <input type="text" name="area_apoyo" placeholder="ej: Tránsito / DOM" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+        </div>
+      </div>
+      <div>
+        <label class="block text-slate-700 mb-1">Fecha Comprometida *</label>
+        <input type="date" name="fecha_comprometida" required class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+      </div>
+      <div>
+        <label class="block text-slate-700 mb-1">Observaciones / Detalle</label>
+        <textarea name="observacion" rows="2" placeholder="ej: Compromiso de reunión técnica en terreno para evaluar demarcación vial" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal"></textarea>
+      </div>
+      <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
+        <button type="button" onclick="document.getElementById('modal-compromiso').close()" class="px-4 py-2.5 rounded-2xl bg-slate-100 text-slate-600 hover:bg-slate-200">Cancelar</button>
+        <button type="submit" class="px-5 py-2.5 rounded-2xl bg-[#C41230] text-white hover:bg-[#8B1D19] shadow-md">Guardar Compromiso</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Tabla de Compromisos -->
+  <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden">
+    <div class="p-4 border-b border-red-100 bg-red-50/40 flex items-center justify-between">
+      <h3 class="font-extrabold text-xs uppercase tracking-widest text-[#8B1D19]">Compromisos de Agenda Registrados</h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs text-slate-600">
+        <thead class="bg-slate-50 text-slate-700 font-extrabold border-b border-slate-200 uppercase tracking-wider">
+          <tr>
+            <th class="p-4">Solicitante</th>
+            <th class="p-4">Responsable</th>
+            <th class="p-4">Territorio</th>
+            <th class="p-4">Fecha Comprometida</th>
+            <th class="p-4">Estado</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for comp in compromisos %}
+          <tr class="hover:bg-red-50/30 transition-colors">
+            <td class="p-4 font-bold text-slate-900">{{ comp.solicitante }}</td>
+            <td class="p-4">{{ comp.responsable }}</td>
+            <td class="p-4">{{ comp.territorio|default:"—" }}</td>
+            <td class="p-4">{{ comp.fecha_comprometida|date:"d/m/Y" }}</td>
+            <td class="p-4">
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800">{{ comp.estado }}</span>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="p-8 text-center text-slate-400">
+              <i data-lucide="calendar" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+              No hay compromisos territoriales registrados.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

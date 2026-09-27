@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+
+{% block title %}Gestión de Funcionarios — Ilustre Municipalidad de La Serena{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- Header de Módulo -->
+  <div class="bg-white p-6 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div>
+      <h2 class="font-display text-xl font-extrabold text-[#8B1D19]">Módulo: Gestión de Funcionarios y Empleados</h2>
+      <p class="text-xs text-slate-500 mt-1">Administración de usuarios, cargos institucionales, delegaciones territoriales y roles SGR.</p>
+    </div>
+    <button onclick="document.getElementById('modal-funcionario').showModal()" class="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-[#C41230] text-white hover:bg-[#8B1D19] shadow-md transition-all flex items-center gap-2 cursor-pointer">
+      <i data-lucide="user-plus" class="w-4 h-4"></i>
+      <span>+ Nuevo Funcionario</span>
+    </button>
+  </div>
+
+  <!-- Modal Nuevo Funcionario -->
+  <dialog id="modal-funcionario" class="rounded-3xl p-6 max-w-md w-full bg-white shadow-2xl backdrop:bg-slate-900/40 border border-red-100">
+    <div class="flex justify-between items-center pb-4 border-b border-slate-100 mb-4">
+      <h3 class="font-display font-extrabold text-base text-[#8B1D19] flex items-center gap-2">
+        <i data-lucide="user-plus" class="w-5 h-5 text-[#C41230]"></i> Registrar Nuevo Funcionario
+      </h3>
+      <button onclick="document.getElementById('modal-funcionario').close()" class="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
+    </div>
+    <form method="POST" class="space-y-4 text-xs font-bold">
+      {% csrf_token %}
+      <div>
+        <label class="block text-slate-700 mb-1">Nombre de Usuario (Username) *</label>
+        <input type="text" name="username" required placeholder="ej: jrojas" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+      </div>
+      <div>
+        <label class="block text-slate-700 mb-1">Correo Electrónico</label>
+        <input type="email" name="email" placeholder="ej: jrojas@laserena.cl" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+      </div>
+      <div>
+        <label class="block text-slate-700 mb-1">Identificador Institucional / RUT *</label>
+        <input type="text" name="identificador_institucional" required placeholder="ej: 12.345.678-9" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+      </div>
+      <div>
+        <label class="block text-slate-700 mb-1">Cargo *</label>
+        <select name="cargo_id" required class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal">
+          <option value="">-- Seleccionar Cargo --</option>
+          {% for c in cargos %}
+            <option value="{{ c.id }}">{{ c.nombre_cargo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-slate-700 mb-1">Delegación Municipal</label>
+        <select name="delegacion_id" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal">
+          <option value="">-- Transversal / Sin Asignar --</option>
+          {% for d in delegaciones %}
+            <option value="{{ d.id }}">{{ d.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-slate-700 mb-1">Estado</label>
+        <select name="estado" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal">
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </div>
+      <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
+        <button type="button" onclick="document.getElementById('modal-funcionario').close()" class="px-4 py-2.5 rounded-2xl bg-slate-100 text-slate-600 hover:bg-slate-200">Cancelar</button>
+        <button type="submit" class="px-5 py-2.5 rounded-2xl bg-[#C41230] text-white hover:bg-[#8B1D19] shadow-md">Guardar Funcionario</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Métricas Rápidas de Personal -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="bg-white p-5 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex items-center justify-between">
+      <div>
+        <p class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Total Funcionarios</p>
+        <h3 class="text-2xl font-extrabold text-slate-900 mt-1 font-display">{{ total_funcionarios }}</h3>
+      </div>
+      <div class="w-11 h-11 rounded-2xl bg-red-50 text-[#C41230] flex items-center justify-center font-bold">
+        <i data-lucide="users" class="w-5 h-5"></i>
+      </div>
+    </div>
+
+    <div class="bg-white p-5 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex items-center justify-between">
+      <div>
+        <p class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Funcionarios Activos</p>
+        <h3 class="text-2xl font-extrabold text-emerald-600 mt-1 font-display">{{ activos }}</h3>
+      </div>
+      <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+        <i data-lucide="user-check" class="w-5 h-5"></i>
+      </div>
+    </div>
+
+    <div class="bg-white p-5 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex items-center justify-between">
+      <div>
+        <p class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Delegaciones Cobertura</p>
+        <h3 class="text-2xl font-extrabold text-blue-600 mt-1 font-display">{{ total_delegaciones }}</h3>
+      </div>
+      <div class="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+        <i data-lucide="building-2" class="w-5 h-5"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabla de Funcionarios -->
+  <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden">
+    <div class="p-4 border-b border-red-100 bg-red-50/40 flex items-center justify-between">
+      <h3 class="font-extrabold text-xs uppercase tracking-widest text-[#8B1D19]">Nómina de Funcionarios Registrados</h3>
+      <span class="text-[11px] font-bold text-slate-400">Control de Acceso y Roles SGR</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs text-slate-600">
+        <thead class="bg-slate-50 text-slate-700 font-extrabold border-b border-slate-200 uppercase tracking-wider">
+          <tr>
+            <th class="p-4">Funcionario / Usuario</th>
+            <th class="p-4">ID Institucional</th>
+            <th class="p-4">Cargo</th>
+            <th class="p-4">Delegación Municipal</th>
+            <th class="p-4">Roles SGR</th>
+            <th class="p-4">Estado</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for f in funcionarios %}
+          <tr class="hover:bg-red-50/30 transition-colors">
+            <td class="p-4">
+              <div class="font-bold text-slate-900">{{ f.user.get_full_name|default:f.user.username }}</div>
+              <div class="text-[11px] text-slate-400 font-mono">{{ f.user.email|default:f.user.username }}</div>
+            </td>
+            <td class="p-4 font-mono font-bold text-[#C41230]">{{ f.identificador_institucional }}</td>
+            <td class="p-4 font-medium text-slate-800">{{ f.cargo.nombre_cargo }}</td>
+            <td class="p-4">
+              {% if f.delegacion %}
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">{{ f.delegacion.nombre }}</span>
+              {% else %}
+                <span class="italic text-slate-400">Transversal / Sin asignar</span>
+              {% endif %}
+            </td>
+            <td class="p-4">
+              <div class="flex flex-wrap gap-1">
+                {% for fr in f.funcionariorol_set.all %}
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-[#8B1D19]">{{ fr.rol.nombre_rol }}</span>
+                {% empty %}
+                  <span class="text-[11px] italic text-slate-400">Funcionario estándar</span>
+                {% endfor %}
+              </div>
+            </td>
+            <td class="p-4">
+              {% if f.estado == 'Activo' %}
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 flex items-center gap-1 w-fit">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Activo
+                </span>
+              {% else %}
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-600 flex items-center gap-1 w-fit">
+                  <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Inactivo
+                </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="p-8 text-center text-slate-400">
+              <i data-lucide="users" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+              No hay funcionarios registrados en el sistema.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
