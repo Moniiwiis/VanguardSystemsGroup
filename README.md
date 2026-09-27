@@ -1,119 +1,133 @@
-# 🏛️ Sistema de Gestión de Resultados (SGR)
-### Ilustre Municipalidad de La Serena — Proyecto Integrador
+# 🏛️ Sistema de Gestión de Resultados (SGR) — Django BackEnd
+### Ilustre Municipalidad de La Serena | INACAP — Evaluación Sumativa II (TI3041)
 
-[![Estado](https://img.shields.io/badge/Estado-Completado-brightgreen.svg)](https://github.com/)
-[![Institución](https://img.shields.io/badge/Institución-INACAP-red.svg)](https://www.inacap.cl/)
-[![Tecnologías](https://img.shields.io/badge/Tech-HTML5%20%7C%20JS%20React%20%7C%20TailwindCSS-blue.svg)](https://react.dev/)
+[![Estado](https://img.shields.io/badge/Estado-Completado%20100%25-brightgreen.svg)](https://github.com/)
+[![Asignatura](https://img.shields.io/badge/Asignatura-Programaci%C3%B3n%20Back%20End-red.svg)](https://www.inacap.cl/)
+[![Framework](https://img.shields.io/badge/Framework-Django%206.1-blue.svg)](https://www.djangoproject.com/)
 
 ---
 
 ## 📋 Descripción del Proyecto
 
-El **Sistema de Gestión de Resultados (SGR)** es una solución web responsiva desarrollada para centralizar, medir y controlar la gestión operativa de funcionarios y delegaciones de la **Ilustre Municipalidad de La Serena** (*Delegación Rural, Centro, Las Compañías, Avenida del Mar, La Pampa y La Antena*).
+El **Sistema de Gestión de Resultados (SGR)** centraliza, mide y controla la gestión operativa de funcionarios y delegaciones de la **Ilustre Municipalidad de La Serena** (*Delegación La Serena Centro, Las Compañías, Rural, entre otras*).
 
-La plataforma permite realizar el seguimiento de solicitudes ciudadanas, gestionar la agenda colectiva de compromisos futuros, respaldar la ejecución mediante evidencias fotográficas con códigos únicos inmutables y calcular automáticamente los indicadores de cumplimiento ponderado y el semáforo diario de desempeño.
-
----
-
-## 🌟 Características Principales
-
-### 1. 👥 Gestión de Empleados y Funcionarios (CRUD Completo)
-- **Lista General & Filtros**: Búsqueda en tiempo real por RUT, nombre o cargo; filtros por Departamento/Delegación y Estado (*Activo / Inactivo*); tabla con paginación interactiva.
-- **Registro y Edición de Personal**: Formulario con validación de obligatoriedad (*), verificación de formato de correo electrónico y control de RUT único en base de datos.
-- **Ficha Detalle del Empleado**: Vista de consulta con perfil laboral, métricas SGR individuales, metas trimestrales, compromisos asignados y catálogo de evidencias cargadas.
-
-### 2. 🛡️ Modales de Validación y Seguridad (Guía RF-010 & CA-07)
-- **Modal Confirmar Eliminación**: Confirmación requerida (*Confirmar / Cancelar*) antes de eliminar registros sin procesos pendientes.
-- **Modal Operación No Permitida** *(Mockup 7)*: Restricción de eliminación para empleados con procesos activos (*Contrato vigente, Vacaciones pendientes, Compromisos SGR pendientes*).
-- **Modal Empleado Duplicado** *(Mockup 5)*: Detección de RUT existente en la base de datos.
-- **Modal Error de Validación** *(Mockup 6)*: Detección de correos electrónicos con formato inválido.
-- **Modal Sin Coincidencias** *(Mockup 8)*: Aviso de búsquedas sin resultados en el sistema.
-
-### 3. 📊 Matriz SGR (Seguimiento de Gestión y Resultados)
-- **Resumen de Delegación**: Indicadores consolidados por área (*último ingreso, días sin ingresar, cantidad de ingresos y promedio diario*).
-- **Pestaña Personal**: Medición por ítem, ponderador de peso (suma 100%), meta trimestral, avance real y cálculo de cumplimiento ponderado.
-- **Tubo de Trabajo / Agenda Colectiva**: Seguimiento de compromisos con transiciones de estado (*Ingresado → Pendiente → En proceso → Realizado*).
-- **Semáforo Diario de Avance**:
-  - 🟢 **Verde**: Avance igual o superior a la meta acumulada esperada al día.
-  - 🟡 **Ámbar**: Avance entre el 60% y menos del 100% de la meta esperada.
-  - 🔴 **Rojo**: Avance inferior al 60% de la meta esperada.
-
-### 4. 🏙️ Portal Vecino & Copiloto IA
-- Asistente inteligente con dictado por voz para dirigir trámites y solicitudes comunitarias (*Aseo y Ornato, DIDECO, Seguridad, Trámites y Vehículos, Fomento Productivo, Salud*).
-- Muro público de transparencia y mapa de crisis comunal en tiempo real.
-
-### 5. 🔒 Auditoría Interna y Anti-Fraude
-- Registro imborrable de operaciones críticas firmado mediante firmas criptográficas HASH (`0x...`) para garantizar la trazabilidad (RNF-008).
+Esta aplicación desarrollada en **Django** incluye un backend desacoplado en aplicaciones de dominio (`accounts`, `activities`, `agenda`, `configuration`, `core`, `analytics`), un **Django Admin personalizado y avanzado (Admin Pro)** con auditoría, inlines, acciones personalizadas, validaciones controladas `clean()`, y restricción de visibilidad por perfil y delegación (**Scoping por Delegación**).
 
 ---
 
-## 🎨 Identidad Visual e Integración de Logos
+## 🛠️ Arquitectura del Sistema y Módulos
 
-El diseño respeta estrictamente la paleta de colores institucional de la **Ilustre Municipalidad de La Serena**:
-- **Rojo Heráldico**: `#C41230`
-- **Rojo Luminoso**: `#DB3334`
-- **Rojo Oscuro**: `#8B1D19`
+El proyecto está organizado en 6 aplicaciones independientes con responsabilidades delimitadas:
 
-### Reglas de Aplicación de Logos:
-1. **Logo Horizontal (`horizontal-blanco.svg` / `horizontal-blanco.png`)**: Integrado en las barras superiores de navegación (*headers*) de todas las páginas de la plataforma.
-2. **Logo Vertical (`vertical-color.svg`)**: Posicionado a la izquierda del texto de encabezado en la parte superior de todos los formularios (*Inicio de Sesión, Registro de Empleados, Solicitudes Vecinales*).
-
----
-
-## 📂 Estructura del Repositorio
-
-```
-VanguardSystemsGroup/
-├── README.md                # Documentación oficial del proyecto integrador
-├── index.html               # Punto de entrada web principal (Listo para GitHub Pages)
-├── app.jsx                  # Código fuente completo con componentes React y lógica SGR
-├── horizontal-blanco.svg    # Logo horizontal blanco institucional
-├── horizontal-color.svg     # Logo horizontal color institucional
-├── horizontal-blanco.png    # Logo horizontal en formato PNG
-├── vertical-color.svg       # Logo vertical a color para encabezados de formularios
-├── vertical-blanco.svg      # Logo vertical blanco
-├── logo-la-serena.svg       # Escudo institucional oficial de La Serena
-
-```
+1. **`core`**: Proporciona el `BaseModel` abstracto con los campos de auditoría requeridos (`created_at`, `updated_at`, `deleted_at`) y la lógica de borrado lógico (*Soft Delete*). Contiene además el comando de carga reproducible `seed_data`.
+2. **`accounts`**: Gestión de `Delegacion`, `Cargo`, `Funcionario` (vinculado a `User`), `Rol` y `FuncionarioRol`.
+3. **`configuration`**: Gestión de `Periodo`, `CatalogoActividad`, `ItemMedicion` y `ConfiguracionMeta` (incluyendo fórmulas de semáforo, cumplimiento ponderado y tope del 150%).
+4. **`activities`**: Gestión de `Actividad` (con autogeneración de `codigo_evidencia_unico`), `Evidencia`, `ValidacionEvidencia` y `AtencionSocialGestion`.
+5. **`agenda`**: Registro de `CompromisoAgenda` (tubo de trabajo) y `AjusteDesempenio`.
+6. **`analytics`**: Módulo de reportabilidad e indicadores consolidados.
 
 ---
 
-## 🚀 Instrucciones de Instalación y Ejecución
+## 🔑 Cuentas de Prueba y Restricciones de Seguridad (Scoping)
 
-### Opción 1: Ejecución Directa (Sin Servidor Local)
-Simplemente haz **doble clic** sobre el archivo `index.html` en la raíz del repositorio para abrir la aplicación web interactiva en cualquier navegador (*Chrome, Edge, Firefox, Safari*).
+Para demostrar las restricciones de seguridad por rol y delegación en el **Django Admin**:
 
-### Opción 2: Ejecución mediante Servidor Local HTTP
-Si deseas ejecutar la aplicación mediante un servidor local:
+| Usuario | Contraseña | Rol / Contexto | Permisos en Django Admin |
+| :--- | :--- | :--- | :--- |
+| **`admin_sgr`** | `Admin1234!` | Superusuario / Administrador | **Acceso Total**: Visualiza y edita todas las delegaciones y registros. |
+| **`delegado_centro`** | `User1234!` | Delegado Centro (Staff) | **Scoping**: Solo visualiza y gestiona funcionarios/actividades de **Delegación La Serena Centro**. |
+| **`delegado_companias`** | `User1234!` | Delegado Las Compañías (Staff) | **Scoping**: Solo visualiza y gestiona funcionarios/actividades de **Delegación Las Compañías**. |
+| **`funcionario_juan`** | `User1234!` | Funcionario (Staff) | **Acceso Limitado**: Restringido a su ámbito operativo. |
 
+---
+
+## ⚡ Django Admin Pro: Funcionalidades Implementadas
+
+1. **Inlines Reutilizables**:
+   - `EvidenciaInline`, `ValidacionEvidenciaInline`, `AtencionSocialGestionInline` dentro de `ActividadAdmin`.
+   - `FuncionarioRolInline` dentro de `FuncionarioAdmin`.
+   - `ItemMedicionInline` dentro de `CargoAdmin`.
+2. **Acciones Personalizadas**:
+   - `aprobar_evidencias` y `rechazar_evidencias` en `ActividadAdmin`.
+   - `marcar_como_realizado` y `marcar_como_en_proceso` en `CompromisoAgendaAdmin`.
+3. **Validación Controlada (`clean()`)**:
+   - `Periodo.clean()`: Valida que la `fecha_termino` no sea anterior a la `fecha_inicio`.
+   - `ConfiguracionMeta.clean()`: Valida que `valor_objetivo` > 0 y `ponderacion` entre 0% y 100%.
+   - `Actividad.clean()`: Valida que la `fecha_actividad` esté dentro del rango del período seleccionado.
+4. **Optimización de Consultas (`list_select_related`)**:
+   - Implementado en todos los ModelAdmins para evitar consultas $N+1$ en relaciones de clave foránea.
+
+---
+
+## 🚀 Instrucciones de Instalación y Ejecución Desde un Entorno Limpio
+
+### 1. Clonar el repositorio y crear el entorno virtual
 ```bash
-# Con Python 3
-python -m http.server 8080
+git clone <URL_DEL_REPOSITORIO>
+cd VanguardSystemsGroup
 
-# Luego abre en tu navegador:
-# http://localhost:8080
+# Crear y activar entorno virtual
+python -m venv .venv
+# En Windows PowerShell:
+.venv\Scripts\Activate.ps1
+# En Linux/macOS:
+source .venv/bin/activate
 ```
+
+### 2. Instalar dependencias
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configurar variables de entorno (.env)
+Copiar el archivo de plantilla `.env.example` a `.env`:
+```bash
+cp .env.example .env
+```
+*(Por defecto viene configurado para usar `sqlite` con `db.sqlite3`. Si se desea MySQL/WAMP, modificar las variables en `.env`)*.
+
+### 4. Ejecutar verificación y migraciones
+```bash
+python manage.py check
+python manage.py migrate
+```
+
+### 5. Cargar datos de prueba reproducibles (Seed Data / Fixtures)
+
+Se disponen de **dos mecanismos equivalentes y reproducibles**:
+
+**Opción A (Management Command - Recomendado):**
+```bash
+python manage.py seed_data
+```
+
+**Opción B (Fixture JSON):**
+```bash
+python manage.py loaddata fixtures/seed.json
+```
+
+### 6. Iniciar el servidor de desarrollo
+```bash
+python manage.py runserver
+```
+Acceder al panel de administración en: [http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/)
 
 ---
 
-## 🌐 Despliegue en Vivo con GitHub Pages
+## 🛡️ Trazabilidad Git y Gestión de Ramas
 
-Para publicar este proyecto en vivo desde GitHub:
-
-1. Subir los archivos al repositorio:
-   ```bash
-   git add .
-   git commit -m "Publicación del Sistema SGR La Serena con README"
-   git push origin main
-   ```
-2. Ir a **Settings > Pages** en tu repositorio de GitHub.
-3. En **Source**, seleccionar la rama `main` y la carpeta `/ (root)`.
-4. Guardar. En 1 minuto tendrás la aplicación web disponible públicamente.
+- **Rama Principal**: `main`
+- **Trabajo en Ramas de Desarrollo**: `feature/backend-architecture`, `feature/django-admin-pro`, `feature/security-scoping`, `feature/seed-fixtures`
+- Para revisar el historial de merges y commits:
+```bash
+git log --oneline --graph --all
+```
 
 ---
 
 ## 👥 Equipo y Créditos
 
-- **Institución**: INACAP — Caso Académico Ilustre Municipalidad de La Serena.
-- **Asignatura**: Proyecto Integrado.
-- **Versión**: 1.0 — Documento y Sistema Consolidado SGR.
+- **Institución**: INACAP — Sede La Serena
+- **Asignatura**: Programación Back End (TI3041)
+- **Docente**: Javier Ahumada
+- **Evaluación**: Evaluación Sumativa II — Taller "Aplicación web con Django Admin" (25%)
