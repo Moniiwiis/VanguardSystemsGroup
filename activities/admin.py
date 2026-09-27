@@ -16,7 +16,11 @@ class AtencionSocialGestionInline(admin.TabularInline):
 
 @admin.register(Actividad)
 class ActividadAdmin(BaseScopedModelAdmin):
-    list_display = ('codigo_evidencia_unico', 'fecha_actividad', 'funcionario', 'item', 'periodo', 'estado_validacion')
+    list_display = ('codigo_evidencia_unico', 'fecha_actividad', 'funcionario', 'get_delegacion', 'item', 'periodo', 'estado_validacion')
+
+    @admin.display(description='Delegación', ordering='funcionario__delegacion__nombre')
+    def get_delegacion(self, obj):
+        return obj.funcionario.delegacion.nombre if (obj.funcionario and obj.funcionario.delegacion) else "-"
     search_fields = (
         'codigo_evidencia_unico',
         'funcionario__user__username',

@@ -4,12 +4,16 @@ from .models import CompromisoAgenda, AjusteDesempenio
 
 @admin.register(CompromisoAgenda)
 class CompromisoAgendaAdmin(BaseScopedModelAdmin):
-    list_display = ('solicitante', 'responsable', 'fecha_comprometida', 'estado', 'territorio')
+    list_display = ('solicitante', 'responsable', 'get_delegacion', 'fecha_comprometida', 'estado', 'territorio')
     search_fields = ('solicitante', 'responsable__user__username', 'territorio')
     list_filter = ('estado', 'fecha_comprometida')
     date_hierarchy = 'fecha_comprometida'
-    list_select_related = ('responsable__user', 'actividad_origen')
+    list_select_related = ('responsable__user', 'responsable__delegacion', 'actividad_origen')
     actions = ['marcar_como_realizado', 'marcar_como_en_proceso']
+
+    @admin.display(description='Delegación', ordering='responsable__delegacion__nombre')
+    def get_delegacion(self, obj):
+        return obj.responsable.delegacion.nombre if (obj.responsable and obj.responsable.delegacion) else "-"
 
     @admin.action(description="Marcar compromisos seleccionados como 'Realizado'")
     def marcar_como_realizado(self, request, queryset):
