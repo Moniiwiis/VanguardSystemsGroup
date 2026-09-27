@@ -152,6 +152,15 @@ class Command(BaseCommand):
         )
         FuncionarioRol.objects.get_or_create(funcionario=f_juan, rol=rol_funcionario)
 
+        # e) Asignar permisos de modelos de Django a los usuarios de staff
+        from django.contrib.auth.models import Permission
+        all_perms = Permission.objects.filter(
+            content_type__app_label__in=['accounts', 'activities', 'agenda', 'configuration', 'analytics']
+        )
+        u_centro.user_permissions.set(all_perms)
+        u_comp.user_permissions.set(all_perms)
+        u_juan.user_permissions.set(all_perms)
+
         # 5. Período de medición
         periodo_actual, _ = Periodo.objects.get_or_create(
             fecha_inicio=datetime.date(2026, 7, 1),

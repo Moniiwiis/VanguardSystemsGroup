@@ -1,4 +1,5 @@
 from django.contrib import admin
+from core.admin import BaseScopedModelAdmin
 from .models import Actividad, Evidencia, ValidacionEvidencia, AtencionSocialGestion
 
 class EvidenciaInline(admin.TabularInline):
@@ -14,7 +15,7 @@ class AtencionSocialGestionInline(admin.TabularInline):
     extra = 1
 
 @admin.register(Actividad)
-class ActividadAdmin(admin.ModelAdmin):
+class ActividadAdmin(BaseScopedModelAdmin):
     list_display = ('codigo_evidencia_unico', 'fecha_actividad', 'funcionario', 'item', 'periodo', 'estado_validacion')
     search_fields = (
         'codigo_evidencia_unico',
@@ -68,13 +69,21 @@ class ActividadAdmin(admin.ModelAdmin):
         return qs
 
 @admin.register(Evidencia)
-class EvidenciaAdmin(admin.ModelAdmin):
+class EvidenciaAdmin(BaseScopedModelAdmin):
     list_display = ('actividad', 'ruta_archivo_url', 'created_at')
     search_fields = ('actividad__codigo_evidencia_unico', 'ruta_archivo_url')
     list_select_related = ('actividad',)
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        if hasattr(request.user, 'funcionario') and request.user.funcionario.delegacion:
+            return qs.filter(actividad__funcionario__delegacion=request.user.funcionario.delegacion)
+        return qs
+
 @admin.register(ValidacionEvidencia)
-class ValidacionEvidenciaAdmin(admin.ModelAdmin):
+class ValidacionEvidenciaAdmin(BaseScopedModelAdmin):
     list_display = ('actividad', 'verificador', 'resultado', 'created_at')
     search_fields = (
         'actividad__codigo_evidencia_unico',
@@ -85,10 +94,25 @@ class ValidacionEvidenciaAdmin(admin.ModelAdmin):
     list_filter = ('resultado',)
     list_select_related = ('actividad', 'verificador__user')
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        if hasattr(request.user, 'funcionario') and request.user.funcionario.delegacion:
+            return qs.filter(actividad__funcionario__delegacion=request.user.funcionario.delegacion)
+        return qs
+
 @admin.register(AtencionSocialGestion)
-class AtencionSocialGestionAdmin(admin.ModelAdmin):
+class AtencionSocialGestionAdmin(BaseScopedModelAdmin):
     list_display = ('actividad', 'numero_gestion', 'tipo_gestion', 'fecha_gestion')
     search_fields = ('actividad__codigo_evidencia_unico', 'tipo_gestion', 'resultado_gestion')
     list_filter = ('tipo_gestion',)
     list_select_related = ('actividad',)
-
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        if hasattr(request.user, 'funcionario') and request.user.funcionario.delegacion:
+            return qs.filter(actividad__funcionario__delegacion=request.user.funcionario.delegacion)
+        return qs
