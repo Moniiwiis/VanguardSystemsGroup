@@ -69,23 +69,42 @@
         {% if delegacion_activa %}
           {% if can_switch_delegacion %}
             <!-- Selector Desplegable de Delegación para Perfiles Autorizados (ej: Administrador) -->
-            <div class="relative group">
-              <button type="button" class="flex items-center gap-2 bg-[#700F17]/90 hover:bg-[#5C0A10] text-white text-xs font-bold px-3.5 py-1.5 rounded-full border border-white/25 shadow-inner transition-all">
+            <div class="relative" id="delegacionDropdownContainer">
+              <button type="button" 
+                      id="delegacionDropdownBtn"
+                      onclick="toggleDelegacionDropdown(event)"
+                      aria-haspopup="true"
+                      aria-expanded="false"
+                      class="flex items-center gap-2.5 bg-[#700F17]/95 hover:bg-[#5C0A10] active:scale-95 text-white text-xs font-bold px-4 py-2 rounded-full border border-white/30 shadow-md transition-all cursor-pointer select-none">
                 <i data-lucide="building-2" class="w-3.5 h-3.5 text-white/90"></i>
-                <span>{{ delegacion_activa.get_codigo }} | {{ delegacion_activa.nombre }}</span>
-                <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-white/70"></i>
+                <span>{{ delegacion_activa.get_codigo }} · {{ delegacion_activa.nombre }}</span>
+                <i data-lucide="chevron-down" id="delegacionChevron" class="w-3.5 h-3.5 text-white/80 transition-transform duration-200"></i>
               </button>
-              <div class="absolute left-1/2 -translate-x-1/2 mt-1.5 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 hidden group-hover:block z-50 text-slate-800 text-xs">
-                <div class="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cambiar Delegación Activa</div>
-                {% for d in delegaciones_autorizadas %}
-                  <a href="{% url 'cambiar_delegacion' d.id %}" 
-                     class="flex items-center justify-between px-3.5 py-2 hover:bg-red-50 text-slate-700 transition-colors {% if d.id == delegacion_activa.id %}font-extrabold text-[#C41230] bg-red-50/70{% endif %}">
-                    <span>{{ d.get_codigo }} — {{ d.nombre }}</span>
-                    {% if d.id == delegacion_activa.id %}
-                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#C41230]"></i>
-                    {% endif %}
-                  </a>
-                {% endfor %}
+              
+              <!-- Menú Desplegable con Click Toggle (Permite seleccionar con total tranquilidad) -->
+              <div id="delegacionDropdownMenu" 
+                   class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-2.5 z-50 text-slate-800 text-xs animate-in fade-in slide-in-from-top-1 duration-150">
+                <div class="px-4 py-1.5 flex items-center justify-between border-b border-slate-100 mb-1">
+                  <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Cambiar Delegación Activa</span>
+                  <span class="text-[10px] font-semibold text-slate-400">{{ delegaciones_autorizadas|length }} disponibles</span>
+                </div>
+                <div class="max-h-64 overflow-y-auto divide-y divide-slate-50">
+                  {% for d in delegaciones_autorizadas %}
+                    <a href="{% url 'cambiar_delegacion' d.id %}" 
+                       class="flex items-center justify-between px-4 py-2.5 hover:bg-red-50 text-slate-700 hover:text-[#C41230] transition-colors rounded-xl mx-1.5 {% if d.id == delegacion_activa.id %}font-extrabold text-[#C41230] bg-red-50/80 shadow-sm{% endif %}">
+                      <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full {% if d.id == delegacion_activa.id %}bg-[#C41230]{% else %}bg-slate-300{% endif %}"></span>
+                        <div class="flex flex-col">
+                          <span class="font-bold text-xs">{{ d.nombre }}</span>
+                          <span class="text-[10px] text-slate-400 font-mono">{{ d.get_codigo }} · {{ d.comuna|default:"La Serena" }}</span>
+                        </div>
+                      </div>
+                      {% if d.id == delegacion_activa.id %}
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#C41230] text-white">Activa</span>
+                      {% endif %}
+                    </a>
+                  {% endfor %}
+                </div>
               </div>
             </div>
           {% else %}
@@ -280,6 +299,55 @@
       });
       return false;
     }
+
+    // Manejo interactivo y accesible del selector de delegación activa
+    function toggleDelegacionDropdown(e) {
+      if (e) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+      const menu = document.getElementById('delegacionDropdownMenu');
+      const btn = document.getElementById('delegacionDropdownBtn');
+      const chevron = document.getElementById('delegacionChevron');
+      if (!menu) return;
+
+      const isHidden = menu.classList.contains('hidden');
+      if (isHidden) {
+        menu.classList.remove('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+        if (chevron) chevron.classList.add('rotate-180');
+      } else {
+        menu.classList.add('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+        if (chevron) chevron.classList.remove('rotate-180');
+      }
+    }
+
+    // Cerrar menú al hacer clic en cualquier lugar fuera o presionar Escape
+    document.addEventListener('click', function(e) {
+      const container = document.getElementById('delegacionDropdownContainer');
+      const menu = document.getElementById('delegacionDropdownMenu');
+      const btn = document.getElementById('delegacionDropdownBtn');
+      const chevron = document.getElementById('delegacionChevron');
+      if (container && !container.contains(e.target) && menu && !menu.classList.contains('hidden')) {
+        menu.classList.add('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+        if (chevron) chevron.classList.remove('rotate-180');
+      }
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        const menu = document.getElementById('delegacionDropdownMenu');
+        const btn = document.getElementById('delegacionDropdownBtn');
+        const chevron = document.getElementById('delegacionChevron');
+        if (menu && !menu.classList.contains('hidden')) {
+          menu.classList.add('hidden');
+          if (btn) btn.setAttribute('aria-expanded', 'false');
+          if (chevron) chevron.classList.remove('rotate-180');
+        }
+      }
+    });
 
     // SweetAlert2 Flash Messages
     document.addEventListener("DOMContentLoaded", function() {
