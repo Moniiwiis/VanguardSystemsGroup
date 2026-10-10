@@ -87,20 +87,55 @@
         </div>
 
         <!-- Requisitos Visibles de la Contraseña (Mockup C2) -->
-        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2 text-left">
-          <p class="font-bold text-slate-800 text-[11px]">Requisitos visibles y coincidencia de ambas claves:</p>
-          <ul class="space-y-1 text-[11px] text-slate-600">
-            <li id="req-len" class="flex items-center gap-1.5"><i data-lucide="circle" class="w-3.5 h-3.5 text-slate-400"></i> Mínimo 8 caracteres</li>
-            <li id="req-upper" class="flex items-center gap-1.5"><i data-lucide="circle" class="w-3.5 h-3.5 text-slate-400"></i> Al menos una letra mayúscula</li>
-            <li id="req-lower" class="flex items-center gap-1.5"><i data-lucide="circle" class="w-3.5 h-3.5 text-slate-400"></i> Al menos una letra minúscula</li>
-            <li id="req-num" class="flex items-center gap-1.5"><i data-lucide="circle" class="w-3.5 h-3.5 text-slate-400"></i> Al menos un número</li>
-            <li id="req-spec" class="flex items-center gap-1.5"><i data-lucide="circle" class="w-3.5 h-3.5 text-slate-400"></i> Carácter especial (! @ # $ %)</li>
-            <li id="req-match" class="flex items-center gap-1.5"><i data-lucide="circle" class="w-3.5 h-3.5 text-slate-400"></i> Coincidencia de ambas contraseñas</li>
+        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2.5 text-left">
+          <div class="flex items-center justify-between">
+            <p class="font-bold text-slate-800 text-[11px]">Requisitos de seguridad de la clave:</p>
+            <span id="all-req-badge" class="hidden px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
+              ✓ Todo listo
+            </span>
+          </div>
+          <ul class="space-y-1.5 text-[11px]">
+            <li id="req-len" class="flex items-center gap-2 text-slate-500 transition-all">
+              <span class="icon-slot shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400"><circle cx="12" cy="12" r="10"></circle></svg>
+              </span>
+              <span>Mínimo 8 caracteres</span>
+            </li>
+            <li id="req-upper" class="flex items-center gap-2 text-slate-500 transition-all">
+              <span class="icon-slot shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400"><circle cx="12" cy="12" r="10"></circle></svg>
+              </span>
+              <span>Al menos una letra mayúscula (A-Z)</span>
+            </li>
+            <li id="req-lower" class="flex items-center gap-2 text-slate-500 transition-all">
+              <span class="icon-slot shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400"><circle cx="12" cy="12" r="10"></circle></svg>
+              </span>
+              <span>Al menos una letra minúscula (a-z)</span>
+            </li>
+            <li id="req-num" class="flex items-center gap-2 text-slate-500 transition-all">
+              <span class="icon-slot shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400"><circle cx="12" cy="12" r="10"></circle></svg>
+              </span>
+              <span>Al menos un número (0-9)</span>
+            </li>
+            <li id="req-spec" class="flex items-center gap-2 text-slate-500 transition-all">
+              <span class="icon-slot shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400"><circle cx="12" cy="12" r="10"></circle></svg>
+              </span>
+              <span>Carácter especial (! @ # $ % & * ...)</span>
+            </li>
+            <li id="req-match" class="flex items-center gap-2 text-slate-500 transition-all">
+              <span class="icon-slot shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400"><circle cx="12" cy="12" r="10"></circle></svg>
+              </span>
+              <span>Coincidencia exacta de ambas contraseñas</span>
+            </li>
           </ul>
         </div>
 
         <!-- Botón Guardar -->
-        <button type="submit" 
+        <button type="submit" id="btn-submit"
                 class="w-full py-3 px-4 bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white text-xs font-extrabold rounded-xl shadow-md transition-all tracking-wide">
           Guardar contraseña
         </button>
@@ -131,39 +166,57 @@
       }
     }
 
-    // Validación interactiva de requisitos en tiempo real
+    // Iconos SVG directos para evitar conflictos con el reemplazo asíncrono de Lucide
+    const svgCheck = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-600 shrink-0"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+    const svgCircle = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400 shrink-0"><circle cx="12" cy="12" r="10"></circle></svg>';
+
     const pass1 = document.getElementById('pass1');
     const pass2 = document.getElementById('pass2');
+    const badgeAll = document.getElementById('all-req-badge');
 
     function checkReq(elemId, condition) {
       const item = document.getElementById(elemId);
+      if (!item) return false;
+      const iconSlot = item.querySelector('.icon-slot');
+
       if (condition) {
+        item.classList.remove('text-slate-500');
         item.classList.add('text-emerald-700', 'font-bold');
-        item.classList.remove('text-slate-600');
-        item.querySelector('i').setAttribute('data-lucide', 'check-circle-2');
-        item.querySelector('i').classList.add('text-emerald-600');
+        if (iconSlot) iconSlot.innerHTML = svgCheck;
       } else {
         item.classList.remove('text-emerald-700', 'font-bold');
-        item.classList.add('text-slate-600');
-        item.querySelector('i').setAttribute('data-lucide', 'circle');
-        item.querySelector('i').classList.remove('text-emerald-600');
+        item.classList.add('text-slate-500');
+        if (iconSlot) iconSlot.innerHTML = svgCircle;
       }
-      lucide.createIcons();
+      return condition;
     }
 
     function validate() {
-      const v1 = pass1.value;
-      const v2 = pass2.value;
-      checkReq('req-len', v1.length >= 8);
-      checkReq('req-upper', /[A-Z]/.test(v1));
-      checkReq('req-lower', /[a-z]/.test(v1));
-      checkReq('req-num', /[0-9]/.test(v1));
-      checkReq('req-spec', /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(v1));
-      checkReq('req-match', v1 && v2 && v1 === v2);
+      const v1 = pass1.value || '';
+      const v2 = pass2.value || '';
+
+      const c1 = checkReq('req-len', v1.length >= 8);
+      const c2 = checkReq('req-upper', /[A-Z]/.test(v1));
+      const c3 = checkReq('req-lower', /[a-z]/.test(v1));
+      const c4 = checkReq('req-num', /[0-9]/.test(v1));
+      const c5 = checkReq('req-spec', /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(v1));
+      const c6 = checkReq('req-match', Boolean(v1 && v2 && v1 === v2));
+
+      const allMet = c1 && c2 && c3 && c4 && c5 && c6;
+      if (badgeAll) {
+        if (allMet) {
+          badgeAll.classList.remove('hidden');
+        } else {
+          badgeAll.classList.add('hidden');
+        }
+      }
     }
 
     pass1.addEventListener('input', validate);
     pass2.addEventListener('input', validate);
+    pass1.addEventListener('change', validate);
+    pass2.addEventListener('change', validate);
+    validate();
 
     {% if messages %}
       {% for message in messages %}
