@@ -349,6 +349,146 @@
       }
     });
 
+    // Sistema de Búsqueda Automática Inteligente (empieza a buscar desde la 1ra letra que escribe)
+    document.addEventListener("DOMContentLoaded", function() {
+      const searchInputs = document.querySelectorAll('input[name="q"]');
+      
+      searchInputs.forEach(input => {
+        let debounceTimer = null;
+        const form = input.closest('form');
+        
+        // Normalización para coincidencias sin tildes y case-insensitive
+        const normalize = (txt) => (txt || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+        // 1. Filtrado instantáneo (0ms) en la tabla actualmente visible
+        const filterClientTable = (term) => {
+          const normTerm = normalize(term);
+          const table = document.querySelector('table');
+          if (!table) return;
+
+          const tbody = table.querySelector('tbody');
+          if (!tbody) return;
+
+          const rows = tbody.querySelectorAll('tr:not(.live-no-results)');
+          let visibleCount = 0;
+
+          rows.forEach(row => {
+            // Evitar ocultar la cabecera o si es fila vacía de Django inicial
+            if (row.querySelector('td[colspan]')) {
+              if (normTerm) row.style.display = 'none';
+              return;
+            }
+
+            const rowText = normalize(row.textContent);
+            if (!normTerm || rowText.includes(normTerm)) {
+              row.style.display = '';
+              visibleCount++;
+            } else {
+              row.style.display = 'none';
+            }
+          });
+
+          // Mensaje visual instantáneo si no hay coincidencias con la letra ingresada
+          let emptyLiveRow = tbody.querySelector('.live-no-results');
+          if (visibleCount === 0 && normTerm) {
+            if (!emptyLiveRow) {
+              emptyLiveRow = document.createElement('tr');
+              emptyLiveRow.className = 'live-no-results';
+              const colCount = table.querySelectorAll('thead th').length || 6;
+              emptyLiveRow.innerHTML = `
+                <td colspan="${colCount}" class="py-8 text-center text-slate-400 font-medium">
+                  <div class="flex flex-col items-center justify-center gap-1.5">
+                    <i data-lucide="search-x" class="w-6 h-6 text-slate-300"></i>
+                    <span>No se encontraron registros que coincidan con "<strong>${term}</strong>".</span>
+                  </div>
+                </td>`;
+              tbody.appendChild(emptyLiveRow);
+              if (window.lucide) lucide.createIcons();
+            } else {
+              emptyLiveRow.style.display = '';
+              const strong = emptyLiveRow.querySelector('strong');
+              if (strong) strong.textContent = term;
+            }
+          } else if (emptyLiveRow) {
+            emptyLiveRow.style.display = 'none';
+          }
+        };
+
+        // 2. Sincronización asíncrona con el servidor para paginación y búsqueda global de BD
+        const triggerServerSearch = (term) => {
+          if (!form) return;
+          const urlObj = new URL(form.action || window.location.href, window.location.origin);
+          const formData = new FormData(form);
+          formData.set('q', term);
+          formData.delete('page'); // Volver a página 1 al filtrar
+
+          const searchParams = new URLSearchParams(formData);
+          urlObj.search = searchParams.toString();
+
+          window.history.replaceState({}, '', urlObj.toString());
+
+          fetch(urlObj.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          })
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // Actualizar tabla
+            const newTable = doc.querySelector('table');
+            const currentTable = document.querySelector('table');
+            if (newTable && currentTable) {
+              const currentTbody = currentTable.querySelector('tbody');
+              const newTbody = newTable.querySelector('tbody');
+              if (currentTbody && newTbody) {
+                currentTbody.innerHTML = newTbody.innerHTML;
+              }
+            }
+
+            // Actualizar barra de paginador
+            const newPagination = doc.querySelector('.overflow-hidden > div:last-child');
+            const currentPagination = document.querySelector('.overflow-hidden > div:last-child');
+            if (newPagination && currentPagination) {
+              currentPagination.innerHTML = newPagination.innerHTML;
+            }
+
+            // Actualizar enlace a Excel con el nuevo filtro
+            const newExcel = doc.querySelector('a[href*="export=excel"]');
+            const currentExcel = document.querySelector('a[href*="export=excel"]');
+            if (newExcel && currentExcel) {
+              currentExcel.href = newExcel.href;
+            }
+
+            if (window.lucide) lucide.createIcons();
+          })
+          .catch(() => {
+            form.submit();
+          });
+        };
+
+        // Escuchar cada tecla: apenas se escribe una letra, filtra en 0ms y sincroniza
+        input.addEventListener('input', function() {
+          const val = this.value;
+          filterClientTable(val);
+
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            triggerServerSearch(val);
+          }, 350);
+        });
+
+        // Si presiona Enter, busca al instante sin esperar el debounce
+        input.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            clearTimeout(debounceTimer);
+            triggerServerSearch(this.value);
+          }
+        });
+      });
+    });
+
     // SweetAlert2 Flash Messages
     document.addEventListener("DOMContentLoaded", function() {
       {% if messages %}
