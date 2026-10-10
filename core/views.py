@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.http import JsonResponse, HttpResponseForbidden
 
 from core.context_processors import global_context
-from core.utils import export_to_excel_csv
+from core.utils import export_to_excel_csv, build_accent_query
 from activities.models import (
     Actividad, ValidacionEvidencia, TipoGestion, Vecino, AtencionCiudadana
 )
@@ -342,7 +342,7 @@ def gestion_delegaciones(request):
 
     qs = Delegacion.objects.all().order_by('id')
     if q:
-        qs = qs.filter(Q(codigo__icontains=q) | Q(nombre__icontains=q) | Q(direccion__icontains=q) | Q(comuna__icontains=q))
+        qs = qs.filter(build_accent_query(['codigo', 'nombre', 'direccion', 'comuna'], q))
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
 
@@ -438,7 +438,7 @@ def gestion_roles(request):
 
     qs = Rol.objects.all().order_by('id')
     if q:
-        qs = qs.filter(Q(codigo__icontains=q) | Q(nombre_rol__icontains=q) | Q(alcance__icontains=q) | Q(descripcion__icontains=q))
+        qs = qs.filter(build_accent_query(['codigo', 'nombre_rol', 'alcance', 'descripcion'], q))
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
 
@@ -576,7 +576,7 @@ def gestion_usuarios(request):
         qs = qs.filter(delegacion=del_activa)
 
     if q:
-        qs = qs.filter(Q(user__first_name__icontains=q) | Q(user__email__icontains=q) | Q(user__username__icontains=q) | Q(delegacion__nombre__icontains=q))
+        qs = qs.filter(build_accent_query(['user__first_name', 'user__email', 'user__username', 'delegacion__nombre'], q))
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
 
@@ -708,7 +708,7 @@ def gestion_metas(request):
 
     qs = ItemMedicion.objects.all().order_by('id')
     if q:
-        qs = qs.filter(Q(codigo__icontains=q) | Q(nombre_item__icontains=q) | Q(descripcion__icontains=q))
+        qs = qs.filter(build_accent_query(['codigo', 'nombre_item', 'descripcion'], q))
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
 
@@ -796,7 +796,7 @@ def gestion_tipo_atencion(request):
 
     qs = TipoAtencion.objects.all().order_by('id')
     if q:
-        qs = qs.filter(Q(codigo__icontains=q) | Q(nombre__icontains=q) | Q(descripcion__icontains=q))
+        qs = qs.filter(build_accent_query(['codigo', 'nombre', 'descripcion'], q))
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
 
@@ -886,7 +886,7 @@ def gestion_sub_atencion(request):
 
     qs = SubAtencion.objects.select_related('tipo_atencion').all().order_by('id')
     if q:
-        qs = qs.filter(Q(codigo__icontains=q) | Q(nombre__icontains=q) | Q(tipo_atencion__nombre__icontains=q))
+        qs = qs.filter(build_accent_query(['codigo', 'nombre', 'tipo_atencion__nombre'], q))
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
 
@@ -1021,12 +1021,10 @@ def gestion_atenciones(request):
         qs = qs.filter(delegacion=del_activa)
 
     if q:
-        qs = qs.filter(
-            Q(codigo_atencion__icontains=q) |
-            Q(solicitante__icontains=q) |
-            Q(descripcion__icontains=q) |
-            Q(sub_atencion__nombre__icontains=q)
-        )
+        qs = qs.filter(build_accent_query([
+            'codigo_atencion', 'solicitante', 'descripcion',
+            'sub_atencion__nombre', 'tipo_atencion__nombre', 'delegacion__nombre'
+        ], q))
     if filtro_tipo:
         qs = qs.filter(tipo_atencion__nombre__iexact=filtro_tipo)
 
