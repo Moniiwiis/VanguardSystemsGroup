@@ -4,12 +4,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}Municipalidad de La Serena — Plataforma Municipal{% endblock %}</title>
+  <title>{% block title %}Municipalidad de La Serena — Sistema Municipal SGR{% endblock %}</title>
   
-  <!-- Google Fonts (Fraunces + Public Sans) -->
+  <!-- Google Fonts (Public Sans + Fraunces) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&display=swap" rel="stylesheet">
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -18,16 +18,14 @@
       theme: {
         extend: {
           fontFamily: {
-            display: ['Fraunces', 'serif'],
             sans: ['Public Sans', 'sans-serif'],
+            display: ['Fraunces', 'serif'],
           },
           colors: {
-            rojoLuminoso: '#DB3334',
-            rojoHeraldico: '#C41230',
+            rojoSerena: '#C41230',
             rojoOscuro: '#8B1D19',
-            surface: '#FFFFFF',
-            bgAlt: '#FDF6F6',
-            borderCustom: 'rgba(196,18,48,0.18)',
+            rojoClaro: '#DB3334',
+            bgMunicipal: '#FDF6F6',
           }
         }
       }
@@ -37,157 +35,269 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   
+  <!-- SweetAlert2 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
   <style>
     body {
       font-family: 'Public Sans', sans-serif;
       background-color: #FDF6F6;
       color: #241016;
     }
-    .font-display {
-      font-family: 'Fraunces', serif;
-    }
   </style>
   {% block extra_head %}{% endblock %}
 </head>
 <body class="min-h-full flex flex-col bg-[#FDF6F6]">
 
-  <!-- TopBar Oficial de la Ilustre Municipalidad de La Serena -->
-  <header class="sticky top-0 z-40 shadow-lg text-white" style="background: linear-gradient(90deg, #8B1D19 0%, #C41230 50%, #DB3334 100%);">
-    <div class="max-w-[1400px] mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
-      <!-- Logo Horizontal Oficial SVG -->
-      <a href="{% url 'gestion_inicio' %}" class="flex items-center gap-3 shrink-0">
+  <!-- TopBar Oficial de la Ilustre Municipalidad de La Serena (Wireframes C3-C6) -->
+  <header class="sticky top-0 z-40 shadow-md text-white" style="background: linear-gradient(90deg, #8B1D19 0%, #C41230 60%, #DB3334 100%);">
+    <div class="max-w-[1440px] mx-auto px-4 md:px-8 py-2.5 flex items-center justify-between gap-4">
+      
+      <!-- Izquierda: Logo y Marca Institucional -->
+      <a href="{% url 'gestion_inicio' %}" class="flex items-center gap-3 shrink-0 group">
         <img src="{% static 'horizontal-blanco.svg' %}" 
              alt="La Serena — Ilustre Municipalidad" 
-             class="h-11 w-auto object-contain drop-shadow-sm max-h-[50px]"
+             class="h-9 w-auto object-contain drop-shadow-sm"
              onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
+        <span class="hidden sm:inline-block font-extrabold tracking-wider text-xs uppercase text-white/95 border-l border-white/20 pl-3">
+          Sistema Municipal
+        </span>
       </a>
 
-      <!-- Badges de Estado y Acceso Rápido -->
-      <div class="flex items-center gap-3">
-        <span class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/20 text-white border border-white/30 backdrop-blur-sm">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          Plataforma Municipal La Serena
-        </span>
-        <a href="/admin/" target="_blank" class="px-4 py-2 rounded-full text-xs font-bold bg-white text-[#C41230] hover:bg-red-50 shadow-md transition-all active:scale-95 flex items-center gap-1.5">
-          <i data-lucide="shield-check" class="w-4 h-4"></i>
-          <span>Django Admin</span>
+      <!-- Centro: Distintivo de Delegación Activa según el Perfil (Requisito Crítico A2 / Wireframes) -->
+      <div class="flex items-center">
+        {% if delegacion_activa %}
+          {% if can_switch_delegacion %}
+            <!-- Selector Desplegable de Delegación para Perfiles Autorizados (ej: Administrador) -->
+            <div class="relative group">
+              <button type="button" class="flex items-center gap-2 bg-[#700F17]/90 hover:bg-[#5C0A10] text-white text-xs font-bold px-3.5 py-1.5 rounded-full border border-white/25 shadow-inner transition-all">
+                <i data-lucide="building-2" class="w-3.5 h-3.5 text-white/90"></i>
+                <span>{{ delegacion_activa.get_codigo }} | {{ delegacion_activa.nombre }}</span>
+                <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-white/70"></i>
+              </button>
+              <div class="absolute left-1/2 -translate-x-1/2 mt-1.5 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 hidden group-hover:block z-50 text-slate-800 text-xs">
+                <div class="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cambiar Delegación Activa</div>
+                {% for d in delegaciones_autorizadas %}
+                  <a href="{% url 'cambiar_delegacion' d.id %}" 
+                     class="flex items-center justify-between px-3.5 py-2 hover:bg-red-50 text-slate-700 transition-colors {% if d.id == delegacion_activa.id %}font-extrabold text-[#C41230] bg-red-50/70{% endif %}">
+                    <span>{{ d.get_codigo }} — {{ d.nombre }}</span>
+                    {% if d.id == delegacion_activa.id %}
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#C41230]"></i>
+                    {% endif %}
+                  </a>
+                {% endfor %}
+              </div>
+            </div>
+          {% else %}
+            <!-- Contexto Territorial Fijo para Operadores / Delegados Monodelegación -->
+            <div class="flex items-center gap-2 bg-[#700F17]/90 text-white text-xs font-bold px-3.5 py-1.5 rounded-full border border-white/25 shadow-inner">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 text-white/90"></i>
+              <span>{{ delegacion_activa.get_codigo }} | {{ delegacion_activa.nombre }}</span>
+            </div>
+          {% endif %}
+        {% endif %}
+      </div>
+
+      <!-- Derecha: Identificación de Usuario, Rol y Salir (Wireframe C3-C6) -->
+      <div class="flex items-center gap-3 shrink-0 text-xs">
+        <div class="text-right hidden sm:block">
+          <div class="font-bold text-white text-xs leading-tight">
+            {{ request.user.first_name|default:request.user.username }}
+          </div>
+          <div class="text-[11px] text-white/80 leading-tight">
+            <span>{{ user_rol_name }}</span>
+            <span class="mx-1 text-white/50">|</span>
+            <a href="{% url 'logout' %}" class="hover:underline font-semibold text-white hover:text-red-200 transition-colors">Salir</a>
+          </div>
+        </div>
+        
+        <!-- Botón Salir Mobile -->
+        <a href="{% url 'logout' %}" title="Cerrar sesión" class="sm:hidden p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
         </a>
       </div>
+
     </div>
   </header>
 
-  <!-- Layout Principal con Sidebar + Contenido -->
-  <div class="flex-1 max-w-[1400px] w-full mx-auto px-4 md:px-8 py-6 flex flex-col md:flex-row gap-6">
+  <!-- Contenedor Principal (Sidebar + Contenido) -->
+  <div class="flex-1 max-w-[1440px] w-full mx-auto px-4 md:px-8 py-6 flex flex-col md:flex-row gap-6">
     
-    <!-- Sidebar Navegación de Módulos (Distribución SVG Vertical + Menú) -->
-    <aside class="w-full md:w-64 shrink-0 flex flex-col gap-6">
+    <!-- Sidebar Navegación de Módulos (Filtrado según Perfil del Usuario) -->
+    <aside class="w-full md:w-60 shrink-0 flex flex-col gap-5">
       
-      <!-- Card Marca y Escudo Oficial Vertical SVG -->
-      <div class="bg-white rounded-3xl p-5 shadow-sm border border-[rgba(196,18,48,0.18)] flex items-center gap-4">
-        <img src="{% static 'vertical-color.svg' %}" 
-             alt="Escudo La Serena" 
-             class="h-14 w-auto object-contain shrink-0"
-             onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
-        <div>
-          <h2 class="font-display font-bold text-sm text-[#8B1D19]">La Serena</h2>
-          <p class="text-[10px] font-bold text-slate-500 tracking-wider uppercase">Ilustre Municipalidad</p>
-        </div>
-      </div>
-
-      <!-- Menú Módulos -->
-      <nav class="bg-white rounded-3xl p-4 shadow-sm border border-[rgba(196,18,48,0.18)] space-y-1.5 text-xs font-bold">
-        <div class="px-3 py-2 text-[10px] font-extrabold text-[#8B1D19] uppercase tracking-widest">Módulos SGR</div>
+      <!-- Menú Módulos Flat y Adaptable según wireframes C3-C6 -->
+      <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-1 text-xs font-bold">
         
+        <!-- Inicio -->
         <a href="{% url 'gestion_inicio' %}" 
-           class="flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all {% if request.resolver_match.url_name == 'gestion_inicio' or request.resolver_match.url_name == 'gestion_inicio_alt' %}bg-[#C41230] text-white shadow-md shadow-red-900/20{% else %}text-slate-700 hover:bg-red-50 hover:text-[#C41230]{% endif %}">
-          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
-          <span>Inicio / Resumen</span>
+           class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_inicio' or request.resolver_match.url_name == 'gestion_inicio_alt' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+          <i data-lucide="home" class="w-4 h-4 shrink-0"></i>
+          <span>Inicio</span>
         </a>
 
-        <a href="{% url 'gestion_funcionarios' %}" 
-           class="flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all {% if request.resolver_match.url_name == 'gestion_funcionarios' %}bg-[#C41230] text-white shadow-md shadow-red-900/20{% else %}text-slate-700 hover:bg-red-50 hover:text-[#C41230]{% endif %}">
-          <i data-lucide="users" class="w-4 h-4"></i>
-          <span>Gestión de Funcionarios</span>
-        </a>
+        <!-- 1. Delegaciones (Solo Administrador) -->
+        {% if permisos.ver_delegaciones %}
+          <a href="{% url 'gestion_delegaciones' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_delegaciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="building-2" class="w-4 h-4 shrink-0"></i>
+            <span>Delegaciones</span>
+          </a>
+        {% endif %}
 
-        <a href="{% url 'gestion_actividades' %}" 
-           class="flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all {% if request.resolver_match.url_name == 'gestion_actividades' %}bg-[#C41230] text-white shadow-md shadow-red-900/20{% else %}text-slate-700 hover:bg-red-50 hover:text-[#C41230]{% endif %}">
-          <i data-lucide="clipboard-list" class="w-4 h-4"></i>
-          <span>Actividades y Evidencias</span>
-        </a>
+        <!-- 2. Roles (Solo Administrador) -->
+        {% if permisos.ver_roles %}
+          <a href="{% url 'gestion_roles' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_roles' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="shield-check" class="w-4 h-4 shrink-0"></i>
+            <span>Roles</span>
+          </a>
+        {% endif %}
 
+        <!-- 3. Usuarios (Administrador y Delegado Municipal) -->
+        {% if permisos.ver_usuarios %}
+          <a href="{% url 'gestion_usuarios' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_usuarios' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="users" class="w-4 h-4 shrink-0"></i>
+            <span>Usuarios</span>
+          </a>
+        {% endif %}
 
-        <a href="{% url 'gestion_agenda' %}" 
-           class="flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all {% if request.resolver_match.url_name == 'gestion_agenda' %}bg-[#C41230] text-white shadow-md shadow-red-900/20{% else %}text-slate-700 hover:bg-red-50 hover:text-[#C41230]{% endif %}">
-          <i data-lucide="calendar" class="w-4 h-4"></i>
-          <span>Agenda y Compromisos</span>
-        </a>
+        <!-- 4. Ítems y metas (Administrador y Coordinador) -->
+        {% if permisos.ver_metas %}
+          <a href="{% url 'gestion_metas' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_metas' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="target" class="w-4 h-4 shrink-0"></i>
+            <span>Ítems y metas</span>
+          </a>
+        {% endif %}
 
-        <a href="{% url 'gestion_configuracion' %}" 
-           class="flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all {% if request.resolver_match.url_name == 'gestion_configuracion' %}bg-[#C41230] text-white shadow-md shadow-red-900/20{% else %}text-slate-700 hover:bg-red-50 hover:text-[#C41230]{% endif %}">
-          <i data-lucide="sliders" class="w-4 h-4"></i>
-          <span>Configuración y Metas</span>
-        </a>
+        <!-- 5. Tipo de Atención (Administrador y Coordinador) -->
+        {% if permisos.ver_tipo_atencion %}
+          <a href="{% url 'gestion_tipo_atencion' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_tipo_atencion' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="heart-handshake" class="w-4 h-4 shrink-0"></i>
+            <span>Tipo de Atención</span>
+          </a>
+        {% endif %}
 
-        <a href="{% url 'gestion_reportes' %}" 
-           class="flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all {% if request.resolver_match.url_name == 'gestion_reportes' %}bg-[#C41230] text-white shadow-md shadow-red-900/20{% else %}text-slate-700 hover:bg-red-50 hover:text-[#C41230]{% endif %}">
-          <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-          <span>Analítica e Informes</span>
-        </a>
+        <!-- 6. Sub Atención (Administrador y Coordinador) -->
+        {% if permisos.ver_sub_atencion %}
+          <a href="{% url 'gestion_sub_atencion' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_sub_atencion' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="git-branch" class="w-4 h-4 shrink-0"></i>
+            <span>Sub Atención</span>
+          </a>
+        {% endif %}
+
+        <!-- 7. Atenciones (Ingreso y Gestión) -->
+        {% if permisos.ver_atenciones %}
+          <a href="{% url 'gestion_atenciones' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_atenciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0"></i>
+            <span>Atenciones</span>
+          </a>
+        {% endif %}
+
+        <!-- 8. Vecinos -->
+        {% if permisos.ver_vecinos %}
+          <a href="{% url 'gestion_vecinos' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_vecinos' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="user-check" class="w-4 h-4 shrink-0"></i>
+            <span>Vecinos</span>
+          </a>
+        {% endif %}
+
+        <!-- 9. Reportes (Administrador, Coordinador y Delegado) -->
+        {% if permisos.ver_reportes %}
+          <a href="{% url 'gestion_reportes' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_reportes' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 shrink-0"></i>
+            <span>Reportes</span>
+          </a>
+        {% endif %}
+
       </nav>
 
-      <!-- Banner Institucional SVG Horizontal Color -->
-      <div class="bg-white rounded-3xl p-5 shadow-sm border border-[rgba(196,18,48,0.18)] flex flex-col items-center text-center gap-3">
-        <img src="{% static 'horizontal-color.svg' %}" 
-             alt="La Serena Horizontal Color" 
+      <!-- Card Informativa Institucional -->
+      <div class="bg-white rounded-3xl p-4 shadow-sm border border-[rgba(196,18,48,0.15)] text-center flex flex-col items-center gap-2">
+        <img src="{% static 'vertical-color.svg' %}" 
+             alt="Escudo La Serena" 
              class="h-10 w-auto object-contain"
              onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
-        <p class="text-[11px] text-slate-500 font-medium">Plataforma Oficial de Seguimiento de Gestión y Solicitudes Municipales.</p>
+        <p class="text-[10px] text-slate-500 font-medium">
+          Ilustre Municipalidad de La Serena<br>
+          <span class="font-bold text-slate-700">Gestión de Atención Ciudadana</span>
+        </p>
       </div>
+
     </aside>
 
     <!-- Área de Contenido Principal -->
     <main class="flex-1 flex flex-col gap-6 min-w-0">
-      {% if messages %}
-        <div class="space-y-2">
-          {% for message in messages %}
-            <div class="p-4 rounded-2xl text-xs font-bold border flex items-center justify-between shadow-sm {% if message.tags == 'error' %}bg-red-50 text-red-800 border-red-200{% else %}bg-emerald-50 text-emerald-800 border-emerald-200{% endif %}">
-              <div class="flex items-center gap-2">
-                <i data-lucide="{% if message.tags == 'error' %}alert-circle{% else %}check-circle-2{% endif %}" class="w-4 h-4"></i>
-                <span>{{ message }}</span>
-              </div>
-              <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-slate-600 font-extrabold">&times;</button>
-            </div>
-          {% endfor %}
-        </div>
-      {% endif %}
       {% block content %}{% endblock %}
     </main>
 
   </div>
 
-  <!-- Footer con Isotipo e Isologos SVG -->
-  <footer class="bg-[#1B0D12] text-white border-t border-red-900/40 py-8 px-4 md:px-8 mt-auto">
-    <div class="max-w-[1400px] mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-      <div class="flex items-center gap-4">
+  <!-- Footer Institucional Oficial -->
+  <footer class="bg-[#1B0D12] text-white border-t border-red-900/40 py-6 px-4 md:px-8 mt-auto">
+    <div class="max-w-[1440px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-red-200/70">
+      <div class="flex items-center gap-3">
         <img src="{% static 'vertical-blanco.svg' %}" 
-             alt="Escudo Blanco" 
-             class="h-10 w-auto opacity-90"
+             alt="Escudo Municipal" 
+             class="h-8 w-auto opacity-80"
              onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
-        <div>
-          <p class="font-display font-bold text-sm">Ilustre Municipalidad de La Serena</p>
-          <p class="text-xs text-red-200/70">Innovación, Transparencia y Eficiencia para nuestra Comuna</p>
-        </div>
+        <span>Ilustre Municipalidad de La Serena · Sistema Integrado SGR</span>
       </div>
-      <div class="text-center md:text-right text-xs text-red-200/60 font-mono space-y-1">
-        <p>© 2026 Todos los derechos reservados.</p>
-        <p>Vanguard Systems Group — Sistema SGR</p>
+      <div>
+        <span>Vanguard Systems Group © 2026</span>
       </div>
     </div>
   </footer>
 
   <script>
     lucide.createIcons();
+
+    // SweetAlert2 helper para confirmación de eliminación (A3 / Pág 3)
+    function confirmDelete(form, itemName) {
+      Swal.fire({
+        title: '¿Confirmar eliminación?',
+        html: `Se eliminará <strong>${itemName}</strong> del sistema.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#C41230',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+          popup: 'rounded-3xl font-sans'
+        }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          form.submit();
+        }
+      });
+      return false;
+    }
+
+    // SweetAlert2 Flash Messages
+    document.addEventListener("DOMContentLoaded", function() {
+      {% if messages %}
+        {% for message in messages %}
+          Swal.fire({
+            icon: "{% if message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% else %}success{% endif %}",
+            title: "{{ message|escapejs }}",
+            confirmButtonColor: '#C41230',
+            timer: 4500,
+            timerProgressBar: true,
+            customClass: {
+              popup: 'rounded-2xl shadow-xl font-sans'
+            }
+          });
+        {% endfor %}
+      {% endif %}
+    });
   </script>
   {% block extra_js %}{% endblock %}
 </body>

@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block title %}Usuarios del Sistema — Sistema Municipal La Serena{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+  <!-- Migas de pan y Encabezado (Wireframe C4 - Diseño 7) -->
+  <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div>
+      <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Gestión municipal / Usuarios</p>
+      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Usuarios del sistema</h1>
+    </div>
+    <button onclick="document.getElementById('modal-crear').classList.remove('hidden')" 
+            class="px-4 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
+      <i data-lucide="plus" class="w-4 h-4"></i>
+      <span>+ Nuevo registro</span>
+    </button>
+  </div>
+
+  <!-- Barra de Búsqueda Inteligente, Exportación y Filtro de Estado -->
+  <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+    <form method="GET" action="{% url 'gestion_usuarios' %}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <div class="relative flex-1">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+          <i data-lucide="search" class="w-4 h-4"></i>
+        </div>
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre, código u otro campo..." 
+               class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]" />
+      </div>
+
+      <select name="estado" onchange="this.form.submit()" 
+              class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+        <option value="">Filtrar estado: Todos</option>
+        <option value="Activo" {% if filtro_estado == 'Activo' %}selected{% endif %}>Activo</option>
+        <option value="Inactivo" {% if filtro_estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
+      </select>
+    </form>
+
+    <a href="?q={{ q }}&estado={{ filtro_estado }}&export=excel" 
+       class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
+      <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+      <span>Exportar a Excel</span>
+    </a>
+  </div>
+
+  <!-- Tabla de Usuarios (Wireframe C4 - Diseño 7) -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs text-slate-700">
+        <thead class="bg-slate-50/80 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+          <tr>
+            <th class="py-3 px-6">Nombre</th>
+            <th class="py-3 px-6">Correo</th>
+            <th class="py-3 px-6">Rol</th>
+            <th class="py-3 px-6">Delegación</th>
+            <th class="py-3 px-6 text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 font-medium">
+          {% for f in funcionarios %}
+          <tr class="hover:bg-slate-50/70 transition-colors">
+            <td class="py-3.5 px-6 font-bold text-slate-900">{{ f.user.first_name|default:f.user.username }}</td>
+            <td class="py-3.5 px-6 text-slate-600">{{ f.user.email|default:"—" }}</td>
+            <td class="py-3.5 px-6">
+              {% with f.funcionariorol_set.first as rol_entry %}
+                {% if rol_entry and rol_entry.rol %}
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                    {{ rol_entry.rol.nombre_rol }}
+                  </span>
+                {% else %}
+                  <span class="text-slate-400">Funcionario</span>
+                {% endif %}
+              {% endwith %}
+            </td>
+            <td class="py-3.5 px-6 font-semibold text-slate-700">{{ f.delegacion.nombre|default:"Global" }}</td>
+            <td class="py-3.5 px-6 text-center">
+              <div class="flex items-center justify-center gap-3 text-xs font-bold">
+                <!-- Ver Detalle -->
+                <button type="button" 
+                        onclick="verDetalle('{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.nombre_rol|default:'Funcionario'|escapejs }}', '{{ f.delegacion.nombre|default:'Global'|escapejs }}', '{{ f.estado|escapejs }}', '{{ f.identificador_institucional|escapejs }}')"
+                        class="text-slate-600 hover:text-slate-900 hover:underline">
+                  Ver
+                </button>
+                <span class="text-slate-300">|</span>
+                <!-- Editar -->
+                <button type="button" 
+                        onclick="editarRegistro('{{ f.id }}', '{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.id|default:'' }}', '{{ f.delegacion.id|default:'' }}', '{{ f.estado|escapejs }}')"
+                        class="text-[#C41230] hover:text-[#8B1D19] hover:underline">
+                  Editar
+                </button>
+                <span class="text-slate-300">|</span>
+                <!-- Eliminar con confirmación SweetAlert2 -->
+                <form method="POST" action="{% url 'gestion_usuarios_eliminar' f.id %}" onsubmit="return confirmDelete(this, '{{ f.user.first_name|default:f.user.username|escapejs }}');" class="inline">
+                  {% csrf_token %}
+                  <button type="submit" class="text-red-500 hover:text-red-700 hover:underline">
+                    Eliminar
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="py-8 text-center text-slate-400 font-medium">
+              No se encontraron usuarios para la búsqueda o filtro aplicado.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Paginador -->
+    <div class="px-6 py-4 bg-slate-50/50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 font-medium">
+      <div>
+        Mostrando {{ page_obj.start_index|default:0 }} a {{ page_obj.end_index|default:0 }} de {{ total_registros }} registros
+      </div>
+      
+      {% if page_obj.has_other_pages %}
+      <div class="flex items-center gap-1.5">
+        {% if page_obj.has_previous %}
+          <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&estado={{ filtro_estado }}" 
+             class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold">
+            Anterior
+          </a>
+        {% endif %}
+
+        {% for p in page_obj.paginator.page_range %}
+          {% if p == page_obj.number %}
+            <span class="px-3 py-1.5 rounded-lg bg-[#C41230] text-white font-bold">{{ p }}</span>
+          {% else %}
+            <a href="?page={{ p }}&q={{ q }}&estado={{ filtro_estado }}" 
+               class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50">{{ p }}</a>
+          {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&estado={{ filtro_estado }}" 
+             class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold">
+            Siguiente
+          </a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <p class="text-[11px] text-slate-400 italic">Diseño referencial · Datos ficticios · Acciones sujetas al perfil</p>
+
+</div>
+
+<!-- Modal Ver Detalle -->
+<div id="modal-ver" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-md space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <h3 class="text-base font-extrabold text-slate-900">Consulta de Usuario</h3>
+      <button onclick="document.getElementById('modal-ver').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+    </div>
+    <div class="space-y-3 text-xs">
+      <div><span class="font-bold text-slate-500">ID Institucional:</span> <span id="ver-id" class="font-mono font-bold text-slate-900"></span></div>
+      <div><span class="font-bold text-slate-500">Nombre Completo:</span> <span id="ver-nombre" class="font-bold text-slate-900"></span></div>
+      <div><span class="font-bold text-slate-500">Correo Electrónico:</span> <span id="ver-correo" class="text-slate-800"></span></div>
+      <div><span class="font-bold text-slate-500">Rol:</span> <span id="ver-rol" class="font-bold text-slate-800"></span></div>
+      <div><span class="font-bold text-slate-500">Delegación Asignada:</span> <span id="ver-del" class="text-slate-800"></span></div>
+      <div><span class="font-bold text-slate-500">Estado:</span> <span id="ver-estado" class="font-bold"></span></div>
+    </div>
+    <div class="flex justify-end pt-2">
+      <button type="button" onclick="document.getElementById('modal-ver').classList.add('hidden')" 
+              class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Crear Usuario -->
+<div id="modal-crear" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-md space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <h3 class="text-base font-extrabold text-slate-900">Nuevo Usuario</h3>
+      <button onclick="document.getElementById('modal-crear').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+    </div>
+    <form method="POST" action="{% url 'gestion_usuarios' %}" class="space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Nombre Completo *</label>
+        <input type="text" name="nombre" required placeholder="Ej: Ana Ejemplo" 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Correo Electrónico *</label>
+        <input type="email" name="correo" required placeholder="ana@example.test" 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Rol *</label>
+        <select name="rol_id" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          {% for r in roles %}
+            <option value="{{ r.id }}">{{ r.nombre_rol }} ({{ r.alcance }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if permisos.es_admin %}
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Delegación Asignada</label>
+        <select name="delegacion_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          {% for d in delegaciones %}
+            <option value="{{ d.id }}">{{ d.get_codigo }} — {{ d.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Estado</label>
+        <select name="estado" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </div>
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <button type="button" onclick="document.getElementById('modal-crear').classList.add('hidden')" 
+                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cancelar</button>
+        <button type="submit" 
+                class="px-5 py-2 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-extrabold rounded-xl shadow-md">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Editar Usuario -->
+<div id="modal-editar" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-md space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <h3 class="text-base font-extrabold text-slate-900">Editar Usuario</h3>
+      <button onclick="document.getElementById('modal-editar').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+    </div>
+    <form id="form-editar" method="POST" action="" class="space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Nombre Completo *</label>
+        <input type="text" id="edit-nombre" name="nombre" required 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Correo Electrónico *</label>
+        <input type="email" id="edit-correo" name="correo" required 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Rol</label>
+        <select id="edit-rol" name="rol_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          {% for r in roles %}
+            <option value="{{ r.id }}">{{ r.nombre_rol }} ({{ r.alcance }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if permisos.es_admin %}
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Delegación</label>
+        <select id="edit-del" name="delegacion_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          {% for d in delegaciones %}
+            <option value="{{ d.id }}">{{ d.get_codigo }} — {{ d.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Estado</label>
+        <select id="edit-estado" name="estado" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </div>
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <button type="button" onclick="document.getElementById('modal-editar').classList.add('hidden')" 
+                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cancelar</button>
+        <button type="submit" 
+                class="px-5 py-2 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-extrabold rounded-xl shadow-md">Guardar Cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function verDetalle(nombre, correo, rol, delegacion, estado, idInst) {
+    document.getElementById('ver-id').textContent = idInst || '—';
+    document.getElementById('ver-nombre').textContent = nombre;
+    document.getElementById('ver-correo').textContent = correo;
+    document.getElementById('ver-rol').textContent = rol;
+    document.getElementById('ver-del').textContent = delegacion;
+    document.getElementById('ver-estado').textContent = estado;
+    document.getElementById('modal-ver').classList.remove('hidden');
+  }
+
+  function editarRegistro(id, nombre, correo, rolId, delId, estado) {
+    document.getElementById('form-editar').action = `/gestion/usuarios/${id}/editar/`;
+    document.getElementById('edit-nombre').value = nombre;
+    document.getElementById('edit-correo').value = correo;
+    if (rolId && document.getElementById('edit-rol')) {
+      document.getElementById('edit-rol').value = rolId;
+    }
+    if (delId && document.getElementById('edit-del')) {
+      document.getElementById('edit-del').value = delId;
+    }
+    document.getElementById('edit-estado').value = estado;
+    document.getElementById('modal-editar').classList.remove('hidden');
+  }
+</script>
+{% endblock %}

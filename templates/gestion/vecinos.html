@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Vecinos — Sistema Municipal{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Page Bar -->
+  <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Vecinos</h1>
+      <p class="text-xs text-slate-500 font-medium">CRUD de vecinos y registro de requerimientos comunitarios</p>
+    </div>
+    <button onclick="document.getElementById('modal-crear-vecino').classList.remove('hidden')" 
+            class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
+      <i data-lucide="plus" class="w-4 h-4"></i>
+      <span>Nuevo Vecino</span>
+    </button>
+  </div>
+
+  <!-- Search Card -->
+  <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200 flex items-center justify-between gap-4">
+    <form method="GET" action="{% url 'gestion_vecinos' %}" class="w-full max-w-md relative">
+      <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+        <i data-lucide="search" class="w-4 h-4"></i>
+      </div>
+      <input type="text" name="q" value="{{ q }}" placeholder="Buscar..." 
+             class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
+    </form>
+  </div>
+
+  <!-- Table Card (Exact match with Page 6 Screenshot) -->
+  <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs text-slate-700">
+        <thead class="bg-slate-50 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+          <tr>
+            <th class="py-3.5 px-4">#</th>
+            <th class="py-3.5 px-4">Nombre</th>
+            <th class="py-3.5 px-4">RUT</th>
+            <th class="py-3.5 px-4">Dirección</th>
+            <th class="py-3.5 px-4">Teléfono</th>
+            <th class="py-3.5 px-4">Territorio</th>
+            <th class="py-3.5 px-4">Tipo de Gestión</th>
+            <th class="py-3.5 px-4">Estado</th>
+            <th class="py-3.5 px-4 text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for v in vecinos %}
+          <tr class="hover:bg-slate-50 transition-colors">
+            <td class="py-4 px-4 font-semibold text-slate-900">{{ forloop.counter }}</td>
+            <td class="py-4 px-4 font-bold text-slate-900">{{ v.nombre }}</td>
+            <td class="py-4 px-4 font-mono text-slate-700">{{ v.rut }}</td>
+            <td class="py-4 px-4 text-slate-600">{{ v.direccion }}</td>
+            <td class="py-4 px-4 font-mono text-slate-600">{{ v.telefono }}</td>
+            <td class="py-4 px-4 font-medium text-slate-800">{{ v.territorio }}</td>
+            <td class="py-4 px-4 font-medium text-slate-800">{{ v.tipo_gestion.nombre|default:"Solicitud" }}</td>
+            <td class="py-4 px-4">
+              {% if v.estado == 'Activo' %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Activo
+                </span>
+              {% else %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-50 text-red-600 border border-red-200">
+                  Inactivo
+                </span>
+              {% endif %}
+            </td>
+            <td class="py-4 px-4 text-center">
+              <div class="flex items-center justify-center gap-1.5">
+                <button onclick="openEditVecino('{{ v.id }}', '{{ v.nombre|escapejs }}', '{{ v.rut|escapejs }}', '{{ v.direccion|escapejs }}', '{{ v.telefono|escapejs }}', '{{ v.territorio|escapejs }}', '{{ v.estado|escapejs }}')" 
+                        class="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all">
+                  <i data-lucide="edit-3" class="w-4 h-4"></i>
+                </button>
+                <form method="POST" action="{% url 'gestion_vecinos_eliminar' v.id %}" onsubmit="return confirmDelete(this, '{{ v.nombre|escapejs }}');">
+                  {% csrf_token %}
+                  <button type="submit" class="p-1.5 rounded-lg text-slate-600 hover:text-red-600 hover:bg-red-50 transition-all">
+                    <i data-lucide="trash-2" class="w-4 h-4 text-red-500"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" class="py-8 text-center text-slate-400 font-medium">No se encontraron vecinos registrados.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal Crear Vecino -->
+<div id="modal-crear-vecino" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-lg space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 class="text-base font-bold text-slate-900">Nuevo Vecino</h3>
+      <button onclick="document.getElementById('modal-crear-vecino').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
+    </div>
+    <form method="POST" action="{% url 'gestion_vecinos' %}" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {% csrf_token %}
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-bold text-slate-700 mb-1">Nombre Completo</label>
+        <input type="text" name="nombre" required placeholder="Ej: Ana González" 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">RUT</label>
+        <input type="text" name="rut" required placeholder="12.345.678-9" 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Teléfono</label>
+        <input type="text" name="telefono" placeholder="+56 9 8765 4321" 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-bold text-slate-700 mb-1">Dirección</label>
+        <input type="text" name="direccion" placeholder="Av. Balmaceda 120" 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Territorio</label>
+        <input type="text" name="territorio" placeholder="Centro" 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Tipo de Gestión</label>
+        <select name="tipo_gestion_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          {% for tg in tipos_gestion %}
+            <option value="{{ tg.id }}">{{ tg.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Estado</label>
+        <select name="estado" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </div>
+      <div class="sm:col-span-2 flex justify-end gap-2 pt-2">
+        <button type="button" onclick="document.getElementById('modal-crear-vecino').classList.add('hidden')" 
+                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cancelar</button>
+        <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md">Guardar Vecino</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Editar Vecino -->
+<div id="modal-editar-vecino" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-lg space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 class="text-base font-bold text-slate-900">Editar Vecino</h3>
+      <button onclick="document.getElementById('modal-editar-vecino').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
+    </div>
+    <form id="form-editar-vecino" method="POST" action="" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {% csrf_token %}
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-bold text-slate-700 mb-1">Nombre Completo</label>
+        <input type="text" id="edit-vecino-nombre" name="nombre" required 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">RUT</label>
+        <input type="text" id="edit-vecino-rut" name="rut" required 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Teléfono</label>
+        <input type="text" id="edit-vecino-telefono" name="telefono" 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-bold text-slate-700 mb-1">Dirección</label>
+        <input type="text" id="edit-vecino-direccion" name="direccion" 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Territorio</label>
+        <input type="text" id="edit-vecino-territorio" name="territorio" 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Estado</label>
+        <select id="edit-vecino-estado" name="estado" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </div>
+      <div class="sm:col-span-2 flex justify-end gap-2 pt-2">
+        <button type="button" onclick="document.getElementById('modal-editar-vecino').classList.add('hidden')" 
+                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cancelar</button>
+        <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md">Actualizar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openEditVecino(id, nombre, rut, direccion, telefono, territorio, estado) {
+    document.getElementById('form-editar-vecino').action = `/gestion/vecinos/${id}/editar/`;
+    document.getElementById('edit-vecino-nombre').value = nombre;
+    document.getElementById('edit-vecino-rut').value = rut;
+    document.getElementById('edit-vecino-direccion').value = direccion;
+    document.getElementById('edit-vecino-telefono').value = telefono;
+    document.getElementById('edit-vecino-territorio').value = territorio;
+    document.getElementById('edit-vecino-estado').value = estado;
+    document.getElementById('modal-editar-vecino').classList.remove('hidden');
+  }
+</script>
+{% endblock %}

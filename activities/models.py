@@ -59,4 +59,48 @@ class AtencionSocialGestion(BaseModel):
         unique_together = ('actividad', 'numero_gestion')
 
     def __str__(self):
-        return f"Gestión {self.numero_gestion} - Actividad {self.actividad.codigo_evidencia_unico}"
+        return f"Gestión {self.numero_gestion} - Actividad {self.actividad.codigo_evidencia_unico}"
+
+class TipoGestion(BaseModel):
+    nombre = models.CharField(max_length=100)
+    descripcion = models.TextField(null=True, blank=True)
+    estado = models.CharField(max_length=20, default='Activo')
+
+    def __str__(self):
+        return self.nombre
+
+class Vecino(BaseModel):
+    nombre = models.CharField(max_length=150)
+    rut = models.CharField(max_length=20, unique=True)
+    direccion = models.CharField(max_length=200, null=True, blank=True)
+    telefono = models.CharField(max_length=30, null=True, blank=True)
+    territorio = models.CharField(max_length=100, null=True, blank=True)
+    tipo_gestion = models.ForeignKey(TipoGestion, on_delete=models.SET_NULL, null=True, blank=True)
+    estado = models.CharField(max_length=20, default='Activo')
+
+    def __str__(self):
+        return f"{self.nombre} ({self.rut})"
+
+class AtencionCiudadana(BaseModel):
+    codigo_atencion = models.CharField(max_length=50, unique=True, blank=True)
+    solicitante = models.CharField(max_length=150)
+    vecino = models.ForeignKey(Vecino, on_delete=models.SET_NULL, null=True, blank=True)
+    delegacion = models.ForeignKey("accounts.Delegacion", on_delete=models.RESTRICT)
+    tipo_atencion = models.ForeignKey("configuration.TipoAtencion", on_delete=models.RESTRICT)
+    sub_atencion = models.ForeignKey("configuration.SubAtencion", on_delete=models.RESTRICT)
+    descripcion = models.TextField()
+    usuario_responsable = models.ForeignKey("auth.User", on_delete=models.RESTRICT)
+    fecha_registro = models.DateTimeField(auto_now_add=True)
+    estado = models.CharField(max_length=30, default='Registrada')
+
+    def save(self, *args, **kwargs):
+        if not self.codigo_atencion:
+            year = timezone.now().year
+            last = AtencionCiudadana.all_objects.order_by('-id').first()
+            next_num = (last.id + 1) if last else 1
+            uid = uuid.uuid4().hex[:4].upper()
+            self.codigo_atencion = f"AT-{year}-{next_num:04d}-{uid}"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.codigo_atencion} - {self.solicitante}"

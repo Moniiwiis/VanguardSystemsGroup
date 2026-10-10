@@ -1,0 +1,182 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crear Nueva Contraseña — Sistema Municipal La Serena</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <style>
+    body { font-family: 'Public Sans', sans-serif; background-color: #FDF6F6; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+  <!-- TopBar Oficial de Acceso (Mockup C2) -->
+  <header class="bg-[#1F1618] text-white px-6 py-3 flex items-center justify-between border-b border-white/10 shadow-sm">
+    <div class="flex items-center gap-3">
+      <img src="{% static 'horizontal-blanco.svg' %}" 
+           alt="La Serena" 
+           class="h-8 w-auto object-contain"
+           onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
+      <span class="text-xs font-mono font-bold tracking-wider text-slate-300">
+        SISTEMA MUNICIPAL <span class="text-white/40">/</span> Acceso y recuperación
+      </span>
+    </div>
+  </header>
+
+  <!-- Contenedor Central Card (Diseño 4 Mockup C2) -->
+  <main class="flex-1 flex items-center justify-center p-4 sm:p-6">
+    <div class="w-full max-w-md bg-white rounded-3xl p-8 sm:p-10 shadow-xl border border-[rgba(196,18,48,0.18)] space-y-6">
+      
+      <!-- Subtítulos y Paso 3 de 3 -->
+      <div class="text-center space-y-1.5">
+        <img src="{% static 'vertical-color.svg' %}" 
+             alt="Escudo La Serena" 
+             class="h-14 w-auto mx-auto object-contain mb-2"
+             onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
+        <p class="text-xs font-extrabold text-[#8B1D19] uppercase tracking-wider">Gestión de Atención Ciudadana</p>
+        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Crear nueva contraseña</h1>
+        <p class="text-xs font-bold text-[#C41230]">Paso 3 de 3 · Nueva clave</p>
+      </div>
+
+      <!-- Formulario Nueva Contraseña -->
+      <form method="POST" action="{% url 'nueva_contrasena' %}" class="space-y-4">
+        {% csrf_token %}
+
+        <!-- Nueva Contraseña -->
+        <div class="space-y-1 text-left">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold text-slate-700">Nueva contraseña</label>
+            <button type="button" onclick="togglePassword('pass1', this)" class="text-[11px] font-bold text-[#C41230] hover:underline focus:outline-none">
+              Mostrar
+            </button>
+          </div>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+              <i data-lucide="lock" class="w-4 h-4"></i>
+            </div>
+            <input type="password" id="pass1" name="nueva_contrasena" required placeholder="••••••••" autofocus
+                   class="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] transition-all font-medium" />
+          </div>
+        </div>
+
+        <!-- Confirmar Nueva Contraseña -->
+        <div class="space-y-1 text-left">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold text-slate-700">Confirmar nueva contraseña</label>
+            <button type="button" onclick="togglePassword('pass2', this)" class="text-[11px] font-bold text-[#C41230] hover:underline focus:outline-none">
+              Mostrar
+            </button>
+          </div>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+              <i data-lucide="lock" class="w-4 h-4"></i>
+            </div>
+            <input type="password" id="pass2" name="confirmar_contrasena" required placeholder="••••••••"
+                   class="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] transition-all font-medium" />
+          </div>
+        </div>
+
+        <!-- Requisitos Visibles de la Contraseña (Mockup C2) -->
+        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2 text-left">
+          <p class="font-bold text-slate-800 text-[11px]">Requisitos visibles y coincidencia de ambas claves:</p>
+          <ul class="space-y-1 text-[11px] text-slate-600">
+            <li id="req-len" class="flex items-center gap-1.5"><i data-lucide="circle" class="w-3.5 h-3.5 text-slate-400"></i> Mínimo 8 caracteres</li>
+            <li id="req-upper" class="flex items-center gap-1.5"><i data-lucide="circle" class="w-3.5 h-3.5 text-slate-400"></i> Al menos una letra mayúscula</li>
+            <li id="req-lower" class="flex items-center gap-1.5"><i data-lucide="circle" class="w-3.5 h-3.5 text-slate-400"></i> Al menos una letra minúscula</li>
+            <li id="req-num" class="flex items-center gap-1.5"><i data-lucide="circle" class="w-3.5 h-3.5 text-slate-400"></i> Al menos un número</li>
+            <li id="req-spec" class="flex items-center gap-1.5"><i data-lucide="circle" class="w-3.5 h-3.5 text-slate-400"></i> Carácter especial (! @ # $ %)</li>
+            <li id="req-match" class="flex items-center gap-1.5"><i data-lucide="circle" class="w-3.5 h-3.5 text-slate-400"></i> Coincidencia de ambas contraseñas</li>
+          </ul>
+        </div>
+
+        <!-- Botón Guardar -->
+        <button type="submit" 
+                class="w-full py-3 px-4 bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white text-xs font-extrabold rounded-xl shadow-md transition-all tracking-wide">
+          Guardar contraseña
+        </button>
+      </form>
+
+      <p class="text-[11px] text-center text-slate-500 font-medium">
+        Al guardar, podrás ingresar con tu nueva contraseña.
+      </p>
+
+    </div>
+  </main>
+
+  <footer class="py-4 text-center text-xs text-slate-500">
+    <span>Ilustre Municipalidad de La Serena © 2026</span>
+  </footer>
+
+  <script>
+    lucide.createIcons();
+
+    function togglePassword(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = 'Ocultar';
+      } else {
+        input.type = 'password';
+        btn.textContent = 'Mostrar';
+      }
+    }
+
+    // Validación interactiva de requisitos en tiempo real
+    const pass1 = document.getElementById('pass1');
+    const pass2 = document.getElementById('pass2');
+
+    function checkReq(elemId, condition) {
+      const item = document.getElementById(elemId);
+      if (condition) {
+        item.classList.add('text-emerald-700', 'font-bold');
+        item.classList.remove('text-slate-600');
+        item.querySelector('i').setAttribute('data-lucide', 'check-circle-2');
+        item.querySelector('i').classList.add('text-emerald-600');
+      } else {
+        item.classList.remove('text-emerald-700', 'font-bold');
+        item.classList.add('text-slate-600');
+        item.querySelector('i').setAttribute('data-lucide', 'circle');
+        item.querySelector('i').classList.remove('text-emerald-600');
+      }
+      lucide.createIcons();
+    }
+
+    function validate() {
+      const v1 = pass1.value;
+      const v2 = pass2.value;
+      checkReq('req-len', v1.length >= 8);
+      checkReq('req-upper', /[A-Z]/.test(v1));
+      checkReq('req-lower', /[a-z]/.test(v1));
+      checkReq('req-num', /[0-9]/.test(v1));
+      checkReq('req-spec', /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(v1));
+      checkReq('req-match', v1 && v2 && v1 === v2);
+    }
+
+    pass1.addEventListener('input', validate);
+    pass2.addEventListener('input', validate);
+
+    {% if messages %}
+      {% for message in messages %}
+        Swal.fire({
+          icon: "{% if message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% else %}success{% endif %}",
+          title: "{{ message|escapejs }}",
+          confirmButtonColor: '#C41230',
+          timer: 5000,
+          timerProgressBar: true,
+          customClass: { popup: 'rounded-3xl font-sans' }
+        });
+      {% endfor %}
+    {% endif %}
+  </script>
+</body>
+</html>

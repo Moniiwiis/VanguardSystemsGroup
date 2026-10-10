@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+
+{% block title %}Ingreso de Atención Ciudadana — Sistema Municipal La Serena{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Migas de pan y Encabezado (Wireframe C6 - Diseño 11) -->
+  <div>
+    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Gestión municipal / Atenciones</p>
+    <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Ingreso de atención</h1>
+  </div>
+
+  <!-- Formulario de Ingreso de Atención (Diseño 11) -->
+  <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-[rgba(196,18,48,0.18)]">
+    <form id="form-atencion" method="POST" action="{% url 'gestion_atenciones' %}" class="space-y-5">
+      {% csrf_token %}
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        
+        <!-- 1. Vecino o Solicitante -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-800">
+            Vecino o solicitante <span class="text-[#C41230]">*</span>
+          </label>
+          <div class="relative">
+            <input type="text" id="solicitante" name="solicitante" required list="vecinos-list"
+                   placeholder="Buscar por identificador o nombre..." 
+                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none transition-all placeholder:text-slate-400 font-medium" />
+            <datalist id="vecinos-list">
+              {% for v in vecinos %}
+                <option value="{{ v.nombre }} ({{ v.rut }})">{{ v.territorio }}</option>
+              {% endfor %}
+            </datalist>
+          </div>
+          <p class="text-[10px] text-slate-400">Ingresa el RUT o nombre completo del solicitante</p>
+        </div>
+
+        <!-- 2. Delegación de Atención (Contexto Asignado por Perfil) -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-800">
+            Delegación de atención
+          </label>
+          <div class="relative">
+            <input type="text" readonly 
+                   value="{{ delegacion_activa.get_codigo }} · {{ delegacion_activa.nombre }} [Asignada por perfil]" 
+                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 cursor-not-allowed select-none" />
+            <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+              <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+            </div>
+          </div>
+          <p class="text-[10px] text-slate-400">Asignada automáticamente a partir del contexto territorial autorizado</p>
+        </div>
+
+        <!-- 3. Tipo de Atención -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-800">
+            Tipo de Atención <span class="text-[#C41230]">*</span>
+          </label>
+          <select id="tipo_atencion_id" name="tipo_atencion_id" required onchange="cargarSubAtenciones(this.value)"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none font-bold">
+            <option value="">Seleccione un Tipo de Atención...</option>
+            {% for t in tipos_activos %}
+              <option value="{{ t.id }}">{{ t.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- 4. Sub Atención (Dependiente de Tipo de Atención) -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-800">
+            Sub Atención <span class="text-[#C41230]">*</span>
+          </label>
+          <select id="sub_atencion_id" name="sub_atencion_id" required
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none font-bold">
+            <option value="">Primero seleccione un Tipo de Atención</option>
+          </select>
+          <p id="sub-helper" class="text-[10px] text-slate-400">Solo muestra opciones activas asociadas al tipo elegido</p>
+        </div>
+
+      </div>
+
+      <!-- 5. Descripción de la Atención -->
+      <div class="space-y-1.5">
+        <label class="block text-xs font-bold text-slate-800">
+          Descripción de la atención <span class="text-[#C41230]">*</span>
+        </label>
+        <textarea id="descripcion" name="descripcion" required rows="3"
+                  placeholder="Describa la solicitud y los antecedentes necesarios."
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none transition-all placeholder:text-slate-400 font-medium"></textarea>
+      </div>
+
+      <!-- Footer Informativo y Botones de Acción (Mockup C6) -->
+      <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="text-[11px] text-slate-500 font-medium">
+          Responsable: <strong class="text-slate-800">{{ request.user.first_name|default:request.user.username }}</strong> 
+          <span class="mx-1 text-slate-300">|</span> 
+          Fecha y hora: <span class="text-slate-600 font-bold">automáticas</span>
+        </div>
+
+        <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+          <!-- Cancelar no crea registros -->
+          <button type="button" onclick="cancelarAtencion()"
+                  class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
+            Cancelar
+          </button>
+          
+          <!-- Guardar Atención con prevención de doble envío -->
+          <button type="submit" id="btn-guardar"
+                  class="px-6 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center gap-2">
+            <i data-lucide="save" class="w-4 h-4"></i>
+            <span id="btn-text">Guardar atención</span>
+          </button>
+        </div>
+      </div>
+
+    </form>
+  </div>
+
+  <p class="text-[11px] text-slate-400 italic">Diseño referencial · Datos ficticios · Acciones sujetas al perfil</p>
+
+  <!-- Historial de Atenciones Registradas Recientemente -->
+  <div class="space-y-4 pt-4 border-t border-slate-200">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-extrabold text-slate-900">Historial de atenciones registradas</h2>
+        <p class="text-xs text-slate-500 font-medium">Consulta y seguimiento de casos ingresados en el sistema</p>
+      </div>
+      <a href="?q={{ q }}&tipo={{ filtro_tipo }}&export=excel" 
+         class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-sm shrink-0">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+        <span>Exportar a Excel</span>
+      </a>
+    </div>
+
+    <!-- Barra de búsqueda y filtro -->
+    <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <form method="GET" action="{% url 'gestion_atenciones' %}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <div class="relative flex-1">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <i data-lucide="search" class="w-4 h-4"></i>
+          </div>
+          <input type="text" name="q" value="{{ q }}" placeholder="Buscar por identificador, solicitante o descripción..." 
+                 class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]" />
+        </div>
+        <select name="tipo" onchange="this.form.submit()" 
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+          <option value="">Filtrar Tipo: Todos</option>
+          {% for t in tipos_activos %}
+            <option value="{{ t.nombre }}" {% if filtro_tipo == t.nombre %}selected{% endif %}>{{ t.nombre }}</option>
+          {% endfor %}
+        </select>
+      </form>
+    </div>
+
+    <!-- Tabla de Atenciones -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-700">
+          <thead class="bg-slate-50/80 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+            <tr>
+              <th class="py-3 px-6">Identificador</th>
+              <th class="py-3 px-6">Solicitante</th>
+              <th class="py-3 px-6">Delegación</th>
+              <th class="py-3 px-6">Tipo / Sub Atención</th>
+              <th class="py-3 px-6">Responsable</th>
+              <th class="py-3 px-6">Fecha</th>
+              <th class="py-3 px-6 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-medium">
+            {% for a in atenciones %}
+            <tr class="hover:bg-slate-50/70 transition-colors">
+              <td class="py-3.5 px-6 font-mono font-bold text-[#C41230]">{{ a.codigo_atencion }}</td>
+              <td class="py-3.5 px-6 font-bold text-slate-900">{{ a.solicitante }}</td>
+              <td class="py-3.5 px-6 text-slate-700">{{ a.delegacion.nombre }}</td>
+              <td class="py-3.5 px-6">
+                <span class="font-bold text-slate-900">{{ a.tipo_atencion.nombre }}</span>
+                <span class="text-slate-400 block text-[11px]">{{ a.sub_atencion.nombre }}</span>
+              </td>
+              <td class="py-3.5 px-6 text-slate-600">{{ a.usuario_responsable.first_name|default:a.usuario_responsable.username }}</td>
+              <td class="py-3.5 px-6 text-slate-500 font-mono">{{ a.created_at|date:"d/m/Y H:i" }}</td>
+              <td class="py-3.5 px-6 text-center">
+                <button type="button" 
+                        onclick="verDetalleAtencion('{{ a.codigo_atencion|escapejs }}', '{{ a.solicitante|escapejs }}', '{{ a.delegacion.nombre|escapejs }}', '{{ a.tipo_atencion.nombre|escapejs }}', '{{ a.sub_atencion.nombre|escapejs }}', '{{ a.descripcion|escapejs }}', '{{ a.usuario_responsable.get_full_name|default:a.usuario_responsable.username|escapejs }}', '{{ a.created_at|date:'d/m/Y H:i' }}')"
+                        class="text-[#C41230] hover:text-[#8B1D19] font-bold hover:underline">
+                  Ver detalle
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="py-8 text-center text-slate-400 font-medium">
+                No hay atenciones registradas para los filtros aplicados.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Paginador -->
+      <div class="px-6 py-4 bg-slate-50/50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 font-medium">
+        <div>
+          Mostrando {{ page_obj.start_index|default:0 }} a {{ page_obj.end_index|default:0 }} de {{ total_registros }} registros
+        </div>
+        {% if page_obj.has_other_pages %}
+        <div class="flex items-center gap-1.5">
+          {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&tipo={{ filtro_tipo }}" 
+               class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold">Anterior</a>
+          {% endif %}
+          {% for p in page_obj.paginator.page_range %}
+            {% if p == page_obj.number %}
+              <span class="px-3 py-1.5 rounded-lg bg-[#C41230] text-white font-bold">{{ p }}</span>
+            {% else %}
+              <a href="?page={{ p }}&q={{ q }}&tipo={{ filtro_tipo }}" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50">{{ p }}</a>
+            {% endif %}
+          {% endfor %}
+          {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&tipo={{ filtro_tipo }}" 
+               class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold">Siguiente</a>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal Ver Detalle de Atención -->
+<div id="modal-detalle-atencion" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 w-full max-w-lg space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div>
+        <span id="at-cod" class="font-mono text-xs font-extrabold text-[#C41230] bg-red-50 px-2.5 py-1 rounded-lg"></span>
+        <h3 class="text-base font-extrabold text-slate-900 mt-1">Ficha de Atención Ciudadana</h3>
+      </div>
+      <button onclick="document.getElementById('modal-detalle-atencion').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+    </div>
+    <div class="space-y-3 text-xs">
+      <div><span class="font-bold text-slate-500">Solicitante:</span> <span id="at-solicitante" class="font-bold text-slate-900"></span></div>
+      <div><span class="font-bold text-slate-500">Delegación:</span> <span id="at-del" class="text-slate-800"></span></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><span class="font-bold text-slate-500">Tipo de Atención:</span> <span id="at-tipo" class="font-bold text-slate-800"></span></div>
+        <div><span class="font-bold text-slate-500">Sub Atención:</span> <span id="at-sub" class="font-bold text-slate-800"></span></div>
+      </div>
+      <div>
+        <span class="font-bold text-slate-500 block mb-1">Descripción:</span>
+        <div id="at-desc" class="p-3 bg-slate-50 rounded-xl text-slate-700 leading-relaxed border border-slate-200"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-[11px]">
+        <div><span class="font-bold text-slate-500">Responsable:</span> <span id="at-resp" class="text-slate-800"></span></div>
+        <div><span class="font-bold text-slate-500">Fecha/Hora:</span> <span id="at-fecha" class="text-slate-800 font-mono"></span></div>
+      </div>
+    </div>
+    <div class="flex justify-end pt-2">
+      <button type="button" onclick="document.getElementById('modal-detalle-atencion').classList.add('hidden')" 
+              class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Carga dependiente en tiempo real de Sub Atenciones según Tipo de Atención seleccionado (A2 / Pág 2)
+  async function cargarSubAtenciones(tipoId) {
+    const subSelect = document.getElementById('sub_atencion_id');
+    subSelect.innerHTML = '<option value="">Cargando sub atenciones...</option>';
+
+    if (!tipoId) {
+      subSelect.innerHTML = '<option value="">Primero seleccione un Tipo de Atención</option>';
+      return;
+    }
+
+    try {
+      const response = await fetch(`/gestion/api/subatenciones/${tipoId}/`);
+      const data = await response.json();
+      
+      subSelect.innerHTML = '<option value="">Seleccione Sub Atención...</option>';
+      if (data.subatenciones && data.subatenciones.length > 0) {
+        data.subatenciones.forEach(sub => {
+          const opt = document.createElement('option');
+          opt.value = sub.id;
+          opt.textContent = `${sub.codigo ? sub.codigo + ' — ' : ''}${sub.nombre}`;
+          subSelect.appendChild(opt);
+        });
+      } else {
+        subSelect.innerHTML = '<option value="">No hay sub atenciones activas para este tipo</option>';
+      }
+    } catch (e) {
+      subSelect.innerHTML = '<option value="">Error al cargar sub atenciones</option>';
+    }
+  }
+
+  // Cancelar atención: no crea registros
+  function cancelarAtencion() {
+    const form = document.getElementById('form-atencion');
+    const desc = document.getElementById('descripcion').value;
+    const sol = document.getElementById('solicitante').value;
+
+    if (desc || sol) {
+      Swal.fire({
+        title: '¿Descartar cambios?',
+        text: 'Se cancelará el ingreso y no se creará ningún registro en el sistema.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#C41230',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, descartar',
+        cancelButtonText: 'Continuar editando',
+        customClass: { popup: 'rounded-3xl font-sans' }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          form.reset();
+          document.getElementById('sub_atencion_id').innerHTML = '<option value="">Primero seleccione un Tipo de Atención</option>';
+        }
+      });
+    } else {
+      form.reset();
+    }
+  }
+
+  // Prevención de doble envío
+  let formSubmitting = false;
+  document.getElementById('form-atencion').addEventListener('submit', function(e) {
+    if (formSubmitting) {
+      e.preventDefault();
+      return false;
+    }
+    formSubmitting = true;
+    const btn = document.getElementById('btn-guardar');
+    btn.disabled = true;
+    btn.classList.add('opacity-75', 'cursor-not-allowed');
+    document.getElementById('btn-text').textContent = 'Guardando atención...';
+  });
+
+  // Modal Ver Detalle
+  function verDetalleAtencion(cod, sol, del, tipo, sub, desc, resp, fecha) {
+    document.getElementById('at-cod').textContent = cod;
+    document.getElementById('at-solicitante').textContent = sol;
+    document.getElementById('at-del').textContent = del;
+    document.getElementById('at-tipo').textContent = tipo;
+    document.getElementById('at-sub').textContent = sub;
+    document.getElementById('at-desc').textContent = desc;
+    document.getElementById('at-resp').textContent = resp;
+    document.getElementById('at-fecha').textContent = fecha;
+    document.getElementById('modal-detalle-atencion').classList.remove('hidden');
+  }
+</script>
+{% endblock %}

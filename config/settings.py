@@ -30,7 +30,7 @@ SECRET_KEY = 'django-insecure-4-334v+k-t#9y=z*@tq+*5_^d!1=3xouo58su-^2mvhzct0d)n
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver', '*']
 
 
 # Application definition
@@ -72,6 +72,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.global_context',
             ],
         },
     },
@@ -150,11 +151,14 @@ STATICFILES_DIRS = [
 
 
 
-# Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
+# Email Configuration
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+DEFAULT_FROM_EMAIL = 'no-reply@municipalidadlaserena.cl'
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 25))
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+# Auth Redirection Settings
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'gestion_inicio'
+LOGOUT_REDIRECT_URL = 'login'
+

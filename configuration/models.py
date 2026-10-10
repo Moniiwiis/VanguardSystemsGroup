@@ -35,6 +35,34 @@ class Periodo(BaseModel):
     def __str__(self):
         return f"Período {self.fecha_inicio} a {self.fecha_termino}"
 
+class TipoAtencion(BaseModel):
+    codigo = models.CharField(max_length=20, null=True, blank=True)
+    nombre = models.CharField(max_length=100)
+    descripcion = models.TextField(null=True, blank=True)
+    estado = models.CharField(max_length=20, default='Activo')
+
+    def get_codigo(self):
+        if self.codigo:
+            return self.codigo
+        return f"TA{self.id:03d}" if self.id else "TA001"
+
+    def __str__(self):
+        return f"{self.get_codigo()} - {self.nombre}"
+
+class SubAtencion(BaseModel):
+    codigo = models.CharField(max_length=20, null=True, blank=True)
+    nombre = models.CharField(max_length=100)
+    tipo_atencion = models.ForeignKey(TipoAtencion, on_delete=models.CASCADE, related_name='sub_atenciones')
+    estado = models.CharField(max_length=20, default='Activo')
+
+    def get_codigo(self):
+        if self.codigo:
+            return self.codigo
+        return f"SA{self.id:03d}" if self.id else "SA001"
+
+    def __str__(self):
+        return f"{self.get_codigo()} - {self.nombre} ({self.tipo_atencion.nombre})"
+
 class CatalogoActividad(BaseModel):
     tipo_actividad = models.CharField(max_length=100)
     servicio = models.CharField(max_length=100)
@@ -46,13 +74,21 @@ class CatalogoActividad(BaseModel):
         return f"{self.tipo_actividad} - {self.servicio}"
 
 class ItemMedicion(BaseModel):
-    cargo = models.ForeignKey("accounts.Cargo", on_delete=models.RESTRICT)
-    catalogo = models.ForeignKey(CatalogoActividad, on_delete=models.RESTRICT)
+    codigo = models.CharField(max_length=20, null=True, blank=True)
+    cargo = models.ForeignKey("accounts.Cargo", on_delete=models.RESTRICT, null=True, blank=True)
+    catalogo = models.ForeignKey(CatalogoActividad, on_delete=models.RESTRICT, null=True, blank=True)
     nombre_item = models.CharField(max_length=150)
+    descripcion = models.TextField(null=True, blank=True)
     unidad_medida = models.CharField(max_length=50, null=True, blank=True)
+    estado = models.CharField(max_length=20, default='Activo')
+
+    def get_codigo(self):
+        if self.codigo:
+            return self.codigo
+        return f"IT{self.id:03d}" if self.id else "IT001"
 
     def __str__(self):
-        return self.nombre_item
+        return f"{self.get_codigo()} - {self.nombre_item}"
 
 class ConfiguracionMeta(BaseModel):
     item = models.ForeignKey(ItemMedicion, on_delete=models.RESTRICT)

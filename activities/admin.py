@@ -1,6 +1,6 @@
 from django.contrib import admin
 from core.admin import BaseScopedModelAdmin
-from .models import Actividad, Evidencia, ValidacionEvidencia, AtencionSocialGestion
+from .models import Actividad, Evidencia, ValidacionEvidencia, AtencionSocialGestion, AtencionCiudadana
 
 class EvidenciaInline(admin.TabularInline):
     model = Evidencia
@@ -119,4 +119,20 @@ class AtencionSocialGestionAdmin(BaseScopedModelAdmin):
             return qs
         if hasattr(request.user, 'funcionario') and request.user.funcionario.delegacion:
             return qs.filter(actividad__funcionario__delegacion=request.user.funcionario.delegacion)
+        return qs
+
+@admin.register(AtencionCiudadana)
+class AtencionCiudadanaAdmin(BaseScopedModelAdmin):
+    list_display = ('codigo_atencion', 'solicitante', 'delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'created_at', 'estado')
+    search_fields = ('codigo_atencion', 'solicitante', 'descripcion')
+    list_filter = ('delegacion', 'tipo_atencion', 'estado', 'created_at')
+    list_select_related = ('delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable')
+    readonly_fields = ('created_at', 'updated_at', 'codigo_atencion')
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        if hasattr(request.user, 'funcionario') and request.user.funcionario.delegacion:
+            return qs.filter(delegacion=request.user.funcionario.delegacion)
         return qs
