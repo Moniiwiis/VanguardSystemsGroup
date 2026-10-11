@@ -8,9 +8,12 @@
   <!-- Migas de pan y Encabezado (Wireframe C6 - Diseño 11) -->
   <div>
     <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Gestión municipal / Atenciones</p>
-    <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Ingreso de atención</h1>
+    <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
+      {% if permisos.es_consultor %}Consulta de Atenciones Ciudadanas{% else %}Ingreso de atención{% endif %}
+    </h1>
   </div>
 
+  {% if not permisos.es_consultor %}
   <!-- Formulario de Ingreso de Atención (Diseño 11) -->
   <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-[rgba(196,18,48,0.18)]">
     <form id="form-atencion" method="POST" action="{% url 'gestion_atenciones' %}" class="space-y-5">
@@ -49,7 +52,7 @@
               <i data-lucide="lock" class="w-3.5 h-3.5"></i>
             </div>
           </div>
-          <p class="text-[10px] text-slate-400">Asignada automáticamente a partir del contexto territorial autorizado</p>
+
         </div>
 
         <!-- 3. Tipo de Atención -->
@@ -112,12 +115,32 @@
             <span id="btn-text">Guardar atención</span>
           </button>
         </div>
-      </div>
-
     </form>
   </div>
+  {% else %}
+  <!-- Banner Informativo para Perfil Consultor (Solo Lectura) -->
+  <div class="bg-gradient-to-r from-blue-50/90 to-indigo-50/90 border border-blue-200 rounded-3xl p-6 sm:p-7 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div class="flex items-center gap-4">
+      <div class="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-700 shrink-0 shadow-inner">
+        <i data-lucide="eye" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h2 class="text-base font-extrabold text-slate-900">Módulo de Atenciones Ciudadanas</h2>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200 uppercase tracking-wider">Modo Solo Lectura</span>
+        </div>
+        <p class="text-xs text-slate-600 mt-1">
+          Has iniciado sesión como <strong>{{ request.user.first_name|default:request.user.username }} (Rol Consultor)</strong>. Tu perfil está configurado en <strong>modo de solo lectura</strong>: puedes revisar el historial, consultar fichas de casos y exportar registros a Excel de <strong>{{ delegacion_activa.nombre }}</strong>, sin permisos de ingreso ni modificación de datos.
+        </p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white border border-blue-200 text-blue-700 text-xs font-bold shrink-0 shadow-sm">
+      <i data-lucide="shield-check" class="w-4 h-4 text-blue-600"></i>
+      <span>Acceso de Consulta</span>
+    </div>
+  </div>
+  {% endif %}
 
-  <p class="text-[11px] text-slate-400 italic">Diseño referencial · Datos ficticios · Acciones sujetas al perfil</p>
 
   <!-- Historial de Atenciones Registradas Recientemente -->
   <div class="space-y-4 pt-4 border-t border-slate-200">
@@ -126,7 +149,7 @@
         <h2 class="text-lg font-extrabold text-slate-900">Historial de atenciones registradas</h2>
         <p class="text-xs text-slate-500 font-medium">Consulta y seguimiento de casos ingresados en el sistema</p>
       </div>
-      <a href="?q={{ q }}&tipo={{ filtro_tipo }}&export=excel" 
+      <a href="?q={{ q }}&tipo={{ filtro_tipo }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}&export=excel" 
          class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-sm shrink-0">
         <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
         <span>Exportar a Excel</span>
@@ -143,6 +166,19 @@
           <input type="text" name="q" value="{{ q }}" placeholder="Buscar por identificador, solicitante o descripción..." 
                  class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]" />
         </div>
+
+        {% if permisos.es_admin %}
+        <select name="delegacion" onchange="this.form.submit()" 
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+          <option value="">Filtrar Delegación: Todas</option>
+          {% for d in todas_delegaciones %}
+            <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
+              {{ d.get_codigo }} — {{ d.nombre }}
+            </option>
+          {% endfor %}
+        </select>
+        {% endif %}
+
         <select name="tipo" onchange="this.form.submit()" 
                 class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
           <option value="">Filtrar Tipo: Todos</option>
@@ -157,40 +193,78 @@
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs text-slate-700">
-          <thead class="bg-slate-50/80 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+          <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
             <tr>
-              <th class="py-3 px-6">Identificador</th>
-              <th class="py-3 px-6">Solicitante</th>
-              <th class="py-3 px-6">Delegación</th>
-              <th class="py-3 px-6">Tipo / Sub Atención</th>
-              <th class="py-3 px-6">Responsable</th>
-              <th class="py-3 px-6">Fecha</th>
-              <th class="py-3 px-6 text-center">Acciones</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Identificador</th>
+              <th class="py-2.5 px-3">Solicitante</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Delegación</th>
+              <th class="py-2.5 px-3">Tipo / Sub Atención</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Evidencia SGR</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Responsable</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Fecha</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap">Estado</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap w-14 sticky right-0 bg-slate-50/95 backdrop-blur-sm shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acción</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 font-medium">
             {% for a in atenciones %}
-            <tr class="hover:bg-slate-50/70 transition-colors">
-              <td class="py-3.5 px-6 font-mono font-bold text-[#C41230]">{{ a.codigo_atencion }}</td>
-              <td class="py-3.5 px-6 font-bold text-slate-900">{{ a.solicitante }}</td>
-              <td class="py-3.5 px-6 text-slate-700">{{ a.delegacion.nombre }}</td>
-              <td class="py-3.5 px-6">
-                <span class="font-bold text-slate-900">{{ a.tipo_atencion.nombre }}</span>
-                <span class="text-slate-400 block text-[11px]">{{ a.sub_atencion.nombre }}</span>
+            <tr class="group hover:bg-slate-50/70 transition-colors">
+              <td class="py-2.5 px-3 font-mono font-bold text-[#C41230] whitespace-nowrap">{{ a.codigo_atencion }}</td>
+              <td class="py-2.5 px-3 font-bold text-slate-900">{{ a.solicitante }}</td>
+              <td class="py-2.5 px-3 text-slate-700 text-[11px] whitespace-nowrap">{{ a.delegacion.nombre }}</td>
+              <td class="py-2.5 px-3">
+                <span class="font-bold text-slate-900 block leading-tight">{{ a.tipo_atencion.nombre }}</span>
+                <span class="text-slate-400 block text-[10px] mt-0.5">{{ a.sub_atencion.nombre }}</span>
               </td>
-              <td class="py-3.5 px-6 text-slate-600">{{ a.usuario_responsable.first_name|default:a.usuario_responsable.username }}</td>
-              <td class="py-3.5 px-6 text-slate-500 font-mono">{{ a.created_at|date:"d/m/Y H:i" }}</td>
-              <td class="py-3.5 px-6 text-center">
+              <td class="py-2.5 px-3 whitespace-nowrap">
+                <span class="font-mono font-bold text-slate-800 text-[11px] block leading-tight">{{ a.get_evidencia_codigo }}</span>
+                {% if a.estado_evidencia == 'Aprobado' %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Aprobada
+                  </span>
+                {% elif a.estado_evidencia == 'Rechazado' %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-extrabold bg-red-50 text-red-700 border border-red-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Rechazada
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Pendiente
+                  </span>
+                {% endif %}
+              </td>
+              <td class="py-2.5 px-3 text-slate-600 text-[11px] whitespace-nowrap">{{ a.usuario_responsable.first_name|default:a.usuario_responsable.username }}</td>
+              <td class="py-2.5 px-3 text-slate-500 font-mono text-[11px] whitespace-nowrap">{{ a.created_at|date:"d/m/Y H:i" }}</td>
+              <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                {% if a.estado == 'Resuelta' %}
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Resuelta
+                  </span>
+                {% elif a.estado == 'En proceso' %}
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> En proceso
+                  </span>
+                {% elif a.estado == 'Cancelada' %}
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-red-50 text-red-700 border border-red-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Cancelada
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Registrada
+                  </span>
+                {% endif %}
+              </td>
+              <td class="py-2.5 px-3 text-center whitespace-nowrap w-14 sticky right-0 bg-white group-hover:bg-slate-50 transition-colors shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
                 <button type="button" 
-                        onclick="verDetalleAtencion('{{ a.codigo_atencion|escapejs }}', '{{ a.solicitante|escapejs }}', '{{ a.delegacion.nombre|escapejs }}', '{{ a.tipo_atencion.nombre|escapejs }}', '{{ a.sub_atencion.nombre|escapejs }}', '{{ a.descripcion|escapejs }}', '{{ a.usuario_responsable.get_full_name|default:a.usuario_responsable.username|escapejs }}', '{{ a.created_at|date:'d/m/Y H:i' }}')"
-                        class="text-[#C41230] hover:text-[#8B1D19] font-bold hover:underline">
-                  Ver detalle
+                        onclick="verDetalleAtencion('{{ a.id }}', '{{ a.codigo_atencion|escapejs }}', '{{ a.solicitante|escapejs }}', '{{ a.delegacion.nombre|escapejs }}', '{{ a.tipo_atencion.nombre|escapejs }}', '{{ a.sub_atencion.nombre|escapejs }}', '{{ a.descripcion|escapejs }}', '{{ a.usuario_responsable.get_full_name|default:a.usuario_responsable.username|escapejs }}', '{{ a.created_at|date:'d/m/Y H:i' }}', '{{ a.estado|escapejs }}', '{{ a.get_evidencia_codigo|escapejs }}', '{{ a.estado_evidencia|escapejs }}')"
+                        title="Ver detalle"
+                        class="p-1.5 rounded-lg text-slate-500 hover:text-[#C41230] hover:bg-red-50 transition-all inline-flex items-center justify-center">
+                  <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
               </td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="7" class="py-8 text-center text-slate-400 font-medium">
+              <td colspan="9" class="py-8 text-center text-slate-400 font-medium">
                 No hay atenciones registradas para los filtros aplicados.
               </td>
             </tr>
@@ -207,18 +281,18 @@
         {% if page_obj.has_other_pages %}
         <div class="flex items-center gap-1.5">
           {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&tipo={{ filtro_tipo }}" 
+            <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&tipo={{ filtro_tipo }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
                class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold">Anterior</a>
           {% endif %}
           {% for p in page_obj.paginator.page_range %}
             {% if p == page_obj.number %}
               <span class="px-3 py-1.5 rounded-lg bg-[#C41230] text-white font-bold">{{ p }}</span>
             {% else %}
-              <a href="?page={{ p }}&q={{ q }}&tipo={{ filtro_tipo }}" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50">{{ p }}</a>
+              <a href="?page={{ p }}&q={{ q }}&tipo={{ filtro_tipo }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50">{{ p }}</a>
             {% endif %}
           {% endfor %}
           {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&tipo={{ filtro_tipo }}" 
+            <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&tipo={{ filtro_tipo }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
                class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold">Siguiente</a>
           {% endif %}
         </div>
@@ -254,7 +328,81 @@
         <div><span class="font-bold text-slate-500">Responsable:</span> <span id="at-resp" class="text-slate-800"></span></div>
         <div><span class="font-bold text-slate-500">Fecha/Hora:</span> <span id="at-fecha" class="text-slate-800 font-mono"></span></div>
       </div>
+      <div class="flex items-center gap-2 pt-1 text-xs">
+        <span class="font-bold text-slate-500">Estado Atención:</span>
+        <span id="at-estado-actual" class="font-extrabold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200"></span>
+      </div>
     </div>
+
+    <!-- Evidencia Territorial SGR Disponible para Aprobar -->
+    <div class="p-4 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-2.5 text-xs">
+      <div class="flex items-center justify-between">
+        <span class="font-extrabold text-slate-900 flex items-center gap-1.5">
+          <i data-lucide="file-check" class="w-4 h-4 text-[#C41230]"></i>
+          Evidencia de Respaldo Territorial (SGR)
+        </span>
+        <span id="at-evi-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800"></span>
+      </div>
+      <div class="flex items-center justify-between text-[11px] pt-0.5">
+        <span class="text-slate-500 font-bold">Código de Evidencia:</span>
+        <span id="at-evi-cod" class="font-mono font-extrabold text-[#C41230]"></span>
+      </div>
+      <div class="flex items-center justify-between text-[11px]">
+        <span class="text-slate-500 font-bold">Documento Adjunto:</span>
+        <span class="text-slate-700 font-semibold flex items-center gap-1">
+          <i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-400"></i>
+          Ficha digital de verificación y terreno
+        </span>
+      </div>
+
+      {% if not permisos.es_consultor %}
+      <div class="pt-2 border-t border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <span class="text-[11px] text-slate-600 font-bold">Auditoría / Validación SGR:</span>
+        <div class="flex items-center gap-2">
+          <form id="form-aprobar-evidencia" method="POST" action="" class="inline">
+            {% csrf_token %}
+            <input type="hidden" name="resultado_evidencia" value="Aprobado">
+            <button type="submit" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold transition-all shadow-sm flex items-center gap-1">
+              <i data-lucide="check" class="w-3.5 h-3.5"></i>
+              <span>Aprobar Evidencia</span>
+            </button>
+          </form>
+          <form id="form-rechazar-evidencia" method="POST" action="" class="inline">
+            {% csrf_token %}
+            <input type="hidden" name="resultado_evidencia" value="Rechazado">
+            <button type="submit" class="px-3 py-1.5 rounded-xl bg-white hover:bg-red-50 text-slate-700 hover:text-red-700 border border-slate-200 text-[11px] font-bold transition-all flex items-center gap-1">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              <span>Rechazar</span>
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Gestión de Estado (No visible para perfil Consultor) -->
+    {% if not permisos.es_consultor %}
+    <div class="pt-3 border-t border-slate-100 space-y-2">
+      <form id="form-cambiar-estado" method="POST" action="">
+        {% csrf_token %}
+        <label class="block text-xs font-bold text-slate-800 mb-1">
+          Actualizar Estado de la Atención:
+        </label>
+        <div class="flex items-center gap-2">
+          <select id="at-select-estado" name="nuevo_estado" class="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="Registrada">Registrada</option>
+            <option value="En proceso">En proceso</option>
+            <option value="Resuelta">Resuelta</option>
+            <option value="Cancelada">Cancelada</option>
+          </select>
+          <button type="submit" class="px-4 py-2 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-md transition-all">
+            Guardar Estado
+          </button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+
     <div class="flex justify-end pt-2">
       <button type="button" onclick="document.getElementById('modal-detalle-atencion').classList.add('hidden')" 
               class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cerrar</button>
@@ -269,6 +417,7 @@
   // Carga dependiente en tiempo real de Sub Atenciones según Tipo de Atención seleccionado (A2 / Pág 2)
   async function cargarSubAtenciones(tipoId) {
     const subSelect = document.getElementById('sub_atencion_id');
+    if (!subSelect) return;
     subSelect.innerHTML = '<option value="">Cargando sub atenciones...</option>';
 
     if (!tipoId) {
@@ -299,8 +448,9 @@
   // Cancelar atención: no crea registros
   function cancelarAtencion() {
     const form = document.getElementById('form-atencion');
-    const desc = document.getElementById('descripcion').value;
-    const sol = document.getElementById('solicitante').value;
+    if (!form) return;
+    const desc = document.getElementById('descripcion')?.value;
+    const sol = document.getElementById('solicitante')?.value;
 
     if (desc || sol) {
       Swal.fire({
@@ -316,7 +466,8 @@
       }).then((result) => {
         if (result.isConfirmed) {
           form.reset();
-          document.getElementById('sub_atencion_id').innerHTML = '<option value="">Primero seleccione un Tipo de Atención</option>';
+          const sub = document.getElementById('sub_atencion_id');
+          if (sub) sub.innerHTML = '<option value="">Primero seleccione un Tipo de Atención</option>';
         }
       });
     } else {
@@ -324,22 +475,28 @@
     }
   }
 
-  // Prevención de doble envío
+  // Prevención de doble envío con verificación de existencia
   let formSubmitting = false;
-  document.getElementById('form-atencion').addEventListener('submit', function(e) {
-    if (formSubmitting) {
-      e.preventDefault();
-      return false;
-    }
-    formSubmitting = true;
-    const btn = document.getElementById('btn-guardar');
-    btn.disabled = true;
-    btn.classList.add('opacity-75', 'cursor-not-allowed');
-    document.getElementById('btn-text').textContent = 'Guardando atención...';
-  });
+  const formAtencion = document.getElementById('form-atencion');
+  if (formAtencion) {
+    formAtencion.addEventListener('submit', function(e) {
+      if (formSubmitting) {
+        e.preventDefault();
+        return false;
+      }
+      formSubmitting = true;
+      const btn = document.getElementById('btn-guardar');
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add('opacity-75', 'cursor-not-allowed');
+      }
+      const btnText = document.getElementById('btn-text');
+      if (btnText) btnText.textContent = 'Guardando atención...';
+    });
+  }
 
-  // Modal Ver Detalle
-  function verDetalleAtencion(cod, sol, del, tipo, sub, desc, resp, fecha) {
+  // Modal Ver Detalle y Gestión de Estado y Evidencia
+  function verDetalleAtencion(id, cod, sol, del, tipo, sub, desc, resp, fecha, estado, eviCod, eviEstado) {
     document.getElementById('at-cod').textContent = cod;
     document.getElementById('at-solicitante').textContent = sol;
     document.getElementById('at-del').textContent = del;
@@ -348,6 +505,41 @@
     document.getElementById('at-desc').textContent = desc;
     document.getElementById('at-resp').textContent = resp;
     document.getElementById('at-fecha').textContent = fecha;
+
+    const estadoEl = document.getElementById('at-estado-actual');
+    if (estadoEl) {
+      estadoEl.textContent = estado;
+    }
+
+    const formEstado = document.getElementById('form-cambiar-estado');
+    if (formEstado) {
+      formEstado.action = `/gestion/atenciones/${id}/estado/`;
+      const selectEstado = document.getElementById('at-select-estado');
+      if (selectEstado) selectEstado.value = estado;
+    }
+
+    // Evidencia SGR
+    const eviCodEl = document.getElementById('at-evi-cod');
+    if (eviCodEl) eviCodEl.textContent = eviCod || 'EVI-GENERADA';
+
+    const eviBadge = document.getElementById('at-evi-badge');
+    if (eviBadge) {
+      eviBadge.textContent = eviEstado || 'Pendiente';
+      if (eviEstado === 'Aprobado') {
+        eviBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200';
+      } else if (eviEstado === 'Rechazado') {
+        eviBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-800 border border-red-200';
+      } else {
+        eviBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200';
+      }
+    }
+
+    const formAprobar = document.getElementById('form-aprobar-evidencia');
+    if (formAprobar) formAprobar.action = `/gestion/atenciones/${id}/validar-evidencia/`;
+
+    const formRechazar = document.getElementById('form-rechazar-evidencia');
+    if (formRechazar) formRechazar.action = `/gestion/atenciones/${id}/validar-evidencia/`;
+
     document.getElementById('modal-detalle-atencion').classList.remove('hidden');
   }
 </script>

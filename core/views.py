@@ -278,35 +278,86 @@ def cambiar_delegacion_view(request, del_id):
 def gestion_inicio(request):
     ctx = global_context(request)
     del_activa = ctx['delegacion_activa']
+    es_admin = ctx['permisos']['es_admin']
 
-    # Filtrar según perfil y delegación activa
-    if ctx['permisos']['es_admin']:
-        atenciones_qs = AtencionCiudadana.objects.all()
-    elif del_activa:
-        atenciones_qs = AtencionCiudadana.objects.filter(delegacion=del_activa)
+    # Métricas territoriales específicas de la delegación activa
+    if del_activa:
+        atenciones_del_qs = AtencionCiudadana.objects.filter(delegacion=del_activa)
+        funcionarios_del_qs = Funcionario.objects.filter(delegacion=del_activa)
+        metas_del_qs = ConfiguracionMeta.objects.filter(funcionario__delegacion=del_activa).select_related('periodo', 'item', 'funcionario')
+        val_del_qs = ValidacionEvidencia.objects.filter(actividad__funcionario__delegacion=del_activa)
     else:
-        atenciones_qs = AtencionCiudadana.objects.none()
+        atenciones_del_qs = AtencionCiudadana.objects.none()
+        funcionarios_del_qs = Funcionario.objects.none()
+        metas_del_qs = ConfiguracionMeta.objects.none()
+        val_del_qs = ValidacionEvidencia.objects.none()
 
-    metas = ConfiguracionMeta.objects.select_related('periodo', 'item').all()
-    if metas.exists():
-        cumplimientos = [m.cumplimiento_ponderado() for m in metas]
-        promedio = round(sum(cumplimientos) / len(cumplimientos), 2)
+    total_atenciones_del = atenciones_del_qs.count()
+    atenciones_resueltas_del = atenciones_del_qs.filter(estado__iexact='Resuelta').count()
+    atenciones_proceso_del = atenciones_del_qs.filter(estado__iexact='En proceso').count()
+    atenciones_registradas_del = atenciones_del_qs.filter(estado__iexact='Registrada').count()
+    pct_resueltas_del = round((atenciones_resueltas_del / total_atenciones_del) * 100, 1) if total_atenciones_del > 0 else 0.0
+
+    total_funcionarios_del = funcionarios_del_qs.count()
+
+    metas_list = list(metas_del_qs)
+    total_metas_del = len(metas_list)
+    if metas_list:
+        cumplimientos = [m.cumplimiento_ponderado() for m in metas_list]
+        promedio_meta_del = round(sum(cumplimientos) / len(cumplimientos), 1)
+        verdes_del = sum(1 for m in metas_list if m.estado_semaforo() == 'VERDE')
+        ambares_del = sum(1 for m in metas_list if m.estado_semaforo() == 'AMBAR')
+        rojos_del = sum(1 for m in metas_list if m.estado_semaforo() == 'ROJO')
     else:
-        promedio = 87.5
+        promedio_meta_del = 0.0
+        verdes_del = 0
+        ambares_del = 0
+        rojos_del = 0
+
+    total_val_del = val_del_qs.count()
+    aprobadas_val_del = val_del_qs.filter(resultado__iexact='Aprobado').count()
+    pct_aprobadas_del = round((aprobadas_val_del / total_val_del) * 100, 1) if total_val_del > 0 else 100.0
+
+    ultimas_atenciones = atenciones_del_qs.select_related(
+        'tipo_atencion', 'sub_atencion', 'delegacion', 'usuario_responsable'
+    ).order_by('-fecha_registro')[:5]
+
+    # Métricas globales comunales
+    total_delegaciones = Delegacion.objects.filter(estado='Activa').count()
+    total_atenciones_global = AtencionCiudadana.objects.count()
+    total_usuarios_global = User.objects.filter(is_active=True).count()
+    total_items_metas = ItemMedicion.objects.count()
+    total_tipos_atencion = TipoAtencion.objects.count()
+    total_subatenciones = SubAtencion.objects.count()
+    total_roles = Rol.objects.count()
 
     context = {
-        'total_actividades': Actividad.objects.count(),
-        'total_compromisos': CompromisoAgenda.objects.count(),
-        'total_funcionarios': Funcionario.objects.count(),
-        'total_atenciones': atenciones_qs.count(),
-        'total_delegaciones': Delegacion.objects.count(),
-        'total_roles': Rol.objects.count(),
-        'total_usuarios': User.objects.filter(is_active=True).count(),
-        'total_items_metas': ItemMedicion.objects.count(),
-        'total_tipos_atencion': TipoAtencion.objects.count(),
-        'total_subatenciones': SubAtencion.objects.count(),
-        'promedio_meta': promedio,
-        'ultimas_atenciones': atenciones_qs.select_related('tipo_atencion', 'sub_atencion', 'delegacion', 'usuario_responsable').order_by('-fecha_registro')[:5],
+        # Métricas de la delegación activa
+        'total_atenciones_del': total_atenciones_del,
+        'atenciones_resueltas_del': atenciones_resueltas_del,
+        'atenciones_proceso_del': atenciones_proceso_del,
+        'atenciones_registradas_del': atenciones_registradas_del,
+        'pct_resueltas_del': pct_resueltas_del,
+        'total_funcionarios_del': total_funcionarios_del,
+        'total_metas_del': total_metas_del,
+        'promedio_meta_del': promedio_meta_del,
+        'verdes_del': verdes_del,
+        'ambares_del': ambares_del,
+        'rojos_del': rojos_del,
+        'total_val_del': total_val_del,
+        'aprobadas_val_del': aprobadas_val_del,
+        'pct_aprobadas_del': pct_aprobadas_del,
+        'ultimas_atenciones': ultimas_atenciones,
+
+        # Métricas globales comunales
+        'total_delegaciones': total_delegaciones,
+        'total_atenciones_global': total_atenciones_global,
+        'total_usuarios': total_usuarios_global,
+        'total_items_metas': total_items_metas,
+        'total_tipos_atencion': total_tipos_atencion,
+        'total_subatenciones': total_subatenciones,
+        'total_roles': total_roles,
+        'es_admin': es_admin,
     }
     return render(request, 'gestion/inicio.html', context)
 
@@ -567,6 +618,9 @@ def gestion_usuarios(request):
 
     q = request.GET.get('q', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
+    filtro_delegacion = request.GET.get('delegacion', '').strip()
+    todas_delegaciones = Delegacion.objects.filter(estado='Activa').order_by('id')
+    delegacion_seleccionada = None
 
     qs = Funcionario.objects.select_related('user', 'delegacion').prefetch_related('funcionariorol_set__rol').order_by('id')
 
@@ -574,6 +628,12 @@ def gestion_usuarios(request):
     # Delegado Municipal solo ve usuarios de su delegación asignada
     if ctx['permisos']['es_delegado'] and not ctx['permisos']['es_admin'] and del_activa:
         qs = qs.filter(delegacion=del_activa)
+        delegacion_seleccionada = del_activa
+    elif ctx['permisos']['es_admin']:
+        if filtro_delegacion and filtro_delegacion.isdigit():
+            delegacion_seleccionada = Delegacion.objects.filter(id=int(filtro_delegacion), estado='Activa').first()
+            if delegacion_seleccionada:
+                qs = qs.filter(delegacion=delegacion_seleccionada)
 
     if q:
         qs = qs.filter(build_accent_query(['user__first_name', 'user__email', 'user__username', 'delegacion__nombre'], q))
@@ -603,6 +663,8 @@ def gestion_usuarios(request):
         'funcionarios': page_obj.object_list,
         'roles': roles,
         'delegaciones': delegaciones,
+        'todas_delegaciones': todas_delegaciones,
+        'delegacion_seleccionada': delegacion_seleccionada,
         'q': q,
         'filtro_estado': filtro_estado,
         'total_registros': qs.count()
@@ -966,6 +1028,10 @@ def gestion_atenciones(request):
 
     # Procesar guardado de atención
     if request.method == 'POST':
+        if not ctx['permisos'].get('puede_ingresar_atencion', True):
+            messages.error(request, "Acceso denegado: El perfil Consultor opera exclusivamente en modo solo lectura y no puede ingresar atenciones.")
+            return redirect('gestion_atenciones')
+
         solicitante = request.POST.get('solicitante', '').strip()
         tipo_id = request.POST.get('tipo_atencion_id')
         sub_id = request.POST.get('sub_atencion_id')
@@ -1011,26 +1077,39 @@ def gestion_atenciones(request):
 
     q = request.GET.get('q', '').strip()
     filtro_tipo = request.GET.get('tipo', '').strip()
+    filtro_delegacion = request.GET.get('delegacion', '').strip()
+    todas_delegaciones = Delegacion.objects.filter(estado='Activa').order_by('id')
+    delegacion_seleccionada = None
 
     qs = AtencionCiudadana.objects.select_related(
-        'delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'vecino'
+        'delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'vecino', 'actividad'
     ).order_by('-id')
 
     # Scoping territorial por perfil (si no es admin global, se restringe a su delegación activa)
-    if not ctx['permisos']['es_admin'] and del_activa:
-        qs = qs.filter(delegacion=del_activa)
+    if not ctx['permisos']['es_admin']:
+        if del_activa:
+            qs = qs.filter(delegacion=del_activa)
+        else:
+            qs = qs.none()
+        delegacion_seleccionada = del_activa
+    elif ctx['permisos']['es_admin']:
+        if filtro_delegacion and filtro_delegacion.isdigit():
+            delegacion_seleccionada = Delegacion.objects.filter(id=int(filtro_delegacion), estado='Activa').first()
+            if delegacion_seleccionada:
+                qs = qs.filter(delegacion=delegacion_seleccionada)
 
     if q:
         qs = qs.filter(build_accent_query([
             'codigo_atencion', 'solicitante', 'descripcion',
-            'sub_atencion__nombre', 'tipo_atencion__nombre', 'delegacion__nombre'
+            'sub_atencion__nombre', 'tipo_atencion__nombre', 'delegacion__nombre',
+            'actividad__codigo_evidencia_unico'
         ], q))
     if filtro_tipo:
         qs = qs.filter(tipo_atencion__nombre__iexact=filtro_tipo)
 
     # Exportar a Excel
     if request.GET.get('export') == 'excel':
-        headers = ['Identificador', 'Solicitante', 'Delegación', 'Tipo de Atención', 'Sub Atención', 'Responsable', 'Fecha y Hora', 'Estado']
+        headers = ['Identificador', 'Solicitante', 'Delegación', 'Tipo de Atención', 'Sub Atención', 'Responsable', 'Fecha y Hora', 'Estado Atención', 'Código Evidencia', 'Estado Evidencia']
         rows = []
         for a in qs:
             rows.append([
@@ -1041,7 +1120,9 @@ def gestion_atenciones(request):
                 a.sub_atencion.nombre,
                 a.usuario_responsable.get_full_name() or a.usuario_responsable.username,
                 a.created_at.strftime('%d/%m/%Y %H:%M'),
-                a.estado
+                a.estado,
+                a.get_evidencia_codigo(),
+                a.estado_evidencia()
             ])
         return export_to_excel_csv("atenciones_ciudadanas", headers, rows)
 
@@ -1050,17 +1131,105 @@ def gestion_atenciones(request):
     page_obj = paginator.get_page(page_number)
 
     tipos_activos = TipoAtencion.objects.filter(estado='Activo')
-    vecinos_catalogo = Vecino.objects.filter(estado='Activo')[:100]
+    vecinos_catalogo = Vecino.objects.filter(estado='Activo')
+    if not ctx['permisos']['es_admin'] and del_activa:
+        vecinos_catalogo = vecinos_catalogo.filter(
+            Q(delegacion=del_activa) | (Q(delegacion__isnull=True) & Q(territorio__icontains=del_activa.nombre))
+        )
+    vecinos_catalogo = vecinos_catalogo[:100]
 
     return render(request, 'gestion/atenciones.html', {
         'page_obj': page_obj,
         'atenciones': page_obj.object_list,
         'tipos_activos': tipos_activos,
         'vecinos': vecinos_catalogo,
+        'todas_delegaciones': todas_delegaciones,
+        'delegacion_seleccionada': delegacion_seleccionada,
         'q': q,
         'filtro_tipo': filtro_tipo,
         'total_registros': qs.count()
     })
+
+
+@login_required
+def gestion_atenciones_estado(request, atencion_id):
+    ctx = global_context(request)
+    if not ctx['permisos'].get('puede_cambiar_estado_atencion', True):
+        messages.error(request, "Acceso denegado: El perfil Consultor opera exclusivamente en modo solo lectura.")
+        return redirect('gestion_atenciones')
+
+    atencion = get_object_or_404(AtencionCiudadana, id=atencion_id)
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+
+    # Scoping de seguridad territorial
+    if not es_admin:
+        if del_activa and atencion.delegacion != del_activa:
+            messages.error(request, "Acceso denegado: No tienes autorización para gestionar atenciones de otra delegación.")
+            return redirect('gestion_atenciones')
+
+    if request.method == 'POST':
+        nuevo_estado = request.POST.get('nuevo_estado', '').strip()
+        estados_validos = ['Registrada', 'En proceso', 'Resuelta', 'Cancelada']
+        if nuevo_estado in estados_validos:
+            anterior = atencion.estado
+            atencion.estado = nuevo_estado
+            atencion.save()
+            messages.success(request, f"¡Atención {atencion.codigo_atencion} actualizada exitosamente a '{nuevo_estado}'!")
+        else:
+            messages.error(request, "Estado no válido.")
+
+    return redirect('gestion_atenciones')
+
+
+@login_required
+def gestion_atenciones_validar_evidencia(request, atencion_id):
+    ctx = global_context(request)
+    if not (ctx['permisos']['es_admin'] or ctx['permisos']['es_coordinador'] or ctx['permisos']['es_delegado']):
+        messages.error(request, "Acceso denegado: No tienes autorización para auditar o validar evidencias.")
+        return redirect('gestion_atenciones')
+
+    atencion = get_object_or_404(AtencionCiudadana, id=atencion_id)
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+
+    # Scoping territorial
+    if not es_admin:
+        if del_activa and atencion.delegacion != del_activa:
+            messages.error(request, "Acceso denegado: No puedes validar evidencias de otra delegación.")
+            return redirect('gestion_atenciones')
+
+    if not atencion.actividad:
+        atencion.save()
+
+    actividad = atencion.actividad
+    funcionario_actual = ctx['funcionario_actual'] or Funcionario.objects.first()
+
+    if request.method == 'POST':
+        resultado = request.POST.get('resultado_evidencia', 'Aprobado').strip()
+        observaciones = request.POST.get('observaciones', f'Validación de evidencia para atención {atencion.codigo_atencion}').strip()
+
+        val, _ = ValidacionEvidencia.objects.get_or_create(
+            actividad=actividad,
+            defaults={
+                'verificador': funcionario_actual,
+                'resultado': resultado,
+                'observaciones': observaciones
+            }
+        )
+        val.resultado = resultado
+        val.verificador = funcionario_actual
+        val.observaciones = observaciones
+        val.save()
+
+        # Si se aprueba la evidencia, pasar la atención a Resuelta si estaba Registrada
+        if resultado == 'Aprobado' and atencion.estado in ['Registrada', 'En proceso']:
+            atencion.estado = 'Resuelta'
+            atencion.save(update_fields=['estado'])
+
+        messages.success(request, f"¡Evidencia {actividad.codigo_evidencia_unico} de atención {atencion.codigo_atencion} validada como '{resultado}'! El Semáforo SGR se ha actualizado.")
+
+    return redirect('gestion_atenciones')
 
 
 # --- 8. TIPO DE GESTIÓN ---
@@ -1115,17 +1284,30 @@ def gestion_tipo_gestion_eliminar(request, tg_id):
 def gestion_vecinos(request):
     ctx = global_context(request)
     if not ctx['permisos']['ver_vecinos']:
-        messages.error(request, "Acceso denegado.")
+        messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para ver o gestionar vecinos.")
         return redirect('gestion_inicio')
 
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+    todas_delegaciones = Delegacion.objects.filter(estado='Activa').order_by('id')
+
     if request.method == 'POST':
-        nombre = request.POST.get('nombre')
-        rut = request.POST.get('rut')
-        direccion = request.POST.get('direccion')
-        telefono = request.POST.get('telefono')
-        territorio = request.POST.get('territorio')
+        nombre = request.POST.get('nombre', '').strip()
+        rut = request.POST.get('rut', '').strip()
+        direccion = request.POST.get('direccion', '').strip()
+        telefono = request.POST.get('telefono', '').strip()
+        territorio = request.POST.get('territorio', '').strip()
         tipo_gestion_id = request.POST.get('tipo_gestion_id')
         estado = request.POST.get('estado', 'Activo')
+
+        # Restricción territorial: no-admin siempre asigna su delegación activa
+        if es_admin:
+            delegacion_id = request.POST.get('delegacion_id')
+            del_obj = Delegacion.objects.filter(id=delegacion_id).first() if delegacion_id else del_activa
+        else:
+            del_obj = del_activa
+            if not territorio and del_activa:
+                territorio = del_activa.nombre
 
         if nombre and rut:
             Vecino.objects.create(
@@ -1133,44 +1315,108 @@ def gestion_vecinos(request):
                 rut=rut,
                 direccion=direccion,
                 telefono=telefono,
+                delegacion=del_obj,
                 territorio=territorio,
                 tipo_gestion_id=tipo_gestion_id if tipo_gestion_id else None,
                 estado=estado
             )
             messages.success(request, f"Vecino/a '{nombre}' registrado exitosamente.")
             return redirect('gestion_vecinos')
+        else:
+            messages.error(request, "El nombre y RUT son obligatorios.")
 
-    q = request.GET.get('q', '')
-    vecinos = Vecino.objects.select_related('tipo_gestion').all()
+    q = request.GET.get('q', '').strip()
+    filtro_delegacion = request.GET.get('delegacion', '').strip()
+
+    qs = Vecino.objects.select_related('tipo_gestion', 'delegacion').order_by('id')
+
+    # Scoping territorial estricto
+    delegacion_seleccionada = None
+    if not es_admin:
+        if del_activa:
+            qs = qs.filter(Q(delegacion=del_activa) | (Q(delegacion__isnull=True) & Q(territorio__icontains=del_activa.nombre)))
+        else:
+            qs = qs.none()
+        delegacion_seleccionada = del_activa
+    else:
+        if filtro_delegacion and filtro_delegacion.isdigit():
+            delegacion_seleccionada = Delegacion.objects.filter(id=int(filtro_delegacion)).first()
+            if delegacion_seleccionada:
+                qs = qs.filter(delegacion=delegacion_seleccionada)
+
     if q:
-        vecinos = vecinos.filter(
+        qs = qs.filter(
             Q(nombre__icontains=q) | Q(rut__icontains=q) | Q(direccion__icontains=q) | Q(territorio__icontains=q)
         )
+
     tipos_gestion = TipoGestion.objects.all()
 
-    return render(request, 'gestion/vecinos.html', {'vecinos': vecinos, 'tipos_gestion': tipos_gestion, 'q': q})
+    return render(request, 'gestion/vecinos.html', {
+        'vecinos': qs,
+        'tipos_gestion': tipos_gestion,
+        'todas_delegaciones': todas_delegaciones,
+        'delegacion_seleccionada': delegacion_seleccionada,
+        'es_admin': es_admin,
+        'q': q,
+        'total_vecinos': qs.count()
+    })
 
 
 @login_required
 def gestion_vecinos_editar(request, vecino_id):
+    ctx = global_context(request)
+    if not ctx['permisos']['ver_vecinos']:
+        messages.error(request, "Acceso denegado.")
+        return redirect('gestion_inicio')
+
     vecino = get_object_or_404(Vecino, id=vecino_id)
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+
+    # Control de acceso en servidor: denegar edición a vecinos fuera de su ámbito territorial
+    if not es_admin:
+        if vecino.delegacion and vecino.delegacion != del_activa:
+            messages.error(request, "Acceso denegado: No tienes autorización para modificar información de vecinos de otra delegación.")
+            return redirect('gestion_vecinos')
+
     if request.method == 'POST':
-        vecino.nombre = request.POST.get('nombre', vecino.nombre)
-        vecino.rut = request.POST.get('rut', vecino.rut)
-        vecino.direccion = request.POST.get('direccion', vecino.direccion)
-        vecino.telefono = request.POST.get('telefono', vecino.telefono)
-        vecino.territorio = request.POST.get('territorio', vecino.territorio)
+        vecino.nombre = request.POST.get('nombre', vecino.nombre).strip()
+        vecino.rut = request.POST.get('rut', vecino.rut).strip()
+        vecino.direccion = request.POST.get('direccion', vecino.direccion).strip()
+        vecino.telefono = request.POST.get('telefono', vecino.telefono).strip()
+        vecino.territorio = request.POST.get('territorio', vecino.territorio).strip()
+        if es_admin:
+            del_id = request.POST.get('delegacion_id')
+            if del_id:
+                vecino.delegacion = Delegacion.objects.filter(id=del_id).first()
+        elif del_activa:
+            vecino.delegacion = del_activa
+
         tg_id = request.POST.get('tipo_gestion_id')
         vecino.tipo_gestion_id = tg_id if tg_id else None
         vecino.estado = request.POST.get('estado', vecino.estado)
         vecino.save()
-        messages.success(request, f"Vecino/a '{vecino.nombre}' actualizado/a.")
+        messages.success(request, f"Vecino/a '{vecino.nombre}' actualizado/a exitosamente.")
     return redirect('gestion_vecinos')
 
 
 @login_required
 def gestion_vecinos_eliminar(request, vecino_id):
+    ctx = global_context(request)
+    if not ctx['permisos']['ver_vecinos']:
+        messages.error(request, "Acceso denegado.")
+        return redirect('gestion_inicio')
+
     vecino = get_object_or_404(Vecino, id=vecino_id)
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+
+    # Control de acceso en servidor
+    if not es_admin:
+        if vecino.delegacion and vecino.delegacion != del_activa:
+            messages.error(request, "Acceso denegado: No tienes autorización para eliminar vecinos de otra delegación.")
+            return redirect('gestion_vecinos')
+
     if request.method == 'POST':
         nombre = vecino.nombre
         vecino.delete()
@@ -1254,27 +1500,195 @@ def gestion_configuracion_eliminar(request, meta_id):
 
 
 @login_required
+def gestion_evidencias_validar(request, actividad_id):
+    ctx = global_context(request)
+    if not (ctx['permisos']['es_admin'] or ctx['permisos']['es_coordinador']):
+        messages.error(request, "Acceso denegado: Solo Administrador y Coordinador pueden validar evidencias SGR.")
+        return redirect('gestion_reportes')
+
+    actividad = get_object_or_404(Actividad, id=actividad_id)
+    funcionario_actual = ctx['funcionario_actual']
+    if not funcionario_actual:
+        funcionario_actual = Funcionario.objects.first()
+
+    if request.method == 'POST':
+        resultado = request.POST.get('resultado', 'Aprobado').strip()
+        observaciones = request.POST.get('observaciones', 'Validado desde panel de auditoría SGR').strip()
+
+        val, _ = ValidacionEvidencia.objects.get_or_create(
+            actividad=actividad,
+            defaults={
+                'verificador': funcionario_actual,
+                'resultado': resultado,
+                'observaciones': observaciones
+            }
+        )
+        val.resultado = resultado
+        val.verificador = funcionario_actual
+        val.observaciones = observaciones
+        val.save()
+
+        messages.success(request, f"¡Evidencia {actividad.codigo_evidencia_unico} actualizada como '{resultado}'! El Semáforo SGR se ha recalculado.")
+
+    referer = request.META.get('HTTP_REFERER')
+    return redirect(referer if referer else 'gestion_reportes')
+
+
+@login_required
+def gestion_metas_simular_evidencia(request, meta_id):
+    ctx = global_context(request)
+    if not (ctx['permisos']['es_admin'] or ctx['permisos']['es_coordinador']):
+        messages.error(request, "Acceso denegado: Solo Administrador y Coordinador pueden generar y validar evidencias.")
+        return redirect('gestion_reportes')
+
+    meta = get_object_or_404(ConfiguracionMeta, id=meta_id)
+    funcionario_actual = ctx['funcionario_actual']
+    func_destino = meta.funcionario or funcionario_actual or Funcionario.objects.first()
+
+    if request.method == 'POST':
+        hoy = timezone.now().date()
+        fecha_act = hoy
+        if meta.periodo.fecha_inicio <= hoy <= meta.periodo.fecha_termino:
+            fecha_act = hoy
+        elif hoy > meta.periodo.fecha_termino:
+            fecha_act = meta.periodo.fecha_termino
+        else:
+            fecha_act = meta.periodo.fecha_inicio
+
+        act = Actividad.objects.create(
+            fecha_actividad=fecha_act,
+            descripcion_solicitud=f"Operativo en terreno para cumplimiento de meta {meta.item.nombre_item}",
+            accion_ejecutada=f"Ejecución verificada de requerimiento territorial para {meta.item.nombre_item}",
+            funcionario=func_destino,
+            item=meta.item,
+            periodo=meta.periodo
+        )
+        ValidacionEvidencia.objects.create(
+            actividad=act,
+            verificador=funcionario_actual or func_destino,
+            resultado='Aprobado',
+            observaciones='Evidencia validada y aprobada para cumplimiento SGR.'
+        )
+        messages.success(request, f"¡Nueva evidencia aprobada para '{meta.item.nombre_item}'! Avance: {meta.calcular_avance()} de {meta.valor_objetivo} ({meta.porcentaje_cumplimiento()}% — Semáforo: {meta.estado_semaforo()}).")
+
+    referer = request.META.get('HTTP_REFERER')
+    return redirect(referer if referer else 'gestion_reportes')
+
+
+@login_required
 def gestion_reportes(request):
     ctx = global_context(request)
     if not ctx['permisos']['ver_reportes']:
         messages.error(request, "Acceso denegado: Se requiere perfil directivo para acceder a reportes.")
         return redirect('gestion_inicio')
 
-    metas = ConfiguracionMeta.objects.select_related('periodo', 'item').all()
-    verdes = sum(1 for m in metas if m.estado_semaforo() == 'VERDE')
-    ambares = sum(1 for m in metas if m.estado_semaforo() == 'AMBAR')
-    rojos = sum(1 for m in metas if m.estado_semaforo() == 'ROJO')
-    total_val = ValidacionEvidencia.objects.count()
-    aprobadas = ValidacionEvidencia.objects.filter(resultado__iexact='Aprobado').count()
-    pct_aprobadas = round((aprobadas / total_val) * 100, 1) if total_val > 0 else 92.0
-    pct_pendientes = round(100 - pct_aprobadas, 1) if total_val > 0 else 8.0
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+    todas_delegaciones = Delegacion.objects.filter(estado='Activa').order_by('id')
+
+    # Scoping territorial estricto en el servidor
+    delegacion_seleccionada = None
+    if es_admin:
+        del_param = request.GET.get('delegacion', '').strip()
+        if del_param and del_param.isdigit():
+            delegacion_seleccionada = Delegacion.objects.filter(id=int(del_param), estado='Activa').first()
+        elif del_param == 'todas':
+            delegacion_seleccionada = None
+        else:
+            delegacion_seleccionada = None
+    else:
+        # Para delegados, coordinadores u otros roles no admin: bloqueo estricto a su delegación activa asignada
+        delegacion_seleccionada = del_activa
+
+    # Filtrar metas de desempeño SGR
+    metas_qs = ConfiguracionMeta.objects.select_related(
+        'periodo', 'item', 'funcionario', 'funcionario__delegacion', 'funcionario__user'
+    ).order_by('id')
+
+    if not es_admin:
+        if del_activa:
+            metas_qs = metas_qs.filter(funcionario__delegacion=del_activa)
+        else:
+            metas_qs = metas_qs.none()
+    elif delegacion_seleccionada:
+        metas_qs = metas_qs.filter(funcionario__delegacion=delegacion_seleccionada)
+
+    # Exportación a Excel/CSV respetando los permisos de delegación
+    if request.GET.get('export') == 'excel':
+        headers = [
+            'Ítem de Medición', 'Período', 'Delegación', 'Asignación',
+            'Meta Objetivo', 'Ponderación (%)', 'Cumplimiento (%)',
+            'Cumplimiento Ponderado (%)', 'Estado Semáforo'
+        ]
+        rows = []
+        for m in metas_qs:
+            del_nombre = m.funcionario.delegacion.nombre if (m.funcionario and m.funcionario.delegacion) else "Global"
+            asig_nombre = str(m.funcionario.user.first_name or m.funcionario.user.username) if m.funcionario else "Global Cargo"
+            rows.append([
+                str(m.item.nombre_item),
+                str(m.periodo),
+                del_nombre,
+                asig_nombre,
+                float(m.valor_objetivo) if m.valor_objetivo else 0,
+                f"{m.ponderacion}%",
+                f"{m.porcentaje_cumplimiento()}%",
+                f"{m.cumplimiento_ponderado()}%",
+                m.estado_semaforo()
+            ])
+        nom_del = delegacion_seleccionada.codigo if delegacion_seleccionada else ('todas' if es_admin else (del_activa.codigo if del_activa else 'delegacion'))
+        return export_to_excel_csv(f"reportes_analiticos_{nom_del}", headers, rows)
+
+    # Métricas y semáforos territoriales
+    metas_list = list(metas_qs)
+    verdes = sum(1 for m in metas_list if m.estado_semaforo() == 'VERDE')
+    ambares = sum(1 for m in metas_list if m.estado_semaforo() == 'AMBAR')
+    rojos = sum(1 for m in metas_list if m.estado_semaforo() == 'ROJO')
+
+    # Validaciones y evidencias territoriales
+    val_qs = ValidacionEvidencia.objects.select_related('actividad__funcionario__delegacion')
+    if not es_admin:
+        if del_activa:
+            val_qs = val_qs.filter(actividad__funcionario__delegacion=del_activa)
+        else:
+            val_qs = val_qs.none()
+    elif delegacion_seleccionada:
+        val_qs = val_qs.filter(actividad__funcionario__delegacion=delegacion_seleccionada)
+
+    total_val = val_qs.count()
+    aprobadas = val_qs.filter(resultado__iexact='Aprobado').count()
+    pct_aprobadas = round((aprobadas / total_val) * 100, 1) if total_val > 0 else 100.0
+    pct_pendientes = round(100 - pct_aprobadas, 1) if total_val > 0 else 0.0
+
+    # Atenciones ciudadanas territoriales
+    atenciones_qs = AtencionCiudadana.objects.select_related('delegacion')
+    if not es_admin:
+        if del_activa:
+            atenciones_qs = atenciones_qs.filter(delegacion=del_activa)
+        else:
+            atenciones_qs = atenciones_qs.none()
+    elif delegacion_seleccionada:
+        atenciones_qs = atenciones_qs.filter(delegacion=delegacion_seleccionada)
+
+    total_atenciones = atenciones_qs.count()
+    atenciones_resueltas = atenciones_qs.filter(estado__iexact='Resuelta').count()
+    atenciones_proceso = atenciones_qs.filter(estado__iexact='En proceso').count()
+    pct_resueltas = round((atenciones_resueltas / total_atenciones) * 100, 1) if total_atenciones > 0 else 0.0
 
     context = {
-        'metas': metas,
+        'metas': metas_list,
         'verdes': verdes,
         'ambares': ambares,
         'rojos': rojos,
+        'total_val': total_val,
+        'aprobadas_val': aprobadas,
         'pct_aprobadas': pct_aprobadas,
         'pct_pendientes': pct_pendientes,
+        'total_atenciones': total_atenciones,
+        'atenciones_resueltas': atenciones_resueltas,
+        'atenciones_proceso': atenciones_proceso,
+        'pct_resueltas': pct_resueltas,
+        'todas_delegaciones': todas_delegaciones,
+        'delegacion_seleccionada': delegacion_seleccionada,
+        'es_admin': es_admin,
     }
     return render(request, 'gestion/reportes.html', context)

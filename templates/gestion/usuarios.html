@@ -29,6 +29,18 @@
                class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]" />
       </div>
 
+      {% if permisos.es_admin %}
+      <select name="delegacion" onchange="this.form.submit()" 
+              class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+        <option value="">Filtrar Delegación: Todas</option>
+        {% for d in todas_delegaciones %}
+          <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
+            {{ d.get_codigo }} — {{ d.nombre }}
+          </option>
+        {% endfor %}
+      </select>
+      {% endif %}
+
       <select name="estado" onchange="this.form.submit()" 
               class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
         <option value="">Filtrar estado: Todos</option>
@@ -37,7 +49,7 @@
       </select>
     </form>
 
-    <a href="?q={{ q }}&estado={{ filtro_estado }}&export=excel" 
+    <a href="?q={{ q }}&estado={{ filtro_estado }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}&export=excel" 
        class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
       <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
       <span>Exportar a Excel</span>
@@ -75,26 +87,26 @@
             </td>
             <td class="py-3.5 px-6 font-semibold text-slate-700">{{ f.delegacion.nombre|default:"Global" }}</td>
             <td class="py-3.5 px-6 text-center">
-              <div class="flex items-center justify-center gap-3 text-xs font-bold">
+              <div class="flex items-center justify-center gap-1.5">
                 <!-- Ver Detalle -->
                 <button type="button" 
                         onclick="verDetalle('{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.nombre_rol|default:'Funcionario'|escapejs }}', '{{ f.delegacion.nombre|default:'Global'|escapejs }}', '{{ f.estado|escapejs }}', '{{ f.identificador_institucional|escapejs }}')"
-                        class="text-slate-600 hover:text-slate-900 hover:underline">
-                  Ver
+                        title="Ver detalle"
+                        class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all">
+                  <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
-                <span class="text-slate-300">|</span>
                 <!-- Editar -->
                 <button type="button" 
                         onclick="editarRegistro('{{ f.id }}', '{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.id|default:'' }}', '{{ f.delegacion.id|default:'' }}', '{{ f.estado|escapejs }}')"
-                        class="text-[#C41230] hover:text-[#8B1D19] hover:underline">
-                  Editar
+                        title="Editar usuario"
+                        class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all">
+                  <i data-lucide="edit-3" class="w-4 h-4"></i>
                 </button>
-                <span class="text-slate-300">|</span>
                 <!-- Eliminar con confirmación SweetAlert2 -->
                 <form method="POST" action="{% url 'gestion_usuarios_eliminar' f.id %}" onsubmit="return confirmDelete(this, '{{ f.user.first_name|default:f.user.username|escapejs }}');" class="inline">
                   {% csrf_token %}
-                  <button type="submit" class="text-red-500 hover:text-red-700 hover:underline">
-                    Eliminar
+                  <button type="submit" title="Eliminar usuario" class="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all">
+                    <i data-lucide="trash-2" class="w-4 h-4 text-red-500"></i>
                   </button>
                 </form>
               </div>
@@ -120,7 +132,7 @@
       {% if page_obj.has_other_pages %}
       <div class="flex items-center gap-1.5">
         {% if page_obj.has_previous %}
-          <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&estado={{ filtro_estado }}" 
+          <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&estado={{ filtro_estado }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold">
             Anterior
           </a>
@@ -130,13 +142,13 @@
           {% if p == page_obj.number %}
             <span class="px-3 py-1.5 rounded-lg bg-[#C41230] text-white font-bold">{{ p }}</span>
           {% else %}
-            <a href="?page={{ p }}&q={{ q }}&estado={{ filtro_estado }}" 
+            <a href="?page={{ p }}&q={{ q }}&estado={{ filtro_estado }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
                class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50">{{ p }}</a>
           {% endif %}
         {% endfor %}
 
         {% if page_obj.has_next %}
-          <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&estado={{ filtro_estado }}" 
+          <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&estado={{ filtro_estado }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold">
             Siguiente
           </a>
@@ -146,7 +158,7 @@
     </div>
   </div>
 
-  <p class="text-[11px] text-slate-400 italic">Diseño referencial · Datos ficticios · Acciones sujetas al perfil</p>
+  
 
 </div>
 

@@ -24,32 +24,32 @@ def global_context(request):
         elif request.user.is_staff:
             rol_name = "Administrador"
 
-    # Determinar delegación activa
-    delegacion_activa = None
-    todas_activas = list(Delegacion.objects.filter(estado='Activa').order_by('id'))
-
-    delegacion_sesion_id = request.session.get('delegacion_activa_id')
-    if delegacion_sesion_id:
-        delegacion_activa = Delegacion.objects.filter(id=delegacion_sesion_id).first()
-
-    if not delegacion_activa:
-        if funcionario and funcionario.delegacion:
-            delegacion_activa = funcionario.delegacion
-        elif todas_activas:
-            delegacion_activa = todas_activas[0]
-        if delegacion_activa:
-            request.session['delegacion_activa_id'] = delegacion_activa.id
-
     # Determinar alcance de delegaciones
     es_admin = (rol_name.lower() in ['administrador', 'superadministrador']) or request.user.is_superuser
+    todas_activas = list(Delegacion.objects.filter(estado='Activa').order_by('id'))
+
+    delegacion_activa = None
     if es_admin:
         delegaciones_autorizadas = todas_activas
         can_switch = len(todas_activas) > 1
+        delegacion_sesion_id = request.session.get('delegacion_activa_id')
+        if delegacion_sesion_id:
+            delegacion_activa = Delegacion.objects.filter(id=delegacion_sesion_id).first()
+        if not delegacion_activa:
+            if funcionario and funcionario.delegacion:
+                delegacion_activa = funcionario.delegacion
+            elif todas_activas:
+                delegacion_activa = todas_activas[0]
+            if delegacion_activa:
+                request.session['delegacion_activa_id'] = delegacion_activa.id
     else:
-        # Fijo en su delegación asignada
+        # Fijo estrictamente en su delegación asignada para delegados y otros usuarios no admin
         if funcionario and funcionario.delegacion:
+            delegacion_activa = funcionario.delegacion
             delegaciones_autorizadas = [funcionario.delegacion]
-        elif delegacion_activa:
+            request.session['delegacion_activa_id'] = delegacion_activa.id
+        elif todas_activas:
+            delegacion_activa = todas_activas[0]
             delegaciones_autorizadas = [delegacion_activa]
         else:
             delegaciones_autorizadas = []
@@ -68,6 +68,8 @@ def global_context(request):
         'es_delegado': es_delegado,
         'es_operador': es_operador,
         'es_consultor': es_consultor,
+        'puede_ingresar_atencion': not es_consultor,
+        'puede_cambiar_estado_atencion': not es_consultor,
         # Módulos permitidos en el menú lateral:
         'ver_inicio': True,
         'ver_delegaciones': es_admin,

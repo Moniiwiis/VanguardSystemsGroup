@@ -74,6 +74,7 @@ class Vecino(BaseModel):
     rut = models.CharField(max_length=20, unique=True)
     direccion = models.CharField(max_length=200, null=True, blank=True)
     telefono = models.CharField(max_length=30, null=True, blank=True)
+    delegacion = models.ForeignKey("accounts.Delegacion", on_delete=models.SET_NULL, null=True, blank=True)
     territorio = models.CharField(max_length=100, null=True, blank=True)
     tipo_gestion = models.ForeignKey(TipoGestion, on_delete=models.SET_NULL, null=True, blank=True)
     estado = models.CharField(max_length=20, default='Activo')
@@ -92,8 +93,20 @@ class AtencionCiudadana(BaseModel):
     usuario_responsable = models.ForeignKey("auth.User", on_delete=models.RESTRICT)
     fecha_registro = models.DateTimeField(auto_now_add=True)
     estado = models.CharField(max_length=30, default='Registrada')
+    actividad = models.ForeignKey(Actividad, on_delete=models.SET_NULL, null=True, blank=True, related_name='atenciones')
+
+    def get_evidencia_codigo(self):
+        if self.actividad and self.actividad.codigo_evidencia_unico:
+            return self.actividad.codigo_evidencia_unico
+        return f"EVI-{self.codigo_atencion.replace('AT-', '')}"
+
+    def estado_evidencia(self):
+        if self.actividad:
+            return self.actividad.estado_validacion()
+        return "Pendiente"
 
     def save(self, *args, **kwargs):
+        is_new = self.id is None
         if not self.codigo_atencion:
             year = timezone.now().year
             last = AtencionCiudadana.all_objects.order_by('-id').first()
@@ -101,6 +114,44 @@ class AtencionCiudadana(BaseModel):
             uid = uuid.uuid4().hex[:4].upper()
             self.codigo_atencion = f"AT-{year}-{next_num:04d}-{uid}"
         super().save(*args, **kwargs)
+
+        if not self.actividad:
+            from configuration.models import ItemMedicion, Periodo
+            from accounts.models import Funcionario
+            
+            func = Funcionario.all_objects.filter(user=self.usuario_responsable).first()
+            if not func and self.delegacion:
+                func = Funcionario.all_objects.filter(delegacion=self.delegacion).first()
+            if not func:
+                func = Funcionario.all_objects.first()
+                
+            periodo = Periodo.objects.filter(estado='Abierto').first() or Periodo.objects.first()
+            item = None
+            if self.tipo_atencion and 'social' in self.tipo_atencion.nombre.lower():
+                item = ItemMedicion.objects.filter(nombre_item__icontains='social').first()
+            if not item:
+                item = ItemMedicion.objects.filter(nombre_item__icontains='operativo').first() or ItemMedicion.objects.first()
+                
+            if func and periodo and item:
+                hoy = timezone.now().date()
+                fecha_act = hoy
+                if periodo.fecha_inicio and periodo.fecha_termino:
+                    if hoy < periodo.fecha_inicio:
+                        fecha_act = periodo.fecha_inicio
+                    elif hoy > periodo.fecha_termino:
+                        fecha_act = periodo.fecha_termino
+                        
+                act = Actividad.objects.create(
+                    fecha_actividad=fecha_act,
+                    descripcion_solicitud=self.descripcion or f"Solicitud ciudadana {self.codigo_atencion}",
+                    accion_ejecutada=f"Atención ciudadana {self.codigo_atencion} ({self.tipo_atencion.nombre if self.tipo_atencion else 'General'})",
+                    contacto_nombre=self.solicitante[:100] if self.solicitante else None,
+                    funcionario=func,
+                    item=item,
+                    periodo=periodo
+                )
+                self.actividad = act
+                super().save(update_fields=['actividad'])
 
     def __str__(self):
         return f"{self.codigo_atencion} - {self.solicitante}"

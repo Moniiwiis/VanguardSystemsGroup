@@ -55,6 +55,10 @@ urlpatterns = [
 
     # 7. Atenciones
     path('gestion/atenciones/', views.gestion_atenciones, name='gestion_atenciones'),
+    path('gestion/atenciones/<int:atencion_id>/estado/', views.gestion_atenciones_estado, name='gestion_atenciones_estado'),
+    path('gestion/atenciones/<int:atencion_id>/validar-evidencia/', views.gestion_atenciones_validar_evidencia, name='gestion_atenciones_validar_evidencia'),
+    path('gestion/evidencias/<int:actividad_id>/validar/', views.gestion_evidencias_validar, name='gestion_evidencias_validar'),
+    path('gestion/metas/<int:meta_id>/simular-evidencia/', views.gestion_metas_simular_evidencia, name='gestion_metas_simular_evidencia'),
 
     # 8. Tipo de Gestión
     path('gestion/tipo-gestion/', views.gestion_tipo_gestion, name='gestion_tipo_gestion'),
