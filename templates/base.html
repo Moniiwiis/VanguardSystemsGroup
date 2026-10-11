@@ -1,0 +1,512 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Municipalidad de La Serena — Sistema Municipal SGR{% endblock %}</title>
+  
+  <!-- Google Fonts (Public Sans + Fraunces) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Public Sans', 'sans-serif'],
+            display: ['Fraunces', 'serif'],
+          },
+          colors: {
+            rojoSerena: '#C41230',
+            rojoOscuro: '#8B1D19',
+            rojoClaro: '#DB3334',
+            bgMunicipal: '#FDF6F6',
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- SweetAlert2 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <style>
+    body {
+      font-family: 'Public Sans', sans-serif;
+      background-color: #FDF6F6;
+      color: #241016;
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="min-h-full flex flex-col bg-[#FDF6F6]">
+
+  <!-- TopBar Oficial de la Ilustre Municipalidad de La Serena (Wireframes C3-C6) -->
+  <header class="sticky top-0 z-40 shadow-md text-white" style="background: linear-gradient(90deg, #8B1D19 0%, #C41230 60%, #DB3334 100%);">
+    <div class="max-w-[1440px] mx-auto px-4 md:px-8 py-2.5 flex items-center justify-between gap-4">
+      
+      <!-- Izquierda: Logo y Marca Institucional -->
+      <a href="{% url 'gestion_inicio' %}" class="flex items-center gap-3 shrink-0 group">
+        <img src="{% static 'horizontal-blanco.svg' %}" 
+             alt="La Serena — Ilustre Municipalidad" 
+             class="h-9 w-auto object-contain drop-shadow-sm"
+             onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
+        <span class="hidden sm:inline-block font-extrabold tracking-wider text-xs uppercase text-white/95 border-l border-white/20 pl-3">
+          Sistema Municipal
+        </span>
+      </a>
+
+      <!-- Centro: Distintivo de Delegación Activa según el Perfil (Requisito Crítico A2 / Wireframes) -->
+      <div class="flex items-center">
+        {% if delegacion_activa %}
+          {% if can_switch_delegacion %}
+            <!-- Selector Desplegable de Delegación para Perfiles Autorizados (ej: Administrador) -->
+            <div class="relative" id="delegacionDropdownContainer">
+              <button type="button" 
+                      id="delegacionDropdownBtn"
+                      onclick="toggleDelegacionDropdown(event)"
+                      aria-haspopup="true"
+                      aria-expanded="false"
+                      class="flex items-center gap-2.5 bg-[#700F17]/95 hover:bg-[#5C0A10] active:scale-95 text-white text-xs font-bold px-4 py-2 rounded-full border border-white/30 shadow-md transition-all cursor-pointer select-none">
+                <i data-lucide="building-2" class="w-3.5 h-3.5 text-white/90"></i>
+                <span>{{ delegacion_activa.get_codigo }} · {{ delegacion_activa.nombre }}</span>
+                <i data-lucide="chevron-down" id="delegacionChevron" class="w-3.5 h-3.5 text-white/80 transition-transform duration-200"></i>
+              </button>
+              
+              <!-- Menú Desplegable con Click Toggle (Permite seleccionar con total tranquilidad) -->
+              <div id="delegacionDropdownMenu" 
+                   class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-2.5 z-50 text-slate-800 text-xs animate-in fade-in slide-in-from-top-1 duration-150">
+                <div class="px-4 py-1.5 flex items-center justify-between border-b border-slate-100 mb-1">
+                  <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Cambiar Delegación Activa</span>
+                  <span class="text-[10px] font-semibold text-slate-400">{{ delegaciones_autorizadas|length }} disponibles</span>
+                </div>
+                <div class="max-h-64 overflow-y-auto divide-y divide-slate-50">
+                  {% for d in delegaciones_autorizadas %}
+                    <a href="{% url 'cambiar_delegacion' d.id %}" 
+                       class="flex items-center justify-between px-4 py-2.5 hover:bg-red-50 text-slate-700 hover:text-[#C41230] transition-colors rounded-xl mx-1.5 {% if d.id == delegacion_activa.id %}font-extrabold text-[#C41230] bg-red-50/80 shadow-sm{% endif %}">
+                      <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full {% if d.id == delegacion_activa.id %}bg-[#C41230]{% else %}bg-slate-300{% endif %}"></span>
+                        <div class="flex flex-col">
+                          <span class="font-bold text-xs">{{ d.nombre }}</span>
+                          <span class="text-[10px] text-slate-400 font-mono">{{ d.get_codigo }} · {{ d.comuna|default:"La Serena" }}</span>
+                        </div>
+                      </div>
+                      {% if d.id == delegacion_activa.id %}
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#C41230] text-white">Activa</span>
+                      {% endif %}
+                    </a>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          {% else %}
+            <!-- Contexto Territorial Fijo para Operadores / Delegados Monodelegación -->
+            <div class="flex items-center gap-2 bg-[#700F17]/90 text-white text-xs font-bold px-3.5 py-1.5 rounded-full border border-white/25 shadow-inner">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 text-white/90"></i>
+              <span>{{ delegacion_activa.get_codigo }} | {{ delegacion_activa.nombre }}</span>
+            </div>
+          {% endif %}
+        {% endif %}
+      </div>
+
+      <!-- Derecha: Identificación de Usuario, Rol y Salir (Wireframe C3-C6) -->
+      <div class="flex items-center gap-3 shrink-0 text-xs">
+        <div class="text-right hidden sm:block">
+          <div class="font-bold text-white text-xs leading-tight">
+            {{ request.user.first_name|default:request.user.username }}
+          </div>
+          <div class="text-[11px] text-white/80 leading-tight">
+            <span>{{ user_rol_name }}</span>
+            <span class="mx-1 text-white/50">|</span>
+            <a href="{% url 'logout' %}" class="hover:underline font-semibold text-white hover:text-red-200 transition-colors">Salir</a>
+          </div>
+        </div>
+        
+        <!-- Botón Salir Mobile -->
+        <a href="{% url 'logout' %}" title="Cerrar sesión" class="sm:hidden p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Contenedor Principal (Sidebar + Contenido) -->
+  <div class="flex-1 max-w-[1440px] w-full mx-auto px-4 md:px-8 py-6 flex flex-col md:flex-row gap-6">
+    
+    <!-- Sidebar Navegación de Módulos (Filtrado según Perfil del Usuario) -->
+    <aside class="w-full md:w-60 shrink-0 flex flex-col gap-5">
+      
+      <!-- Menú Módulos Flat y Adaptable según wireframes C3-C6 -->
+      <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-1 text-xs font-bold">
+        
+        <!-- Inicio -->
+        <a href="{% url 'gestion_inicio' %}" 
+           class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_inicio' or request.resolver_match.url_name == 'gestion_inicio_alt' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+          <i data-lucide="home" class="w-4 h-4 shrink-0"></i>
+          <span>Inicio</span>
+        </a>
+
+        <!-- 1. Delegaciones (Solo Administrador) -->
+        {% if permisos.ver_delegaciones %}
+          <a href="{% url 'gestion_delegaciones' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_delegaciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="building-2" class="w-4 h-4 shrink-0"></i>
+            <span>Delegaciones</span>
+          </a>
+        {% endif %}
+
+        <!-- 2. Roles (Solo Administrador) -->
+        {% if permisos.ver_roles %}
+          <a href="{% url 'gestion_roles' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_roles' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="shield-check" class="w-4 h-4 shrink-0"></i>
+            <span>Roles</span>
+          </a>
+        {% endif %}
+
+        <!-- 3. Usuarios (Administrador y Delegado Municipal) -->
+        {% if permisos.ver_usuarios %}
+          <a href="{% url 'gestion_usuarios' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_usuarios' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="users" class="w-4 h-4 shrink-0"></i>
+            <span>Usuarios</span>
+          </a>
+        {% endif %}
+
+        <!-- 4. Ítems y metas (Administrador y Coordinador) -->
+        {% if permisos.ver_metas %}
+          <a href="{% url 'gestion_metas' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_metas' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="target" class="w-4 h-4 shrink-0"></i>
+            <span>Ítems y metas</span>
+          </a>
+        {% endif %}
+
+        <!-- 5. Tipo de Atención (Administrador y Coordinador) -->
+        {% if permisos.ver_tipo_atencion %}
+          <a href="{% url 'gestion_tipo_atencion' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_tipo_atencion' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="heart-handshake" class="w-4 h-4 shrink-0"></i>
+            <span>Tipo de Atención</span>
+          </a>
+        {% endif %}
+
+        <!-- 6. Sub Atención (Administrador y Coordinador) -->
+        {% if permisos.ver_sub_atencion %}
+          <a href="{% url 'gestion_sub_atencion' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_sub_atencion' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="git-branch" class="w-4 h-4 shrink-0"></i>
+            <span>Sub Atención</span>
+          </a>
+        {% endif %}
+
+        <!-- 7. Atenciones (Ingreso y Gestión) -->
+        {% if permisos.ver_atenciones %}
+          <a href="{% url 'gestion_atenciones' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_atenciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0"></i>
+            <span>Atenciones</span>
+          </a>
+        {% endif %}
+
+        <!-- 8. Vecinos -->
+        {% if permisos.ver_vecinos %}
+          <a href="{% url 'gestion_vecinos' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_vecinos' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="user-check" class="w-4 h-4 shrink-0"></i>
+            <span>Vecinos</span>
+          </a>
+        {% endif %}
+
+        <!-- 9. Reportes (Administrador, Coordinador y Delegado) -->
+        {% if permisos.ver_reportes %}
+          <a href="{% url 'gestion_reportes' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_reportes' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 shrink-0"></i>
+            <span>Reportes</span>
+          </a>
+        {% endif %}
+
+      </nav>
+
+      <!-- Card Informativa Institucional -->
+      <div class="bg-white rounded-3xl p-4 shadow-sm border border-[rgba(196,18,48,0.15)] text-center flex flex-col items-center gap-2">
+        <img src="{% static 'vertical-color.svg' %}" 
+             alt="Escudo La Serena" 
+             class="h-10 w-auto object-contain"
+             onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
+        <p class="text-[10px] text-slate-500 font-medium">
+          Ilustre Municipalidad de La Serena<br>
+          <span class="font-bold text-slate-700">Gestión de Atención Ciudadana</span>
+        </p>
+      </div>
+
+    </aside>
+
+    <!-- Área de Contenido Principal -->
+    <main class="flex-1 flex flex-col gap-6 min-w-0">
+      {% block content %}{% endblock %}
+    </main>
+
+  </div>
+
+  <!-- Footer Institucional Oficial -->
+  <footer class="bg-[#1B0D12] text-white border-t border-red-900/40 py-6 px-4 md:px-8 mt-auto">
+    <div class="max-w-[1440px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-red-200/70">
+      <div class="flex items-center gap-3">
+        <img src="{% static 'vertical-blanco.svg' %}" 
+             alt="Escudo Municipal" 
+             class="h-8 w-auto opacity-80"
+             onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
+        <span>Ilustre Municipalidad de La Serena · Sistema Integrado SGR</span>
+      </div>
+      <div>
+        <span>Vanguard Systems Group © 2026</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    lucide.createIcons();
+
+    // SweetAlert2 helper para confirmación de eliminación (A3 / Pág 3)
+    function confirmDelete(form, itemName) {
+      Swal.fire({
+        title: '¿Confirmar eliminación?',
+        html: `Se eliminará <strong>${itemName}</strong> del sistema.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#C41230',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+          popup: 'rounded-3xl font-sans'
+        }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          form.submit();
+        }
+      });
+      return false;
+    }
+
+    // Manejo interactivo y accesible del selector de delegación activa
+    function toggleDelegacionDropdown(e) {
+      if (e) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+      const menu = document.getElementById('delegacionDropdownMenu');
+      const btn = document.getElementById('delegacionDropdownBtn');
+      const chevron = document.getElementById('delegacionChevron');
+      if (!menu) return;
+
+      const isHidden = menu.classList.contains('hidden');
+      if (isHidden) {
+        menu.classList.remove('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+        if (chevron) chevron.classList.add('rotate-180');
+      } else {
+        menu.classList.add('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+        if (chevron) chevron.classList.remove('rotate-180');
+      }
+    }
+
+    // Cerrar menú al hacer clic en cualquier lugar fuera o presionar Escape
+    document.addEventListener('click', function(e) {
+      const container = document.getElementById('delegacionDropdownContainer');
+      const menu = document.getElementById('delegacionDropdownMenu');
+      const btn = document.getElementById('delegacionDropdownBtn');
+      const chevron = document.getElementById('delegacionChevron');
+      if (container && !container.contains(e.target) && menu && !menu.classList.contains('hidden')) {
+        menu.classList.add('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+        if (chevron) chevron.classList.remove('rotate-180');
+      }
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        const menu = document.getElementById('delegacionDropdownMenu');
+        const btn = document.getElementById('delegacionDropdownBtn');
+        const chevron = document.getElementById('delegacionChevron');
+        if (menu && !menu.classList.contains('hidden')) {
+          menu.classList.add('hidden');
+          if (btn) btn.setAttribute('aria-expanded', 'false');
+          if (chevron) chevron.classList.remove('rotate-180');
+        }
+      }
+    });
+
+    // Sistema de Búsqueda Automática Inteligente (empieza a buscar desde la 1ra letra que escribe)
+    document.addEventListener("DOMContentLoaded", function() {
+      const searchInputs = document.querySelectorAll('input[name="q"]');
+      
+      searchInputs.forEach(input => {
+        let debounceTimer = null;
+        const form = input.closest('form');
+        
+        // Normalización para coincidencias sin tildes y case-insensitive
+        const normalize = (txt) => (txt || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+        // 1. Filtrado instantáneo (0ms) en la tabla actualmente visible
+        const filterClientTable = (term) => {
+          const normTerm = normalize(term);
+          const table = document.querySelector('table');
+          if (!table) return;
+
+          const tbody = table.querySelector('tbody');
+          if (!tbody) return;
+
+          const rows = tbody.querySelectorAll('tr:not(.live-no-results)');
+          let visibleCount = 0;
+
+          rows.forEach(row => {
+            // Evitar ocultar la cabecera o si es fila vacía de Django inicial
+            if (row.querySelector('td[colspan]')) {
+              if (normTerm) row.style.display = 'none';
+              return;
+            }
+
+            const rowText = normalize(row.textContent);
+            if (!normTerm || rowText.includes(normTerm)) {
+              row.style.display = '';
+              visibleCount++;
+            } else {
+              row.style.display = 'none';
+            }
+          });
+
+          // Mensaje visual instantáneo si no hay coincidencias con la letra ingresada
+          let emptyLiveRow = tbody.querySelector('.live-no-results');
+          if (visibleCount === 0 && normTerm) {
+            if (!emptyLiveRow) {
+              emptyLiveRow = document.createElement('tr');
+              emptyLiveRow.className = 'live-no-results';
+              const colCount = table.querySelectorAll('thead th').length || 6;
+              emptyLiveRow.innerHTML = `
+                <td colspan="${colCount}" class="py-8 text-center text-slate-400 font-medium">
+                  <div class="flex flex-col items-center justify-center gap-1.5">
+                    <i data-lucide="search-x" class="w-6 h-6 text-slate-300"></i>
+                    <span>No se encontraron registros que coincidan con "<strong>${term}</strong>".</span>
+                  </div>
+                </td>`;
+              tbody.appendChild(emptyLiveRow);
+              if (window.lucide) lucide.createIcons();
+            } else {
+              emptyLiveRow.style.display = '';
+              const strong = emptyLiveRow.querySelector('strong');
+              if (strong) strong.textContent = term;
+            }
+          } else if (emptyLiveRow) {
+            emptyLiveRow.style.display = 'none';
+          }
+        };
+
+        // 2. Sincronización asíncrona con el servidor para paginación y búsqueda global de BD
+        const triggerServerSearch = (term) => {
+          if (!form) return;
+          const urlObj = new URL(form.action || window.location.href, window.location.origin);
+          const formData = new FormData(form);
+          formData.set('q', term);
+          formData.delete('page'); // Volver a página 1 al filtrar
+
+          const searchParams = new URLSearchParams(formData);
+          urlObj.search = searchParams.toString();
+
+          window.history.replaceState({}, '', urlObj.toString());
+
+          fetch(urlObj.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          })
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // Actualizar tabla
+            const newTable = doc.querySelector('table');
+            const currentTable = document.querySelector('table');
+            if (newTable && currentTable) {
+              const currentTbody = currentTable.querySelector('tbody');
+              const newTbody = newTable.querySelector('tbody');
+              if (currentTbody && newTbody) {
+                currentTbody.innerHTML = newTbody.innerHTML;
+              }
+            }
+
+            // Actualizar barra de paginador
+            const newPagination = doc.querySelector('.overflow-hidden > div:last-child');
+            const currentPagination = document.querySelector('.overflow-hidden > div:last-child');
+            if (newPagination && currentPagination) {
+              currentPagination.innerHTML = newPagination.innerHTML;
+            }
+
+            // Actualizar enlace a Excel con el nuevo filtro
+            const newExcel = doc.querySelector('a[href*="export=excel"]');
+            const currentExcel = document.querySelector('a[href*="export=excel"]');
+            if (newExcel && currentExcel) {
+              currentExcel.href = newExcel.href;
+            }
+
+            if (window.lucide) lucide.createIcons();
+          })
+          .catch(() => {
+            form.submit();
+          });
+        };
+
+        // Escuchar cada tecla: apenas se escribe una letra, filtra en 0ms y sincroniza
+        input.addEventListener('input', function() {
+          const val = this.value;
+          filterClientTable(val);
+
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            triggerServerSearch(val);
+          }, 350);
+        });
+
+        // Si presiona Enter, busca al instante sin esperar el debounce
+        input.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            clearTimeout(debounceTimer);
+            triggerServerSearch(this.value);
+          }
+        });
+      });
+    });
+
+    // SweetAlert2 Flash Messages
+    document.addEventListener("DOMContentLoaded", function() {
+      {% if messages %}
+        {% for message in messages %}
+          Swal.fire({
+            icon: "{% if message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% else %}success{% endif %}",
+            title: "{{ message|escapejs }}",
+            confirmButtonColor: '#C41230',
+            timer: 4500,
+            timerProgressBar: true,
+            customClass: {
+              popup: 'rounded-2xl shadow-xl font-sans'
+            }
+          });
+        {% endfor %}
+      {% endif %}
+    });
+  </script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

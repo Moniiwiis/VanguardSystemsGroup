@@ -1,0 +1,316 @@
+{% extends 'base.html' %}
+
+{% block title %}Inicio — Ilustre Municipalidad de La Serena{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Encabezado y Contexto Territorial del Usuario -->
+  <div class="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div class="space-y-2">
+      <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+        <span>Gestión municipal</span>
+        <span class="text-slate-300">/</span>
+        <span class="text-[#C41230]">Panel de Control</span>
+      </div>
+      <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+        Panel de Gestión Territorial SGR
+      </h1>
+      <p class="text-sm text-slate-600 max-w-2xl leading-relaxed">
+        Plataforma oficial de seguimiento de atenciones ciudadanas, mantenedores de gestión y administración de delegaciones de la Ilustre Municipalidad de La Serena.
+      </p>
+    </div>
+
+    <!-- Acciones Rápidas y Contexto Activo -->
+    <div class="flex flex-wrap items-center gap-3">
+      {% if delegacion_activa %}
+      <div class="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 flex items-center gap-2">
+        <i data-lucide="map-pin" class="w-4 h-4 text-[#C41230]"></i>
+        <span>{{ delegacion_activa.codigo }} · {{ delegacion_activa.nombre }}</span>
+      </div>
+      {% endif %}
+
+      <a href="{% url 'gestion_atenciones' %}" class="px-4 py-2.5 rounded-xl text-xs font-extrabold bg-[#C41230] text-white hover:bg-[#8B1D19] shadow-sm transition-all flex items-center gap-2">
+        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+        <span>Nueva Atención</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Métricas de la Delegación Activa -->
+  <div class="space-y-3">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+      <div class="flex items-center gap-2">
+        <div class="w-2.5 h-2.5 rounded-full bg-[#C41230] animate-pulse"></div>
+        <h2 class="text-xs sm:text-sm font-extrabold text-slate-900 uppercase tracking-wider">
+          Métricas Territoriales: <span class="text-[#C41230]">{{ delegacion_activa.nombre }}</span>
+        </h2>
+      </div>
+      {% if es_admin %}
+        <span class="text-[11px] font-semibold text-slate-400">
+          (Administrador: puedes cambiar de delegación en la cabecera para ver las métricas de otro territorio)
+        </span>
+      {% else %}
+        <span class="text-[11px] font-semibold text-slate-400">
+          Contexto asignado exclusivamente a tu delegación
+        </span>
+      {% endif %}
+    </div>
+
+    <!-- 4 Tarjetas de la Delegación Activa -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+      <!-- 1. Atenciones Ciudadanas (Delegación Activa) -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
+        <div>
+          <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Atenciones en Sede</p>
+          <h3 class="text-2xl font-black text-slate-900 mt-1 font-display">{{ total_atenciones_del }}</h3>
+          <span class="text-xs text-emerald-600 font-bold flex items-center gap-1 mt-1">
+            <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> {{ atenciones_resueltas_del }} resueltas ({{ pct_resueltas_del }}%)
+          </span>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-red-50 text-[#C41230] flex items-center justify-center shrink-0">
+          <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+        </div>
+      </div>
+
+      <!-- 2. Cumplimiento de Metas SGR (Delegación Activa) -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
+        <div>
+          <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Metas y Cumplimiento</p>
+          <h3 class="text-2xl font-black text-slate-900 mt-1 font-display">{{ promedio_meta_del }}%</h3>
+          <div class="flex items-center gap-2 mt-1 text-[11px] font-extrabold">
+            <span class="text-emerald-700 flex items-center gap-0.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>{{ verdes_del }}</span>
+            <span class="text-amber-700 flex items-center gap-0.5"><span class="w-2 h-2 rounded-full bg-amber-500"></span>{{ ambares_del }}</span>
+            <span class="text-red-700 flex items-center gap-0.5"><span class="w-2 h-2 rounded-full bg-red-500"></span>{{ rojos_del }}</span>
+            <span class="text-slate-400 font-medium">({{ total_metas_del }} metas)</span>
+          </div>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+          <i data-lucide="award" class="w-6 h-6"></i>
+        </div>
+      </div>
+
+      <!-- 3. Dotación Territorial (Delegación Activa) -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
+        <div>
+          <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Dotación en Sede</p>
+          <h3 class="text-2xl font-black text-slate-900 mt-1 font-display">{{ total_funcionarios_del }}</h3>
+          <span class="text-xs text-slate-500 font-bold flex items-center gap-1 mt-1">
+            <i data-lucide="users" class="w-3.5 h-3.5"></i> Funcionarios asignados
+          </span>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+          <i data-lucide="users" class="w-6 h-6"></i>
+        </div>
+      </div>
+
+      <!-- 4. Auditoría y Evidencias (Delegación Activa) -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
+        <div>
+          <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Evidencias Auditadas</p>
+          <h3 class="text-2xl font-black text-slate-900 mt-1 font-display">{{ pct_aprobadas_del }}%</h3>
+          <span class="text-xs text-slate-500 font-bold flex items-center gap-1 mt-1">
+            <i data-lucide="file-check" class="w-3.5 h-3.5"></i> {{ total_val_del }} evidencias validadas
+          </span>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+          <i data-lucide="file-check" class="w-6 h-6"></i>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Consolidado Global Comunal (Exclusivo para el Administrador) -->
+  {% if es_admin %}
+  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="px-2.5 py-1 rounded-lg bg-red-50 text-[#C41230] font-extrabold text-[10px] uppercase tracking-wider border border-red-100">
+        Vista Administrador
+      </span>
+      <span class="font-extrabold text-slate-800">Consolidado General Comunal (Toda La Serena):</span>
+    </div>
+    <div class="flex flex-wrap items-center gap-4 sm:gap-6 font-bold text-slate-600">
+      <div class="flex items-center gap-1.5">
+        <i data-lucide="building-2" class="w-4 h-4 text-slate-400"></i>
+        <span>{{ total_delegaciones }} Delegaciones</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <i data-lucide="clipboard-list" class="w-4 h-4 text-slate-400"></i>
+        <span>{{ total_atenciones_global }} Atenciones Comunales</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <i data-lucide="shield-check" class="w-4 h-4 text-slate-400"></i>
+        <span>{{ total_usuarios }} Usuarios Activos</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <i data-lucide="tag" class="w-4 h-4 text-slate-400"></i>
+        <span>{{ total_tipos_atencion }} Tipos / {{ total_subatenciones }} Subatenciones</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Acceso Directo a los Mantenedores y Módulos -->
+  <div class="space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+        <i data-lucide="grid" class="w-4 h-4 text-[#C41230]"></i>
+        <span>Módulos y Mantenedores del Sistema</span>
+      </h2>
+      <span class="text-xs font-semibold text-slate-500">Acceso según perfil autorizado</span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- 1. Delegaciones -->
+      {% if permisos.ver_delegaciones %}
+      <a href="{% url 'gestion_delegaciones' %}" class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-[#C41230]/40 hover:shadow-md transition-all group">
+        <div class="flex items-start justify-between">
+          <div class="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-red-50 text-slate-700 group-hover:text-[#C41230] flex items-center justify-center transition-colors">
+            <i data-lucide="building-2" class="w-5 h-5"></i>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">{{ total_delegaciones }} registros</span>
+        </div>
+        <h3 class="font-extrabold text-slate-900 text-sm mt-3 group-hover:text-[#C41230] transition-colors">CRUD Delegaciones</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">Gestión de sedes territoriales, código, dirección y estado municipal.</p>
+      </a>
+      {% endif %}
+
+      <!-- 2. Roles -->
+      {% if permisos.ver_roles %}
+      <a href="{% url 'gestion_roles' %}" class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-[#C41230]/40 hover:shadow-md transition-all group">
+        <div class="flex items-start justify-between">
+          <div class="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-red-50 text-slate-700 group-hover:text-[#C41230] flex items-center justify-center transition-colors">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">{{ total_roles }} registros</span>
+        </div>
+        <h3 class="font-extrabold text-slate-900 text-sm mt-3 group-hover:text-[#C41230] transition-colors">CRUD Roles y Permisos</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">Administración de niveles de acceso, alcance y descripción de funciones.</p>
+      </a>
+      {% endif %}
+
+      <!-- 3. Usuarios -->
+      {% if permisos.ver_usuarios %}
+      <a href="{% url 'gestion_usuarios' %}" class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-[#C41230]/40 hover:shadow-md transition-all group">
+        <div class="flex items-start justify-between">
+          <div class="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-red-50 text-slate-700 group-hover:text-[#C41230] flex items-center justify-center transition-colors">
+            <i data-lucide="users" class="w-5 h-5"></i>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">{{ total_usuarios }} registros</span>
+        </div>
+        <h3 class="font-extrabold text-slate-900 text-sm mt-3 group-hover:text-[#C41230] transition-colors">CRUD Usuarios</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">Cuentas institucionales, asignación de rol, delegación autorizada y estado.</p>
+      </a>
+      {% endif %}
+
+      <!-- 4. Ítems y metas -->
+      {% if permisos.ver_metas %}
+      <a href="{% url 'gestion_metas' %}" class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-[#C41230]/40 hover:shadow-md transition-all group">
+        <div class="flex items-start justify-between">
+          <div class="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-red-50 text-slate-700 group-hover:text-[#C41230] flex items-center justify-center transition-colors">
+            <i data-lucide="target" class="w-5 h-5"></i>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">{{ total_items_metas }} registros</span>
+        </div>
+        <h3 class="font-extrabold text-slate-900 text-sm mt-3 group-hover:text-[#C41230] transition-colors">CRUD Ítems y Metas</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">Mantenedor de ítems de medición, indicadores de cobertura y metas SGR.</p>
+      </a>
+      {% endif %}
+
+      <!-- 5. Tipo de Atención -->
+      {% if permisos.ver_tipo_atencion %}
+      <a href="{% url 'gestion_tipo_atencion' %}" class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-[#C41230]/40 hover:shadow-md transition-all group">
+        <div class="flex items-start justify-between">
+          <div class="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-red-50 text-slate-700 group-hover:text-[#C41230] flex items-center justify-center transition-colors">
+            <i data-lucide="tag" class="w-5 h-5"></i>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">{{ total_tipos_atencion }} registros</span>
+        </div>
+        <h3 class="font-extrabold text-slate-900 text-sm mt-3 group-hover:text-[#C41230] transition-colors">CRUD Tipo de Atención</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">Catálogo principal de tipologías de asistencia vecinal y comunitaria.</p>
+      </a>
+      {% endif %}
+
+      <!-- 6. Sub Atención -->
+      {% if permisos.ver_sub_atencion %}
+      <a href="{% url 'gestion_sub_atencion' %}" class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-[#C41230]/40 hover:shadow-md transition-all group">
+        <div class="flex items-start justify-between">
+          <div class="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-red-50 text-slate-700 group-hover:text-[#C41230] flex items-center justify-center transition-colors">
+            <i data-lucide="layers" class="w-5 h-5"></i>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">{{ total_subatenciones }} registros</span>
+        </div>
+        <h3 class="font-extrabold text-slate-900 text-sm mt-3 group-hover:text-[#C41230] transition-colors">CRUD Sub Atención</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">Subcategorías dependientes asociadas a cada Tipo de Atención.</p>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Registro de Atenciones Recientes de la Delegación Activa -->
+  <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+    <div class="p-5 border-b border-slate-200/80 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <i data-lucide="history" class="w-4 h-4 text-[#C41230]"></i>
+        <h3 class="font-extrabold text-slate-900 text-sm">
+          Últimas Atenciones Ciudadanas — {{ delegacion_activa.nombre }}
+        </h3>
+      </div>
+      <a href="{% url 'gestion_atenciones' %}" class="text-xs font-bold text-[#C41230] hover:underline flex items-center gap-1">
+        <span>Ir al módulo de Atenciones</span>
+        <i data-lucide="chevron-right" class="w-4 h-4"></i>
+      </a>
+    </div>
+
+    {% if ultimas_atenciones %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead>
+          <tr class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider">
+            <th class="py-3 px-4">Código</th>
+            <th class="py-3 px-4">Solicitante</th>
+            <th class="py-3 px-4">Tipo / Subatención</th>
+            <th class="py-3 px-4">Delegación</th>
+            <th class="py-3 px-4">Responsable</th>
+            <th class="py-3 px-4">Fecha</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for atn in ultimas_atenciones %}
+          <tr class="hover:bg-slate-50/70 transition-colors">
+            <td class="py-3 px-4 font-mono font-bold text-[#C41230]">{{ atn.codigo_atencion }}</td>
+            <td class="py-3 px-4 font-bold text-slate-900">{{ atn.solicitante }}</td>
+            <td class="py-3 px-4 text-slate-600">
+              <span class="font-semibold text-slate-800">{{ atn.tipo_atencion.nombre }}</span>
+              <span class="text-slate-400">›</span>
+              <span>{{ atn.sub_atencion.nombre }}</span>
+            </td>
+            <td class="py-3 px-4 text-slate-600">
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-red-50 text-[#C41230]">
+                {{ atn.delegacion.nombre }}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-slate-600">{{ atn.usuario_responsable.username }}</td>
+            <td class="py-3 px-4 text-slate-400 font-mono">{{ atn.fecha_registro|date:"d/m/Y H:i" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="py-10 text-center text-slate-400 space-y-2">
+      <i data-lucide="inbox" class="w-8 h-8 mx-auto text-slate-300"></i>
+      <p class="text-xs font-medium">Aún no se han registrado atenciones ciudadanas en {{ delegacion_activa.nombre }}.</p>
+      {% if permisos.puede_ingresar_atencion %}
+      <a href="{% url 'gestion_atenciones' %}" class="inline-block mt-2 px-4 py-2 text-xs font-bold bg-[#C41230] text-white rounded-xl hover:bg-[#8B1D19]">
+        Registrar primera atención en esta delegación
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

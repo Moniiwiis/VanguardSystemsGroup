@@ -1,0 +1,174 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Validar Código — Sistema Municipal La Serena</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <style>
+    body { font-family: 'Public Sans', sans-serif; background-color: #FDF6F6; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+  <!-- TopBar Oficial de Acceso (Mockup C2) -->
+  <header class="bg-[#1F1618] text-white px-6 py-3 flex items-center justify-between border-b border-white/10 shadow-sm">
+    <div class="flex items-center gap-3">
+      <img src="{% static 'horizontal-blanco.svg' %}" 
+           alt="La Serena" 
+           class="h-8 w-auto object-contain"
+           onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
+      <span class="text-xs font-mono font-bold tracking-wider text-slate-300">
+        SISTEMA MUNICIPAL <span class="text-white/40">/</span> Acceso y recuperación
+      </span>
+    </div>
+  </header>
+
+  <!-- Contenedor Central Card (Diseño 3 Mockup C2) -->
+  <main class="flex-1 flex items-center justify-center p-4 sm:p-6">
+    <div class="w-full max-w-md bg-white rounded-3xl p-8 sm:p-10 shadow-xl border border-[rgba(196,18,48,0.18)] space-y-6 text-center">
+      
+      <!-- Subtítulos y Paso 2 de 3 -->
+      <div class="space-y-1.5">
+        <img src="{% static 'vertical-color.svg' %}" 
+             alt="Escudo La Serena" 
+             class="h-14 w-auto mx-auto object-contain mb-2"
+             onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
+        <p class="text-xs font-extrabold text-[#8B1D19] uppercase tracking-wider">Gestión de Atención Ciudadana</p>
+        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Validar código</h1>
+        <p class="text-xs font-bold text-[#C41230]">Paso 2 de 3 · Verificación</p>
+        <p class="text-xs text-slate-500 font-medium">Código enviado a <strong class="text-slate-800">{{ masked_email }}</strong></p>
+      </div>
+
+      <!-- Formulario Código de 6 dígitos -->
+      <form id="code-form" method="POST" action="{% url 'validar_codigo' %}" class="space-y-6">
+        {% csrf_token %}
+
+        <!-- 6 Casillas Numéricas con soporte Paste y Teclado -->
+        <div class="flex justify-center gap-2 sm:gap-3">
+          {% for i in "123456" %}
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" 
+                   id="code_{{ forloop.counter }}" name="code_{{ forloop.counter }}" required
+                   {% if forloop.first %}autofocus{% endif %}
+                   class="code-digit w-10 sm:w-12 h-14 text-center text-xl font-extrabold text-slate-900 border-2 border-slate-300 rounded-2xl focus:border-[#C41230] focus:ring-2 focus:ring-[#C41230]/30 focus:outline-none transition-all shadow-sm" />
+          {% endfor %}
+        </div>
+
+        <!-- Vigencia de referencia -->
+        <p class="text-[11px] text-slate-500 font-medium">
+          Vigencia de referencia: <span class="font-bold text-slate-700">10 minutos</span>.
+        </p>
+
+        <!-- Botón Verificar Código Rojo La Serena -->
+        <button type="submit" 
+                class="w-full py-3 px-4 bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white text-xs font-extrabold rounded-xl shadow-md transition-all tracking-wide">
+          Verificar código
+        </button>
+      </form>
+
+      <!-- Reenvío de código con cuenta regresiva -->
+      <div class="space-y-2 text-xs pt-1">
+        <div id="resend-container" class="text-slate-500">
+          <span id="countdown-text">Reenviar código en <strong id="timer-sec" class="text-slate-700">00:45</strong></span>
+          <a id="resend-btn" href="{% url 'reenviar_codigo' %}" class="hidden font-bold text-[#C41230] hover:underline">
+            Reenviar código ahora
+          </a>
+        </div>
+
+        <div class="pt-2 border-t border-slate-100">
+          <a href="{% url 'login' %}" class="text-xs font-bold text-[#C41230] hover:text-[#8B1D19] hover:underline transition-colors flex items-center justify-center gap-1.5">
+            <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+            <span>Volver al inicio de sesión</span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="py-4 text-center text-xs text-slate-500">
+    <span>Ilustre Municipalidad de La Serena © 2026</span>
+  </footer>
+
+  <script>
+    lucide.createIcons();
+
+    // Lógica para desplazamiento entre casillas y pegar (Paste) el código completo
+    const digits = Array.from(document.querySelectorAll('.code-digit'));
+
+    digits.forEach((input, index) => {
+      // Auto-avance al escribir
+      input.addEventListener('input', (e) => {
+        const val = e.target.value.replace(/[^0-9]/g, '');
+        e.target.value = val;
+        if (val.length === 1 && index < digits.length - 1) {
+          digits[index + 1].focus();
+        }
+      });
+
+      // Navegación con teclado (Flechas y Backspace)
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !input.value && index > 0) {
+          digits[index - 1].focus();
+        } else if (e.key === 'ArrowLeft' && index > 0) {
+          digits[index - 1].focus();
+        } else if (e.key === 'ArrowRight' && index < digits.length - 1) {
+          digits[index + 1].focus();
+        }
+      });
+
+      // Pegado del código completo de 6 dígitos
+      input.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const pastedData = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '');
+        if (pastedData.length >= 6) {
+          for (let i = 0; i < 6; i++) {
+            digits[i].value = pastedData[i];
+          }
+          digits[5].focus();
+        }
+      });
+    });
+
+    // Temporizador de reenvío (45 segundos)
+    let timeLeft = 45;
+    const timerElem = document.getElementById('timer-sec');
+    const countdownText = document.getElementById('countdown-text');
+    const resendBtn = document.getElementById('resend-btn');
+
+    const countdownInterval = setInterval(() => {
+      timeLeft--;
+      if (timeLeft <= 0) {
+        clearInterval(countdownInterval);
+        countdownText.classList.add('hidden');
+        resendBtn.classList.remove('hidden');
+      } else {
+        const str = timeLeft < 10 ? `00:0${timeLeft}` : `00:${timeLeft}`;
+        timerElem.textContent = str;
+      }
+    }, 1000);
+
+    {% if messages %}
+      {% for message in messages %}
+        Swal.fire({
+          icon: "{% if message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% else %}success{% endif %}",
+          title: "{{ message|escapejs }}",
+          confirmButtonColor: '#C41230',
+          timer: 5000,
+          timerProgressBar: true,
+          customClass: { popup: 'rounded-3xl font-sans' }
+        });
+      {% endfor %}
+    {% endif %}
+  </script>
+</body>
+</html>

@@ -1,0 +1,2134 @@
+[
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1500000$PHmTzw5DFfFXTJLrSWvPqf$d10j1keDoebD0QKEe38VyT+vPikUh2HXosvC0nFopJg=",
+    "last_login": "2026-09-18T17:55:44Z",
+    "is_superuser": true,
+    "username": "Monis",
+    "first_name": "Dayna",
+    "last_name": "Muñoz",
+    "email": "dayna.munoz@inacapmail.cl",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-09-18T17:52:11Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1500000$FNUoVAp68sUdGUjyEYD9qB$2QE47wHLqCbPrzOrAk1z78LqicrBGChe7QE/tq7Gcws=",
+    "last_login": "2026-09-27T19:21:44.655Z",
+    "is_superuser": true,
+    "username": "admin_sgr",
+    "first_name": "Administrador",
+    "last_name": "General",
+    "email": "admin@laserena.cl",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-09-27T15:39:50.699Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1500000$E7Q5uPNR5zjyOP2WFy7082$pn65rNb4CQ3SpngF8fMpGv9XMcIIOIUfTcNunAvYFnw=",
+    "last_login": "2026-09-27T19:20:07.918Z",
+    "is_superuser": false,
+    "username": "delegado_centro",
+    "first_name": "Carlos",
+    "last_name": "Mendoza",
+    "email": "delegado.centro@laserena.cl",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-09-27T15:39:51.250Z",
+    "groups": [],
+    "user_permissions": [
+      [
+        "add_cargo",
+        "accounts",
+        "cargo"
+      ],
+      [
+        "change_cargo",
+        "accounts",
+        "cargo"
+      ],
+      [
+        "delete_cargo",
+        "accounts",
+        "cargo"
+      ],
+      [
+        "view_cargo",
+        "accounts",
+        "cargo"
+      ],
+      [
+        "add_delegacion",
+        "accounts",
+        "delegacion"
+      ],
+      [
+        "change_delegacion",
+        "accounts",
+        "delegacion"
+      ],
+      [
+        "delete_delegacion",
+        "accounts",
+        "delegacion"
+      ],
+      [
+        "view_delegacion",
+        "accounts",
+        "delegacion"
+      ],
+      [
+        "add_funcionario",
+        "accounts",
+        "funcionario"
+      ],
+      [
+        "change_funcionario",
+        "accounts",
+        "funcionario"
+      ],
+      [
+        "delete_funcionario",
+        "accounts",
+        "funcionario"
+      ],
+      [
+        "view_funcionario",
+        "accounts",
+        "funcionario"
+      ],
+      [
+        "add_funcionariorol",
+        "accounts",
+        "funcionariorol"
+      ],
+      [
+        "change_funcionariorol",
+        "accounts",
+        "funcionariorol"
+      ],
+      [
+        "delete_funcionariorol",
+        "accounts",
+        "funcionariorol"
+      ],
+      [
+        "view_funcionariorol",
+        "accounts",
+        "funcionariorol"
+      ],
+      [
+        "add_rol",
+        "accounts",
+        "rol"
+      ],
+      [
+        "change_rol",
+        "accounts",
+        "rol"
+      ],
+      [
+        "delete_rol",
+        "accounts",
+        "rol"
+      ],
+      [
+        "view_rol",
+        "accounts",
+        "rol"
+      ],
+      [
+        "add_actividad",
+        "activities",
+        "actividad"
+      ],
+      [
+        "change_actividad",
+        "activities",
+        "actividad"
+      ],
+      [
+        "delete_actividad",
+        "activities",
+        "actividad"
+      ],
+      [
+        "view_actividad",
+        "activities",
+        "actividad"
+      ],
+      [
+        "add_atencionsocialgestion",
+        "activities",
+        "atencionsocialgestion"
+      ],
+      [
+        "change_atencionsocialgestion",
+        "activities",
+        "atencionsocialgestion"
+      ],
+      [
+        "delete_atencionsocialgestion",
+        "activities",
+        "atencionsocialgestion"
+      ],
+      [
+        "view_atencionsocialgestion",
+        "activities",
+        "atencionsocialgestion"
+      ],
+      [
+        "add_evidencia",
+        "activities",
+        "evidencia"
+      ],
+      [
+        "change_evidencia",
+        "activities",
+        "evidencia"
+      ],
+      [
+        "delete_evidencia",
+        "activities",
+        "evidencia"
+      ],
+      [
+        "view_evidencia",
+        "activities",
+        "evidencia"
+      ],
+      [
+        "add_validacionevidencia",
+        "activities",
+        "validacionevidencia"
+      ],
+      [
+        "change_validacionevidencia",
+        "activities",
+        "validacionevidencia"
+      ],
+      [
+        "delete_validacionevidencia",
+        "activities",
+        "validacionevidencia"
+      ],
+      [
+        "view_validacionevidencia",
+        "activities",
+        "validacionevidencia"
+      ],
+      [
+        "add_ajustedesempenio",
+        "agenda",
+        "ajustedesempenio"
+      ],
+      [
+        "change_ajustedesempenio",
+        "agenda",
+        "ajustedesempenio"
+      ],
+      [
+        "delete_ajustedesempenio",
+        "agenda",
+        "ajustedesempenio"
+      ],
+      [
+        "view_ajustedesempenio",
+        "agenda",
+        "ajustedesempenio"
+      ],
+      [
+        "add_compromisoagenda",
+        "agenda",
+        "compromisoagenda"
+      ],
+      [
+        "change_compromisoagenda",
+        "agenda",
+        "compromisoagenda"
+      ],
+      [
+        "delete_compromisoagenda",
+        "agenda",
+        "compromisoagenda"
+      ],
+      [
+        "view_compromisoagenda",
+        "agenda",
+        "compromisoagenda"
+      ],
+      [
+        "add_catalogoactividad",
+        "configuration",
+        "catalogoactividad"
+      ],
+      [
+        "change_catalogoactividad",
+        "configuration",
+        "catalogoactividad"
+      ],
+      [
+        "delete_catalogoactividad",
+        "configuration",
+        "catalogoactividad"
+      ],
+      [
+        "view_catalogoactividad",
+        "configuration",
+        "catalogoactividad"
+      ],
+      [
+        "add_configuracionmeta",
+        "configuration",
+        "configuracionmeta"
+      ],
+      [
+        "change_configuracionmeta",
+        "configuration",
+        "configuracionmeta"
+      ],
+      [
+        "delete_configuracionmeta",
+        "configuration",
+        "configuracionmeta"
+      ],
+      [
+        "view_configuracionmeta",
+        "configuration",
+        "configuracionmeta"
+      ],
+      [
+        "add_itemmedicion",
+        "configuration",
+        "itemmedicion"
+      ],
+      [
+        "change_itemmedicion",
+        "configuration",
+        "itemmedicion"
+      ],
+      [
+        "delete_itemmedicion",
+        "configuration",
+        "itemmedicion"
+      ],
+      [
+        "view_itemmedicion",
+        "configuration",
+        "itemmedicion"
+      ],
+      [
+        "add_periodo",
+        "configuration",
+        "periodo"
+      ],
+      [
+        "change_periodo",
+        "configuration",
+        "periodo"
+      ],
+      [
+        "delete_periodo",
+        "configuration",
+        "periodo"
+      ],
+      [
+        "view_periodo",
+        "configuration",
+        "periodo"
+      ]
+    ]
+  }
+},
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1500000$xYffuJlfeaIvgBIzNjCUgW$I4pf1tHvviGasmVPwKv4a8Sc5A1d9OeJb4n2IOIUtNw=",
+    "last_login": "2026-09-27T19:20:50.798Z",
+    "is_superuser": false,
+    "username": "delegado_companias",
+    "first_name": "María",
+    "last_name": "Rojas",
+    "email": "delegado.companias@laserena.cl",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-09-27T15:39:51.806Z",
+    "groups": [],
+    "user_permissions": [
+      [
+        "add_cargo",
+        "accounts",
+        "cargo"
+      ],
+      [
+        "change_cargo",
+        "accounts",
+        "cargo"
+      ],
+      [
+        "delete_cargo",
+        "accounts",
+        "cargo"
+      ],
+      [
+        "view_cargo",
+        "accounts",
+        "cargo"
+      ],
+      [
+        "add_delegacion",
+        "accounts",
+        "delegacion"
+      ],
+      [
+        "change_delegacion",
+        "accounts",
+        "delegacion"
+      ],
+      [
+        "delete_delegacion",
+        "accounts",
+        "delegacion"
+      ],
+      [
+        "view_delegacion",
+        "accounts",
+        "delegacion"
+      ],
+      [
+        "add_funcionario",
+        "accounts",
+        "funcionario"
+      ],
+      [
+        "change_funcionario",
+        "accounts",
+        "funcionario"
+      ],
+      [
+        "delete_funcionario",
+        "accounts",
+        "funcionario"
+      ],
+      [
+        "view_funcionario",
+        "accounts",
+        "funcionario"
+      ],
+      [
+        "add_funcionariorol",
+        "accounts",
+        "funcionariorol"
+      ],
+      [
+        "change_funcionariorol",
+        "accounts",
+        "funcionariorol"
+      ],
+      [
+        "delete_funcionariorol",
+        "accounts",
+        "funcionariorol"
+      ],
+      [
+        "view_funcionariorol",
+        "accounts",
+        "funcionariorol"
+      ],
+      [
+        "add_rol",
+        "accounts",
+        "rol"
+      ],
+      [
+        "change_rol",
+        "accounts",
+        "rol"
+      ],
+      [
+        "delete_rol",
+        "accounts",
+        "rol"
+      ],
+      [
+        "view_rol",
+        "accounts",
+        "rol"
+      ],
+      [
+        "add_actividad",
+        "activities",
+        "actividad"
+      ],
+      [
+        "change_actividad",
+        "activities",
+        "actividad"
+      ],
+      [
+        "delete_actividad",
+        "activities",
+        "actividad"
+      ],
+      [
+        "view_actividad",
+        "activities",
+        "actividad"
+      ],
+      [
+        "add_atencionsocialgestion",
+        "activities",
+        "atencionsocialgestion"
+      ],
+      [
+        "change_atencionsocialgestion",
+        "activities",
+        "atencionsocialgestion"
+      ],
+      [
+        "delete_atencionsocialgestion",
+        "activities",
+        "atencionsocialgestion"
+      ],
+      [
+        "view_atencionsocialgestion",
+        "activities",
+        "atencionsocialgestion"
+      ],
+      [
+        "add_evidencia",
+        "activities",
+        "evidencia"
+      ],
+      [
+        "change_evidencia",
+        "activities",
+        "evidencia"
+      ],
+      [
+        "delete_evidencia",
+        "activities",
+        "evidencia"
+      ],
+      [
+        "view_evidencia",
+        "activities",
+        "evidencia"
+      ],
+      [
+        "add_validacionevidencia",
+        "activities",
+        "validacionevidencia"
+      ],
+      [
+        "change_validacionevidencia",
+        "activities",
+        "validacionevidencia"
+      ],
+      [
+        "delete_validacionevidencia",
+        "activities",
+        "validacionevidencia"
+      ],
+      [
+        "view_validacionevidencia",
+        "activities",
+        "validacionevidencia"
+      ],
+      [
+        "add_ajustedesempenio",
+        "agenda",
+        "ajustedesempenio"
+      ],
+      [
+        "change_ajustedesempenio",
+        "agenda",
+        "ajustedesempenio"
+      ],
+      [
+        "delete_ajustedesempenio",
+        "agenda",
+        "ajustedesempenio"
+      ],
+      [
+        "view_ajustedesempenio",
+        "agenda",
+        "ajustedesempenio"
+      ],
+      [
+        "add_compromisoagenda",
+        "agenda",
+        "compromisoagenda"
+      ],
+      [
+        "change_compromisoagenda",
+        "agenda",
+        "compromisoagenda"
+      ],
+      [
+        "delete_compromisoagenda",
+        "agenda",
+        "compromisoagenda"
+      ],
+      [
+        "view_compromisoagenda",
+        "agenda",
+        "compromisoagenda"
+      ],
+      [
+        "add_catalogoactividad",
+        "configuration",
+        "catalogoactividad"
+      ],
+      [
+        "change_catalogoactividad",
+        "configuration",
+        "catalogoactividad"
+      ],
+      [
+        "delete_catalogoactividad",
+        "configuration",
+        "catalogoactividad"
+      ],
+      [
+        "view_catalogoactividad",
+        "configuration",
+        "catalogoactividad"
+      ],
+      [
+        "add_configuracionmeta",
+        "configuration",
+        "configuracionmeta"
+      ],
+      [
+        "change_configuracionmeta",
+        "configuration",
+        "configuracionmeta"
+      ],
+      [
+        "delete_configuracionmeta",
+        "configuration",
+        "configuracionmeta"
+      ],
+      [
+        "view_configuracionmeta",
+        "configuration",
+        "configuracionmeta"
+      ],
+      [
+        "add_itemmedicion",
+        "configuration",
+        "itemmedicion"
+      ],
+      [
+        "change_itemmedicion",
+        "configuration",
+        "itemmedicion"
+      ],
+      [
+        "delete_itemmedicion",
+        "configuration",
+        "itemmedicion"
+      ],
+      [
+        "view_itemmedicion",
+        "configuration",
+        "itemmedicion"
+      ],
+      [
+        "add_periodo",
+        "configuration",
+        "periodo"
+      ],
+      [
+        "change_periodo",
+        "configuration",
+        "periodo"
+      ],
+      [
+        "delete_periodo",
+        "configuration",
+        "periodo"
+      ],
+      [
+        "view_periodo",
+        "configuration",
+        "periodo"
+      ]
+    ]
+  }
+},
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1500000$Kkqxf4kOrNPgyIRrm8R6Yw$SaqcoI6Bq70HLQRZ4bKYulx5ZEICx23GBAWmqQ91Q8U=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "funcionario_juan",
+    "first_name": "Juan",
+    "last_name": "Pérez",
+    "email": "juan.perez@laserena.cl",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-09-27T15:39:52.356Z",
+    "groups": [],
+    "user_permissions": [
+      [
+        "add_cargo",
+        "accounts",
+        "cargo"
+      ],
+      [
+        "change_cargo",
+        "accounts",
+        "cargo"
+      ],
+      [
+        "delete_cargo",
+        "accounts",
+        "cargo"
+      ],
+      [
+        "view_cargo",
+        "accounts",
+        "cargo"
+      ],
+      [
+        "add_delegacion",
+        "accounts",
+        "delegacion"
+      ],
+      [
+        "change_delegacion",
+        "accounts",
+        "delegacion"
+      ],
+      [
+        "delete_delegacion",
+        "accounts",
+        "delegacion"
+      ],
+      [
+        "view_delegacion",
+        "accounts",
+        "delegacion"
+      ],
+      [
+        "add_funcionario",
+        "accounts",
+        "funcionario"
+      ],
+      [
+        "change_funcionario",
+        "accounts",
+        "funcionario"
+      ],
+      [
+        "delete_funcionario",
+        "accounts",
+        "funcionario"
+      ],
+      [
+        "view_funcionario",
+        "accounts",
+        "funcionario"
+      ],
+      [
+        "add_funcionariorol",
+        "accounts",
+        "funcionariorol"
+      ],
+      [
+        "change_funcionariorol",
+        "accounts",
+        "funcionariorol"
+      ],
+      [
+        "delete_funcionariorol",
+        "accounts",
+        "funcionariorol"
+      ],
+      [
+        "view_funcionariorol",
+        "accounts",
+        "funcionariorol"
+      ],
+      [
+        "add_rol",
+        "accounts",
+        "rol"
+      ],
+      [
+        "change_rol",
+        "accounts",
+        "rol"
+      ],
+      [
+        "delete_rol",
+        "accounts",
+        "rol"
+      ],
+      [
+        "view_rol",
+        "accounts",
+        "rol"
+      ],
+      [
+        "add_actividad",
+        "activities",
+        "actividad"
+      ],
+      [
+        "change_actividad",
+        "activities",
+        "actividad"
+      ],
+      [
+        "delete_actividad",
+        "activities",
+        "actividad"
+      ],
+      [
+        "view_actividad",
+        "activities",
+        "actividad"
+      ],
+      [
+        "add_atencionsocialgestion",
+        "activities",
+        "atencionsocialgestion"
+      ],
+      [
+        "change_atencionsocialgestion",
+        "activities",
+        "atencionsocialgestion"
+      ],
+      [
+        "delete_atencionsocialgestion",
+        "activities",
+        "atencionsocialgestion"
+      ],
+      [
+        "view_atencionsocialgestion",
+        "activities",
+        "atencionsocialgestion"
+      ],
+      [
+        "add_evidencia",
+        "activities",
+        "evidencia"
+      ],
+      [
+        "change_evidencia",
+        "activities",
+        "evidencia"
+      ],
+      [
+        "delete_evidencia",
+        "activities",
+        "evidencia"
+      ],
+      [
+        "view_evidencia",
+        "activities",
+        "evidencia"
+      ],
+      [
+        "add_validacionevidencia",
+        "activities",
+        "validacionevidencia"
+      ],
+      [
+        "change_validacionevidencia",
+        "activities",
+        "validacionevidencia"
+      ],
+      [
+        "delete_validacionevidencia",
+        "activities",
+        "validacionevidencia"
+      ],
+      [
+        "view_validacionevidencia",
+        "activities",
+        "validacionevidencia"
+      ],
+      [
+        "add_ajustedesempenio",
+        "agenda",
+        "ajustedesempenio"
+      ],
+      [
+        "change_ajustedesempenio",
+        "agenda",
+        "ajustedesempenio"
+      ],
+      [
+        "delete_ajustedesempenio",
+        "agenda",
+        "ajustedesempenio"
+      ],
+      [
+        "view_ajustedesempenio",
+        "agenda",
+        "ajustedesempenio"
+      ],
+      [
+        "add_compromisoagenda",
+        "agenda",
+        "compromisoagenda"
+      ],
+      [
+        "change_compromisoagenda",
+        "agenda",
+        "compromisoagenda"
+      ],
+      [
+        "delete_compromisoagenda",
+        "agenda",
+        "compromisoagenda"
+      ],
+      [
+        "view_compromisoagenda",
+        "agenda",
+        "compromisoagenda"
+      ],
+      [
+        "add_catalogoactividad",
+        "configuration",
+        "catalogoactividad"
+      ],
+      [
+        "change_catalogoactividad",
+        "configuration",
+        "catalogoactividad"
+      ],
+      [
+        "delete_catalogoactividad",
+        "configuration",
+        "catalogoactividad"
+      ],
+      [
+        "view_catalogoactividad",
+        "configuration",
+        "catalogoactividad"
+      ],
+      [
+        "add_configuracionmeta",
+        "configuration",
+        "configuracionmeta"
+      ],
+      [
+        "change_configuracionmeta",
+        "configuration",
+        "configuracionmeta"
+      ],
+      [
+        "delete_configuracionmeta",
+        "configuration",
+        "configuracionmeta"
+      ],
+      [
+        "view_configuracionmeta",
+        "configuration",
+        "configuracionmeta"
+      ],
+      [
+        "add_itemmedicion",
+        "configuration",
+        "itemmedicion"
+      ],
+      [
+        "change_itemmedicion",
+        "configuration",
+        "itemmedicion"
+      ],
+      [
+        "delete_itemmedicion",
+        "configuration",
+        "itemmedicion"
+      ],
+      [
+        "view_itemmedicion",
+        "configuration",
+        "itemmedicion"
+      ],
+      [
+        "add_periodo",
+        "configuration",
+        "periodo"
+      ],
+      [
+        "change_periodo",
+        "configuration",
+        "periodo"
+      ],
+      [
+        "delete_periodo",
+        "configuration",
+        "periodo"
+      ],
+      [
+        "view_periodo",
+        "configuration",
+        "periodo"
+      ]
+    ]
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "85h0szwcvqc2fg57p2xre13vefnf6y2v",
+  "fields": {
+    "session_data": ".eJxVjDEOAiEQRe9CbQggyyyW9p6BDDMgqwaSZbcy3t2QbKHNL_57eW8RcN9K2Htaw8LiIow4_X4R6ZnqAPzAem-SWt3WJcqhyIN2eWucXtfD_QsU7GVkHSifNWpHkcFGMmqy2bEjhmlmQlDkrVasAcGPzcbMXiXKrPHsxecL4b03_w:1xAuRU:ox7m35AVRanKAItzMoTXuQ4UMJhDMaSMeAzWrs3nh_I",
+    "expire_date": "2026-10-11T19:21:44.661Z"
+  }
+},
+{
+  "model": "accounts.delegacion",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-09-18T19:15:01.013Z",
+    "updated_at": "2026-09-18T19:15:01.013Z",
+    "deleted_at": null,
+    "nombre": "Las Compañias",
+    "estado": "Activa",
+    "ambito": "Sector urbano norte de alta densidad y fuerte identidad territorial"
+  }
+},
+{
+  "model": "accounts.delegacion",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-09-18T19:15:17.801Z",
+    "updated_at": "2026-09-18T19:15:17.801Z",
+    "deleted_at": null,
+    "nombre": "Avenida del Mar",
+    "estado": "Activa",
+    "ambito": "Borde costero, turismo, residencial y servicios"
+  }
+},
+{
+  "model": "accounts.delegacion",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-09-18T19:15:31.779Z",
+    "updated_at": "2026-09-18T19:15:31.779Z",
+    "deleted_at": null,
+    "nombre": "Centro",
+    "estado": "Activa",
+    "ambito": "Centro histórico, administrativo, comercial y patrimonial"
+  }
+},
+{
+  "model": "accounts.delegacion",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-09-18T19:15:47.819Z",
+    "updated_at": "2026-09-18T19:15:47.819Z",
+    "deleted_at": null,
+    "nombre": "La Antena",
+    "estado": "Activa",
+    "ambito": "Sector urbano oriental y barrios asociados"
+  }
+},
+{
+  "model": "accounts.delegacion",
+  "pk": 5,
+  "fields": {
+    "created_at": "2026-09-18T19:16:01.878Z",
+    "updated_at": "2026-09-18T19:16:01.879Z",
+    "deleted_at": null,
+    "nombre": "La Pampa",
+    "estado": "Activa",
+    "ambito": "Sector urbano sur y áreas residenciales asociadas"
+  }
+},
+{
+  "model": "accounts.delegacion",
+  "pk": 6,
+  "fields": {
+    "created_at": "2026-09-18T19:16:17.805Z",
+    "updated_at": "2026-09-18T19:16:17.805Z",
+    "deleted_at": null,
+    "nombre": "Rural",
+    "estado": "Activa",
+    "ambito": "Localidades y comunidades rurales dispersas"
+  }
+},
+{
+  "model": "accounts.delegacion",
+  "pk": 7,
+  "fields": {
+    "created_at": "2026-09-27T15:39:50.667Z",
+    "updated_at": "2026-09-27T15:39:50.667Z",
+    "deleted_at": null,
+    "nombre": "Delegación La Serena Centro",
+    "estado": "Activa",
+    "ambito": "Urbano Central"
+  }
+},
+{
+  "model": "accounts.delegacion",
+  "pk": 8,
+  "fields": {
+    "created_at": "2026-09-27T15:39:50.673Z",
+    "updated_at": "2026-09-27T15:39:50.674Z",
+    "deleted_at": null,
+    "nombre": "Delegación Las Compañías",
+    "estado": "Activa",
+    "ambito": "Sector Norte"
+  }
+},
+{
+  "model": "accounts.delegacion",
+  "pk": 9,
+  "fields": {
+    "created_at": "2026-09-27T15:39:50.678Z",
+    "updated_at": "2026-09-27T15:39:50.678Z",
+    "deleted_at": null,
+    "nombre": "Delegación Rural",
+    "estado": "Activa",
+    "ambito": "Valle de Elqui / Rural"
+  }
+},
+{
+  "model": "accounts.cargo",
+  "pk": 7,
+  "fields": {
+    "created_at": "2026-09-18T19:21:41.249Z",
+    "updated_at": "2026-09-18T19:21:41.249Z",
+    "deleted_at": null,
+    "nombre_cargo": "Alcaldesa",
+    "descripcion": ""
+  }
+},
+{
+  "model": "accounts.cargo",
+  "pk": 8,
+  "fields": {
+    "created_at": "2026-09-18T19:22:04.609Z",
+    "updated_at": "2026-09-18T19:22:04.609Z",
+    "deleted_at": null,
+    "nombre_cargo": "Concejal/a",
+    "descripcion": ""
+  }
+},
+{
+  "model": "accounts.cargo",
+  "pk": 9,
+  "fields": {
+    "created_at": "2026-09-18T19:22:18.279Z",
+    "updated_at": "2026-09-18T19:22:18.279Z",
+    "deleted_at": null,
+    "nombre_cargo": "Delegado/Jefatura",
+    "descripcion": ""
+  }
+},
+{
+  "model": "accounts.cargo",
+  "pk": 10,
+  "fields": {
+    "created_at": "2026-09-18T19:22:41.551Z",
+    "updated_at": "2026-09-18T19:22:41.551Z",
+    "deleted_at": null,
+    "nombre_cargo": "Funcionario",
+    "descripcion": ""
+  }
+},
+{
+  "model": "accounts.cargo",
+  "pk": 11,
+  "fields": {
+    "created_at": "2026-09-27T15:39:50.688Z",
+    "updated_at": "2026-09-27T15:39:50.688Z",
+    "deleted_at": null,
+    "nombre_cargo": "Gestor Social",
+    "descripcion": "Atención y derivación de requerimientos sociales vecinales."
+  }
+},
+{
+  "model": "accounts.cargo",
+  "pk": 12,
+  "fields": {
+    "created_at": "2026-09-27T15:39:50.692Z",
+    "updated_at": "2026-09-27T15:39:50.692Z",
+    "deleted_at": null,
+    "nombre_cargo": "Coordinador Territorial",
+    "descripcion": "Supervisión de compromisos e intervenciones comunitarias."
+  }
+},
+{
+  "model": "accounts.cargo",
+  "pk": 13,
+  "fields": {
+    "created_at": "2026-09-27T15:39:50.696Z",
+    "updated_at": "2026-09-27T15:39:50.696Z",
+    "deleted_at": null,
+    "nombre_cargo": "Inspector Municipal",
+    "descripcion": "Fiscalización y respuesta a denuncias urbanas."
+  }
+},
+{
+  "model": "accounts.funcionario",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-09-27T15:39:51.240Z",
+    "updated_at": "2026-09-27T15:39:51.240Z",
+    "deleted_at": null,
+    "user": [
+      "admin_sgr"
+    ],
+    "identificador_institucional": "ADM-001",
+    "delegacion": 7,
+    "cargo": 12,
+    "estado": "Activo"
+  }
+},
+{
+  "model": "accounts.funcionario",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-09-27T15:39:51.797Z",
+    "updated_at": "2026-09-27T15:39:51.797Z",
+    "deleted_at": null,
+    "user": [
+      "delegado_centro"
+    ],
+    "identificador_institucional": "DEL-001",
+    "delegacion": 7,
+    "cargo": 12,
+    "estado": "Activo"
+  }
+},
+{
+  "model": "accounts.funcionario",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.348Z",
+    "updated_at": "2026-09-27T15:39:52.348Z",
+    "deleted_at": null,
+    "user": [
+      "delegado_companias"
+    ],
+    "identificador_institucional": "DEL-002",
+    "delegacion": 8,
+    "cargo": 12,
+    "estado": "Activo"
+  }
+},
+{
+  "model": "accounts.funcionario",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.917Z",
+    "updated_at": "2026-09-27T15:39:52.917Z",
+    "deleted_at": null,
+    "user": [
+      "funcionario_juan"
+    ],
+    "identificador_institucional": "FUN-101",
+    "delegacion": 7,
+    "cargo": 11,
+    "estado": "Activo"
+  }
+},
+{
+  "model": "accounts.rol",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-09-18T19:18:08.547Z",
+    "updated_at": "2026-09-18T19:18:08.547Z",
+    "deleted_at": null,
+    "nombre_rol": "Usuario de Consulta"
+  }
+},
+{
+  "model": "accounts.rol",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-09-18T19:18:30.133Z",
+    "updated_at": "2026-09-18T19:18:30.133Z",
+    "deleted_at": null,
+    "nombre_rol": "Verificador"
+  }
+},
+{
+  "model": "accounts.rol",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-09-18T19:18:40.381Z",
+    "updated_at": "2026-09-18T19:18:40.381Z",
+    "deleted_at": null,
+    "nombre_rol": "Funcionario"
+  }
+},
+{
+  "model": "accounts.rol",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-09-18T19:18:53.237Z",
+    "updated_at": "2026-09-18T19:22:27.603Z",
+    "deleted_at": null,
+    "nombre_rol": "Delegado/Jefatura"
+  }
+},
+{
+  "model": "accounts.rol",
+  "pk": 5,
+  "fields": {
+    "created_at": "2026-09-18T19:19:04.600Z",
+    "updated_at": "2026-09-18T19:19:04.600Z",
+    "deleted_at": null,
+    "nombre_rol": "Coordinador del sistema"
+  }
+},
+{
+  "model": "accounts.rol",
+  "pk": 6,
+  "fields": {
+    "created_at": "2026-09-18T19:19:17.686Z",
+    "updated_at": "2026-09-18T19:19:17.686Z",
+    "deleted_at": null,
+    "nombre_rol": "Administrador"
+  }
+},
+{
+  "model": "accounts.rol",
+  "pk": 7,
+  "fields": {
+    "created_at": "2026-09-27T15:39:50.684Z",
+    "updated_at": "2026-09-27T15:39:50.684Z",
+    "deleted_at": null,
+    "nombre_rol": "Delegado / Jefatura"
+  }
+},
+{
+  "model": "accounts.funcionariorol",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-09-27T15:39:51.245Z",
+    "updated_at": "2026-09-27T15:39:51.245Z",
+    "deleted_at": null,
+    "funcionario": 1,
+    "rol": 6
+  }
+},
+{
+  "model": "accounts.funcionariorol",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-09-27T15:39:51.802Z",
+    "updated_at": "2026-09-27T15:39:51.802Z",
+    "deleted_at": null,
+    "funcionario": 2,
+    "rol": 7
+  }
+},
+{
+  "model": "accounts.funcionariorol",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.353Z",
+    "updated_at": "2026-09-27T15:39:52.353Z",
+    "deleted_at": null,
+    "funcionario": 3,
+    "rol": 7
+  }
+},
+{
+  "model": "accounts.funcionariorol",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.921Z",
+    "updated_at": "2026-09-27T15:39:52.921Z",
+    "deleted_at": null,
+    "funcionario": 4,
+    "rol": 3
+  }
+},
+{
+  "model": "activities.actividad",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.956Z",
+    "updated_at": "2026-09-27T15:39:52.956Z",
+    "deleted_at": null,
+    "codigo_evidencia_unico": "EVI-20260927-746346",
+    "fecha_actividad": "2026-08-10",
+    "descripcion_solicitud": "Solicitud de entrega de alimentos por emergencia invernal",
+    "accion_ejecutada": "Evaluación social realizada y caja entregada en domicilio",
+    "contacto_nombre": "Ana Gutiérrez",
+    "contacto_telefono": "+56912345678",
+    "funcionario": 4,
+    "item": 1,
+    "periodo": 1
+  }
+},
+{
+  "model": "activities.actividad",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.971Z",
+    "updated_at": "2026-09-27T15:39:52.971Z",
+    "deleted_at": null,
+    "codigo_evidencia_unico": "EVI-20260927-D1EA37",
+    "fecha_actividad": "2026-08-15",
+    "descripcion_solicitud": "Operativo de limpieza de microbasural en Av. Las Compañías",
+    "accion_ejecutada": "Despacho de maquinaria pesada y retiro de 4 toneladas de escombros",
+    "contacto_nombre": "Roberto Gómez (Junta de Vecinos #4)",
+    "contacto_telefono": "+56987654321",
+    "funcionario": 3,
+    "item": 2,
+    "periodo": 1
+  }
+},
+{
+  "model": "activities.evidencia",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.960Z",
+    "updated_at": "2026-09-27T15:39:52.960Z",
+    "deleted_at": null,
+    "actividad": 1,
+    "ruta_archivo_url": "evidencias/2026/08/act1_foto.jpg",
+    "metadatos": "GPS: -29.9045, -71.2489 | Fecha: 2026-08-10"
+  }
+},
+{
+  "model": "activities.evidencia",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.975Z",
+    "updated_at": "2026-09-27T15:39:52.975Z",
+    "deleted_at": null,
+    "actividad": 2,
+    "ruta_archivo_url": "evidencias/2026/08/act2_limpieza.jpg",
+    "metadatos": "Fotografía panorámica del terreno despejado"
+  }
+},
+{
+  "model": "activities.validacionevidencia",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.964Z",
+    "updated_at": "2026-09-27T15:39:52.964Z",
+    "deleted_at": null,
+    "actividad": 1,
+    "verificador": 2,
+    "resultado": "Aprobado",
+    "observaciones": "Fotografía conforme con firma de recepción"
+  }
+},
+{
+  "model": "activities.validacionevidencia",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.977Z",
+    "updated_at": "2026-09-27T15:39:52.977Z",
+    "deleted_at": null,
+    "actividad": 2,
+    "verificador": 1,
+    "resultado": "Aprobado",
+    "observaciones": "Terreno verificado libre de escombros"
+  }
+},
+{
+  "model": "activities.atencionsocialgestion",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.967Z",
+    "updated_at": "2026-09-27T15:39:52.967Z",
+    "deleted_at": null,
+    "actividad": 1,
+    "numero_gestion": 1,
+    "tipo_gestion": "Entrevista Inicial",
+    "fecha_gestion": "2026-08-10",
+    "resultado_gestion": "Aprobada ayuda de emergencia"
+  }
+},
+{
+  "model": "agenda.compromisoagenda",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.982Z",
+    "updated_at": "2026-09-27T15:39:52.982Z",
+    "deleted_at": null,
+    "actividad_origen": 1,
+    "solicitante": "Junta de Vecinos El Milagro",
+    "territorio": "La Serena Centro",
+    "responsable": 4,
+    "area_apoyo": "DIDECO",
+    "fecha_comprometida": "2026-09-28",
+    "estado": "En proceso",
+    "observacion": "Reunión de coordinación vecinal por seguridad"
+  }
+},
+{
+  "model": "agenda.compromisoagenda",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.986Z",
+    "updated_at": "2026-09-27T15:39:52.986Z",
+    "deleted_at": null,
+    "actividad_origen": 2,
+    "solicitante": "Comité de Adelanto Las Compañías",
+    "territorio": "Las Compañías Sector Norte",
+    "responsable": 3,
+    "area_apoyo": "Operaciones",
+    "fecha_comprometida": "2026-09-30",
+    "estado": "Ingresado",
+    "observacion": "Instalación de contenedores comunitarios"
+  }
+},
+{
+  "model": "configuration.periodo",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.926Z",
+    "updated_at": "2026-09-27T15:39:52.926Z",
+    "deleted_at": null,
+    "fecha_inicio": "2026-07-01",
+    "fecha_termino": "2026-09-30",
+    "dias_computables": 91,
+    "estado": "Abierto"
+  }
+},
+{
+  "model": "configuration.catalogoactividad",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.929Z",
+    "updated_at": "2026-09-27T15:39:52.929Z",
+    "deleted_at": null,
+    "tipo_actividad": "Atención Social",
+    "servicio": "Asistencia Vecinal Directa",
+    "tipo_atencion": "Presencial",
+    "subtipo_atencion": "Registro Ficha Familiar",
+    "estado": "Activo"
+  }
+},
+{
+  "model": "configuration.catalogoactividad",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.933Z",
+    "updated_at": "2026-09-27T15:39:52.933Z",
+    "deleted_at": null,
+    "tipo_actividad": "Operativo Territorial",
+    "servicio": "Limpieza y Desmalezado",
+    "tipo_atencion": "Terreno",
+    "subtipo_atencion": "Intervención Comunitaria",
+    "estado": "Activo"
+  }
+},
+{
+  "model": "configuration.itemmedicion",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.936Z",
+    "updated_at": "2026-09-27T15:39:52.936Z",
+    "deleted_at": null,
+    "cargo": 11,
+    "catalogo": 1,
+    "nombre_item": "Fichas Sociales Ejecutadas",
+    "unidad_medida": "Fichas"
+  }
+},
+{
+  "model": "configuration.itemmedicion",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.941Z",
+    "updated_at": "2026-09-27T15:39:52.941Z",
+    "deleted_at": null,
+    "cargo": 12,
+    "catalogo": 2,
+    "nombre_item": "Operativos Territoriales Concluidos",
+    "unidad_medida": "Operativos"
+  }
+},
+{
+  "model": "configuration.configuracionmeta",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.946Z",
+    "updated_at": "2026-09-27T15:39:52.946Z",
+    "deleted_at": null,
+    "item": 1,
+    "periodo": 1,
+    "funcionario": 4,
+    "valor_objetivo": "10.00",
+    "ponderacion": "40.00",
+    "umbral_minimo": "80.00",
+    "maximo_computable": "150.00"
+  }
+},
+{
+  "model": "configuration.configuracionmeta",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-09-27T15:39:52.951Z",
+    "updated_at": "2026-09-27T15:39:52.951Z",
+    "deleted_at": null,
+    "item": 2,
+    "periodo": 1,
+    "funcionario": 3,
+    "valor_objetivo": "5.00",
+    "ponderacion": "60.00",
+    "umbral_minimo": "80.00",
+    "maximo_computable": "150.00"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 1,
+  "fields": {
+    "action_time": "2026-09-18T19:06:21.929Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "auth",
+      "user"
+    ],
+    "object_id": "1",
+    "object_repr": "Monis",
+    "action_flag": 2,
+    "change_message": "[{\"changed\": {\"fields\": [\"First name\", \"Last name\"]}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 2,
+  "fields": {
+    "action_time": "2026-09-18T19:09:02.590Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "1",
+    "object_repr": "Administrador",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 3,
+  "fields": {
+    "action_time": "2026-09-18T19:09:21.765Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "2",
+    "object_repr": "Coordinador del sistema",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 4,
+  "fields": {
+    "action_time": "2026-09-18T19:09:43.198Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "3",
+    "object_repr": "Delegado o Jefatura",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 5,
+  "fields": {
+    "action_time": "2026-09-18T19:09:59.565Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "4",
+    "object_repr": "Funcionario",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 6,
+  "fields": {
+    "action_time": "2026-09-18T19:10:14.897Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "5",
+    "object_repr": "Verificador",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 7,
+  "fields": {
+    "action_time": "2026-09-18T19:10:32.612Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "6",
+    "object_repr": "Usuario de Consulta",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 8,
+  "fields": {
+    "action_time": "2026-09-18T19:15:01.016Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "delegacion"
+    ],
+    "object_id": "1",
+    "object_repr": "Las Compañias",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 9,
+  "fields": {
+    "action_time": "2026-09-18T19:15:17.806Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "delegacion"
+    ],
+    "object_id": "2",
+    "object_repr": "Avenida del Mar",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 10,
+  "fields": {
+    "action_time": "2026-09-18T19:15:31.782Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "delegacion"
+    ],
+    "object_id": "3",
+    "object_repr": "Centro",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 11,
+  "fields": {
+    "action_time": "2026-09-18T19:15:47.822Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "delegacion"
+    ],
+    "object_id": "4",
+    "object_repr": "La Antena",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 12,
+  "fields": {
+    "action_time": "2026-09-18T19:16:01.883Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "delegacion"
+    ],
+    "object_id": "5",
+    "object_repr": "La Pampa",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 13,
+  "fields": {
+    "action_time": "2026-09-18T19:16:17.810Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "delegacion"
+    ],
+    "object_id": "6",
+    "object_repr": "Rural",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 14,
+  "fields": {
+    "action_time": "2026-09-18T19:18:08.553Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "rol"
+    ],
+    "object_id": "1",
+    "object_repr": "Usuario de Consulta",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 15,
+  "fields": {
+    "action_time": "2026-09-18T19:18:19.319Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "6",
+    "object_repr": "Usuario de Consulta",
+    "action_flag": 3,
+    "change_message": ""
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 16,
+  "fields": {
+    "action_time": "2026-09-18T19:18:30.138Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "rol"
+    ],
+    "object_id": "2",
+    "object_repr": "Verificador",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 17,
+  "fields": {
+    "action_time": "2026-09-18T19:18:32.934Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "5",
+    "object_repr": "Verificador",
+    "action_flag": 3,
+    "change_message": ""
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 18,
+  "fields": {
+    "action_time": "2026-09-18T19:18:40.387Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "rol"
+    ],
+    "object_id": "3",
+    "object_repr": "Funcionario",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 19,
+  "fields": {
+    "action_time": "2026-09-18T19:18:43.690Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "4",
+    "object_repr": "Funcionario",
+    "action_flag": 3,
+    "change_message": ""
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 20,
+  "fields": {
+    "action_time": "2026-09-18T19:18:53.242Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "rol"
+    ],
+    "object_id": "4",
+    "object_repr": "Delegado",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 21,
+  "fields": {
+    "action_time": "2026-09-18T19:18:58.183Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "3",
+    "object_repr": "Delegado o Jefatura",
+    "action_flag": 3,
+    "change_message": ""
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 22,
+  "fields": {
+    "action_time": "2026-09-18T19:19:04.603Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "rol"
+    ],
+    "object_id": "5",
+    "object_repr": "Coordinador del sistema",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 23,
+  "fields": {
+    "action_time": "2026-09-18T19:19:11.257Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "2",
+    "object_repr": "Coordinador del sistema",
+    "action_flag": 3,
+    "change_message": ""
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 24,
+  "fields": {
+    "action_time": "2026-09-18T19:19:17.690Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "rol"
+    ],
+    "object_id": "6",
+    "object_repr": "Administrador",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 25,
+  "fields": {
+    "action_time": "2026-09-18T19:19:21.962Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "1",
+    "object_repr": "Administrador",
+    "action_flag": 3,
+    "change_message": ""
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 26,
+  "fields": {
+    "action_time": "2026-09-18T19:21:41.253Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "7",
+    "object_repr": "Alcaldesa",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 27,
+  "fields": {
+    "action_time": "2026-09-18T19:22:04.613Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "8",
+    "object_repr": "Concejal/a",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 28,
+  "fields": {
+    "action_time": "2026-09-18T19:22:18.283Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "9",
+    "object_repr": "Delegado/Jefatura",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 29,
+  "fields": {
+    "action_time": "2026-09-18T19:22:27.607Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "rol"
+    ],
+    "object_id": "4",
+    "object_repr": "Delegado/Jefatura",
+    "action_flag": 2,
+    "change_message": "[{\"changed\": {\"fields\": [\"Nombre rol\"]}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 30,
+  "fields": {
+    "action_time": "2026-09-18T19:22:41.556Z",
+    "user": [
+      "Monis"
+    ],
+    "content_type": [
+      "accounts",
+      "cargo"
+    ],
+    "object_id": "10",
+    "object_repr": "Funcionario",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+}
+]
