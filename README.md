@@ -1,5 +1,5 @@
-# 🏛️ Sistema de Gestión de Resultados (SGR) — Segunda Evaluación
-### Ilustre Municipalidad de La Serena | INACAP — Evaluación Sumativa II (TI3041)
+# 🏛️ Sistema de Gestión de Resultados (SGR) #
+### Ilustre Municipalidad de La Serena | INACAP ###
 **Desarrollado por: Vanguard Systems Group**
 
 [![Estado](https://img.shields.io/badge/Entrega-Segunda%20Evaluaci%C3%B3n%20100%25-brightgreen.svg)](https://github.com/)
@@ -12,16 +12,16 @@
 ## 👥 1. Integrantes del Equipo
 - **Integrantes**: Vanguard Systems Group
 - **Institución**: INACAP Sede La Serena
-- **Carrera**: Ingeniería en Informática / Analista Programador
-- **Asignatura**: Programación Back End (TI3041)
-- **Docente**: Javier Ahumada
+- **Carrera**: Ingeniería en Informática
+- **Asignatura**: Programación Back End (TI3041) y Proyecto Integrado (TIHI43)
+- **Docente**: Javier Ahumada y Jorge Cortés
 
 ---
 
 ## 📋 2. Descripción General del Proyecto
 El **Sistema de Gestión de Resultados (SGR)** centraliza, mide y controla la gestión operativa de funcionarios, delegaciones territoriales (*Delegación La Serena Centro, Las Compañías / Norte, Sur, Rural*) y la atención ciudadana vecinal de la **Ilustre Municipalidad de La Serena**.
 
-En esta **Segunda Entrega** se presenta la arquitectura integral frontend/backend, la aplicación estricta de las **Normas Gráficas Oficiales de la Municipalidad de La Serena**, el flujo completo de autenticación y recuperación de contraseñas con validación de código de 6 dígitos, **seis mantenedores CRUD operativos**, el **formulario dependiente de ingreso de atención ciudadana**, el control de acceso diferenciado por roles con scoping territorial permanente y el plan exhaustivo de pruebas funcionales y de estrés.
+
 
 ---
 
@@ -37,7 +37,7 @@ Conforme a los requerimientos de la evaluación, a continuación se detalla el e
 | **Crear Nueva Contraseña** | Validación de requisitos (8+ car., mayús., minús., núm., esp.), confirmación, invalidación de código. | **OPERATIVO** | Real (Actualización en User Django) |
 | **CRUD Delegaciones** | Código, nombre, dirección, comuna, estado. Paginador, búsqueda, Excel, modales Ver/Editar/Eliminar. | **OPERATIVO** | Real (Soft delete `BaseModel`) |
 | **CRUD Roles** | Código, nombre_rol, alcance, estado, descripción. Paginador, búsqueda, Excel y modales. | **OPERATIVO** | Real (Soft delete `BaseModel`) |
-| **CRUD Usuarios** | Nombre, correo, rol, delegación asignada, estado. Scoping por perfil de delegación, Excel seguro. | **OPERATIVO** | Real (`Funcionario` + `User`) |
+| **CRUD Usuarios** | Nombre de usuario, nombre, correo, cargo, rol y delegación opcional para administradores. Contraseña temporal con cambio obligatorio al primer acceso. | **OPERATIVO** | Real (`Funcionario` + `User`) |
 | **CRUD Ítems y metas** | Código, nombre_item, descripción, estado. Paginador, búsqueda inteligente y Excel. | **OPERATIVO** | Real (`ItemMedicion`) |
 | **CRUD Tipo de Atención** | Código, nombre, descripción, estado. Integridad referencial con Subatenciones y Excel. | **OPERATIVO** | Real (`TipoAtencion`) |
 | **CRUD Sub Atención** | Código, nombre, Tipo de Atención asociado, estado. Paginador, búsqueda y Excel. | **OPERATIVO** | Real (`SubAtencion`) |
@@ -107,6 +107,7 @@ Copiar la plantilla de configuración sin secretos:
 ```bash
 cp .env.example .env
 ```
+Para configurar el correo, cambia `EMAIL_HOST_USER` y `EMAIL_HOST_PASSWORD` en `.env` por la cuenta emisora y su contraseña de aplicación. El remitente se define en `DEFAULT_FROM_EMAIL`; para Gmail se usa SMTP SSL en el puerto 465.
 
 ### Paso 5: Ejecutar migraciones de base de datos
 ```bash

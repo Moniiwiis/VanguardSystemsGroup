@@ -1,6 +1,6 @@
 from django.contrib import admin
 from core.admin import BaseScopedModelAdmin
-from .models import Delegacion, Cargo, Funcionario, Rol, FuncionarioRol
+from .models import Delegacion, Sector, Cargo, Funcionario, Rol, FuncionarioRol
 from configuration.models import ItemMedicion
 
 class FuncionarioRolInline(admin.TabularInline):
@@ -16,6 +16,21 @@ class DelegacionAdmin(BaseScopedModelAdmin):
     list_display = ('nombre', 'estado', 'ambito', 'created_at')
     search_fields = ('nombre', 'ambito')
     list_filter = ('estado',)
+
+@admin.register(Sector)
+class SectorAdmin(BaseScopedModelAdmin):
+    list_display = ('get_codigo', 'nombre', 'delegacion', 'estado', 'created_at')
+    search_fields = ('codigo', 'nombre', 'descripcion', 'delegacion__nombre')
+    list_filter = ('delegacion', 'estado')
+    list_select_related = ('delegacion',)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        if hasattr(request.user, 'funcionario') and request.user.funcionario.delegacion:
+            return qs.filter(delegacion=request.user.funcionario.delegacion)
+        return qs
 
 @admin.register(Cargo)
 class CargoAdmin(BaseScopedModelAdmin):

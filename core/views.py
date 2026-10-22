@@ -1,27 +1,143 @@
-import random
+import logging
+import secrets
 import datetime
+from smtplib import SMTPException
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth import login, logout, authenticate, update_session_auth_hash
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
+from django import forms
+from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
+from django.core.mail.message import BadHeaderError
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.core.validators import validate_email
+from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponseForbidden
 
 from core.context_processors import global_context
 from core.utils import export_to_excel_csv, build_accent_query
 from activities.models import (
-    Actividad, ValidacionEvidencia, TipoGestion, Vecino, AtencionCiudadana
+    Actividad, Evidencia, ValidacionEvidencia, TipoGestion, Vecino, AtencionCiudadana
 )
 from agenda.models import CompromisoAgenda
 from configuration.models import (
     ConfiguracionMeta, Periodo, ItemMedicion, CatalogoActividad,
     TipoAtencion, SubAtencion
 )
-from accounts.models import Funcionario, Cargo, Delegacion, Rol, FuncionarioRol
+from accounts.models import Funcionario, Cargo, Delegacion, Sector, Rol, FuncionarioRol
+
+logger = logging.getLogger(__name__)
+
+
+def _send_recovery_code(email, code):
+    sent_count = send_mail(
+        subject='Código de Recuperación — Sistema Municipal La Serena',
+        message=(
+            "Estimado/a funcionario/a:\n\n"
+            "Has solicitado restablecer tu contraseña en el Sistema Municipal SGR.\n"
+            f"Tu código de verificación de 6 dígitos es: {code}\n\n"
+            "Este código es válido por 10 minutos.\n"
+            "Si no solicitaste este cambio, ignora este mensaje.\n\n"
+            "Ilustre Municipalidad de La Serena"
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[email],
+        fail_silently=False,
+    )
+    if sent_count != 1:
+        raise SMTPException("El backend de correo no confirmó el envío del mensaje.")
+
+
+def _clear_recovery_session(request):
+    for key in (
+        'recovery_code',
+        'recovery_email',
+        'recovery_user_id',
+        'recovery_code_time',
+        'recovery_attempts',
+        'recovery_verified',
+        'recovery_resend_allowed',
+    ):
+        request.session.pop(key, None)
+
+
+def _apply_list_ordering(queryset, request, options, default):
+    ordering = request.GET.get('orden', default)
+    allowed = {value for value, _label in options}
+    if ordering not in allowed:
+        ordering = default
+    return queryset.order_by(ordering), ordering
+
+
+DEFAULT_NEW_USER_PASSWORD = "User1234!"
+
+
+def _validate_password(password):
+    if len(password) < 8:
+        return "La contraseña debe tener al menos 8 caracteres."
+    if not any(character.isupper() for character in password):
+        return "La contraseña debe contener al menos una letra mayúscula."
+    if not any(character.islower() for character in password):
+        return "La contraseña debe contener al menos una letra minúscula."
+    if not any(character.isdigit() for character in password):
+        return "La contraseña debe contener al menos un número."
+    if not any(character in "!@#$%^&*()_+-=[]{}|;:,.<>?" for character in password):
+        return "La contraseña debe contener al menos un carácter especial."
+    return None
+
+
+ALLOWED_PAGE_SIZES = {5, 15, 30}
+
+
+def _get_page_size(request, session_key='page_size'):
+    """
+    Clase 10 (Diapositivas 15-16):
+    Paginación profesional con persistencia en sesión (5, 15, 30).
+    - Valida contra whitelist ALLOWED_PAGE_SIZES.
+    - Si llega por GET, actualiza request.session (si está disponible).
+    - Si no llega por GET, recupera de request.session.
+    - Valor por defecto: 15.
+    """
+    raw_size = request.GET.get('page_size')
+    session = getattr(request, 'session', None)
+    if raw_size:
+        try:
+            selected_size = int(raw_size)
+            if selected_size in ALLOWED_PAGE_SIZES:
+                if session is not None:
+                    session[session_key] = selected_size
+                    if hasattr(session, 'modified'):
+                        session.modified = True
+                return selected_size
+        except (TypeError, ValueError):
+            pass
+    if session is not None:
+        return session.get(session_key, 15)
+    return 15
+
+
+def _paginate_queryset(request, queryset, session_key='page_size'):
+    """
+    Clase 10 (Diapositiva 17):
+    Conserva la consulta al paginar:
+    params = request.GET.copy()
+    params.pop('page', None)
+    query_params = params.urlencode()
+    """
+    page_size = _get_page_size(request, session_key)
+    paginator = Paginator(queryset, page_size)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    params = request.GET.copy()
+    params.pop('page', None)
+    query_params = params.urlencode()
+
+    return page_obj, page_size, query_params
 
 
 # --- DECORADOR DE PERMISOS POR ROL ---
@@ -69,6 +185,9 @@ def login_view(request):
                 if first_del:
                     request.session['delegacion_activa_id'] = first_del.id
 
+            if func and func.debe_cambiar_contrasena:
+                return redirect('cambiar_contrasena_inicial')
+
             messages.success(request, f"Bienvenido/a al Sistema Municipal, {user.first_name or user.username}.")
             
             # Si es operador exclusivo, dirigir a atenciones
@@ -91,43 +210,76 @@ def logout_view(request):
     return redirect('login')
 
 
+@login_required
+def cambiar_contrasena_inicial_view(request):
+    funcionario = get_object_or_404(
+        Funcionario,
+        user=request.user,
+        debe_cambiar_contrasena=True,
+    )
+
+    if request.method == 'POST':
+        password = request.POST.get('nueva_contrasena', '')
+        confirmation = request.POST.get('confirmar_contrasena', '')
+        error = _validate_password(password)
+        if error:
+            messages.error(request, error)
+        elif password != confirmation:
+            messages.error(request, "Las contraseñas no coinciden.")
+        else:
+            request.user.set_password(password)
+            request.user.save()
+            funcionario.debe_cambiar_contrasena = False
+            funcionario.save(update_fields=['debe_cambiar_contrasena', 'updated_at'])
+            update_session_auth_hash(request, request.user)
+            messages.success(request, "Contraseña actualizada. Ya puedes usar el sistema.")
+            return redirect('gestion_inicio')
+
+    return render(request, 'auth/cambiar_contrasena_inicial.html')
+
+
 def recuperar_contrasena_view(request):
     if request.method == 'POST':
         email = request.POST.get('email', '').strip()
-        if email:
-            code = f"{random.randint(100000, 999999)}"
-            now = timezone.now()
-            
-            request.session['recovery_code'] = code
-            request.session['recovery_email'] = email
-            request.session['recovery_code_time'] = now.timestamp()
-            request.session['recovery_attempts'] = 0
-            request.session['recovery_verified'] = False
-            request.session['recovery_resend_allowed'] = (now + datetime.timedelta(seconds=45)).timestamp()
+        try:
+            validate_email(email)
+        except ValidationError:
+            messages.error(request, "Por favor ingresa un correo electrónico válido.")
+            return render(request, 'auth/recuperar_contrasena.html')
 
-            # Enviar correo (o registrar en consola sin revelar si existe)
+        user = User.objects.filter(email__iexact=email).first()
+        _clear_recovery_session(request)
+        request.session['recovery_email'] = email
+        now = timezone.now()
+        request.session['recovery_code_time'] = now.timestamp()
+        request.session['recovery_attempts'] = 0
+        request.session['recovery_verified'] = False
+        request.session['recovery_resend_allowed'] = (
+            now + datetime.timedelta(seconds=45)
+        ).timestamp()
+
+        if user:
+            code = f"{secrets.randbelow(1_000_000):06d}"
             try:
-                send_mail(
-                    subject='Código de Recuperación — Sistema Municipal La Serena',
-                    message=(
-                        f"Estimado/a funcionario/a:\n\n"
-                        f"Has solicitado restablecer tu contraseña en el Sistema Municipal SGR.\n"
-                        f"Tu código de verificación de 6 dígitos es: {code}\n\n"
-                        f"Este código es válido por 10 minutos.\n"
-                        f"Si no solicitaste este cambio, ignora este mensaje.\n\n"
-                        f"Ilustre Municipalidad de La Serena"
-                    ),
-                    from_email='no-reply@municipalidadlaserena.cl',
-                    recipient_list=[email],
-                    fail_silently=True,
+                _send_recovery_code(user.email, code)
+            except (OSError, SMTPException, BadHeaderError):
+                logger.exception("No se pudo enviar el código de recuperación.")
+                _clear_recovery_session(request)
+                messages.error(
+                    request,
+                    "No fue posible enviar el correo en este momento. "
+                    "Verifica la configuración SMTP e inténtalo nuevamente.",
                 )
-            except Exception:
-                pass
+                return redirect('recuperar_contrasena')
 
-            # Mensaje genérico según requerimiento de seguridad (A3 / Pág 3 y 5)
-            messages.success(request, f"Si la cuenta existe, recibirás instrucciones y tu código de verificación. (Código generado para pruebas: {code})")
-            return redirect('validar_codigo')
-        messages.error(request, "Por favor ingresa un correo electrónico válido.")
+            request.session['recovery_code'] = code
+            request.session['recovery_user_id'] = user.id
+
+        messages.success(
+            request,
+            "Si la cuenta existe, recibirás instrucciones en el correo asociado.",
+        )
+        return redirect('validar_codigo')
 
     return render(request, 'auth/recuperar_contrasena.html')
 
@@ -145,19 +297,46 @@ def reenviar_codigo_view(request):
         messages.warning(request, f"Debes esperar {segundos} segundos antes de solicitar un reenvío.")
         return redirect('validar_codigo')
 
-    # Generar nuevo código
-    code = f"{random.randint(100000, 999999)}"
-    request.session['recovery_code'] = code
-    request.session['recovery_code_time'] = now_ts
-    request.session['recovery_attempts'] = 0
-    request.session['recovery_resend_allowed'] = (timezone.now() + datetime.timedelta(seconds=45)).timestamp()
+    user_id = request.session.get('recovery_user_id')
+    if user_id:
+        user = User.objects.filter(id=user_id, email__iexact=email).first()
+        if not user:
+            _clear_recovery_session(request)
+            messages.error(request, "La sesión de recuperación expiró. Inicia el proceso nuevamente.")
+            return redirect('recuperar_contrasena')
 
-    messages.success(request, f"Se ha generado y reenviado un nuevo código de verificación. (Código: {code})")
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        try:
+            _send_recovery_code(user.email, code)
+        except (OSError, SMTPException, BadHeaderError):
+            logger.exception("No se pudo reenviar el código de recuperación.")
+            messages.error(
+                request,
+                "No fue posible enviar el correo en este momento. "
+                "Verifica la configuración SMTP e inténtalo nuevamente.",
+            )
+            return redirect('validar_codigo')
+
+        request.session['recovery_code'] = code
+        request.session['recovery_code_time'] = now_ts
+        request.session['recovery_attempts'] = 0
+
+    request.session['recovery_resend_allowed'] = (
+        timezone.now() + datetime.timedelta(seconds=45)
+    ).timestamp()
+    messages.success(
+        request,
+        "Si la cuenta existe, recibirás un nuevo código en el correo asociado.",
+    )
     return redirect('validar_codigo')
 
 
 def validar_codigo_view(request):
-    email = request.session.get('recovery_email', 'usuario@laserena.cl')
+    email = request.session.get('recovery_email')
+    if not email:
+        messages.error(request, "Inicia nuevamente la recuperación de contraseña.")
+        return redirect('recuperar_contrasena')
+
     actual_code = request.session.get('recovery_code')
     code_time = request.session.get('recovery_code_time')
     attempts = request.session.get('recovery_attempts', 0)
@@ -182,7 +361,12 @@ def validar_codigo_view(request):
         digits = [request.POST.get(f'code_{i}', '').strip() for i in range(1, 7)]
         entered_code = "".join(digits)
 
-        if entered_code and actual_code and entered_code == str(actual_code):
+        if (
+            entered_code
+            and actual_code
+            and request.session.get('recovery_user_id')
+            and entered_code == str(actual_code)
+        ):
             request.session['recovery_verified'] = True
             messages.success(request, "Código validado exitosamente. Ahora crea tu nueva contraseña.")
             return redirect('nueva_contrasena')
@@ -238,18 +422,21 @@ def nueva_contrasena_view(request):
             return render(request, 'auth/nueva_contrasena.html')
 
         # Actualizar contraseña en base de datos real
-        user = User.objects.filter(Q(email__iexact=email) | Q(username__iexact=email.split('@')[0])).first()
+        user_id = request.session.get('recovery_user_id')
+        user = User.objects.filter(id=user_id, email__iexact=email).first()
         if user:
             user.set_password(pass1)
-            user.is_active = True
             user.save()
+            Funcionario.all_objects.filter(user=user).update(
+                debe_cambiar_contrasena=False,
+            )
+        else:
+            _clear_recovery_session(request)
+            messages.error(request, "La sesión de recuperación expiró. Inicia el proceso nuevamente.")
+            return redirect('recuperar_contrasena')
 
         # Invalidar de inmediato código y limpiar sesión
-        request.session.pop('recovery_code', None)
-        request.session.pop('recovery_email', None)
-        request.session.pop('recovery_verified', None)
-        request.session.pop('recovery_code_time', None)
-        request.session.pop('recovery_attempts', None)
+        _clear_recovery_session(request)
 
         messages.success(request, "¡Contraseña actualizada exitosamente! Ahora puedes iniciar sesión con tu nueva clave.")
         return redirect('login')
@@ -266,10 +453,34 @@ def cambiar_delegacion_view(request, del_id):
         messages.error(request, "Tu perfil de usuario tiene asignado un contexto territorial fijo.")
         return redirect(request.META.get('HTTP_REFERER', 'gestion_inicio'))
 
+    referer = request.META.get('HTTP_REFERER', '')
+
+    if del_id == 0:
+        request.session['delegacion_activa_id'] = 'global'
+        messages.success(request, "Contexto territorial cambiado a 'Global (Todas las delegaciones)'.")
+        if referer:
+            from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+            u = urlparse(referer)
+            q = parse_qs(u.query)
+            q.pop('delegacion', None)
+            q.pop('page', None)
+            new_query = urlencode(q, doseq=True)
+            return redirect(urlunparse((u.scheme, u.netloc, u.path, u.params, new_query, u.fragment)))
+        return redirect('gestion_inicio')
+
     nueva_del = get_object_or_404(Delegacion, id=del_id, estado='Activa')
     request.session['delegacion_activa_id'] = nueva_del.id
     messages.success(request, f"Contexto territorial cambiado a '{nueva_del.nombre}'.")
-    return redirect(request.META.get('HTTP_REFERER', 'gestion_inicio'))
+
+    if referer:
+        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+        u = urlparse(referer)
+        q = parse_qs(u.query)
+        q['delegacion'] = [str(nueva_del.id)]
+        q.pop('page', None)
+        new_query = urlencode(q, doseq=True)
+        return redirect(urlunparse((u.scheme, u.netloc, u.path, u.params, new_query, u.fragment)))
+    return redirect('gestion_inicio')
 
 
 # --- INICIO / DASHBOARD ---
@@ -391,11 +602,20 @@ def gestion_delegaciones(request):
     q = request.GET.get('q', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
 
-    qs = Delegacion.objects.all().order_by('id')
+    qs = Delegacion.objects.all().order_by('-id')
     if q:
         qs = qs.filter(build_accent_query(['codigo', 'nombre', 'direccion', 'comuna'], q))
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
+
+    orden_opciones = [
+        ('id', 'Más antiguas'),
+        ('-id', 'Más recientes'),
+        ('nombre', 'Nombre A-Z'),
+        ('-nombre', 'Nombre Z-A'),
+        ('estado', 'Estado'),
+    ]
+    qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-id')
 
     # Exportar a Excel
     if request.GET.get('export') == 'excel':
@@ -403,7 +623,8 @@ def gestion_delegaciones(request):
         rows = [[d.get_codigo(), d.nombre, d.direccion or '', d.comuna or '', d.estado] for d in qs]
         return export_to_excel_csv("delegaciones_municipales", headers, rows)
 
-    paginator = Paginator(qs, 10)
+    page_size = _get_page_size(request)
+    paginator = Paginator(qs, page_size)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
@@ -412,6 +633,9 @@ def gestion_delegaciones(request):
         'delegaciones': page_obj.object_list,
         'q': q,
         'filtro_estado': filtro_estado,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
         'total_registros': qs.count()
     })
 
@@ -487,18 +711,28 @@ def gestion_roles(request):
     q = request.GET.get('q', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
 
-    qs = Rol.objects.all().order_by('id')
+    qs = Rol.objects.all().order_by('-id')
     if q:
         qs = qs.filter(build_accent_query(['codigo', 'nombre_rol', 'alcance', 'descripcion'], q))
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
+
+    orden_opciones = [
+        ('id', 'Más antiguos'),
+        ('-id', 'Más recientes'),
+        ('nombre_rol', 'Nombre A-Z'),
+        ('-nombre_rol', 'Nombre Z-A'),
+        ('estado', 'Estado'),
+    ]
+    qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-id')
 
     if request.GET.get('export') == 'excel':
         headers = ['Código', 'Rol', 'Alcance', 'Estado', 'Descripción']
         rows = [[r.get_codigo(), r.nombre_rol, r.alcance, r.estado, r.descripcion or ''] for r in qs]
         return export_to_excel_csv("roles_sistema", headers, rows)
 
-    paginator = Paginator(qs, 10)
+    page_size = _get_page_size(request)
+    paginator = Paginator(qs, page_size)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
@@ -507,6 +741,9 @@ def gestion_roles(request):
         'roles': page_obj.object_list,
         'q': q,
         'filtro_estado': filtro_estado,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
         'total_registros': qs.count()
     })
 
@@ -562,7 +799,9 @@ def gestion_usuarios(request):
     if request.method == 'POST':
         nombre = request.POST.get('nombre', '').strip()
         correo = request.POST.get('correo', '').strip()
+        username = request.POST.get('username', '').strip()
         rol_id = request.POST.get('rol_id')
+        cargo_id = request.POST.get('cargo_id')
         delegacion_id = request.POST.get('delegacion_id')
         estado = request.POST.get('estado', 'Activo')
 
@@ -570,50 +809,78 @@ def gestion_usuarios(request):
         if ctx['permisos']['es_delegado'] and not ctx['permisos']['es_admin']:
             delegacion_id = del_activa.id if del_activa else None
 
-        if not nombre or not correo:
-            messages.error(request, "Nombre y correo electrónico son requeridos.")
+        rol_obj = Rol.objects.filter(id=rol_id, estado='Activo').first()
+        cargo_obj = Cargo.objects.filter(id=cargo_id).first()
+        if not nombre or not correo or not username or not rol_obj or not cargo_obj:
+            messages.error(request, "Nombre, usuario, correo, rol y cargo son obligatorios.")
+        elif (
+            not ctx['permisos']['es_admin']
+            and rol_obj.nombre_rol.strip().casefold()
+            in {'administrador', 'superadministrador'}
+        ):
+            messages.error(request, "Solo un administrador puede asignar el rol de administrador.")
+        elif User.objects.filter(username__iexact=username).exists():
+            messages.error(request, "Ese nombre de usuario ya está registrado.")
+        elif User.objects.filter(email__iexact=correo).exists():
+            messages.error(request, "Ese correo electrónico ya está registrado.")
         else:
-            username_base = correo.split('@')[0]
-            user, created = User.objects.get_or_create(
-                username=username_base,
-                defaults={'email': correo, 'first_name': nombre, 'is_staff': True}
+            rol_es_administrador = rol_obj.nombre_rol.strip().casefold() in {
+                'administrador',
+                'superadministrador',
+            }
+            del_obj = None
+            requiere_delegacion = rol_obj.alcance.strip().casefold() == 'delegación'
+            if not rol_es_administrador and requiere_delegacion and not delegacion_id:
+                messages.error(request, "Este rol requiere una delegación.")
+                return redirect('gestion_usuarios')
+            if not rol_es_administrador and delegacion_id:
+                del_obj = Delegacion.objects.filter(
+                    id=delegacion_id,
+                    estado='Activa',
+                ).first()
+                if not del_obj:
+                    messages.error(request, "Selecciona una delegación activa válida.")
+                    return redirect('gestion_usuarios')
+
+            user = User.objects.create_user(
+                username=username,
+                email=correo,
+                first_name=nombre,
+                password=DEFAULT_NEW_USER_PASSWORD,
+                is_staff=True,
             )
-            user.first_name = nombre
-            user.email = correo
             user.is_active = (estado == 'Activo')
-            if created:
-                user.set_password("User1234!")
             user.save()
 
-            del_obj = Delegacion.objects.filter(id=delegacion_id).first() if delegacion_id else None
-            cargo_def = Cargo.objects.first()
-            func, f_created = Funcionario.all_objects.get_or_create(
+            func = Funcionario.all_objects.get_or_create(
                 user=user,
                 defaults={
                     'identificador_institucional': f"USR-{user.id:03d}",
                     'delegacion': del_obj,
-                    'cargo': cargo_def,
+                    'cargo': cargo_obj,
                     'estado': estado
                 }
-            )
+            )[0]
             func.delegacion = del_obj
+            func.cargo = cargo_obj
             func.estado = estado
+            func.debe_cambiar_contrasena = True
             func.deleted_at = None
             func.save()
 
-            if rol_id:
-                rol_obj = Rol.objects.filter(id=rol_id).first()
-                if rol_obj:
-                    # Desactivar roles previos y asignar el seleccionado
-                    FuncionarioRol.objects.filter(funcionario=func).delete()
-                    fr = FuncionarioRol.all_objects.filter(funcionario=func, rol=rol_obj).first()
-                    if fr:
-                        fr.deleted_at = None
-                        fr.save()
-                    else:
-                        FuncionarioRol.objects.create(funcionario=func, rol=rol_obj)
+            FuncionarioRol.objects.filter(funcionario=func).delete()
+            fr = FuncionarioRol.all_objects.filter(funcionario=func, rol=rol_obj).first()
+            if fr:
+                fr.deleted_at = None
+                fr.save()
+            else:
+                FuncionarioRol.objects.create(funcionario=func, rol=rol_obj)
 
-            messages.success(request, f"Usuario '{nombre}' registrado exitosamente.")
+            messages.success(
+                request,
+                f"Usuario '{username}' creado. Contraseña temporal: "
+                f"{DEFAULT_NEW_USER_PASSWORD}. Deberá cambiarla al iniciar sesión.",
+            )
             return redirect('gestion_usuarios')
 
     q = request.GET.get('q', '').strip()
@@ -622,7 +889,9 @@ def gestion_usuarios(request):
     todas_delegaciones = Delegacion.objects.filter(estado='Activa').order_by('id')
     delegacion_seleccionada = None
 
-    qs = Funcionario.objects.select_related('user', 'delegacion').prefetch_related('funcionariorol_set__rol').order_by('id')
+    qs = Funcionario.objects.select_related(
+        'user', 'delegacion', 'cargo'
+    ).prefetch_related('funcionariorol_set__rol').order_by('-id')
 
     # Scoping de seguridad en el servidor:
     # Delegado Municipal solo ve usuarios de su delegación asignada
@@ -640,33 +909,57 @@ def gestion_usuarios(request):
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
 
+    orden_opciones = [
+        ('id', 'Más antiguos'),
+        ('-id', 'Más recientes'),
+        ('user__first_name', 'Nombre A-Z'),
+        ('-user__first_name', 'Nombre Z-A'),
+        ('user__email', 'Correo'),
+        ('delegacion__nombre', 'Delegación'),
+    ]
+    qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-id')
+
     # Exportar a Excel (sin claves, tokens ni datos sensibles)
     if request.GET.get('export') == 'excel':
-        headers = ['Nombre', 'Correo Electrónico', 'Rol Principal', 'Delegación', 'Estado']
+        headers = ['Usuario', 'Nombre', 'Correo Electrónico', 'Cargo', 'Rol Principal', 'Delegación', 'Estado']
         rows = []
         for f in qs:
             rol_p = f.funcionariorol_set.first()
             rol_txt = rol_p.rol.nombre_rol if rol_p and rol_p.rol else 'Funcionario'
             del_txt = f.delegacion.nombre if f.delegacion else 'Sin delegación'
-            rows.append([f.user.first_name or f.user.username, f.user.email, rol_txt, del_txt, f.estado])
+            rows.append([
+                f.user.username,
+                f.user.first_name or f.user.username,
+                f.user.email,
+                f.cargo.nombre_cargo,
+                rol_txt,
+                del_txt,
+                f.estado,
+            ])
         return export_to_excel_csv("usuarios_sistema", headers, rows)
 
-    paginator = Paginator(qs, 10)
+    page_size = _get_page_size(request)
+    paginator = Paginator(qs, page_size)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
     roles = Rol.objects.filter(estado='Activo')
+    cargos = Cargo.objects.all().order_by('nombre_cargo')
     delegaciones = ctx['delegaciones_autorizadas']
 
     return render(request, 'gestion/usuarios.html', {
         'page_obj': page_obj,
         'funcionarios': page_obj.object_list,
         'roles': roles,
+        'cargos': cargos,
         'delegaciones': delegaciones,
         'todas_delegaciones': todas_delegaciones,
         'delegacion_seleccionada': delegacion_seleccionada,
         'q': q,
         'filtro_estado': filtro_estado,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
         'total_registros': qs.count()
     })
 
@@ -687,31 +980,84 @@ def gestion_usuarios_editar(request, user_id):
             return redirect('gestion_usuarios')
 
     if request.method == 'POST':
+        rol_id = request.POST.get('rol_id')
+        rol_obj = Rol.objects.filter(id=rol_id, estado='Activo').first() if rol_id else None
+        cargo_id = request.POST.get('cargo_id')
+        cargo_obj = Cargo.objects.filter(id=cargo_id).first() if cargo_id else None
+        if not cargo_obj:
+            messages.error(request, "Selecciona un cargo válido.")
+            return redirect('gestion_usuarios')
+        if rol_id and not rol_obj:
+            messages.error(request, "Selecciona un rol válido.")
+            return redirect('gestion_usuarios')
+        if (
+            rol_obj
+            and not ctx['permisos']['es_admin']
+            and rol_obj.nombre_rol.strip().casefold()
+            in {'administrador', 'superadministrador'}
+        ):
+            messages.error(request, "Solo un administrador puede asignar el rol de administrador.")
+            return redirect('gestion_usuarios')
+
+        if ctx['permisos']['es_admin'] and rol_obj:
+            es_rol_administrador = rol_obj.nombre_rol.strip().casefold() in {
+                'administrador',
+                'superadministrador',
+            }
+            del_id = request.POST.get('delegacion_id', '').strip()
+            if (
+                not es_rol_administrador
+                and rol_obj.alcance.strip().casefold() == 'delegación'
+                and not del_id
+            ):
+                messages.error(request, "Este rol requiere una delegación.")
+                return redirect('gestion_usuarios')
+            if not es_rol_administrador and del_id and not Delegacion.objects.filter(
+                id=del_id,
+                estado='Activa',
+            ).exists():
+                messages.error(request, "Selecciona una delegación activa válida.")
+                return redirect('gestion_usuarios')
+
         estado = request.POST.get('estado', funcionario.estado)
         funcionario.user.first_name = request.POST.get('nombre', funcionario.user.first_name).strip()
         funcionario.user.email = request.POST.get('correo', funcionario.user.email).strip()
         funcionario.user.is_active = (estado == 'Activo')
         funcionario.user.save()
 
+        funcionario.cargo = cargo_obj
+
         if ctx['permisos']['es_admin']:
             del_id = request.POST.get('delegacion_id')
-            if del_id:
+            if rol_obj and rol_obj.nombre_rol.strip().casefold() in {
+                'administrador',
+                'superadministrador',
+            }:
+                funcionario.delegacion = None
+            elif del_id:
                 funcionario.delegacion_id = del_id
+            else:
+                funcionario.delegacion = None
+        elif ctx['permisos']['es_delegado'] and ctx['delegacion_activa']:
+            funcionario.delegacion = ctx['delegacion_activa']
 
         funcionario.estado = estado
         funcionario.save()
 
-        rol_id = request.POST.get('rol_id')
-        if rol_id:
-            rol_obj = Rol.objects.filter(id=rol_id).first()
-            if rol_obj:
-                FuncionarioRol.objects.filter(funcionario=funcionario).delete()
-                fr = FuncionarioRol.all_objects.filter(funcionario=funcionario, rol=rol_obj).first()
-                if fr:
-                    fr.deleted_at = None
-                    fr.save()
-                else:
-                    FuncionarioRol.objects.create(funcionario=funcionario, rol=rol_obj)
+        if rol_obj:
+            if rol_obj.nombre_rol.strip().casefold() in {
+                'administrador',
+                'superadministrador',
+            }:
+                funcionario.delegacion = None
+                funcionario.save(update_fields=['delegacion', 'updated_at'])
+            FuncionarioRol.objects.filter(funcionario=funcionario).delete()
+            fr = FuncionarioRol.all_objects.filter(funcionario=funcionario, rol=rol_obj).first()
+            if fr:
+                fr.deleted_at = None
+                fr.save()
+            else:
+                FuncionarioRol.objects.create(funcionario=funcionario, rol=rol_obj)
 
         messages.success(request, f"Usuario '{funcionario.user.first_name}' actualizado exitosamente.")
     return redirect('gestion_usuarios')
@@ -768,18 +1114,28 @@ def gestion_metas(request):
     q = request.GET.get('q', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
 
-    qs = ItemMedicion.objects.all().order_by('id')
+    qs = ItemMedicion.objects.all().order_by('-id')
     if q:
         qs = qs.filter(build_accent_query(['codigo', 'nombre_item', 'descripcion'], q))
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
+
+    orden_opciones = [
+        ('id', 'Más antiguos'),
+        ('-id', 'Más recientes'),
+        ('nombre_item', 'Nombre A-Z'),
+        ('-nombre_item', 'Nombre Z-A'),
+        ('estado', 'Estado'),
+    ]
+    qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-id')
 
     if request.GET.get('export') == 'excel':
         headers = ['Código', 'Nombre', 'Descripción', 'Estado']
         rows = [[it.get_codigo(), it.nombre_item, it.descripcion or '', it.estado] for it in qs]
         return export_to_excel_csv("items_metas", headers, rows)
 
-    paginator = Paginator(qs, 10)
+    page_size = _get_page_size(request)
+    paginator = Paginator(qs, page_size)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
@@ -788,6 +1144,9 @@ def gestion_metas(request):
         'items': page_obj.object_list,
         'q': q,
         'filtro_estado': filtro_estado,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
         'total_registros': qs.count()
     })
 
@@ -856,18 +1215,28 @@ def gestion_tipo_atencion(request):
     q = request.GET.get('q', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
 
-    qs = TipoAtencion.objects.all().order_by('id')
+    qs = TipoAtencion.objects.all().order_by('-id')
     if q:
         qs = qs.filter(build_accent_query(['codigo', 'nombre', 'descripcion'], q))
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
+
+    orden_opciones = [
+        ('id', 'Más antiguos'),
+        ('-id', 'Más recientes'),
+        ('nombre', 'Nombre A-Z'),
+        ('-nombre', 'Nombre Z-A'),
+        ('estado', 'Estado'),
+    ]
+    qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-id')
 
     if request.GET.get('export') == 'excel':
         headers = ['Código', 'Nombre', 'Descripción', 'Estado']
         rows = [[ta.get_codigo(), ta.nombre, ta.descripcion or '', ta.estado] for ta in qs]
         return export_to_excel_csv("tipos_de_atencion", headers, rows)
 
-    paginator = Paginator(qs, 10)
+    page_size = _get_page_size(request)
+    paginator = Paginator(qs, page_size)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
@@ -876,6 +1245,9 @@ def gestion_tipo_atencion(request):
         'tipos': page_obj.object_list,
         'q': q,
         'filtro_estado': filtro_estado,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
         'total_registros': qs.count()
     })
 
@@ -946,18 +1318,29 @@ def gestion_sub_atencion(request):
     q = request.GET.get('q', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
 
-    qs = SubAtencion.objects.select_related('tipo_atencion').all().order_by('id')
+    qs = SubAtencion.objects.select_related('tipo_atencion').all().order_by('-id')
     if q:
         qs = qs.filter(build_accent_query(['codigo', 'nombre', 'tipo_atencion__nombre'], q))
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
+
+    orden_opciones = [
+        ('id', 'Más antiguas'),
+        ('-id', 'Más recientes'),
+        ('nombre', 'Nombre A-Z'),
+        ('-nombre', 'Nombre Z-A'),
+        ('tipo_atencion__nombre', 'Tipo de atención'),
+        ('estado', 'Estado'),
+    ]
+    qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-id')
 
     if request.GET.get('export') == 'excel':
         headers = ['Código', 'Nombre', 'Tipo de Atención Asociado', 'Estado']
         rows = [[sa.get_codigo(), sa.nombre, sa.tipo_atencion.nombre, sa.estado] for sa in qs]
         return export_to_excel_csv("sub_atenciones", headers, rows)
 
-    paginator = Paginator(qs, 10)
+    page_size = _get_page_size(request)
+    paginator = Paginator(qs, page_size)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
@@ -969,6 +1352,9 @@ def gestion_sub_atencion(request):
         'tipos': tipos,
         'q': q,
         'filtro_estado': filtro_estado,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
         'total_registros': qs.count()
     })
 
@@ -1019,6 +1405,12 @@ def api_subatenciones(request, tipo_id):
     return JsonResponse({'subatenciones': list(subs)})
 
 
+@login_required
+def api_sectores_por_delegacion(request, delegacion_id):
+    sectores = Sector.objects.filter(delegacion_id=delegacion_id, estado='Activo').order_by('nombre').values('id', 'codigo', 'nombre')
+    return JsonResponse({'sectores': list(sectores)})
+
+
 # --- 7. INGRESO DE ATENCIÓN CIUDADANA (Wireframe C6 - Diseño 11) ---
 
 @login_required
@@ -1032,11 +1424,81 @@ def gestion_atenciones(request):
             messages.error(request, "Acceso denegado: El perfil Consultor opera exclusivamente en modo solo lectura y no puede ingresar atenciones.")
             return redirect('gestion_atenciones')
 
+        modo_vecino = request.POST.get('modo_vecino', 'existente')
         solicitante = request.POST.get('solicitante', '').strip()
         tipo_id = request.POST.get('tipo_atencion_id')
         sub_id = request.POST.get('sub_atencion_id')
         descripcion = request.POST.get('descripcion', '').strip()
         vecino_id = request.POST.get('vecino_id')
+        responsable_id = request.POST.get('responsable_id')
+
+        # Manejo de nuevo vecino si se ingresaron los datos en el formulario
+        nuevo_nombre = request.POST.get('nuevo_vecino_nombre', '').strip()
+        nuevo_rut = request.POST.get('nuevo_vecino_rut', '').strip()
+        nuevo_tel = request.POST.get('nuevo_vecino_telefono', '').strip()
+        nuevo_dir = request.POST.get('nuevo_vecino_direccion', '').strip()
+        nuevo_sec_id = request.POST.get('nuevo_vecino_sector_id')
+
+        vecino_obj = None
+        if modo_vecino == 'nuevo' or (nuevo_nombre and nuevo_rut):
+            if not nuevo_nombre or not nuevo_rut:
+                messages.error(request, "Para registrar un nuevo vecino debe ingresar al menos el Nombre completo y el RUT.")
+                return redirect('gestion_atenciones')
+
+            sector_obj = None
+            if nuevo_sec_id and nuevo_sec_id.isdigit():
+                sec_filter = Sector.objects.filter(id=int(nuevo_sec_id), estado='Activo')
+                if del_activa:
+                    sec_filter = sec_filter.filter(delegacion=del_activa)
+                sector_obj = sec_filter.first()
+
+            territorio_val = sector_obj.nombre if sector_obj else (del_activa.nombre if del_activa else 'General')
+
+            # Buscar si ya existe por RUT o crearlo en el padrón
+            vecino_obj = Vecino.objects.filter(rut=nuevo_rut).first()
+            if not vecino_obj:
+                vecino_obj = Vecino.objects.create(
+                    nombre=nuevo_nombre,
+                    rut=nuevo_rut,
+                    telefono=nuevo_tel,
+                    direccion=nuevo_dir,
+                    delegacion=del_activa,
+                    sector=sector_obj,
+                    territorio=territorio_val,
+                    estado='Activo'
+                )
+            else:
+                actualizado = False
+                if nuevo_nombre and vecino_obj.nombre != nuevo_nombre:
+                    vecino_obj.nombre = nuevo_nombre
+                    actualizado = True
+                if nuevo_tel and not vecino_obj.telefono:
+                    vecino_obj.telefono = nuevo_tel
+                    actualizado = True
+                if nuevo_dir and not vecino_obj.direccion:
+                    vecino_obj.direccion = nuevo_dir
+                    actualizado = True
+                if del_activa and not vecino_obj.delegacion:
+                    vecino_obj.delegacion = del_activa
+                    actualizado = True
+                if sector_obj and not vecino_obj.sector:
+                    vecino_obj.sector = sector_obj
+                    vecino_obj.territorio = sector_obj.nombre
+                    actualizado = True
+                if actualizado:
+                    vecino_obj.save()
+            solicitante = f"{vecino_obj.nombre} ({vecino_obj.rut})"
+        elif vecino_id and vecino_id.isdigit():
+            vecino_obj = Vecino.objects.filter(id=int(vecino_id)).first()
+            if vecino_obj and not solicitante:
+                solicitante = f"{vecino_obj.nombre} ({vecino_obj.rut})"
+
+        # Determinar representante asignado para la atención
+        responsable_user = request.user
+        if responsable_id and responsable_id.isdigit():
+            user_encontrado = User.objects.filter(id=int(responsable_id), is_active=True).first()
+            if user_encontrado:
+                responsable_user = user_encontrado
 
         if not solicitante or not tipo_id or not sub_id or not descripcion:
             messages.error(request, "Todos los campos marcados con (*) son obligatorios.")
@@ -1045,13 +1507,12 @@ def gestion_atenciones(request):
         else:
             tipo_obj = get_object_or_404(TipoAtencion, id=tipo_id)
             sub_obj = get_object_or_404(SubAtencion, id=sub_id, tipo_atencion=tipo_obj)
-            vecino_obj = Vecino.objects.filter(id=vecino_id).first() if vecino_id else None
 
             # Prevenir doble envío comprobando si ya existe un registro idéntico en los últimos 15 segundos
             tiempo_limite = timezone.now() - datetime.timedelta(seconds=15)
             duplicado = AtencionCiudadana.objects.filter(
                 solicitante=solicitante,
-                usuario_responsable=request.user,
+                creado_por=request.user,
                 delegacion=del_activa,
                 created_at__gte=tiempo_limite
             ).first()
@@ -1067,58 +1528,95 @@ def gestion_atenciones(request):
                 tipo_atencion=tipo_obj,
                 sub_atencion=sub_obj,
                 descripcion=descripcion,
-                usuario_responsable=request.user,
+                usuario_responsable=responsable_user,
+                creado_por=request.user,
                 estado='Registrada'
             )
-
             # Notificación y confirmación de atención generada
             messages.success(request, f"¡Atención ingresada exitosamente! Identificador generado: {atencion.codigo_atencion}")
             return redirect('gestion_atenciones')
 
     q = request.GET.get('q', '').strip()
     filtro_tipo = request.GET.get('tipo', '').strip()
-    filtro_delegacion = request.GET.get('delegacion', '').strip()
+    filtro_estado = request.GET.get('estado', '').strip()
+    filtro_delegacion_raw = request.GET.get('delegacion')
+    filtro_delegacion = filtro_delegacion_raw.strip() if filtro_delegacion_raw is not None else None
     todas_delegaciones = Delegacion.objects.filter(estado='Activa').order_by('id')
     delegacion_seleccionada = None
 
-    qs = AtencionCiudadana.objects.select_related(
-        'delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'vecino', 'actividad'
-    ).order_by('-id')
+    qs_base = AtencionCiudadana.objects.select_related(
+        'delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'creado_por', 'vecino', 'actividad'
+    ).prefetch_related('actividad__evidencias')
 
     # Scoping territorial por perfil (si no es admin global, se restringe a su delegación activa)
     if not ctx['permisos']['es_admin']:
         if del_activa:
-            qs = qs.filter(delegacion=del_activa)
+            qs_base = qs_base.filter(delegacion=del_activa)
         else:
-            qs = qs.none()
+            qs_base = qs_base.none()
         delegacion_seleccionada = del_activa
     elif ctx['permisos']['es_admin']:
-        if filtro_delegacion and filtro_delegacion.isdigit():
-            delegacion_seleccionada = Delegacion.objects.filter(id=int(filtro_delegacion), estado='Activa').first()
-            if delegacion_seleccionada:
-                qs = qs.filter(delegacion=delegacion_seleccionada)
+        if filtro_delegacion_raw is not None:
+            # El administrador interactuó con el filtro de la tabla de forma independiente
+            if filtro_delegacion and filtro_delegacion.isdigit():
+                delegacion_seleccionada = Delegacion.objects.filter(id=int(filtro_delegacion), estado='Activa').first()
+                if delegacion_seleccionada:
+                    qs_base = qs_base.filter(delegacion=delegacion_seleccionada)
+            else:
+                # El administrador eligió explícitamente "Todas" en la tabla
+                delegacion_seleccionada = None
+        elif del_activa:
+            # Si no viene en la URL, se inicializa con la delegación activa
+            delegacion_seleccionada = del_activa
+            qs_base = qs_base.filter(delegacion=del_activa)
+
+    # Conteo de solicitudes por estado (Registradas, En proceso, Resueltas, Canceladas)
+    total_registradas = qs_base.filter(estado__iexact='Registrada').count()
+    total_en_proceso = qs_base.filter(estado__iexact='En proceso').count()
+    total_resueltas = qs_base.filter(estado__iexact='Resuelta').count()
+    total_canceladas = qs_base.filter(estado__iexact='Cancelada').count()
+    total_general = qs_base.count()
+
+    qs = qs_base.order_by('-id')
 
     if q:
         qs = qs.filter(build_accent_query([
             'codigo_atencion', 'solicitante', 'descripcion',
             'sub_atencion__nombre', 'tipo_atencion__nombre', 'delegacion__nombre',
-            'actividad__codigo_evidencia_unico'
+            'actividad__codigo_evidencia_unico',
+            'usuario_responsable__first_name', 'usuario_responsable__last_name', 'usuario_responsable__username',
+            'creado_por__first_name', 'creado_por__last_name', 'creado_por__username'
         ], q))
     if filtro_tipo:
         qs = qs.filter(tipo_atencion__nombre__iexact=filtro_tipo)
+    if filtro_estado:
+        qs = qs.filter(estado__iexact=filtro_estado)
+
+    orden_opciones = [
+        ('-created_at', 'Más recientes'),
+        ('created_at', 'Más antiguas'),
+        ('solicitante', 'Solicitante A-Z'),
+        ('-solicitante', 'Solicitante Z-A'),
+        ('estado', 'Estado'),
+        ('tipo_atencion__nombre', 'Tipo de atención'),
+    ]
+    qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-created_at')
 
     # Exportar a Excel
     if request.GET.get('export') == 'excel':
-        headers = ['Identificador', 'Solicitante', 'Delegación', 'Tipo de Atención', 'Sub Atención', 'Responsable', 'Fecha y Hora', 'Estado Atención', 'Código Evidencia', 'Estado Evidencia']
+        headers = ['Identificador', 'Solicitante', 'Delegación', 'Tipo de Atención', 'Sub Atención', 'Responsable / Asignado', 'Creado Por', 'Fecha y Hora', 'Estado Atención', 'Código Evidencia', 'Estado Evidencia']
         rows = []
         for a in qs:
+            creador_nombre = a.creado_por.get_full_name() or a.creado_por.username if a.creado_por else 'Sistema'
+            resp_nombre = a.usuario_responsable.get_full_name() or a.usuario_responsable.username
             rows.append([
                 a.codigo_atencion,
                 a.solicitante,
                 a.delegacion.nombre,
                 a.tipo_atencion.nombre,
                 a.sub_atencion.nombre,
-                a.usuario_responsable.get_full_name() or a.usuario_responsable.username,
+                resp_nombre,
+                creador_nombre,
                 a.created_at.strftime('%d/%m/%Y %H:%M'),
                 a.estado,
                 a.get_evidencia_codigo(),
@@ -1126,28 +1624,78 @@ def gestion_atenciones(request):
             ])
         return export_to_excel_csv("atenciones_ciudadanas", headers, rows)
 
-    paginator = Paginator(qs, 10)
+    page_size = _get_page_size(request)
+    paginator = Paginator(qs, page_size)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
     tipos_activos = TipoAtencion.objects.filter(estado='Activo')
-    vecinos_catalogo = Vecino.objects.filter(estado='Activo')
+    vecinos_catalogo = Vecino.objects.filter(estado='Activo').order_by('nombre')
     if not ctx['permisos']['es_admin'] and del_activa:
         vecinos_catalogo = vecinos_catalogo.filter(
             Q(delegacion=del_activa) | (Q(delegacion__isnull=True) & Q(territorio__icontains=del_activa.nombre))
         )
-    vecinos_catalogo = vecinos_catalogo[:100]
+    vecinos_catalogo = vecinos_catalogo[:150]
+
+    # Representantes / Funcionarios disponibles para asignación (filtrados exclusivamente por delegación)
+    delegacion_efectiva = del_activa or delegacion_seleccionada
+    representantes_qs = User.objects.filter(is_active=True).select_related('funcionario__delegacion', 'funcionario__cargo')
+    if delegacion_efectiva:
+        representantes_qs = representantes_qs.filter(
+            Q(funcionario__delegacion=delegacion_efectiva) | Q(id=request.user.id)
+        ).distinct()
+    representantes_qs = representantes_qs.order_by('first_name', 'username')
+    representantes_disponibles = []
+    for u in representantes_qs:
+        cargo_nom = ""
+        del_nom = ""
+        if hasattr(u, 'funcionario') and u.funcionario:
+            if u.funcionario.cargo:
+                cargo_nom = u.funcionario.cargo.nombre_cargo
+            if u.funcionario.delegacion:
+                del_nom = u.funcionario.delegacion.nombre
+        nombre_completo = u.get_full_name() or u.username
+        label = f"{nombre_completo} ({u.username})"
+        if cargo_nom:
+            label += f" · {cargo_nom}"
+        if del_nom:
+            label += f" [{del_nom}]"
+        representantes_disponibles.append({
+            'id': u.id,
+            'nombre': nombre_completo,
+            'username': u.username,
+            'label': label,
+            'es_actual': (u.id == request.user.id)
+        })
+
+    if del_activa:
+        sectores_disponibles = Sector.objects.filter(delegacion=del_activa, estado='Activo').order_by('nombre')
+    elif delegacion_seleccionada:
+        sectores_disponibles = Sector.objects.filter(delegacion=delegacion_seleccionada, estado='Activo').order_by('nombre')
+    else:
+        sectores_disponibles = Sector.objects.filter(estado='Activo').order_by('delegacion__nombre', 'nombre')
 
     return render(request, 'gestion/atenciones.html', {
         'page_obj': page_obj,
         'atenciones': page_obj.object_list,
         'tipos_activos': tipos_activos,
         'vecinos': vecinos_catalogo,
+        'sectores': sectores_disponibles,
+        'representantes_disponibles': representantes_disponibles,
         'todas_delegaciones': todas_delegaciones,
         'delegacion_seleccionada': delegacion_seleccionada,
         'q': q,
         'filtro_tipo': filtro_tipo,
-        'total_registros': qs.count()
+        'filtro_estado': filtro_estado,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
+        'total_registros': qs.count(),
+        'total_registradas': total_registradas,
+        'total_en_proceso': total_en_proceso,
+        'total_resueltas': total_resueltas,
+        'total_canceladas': total_canceladas,
+        'total_general': total_general,
     })
 
 
@@ -1199,15 +1747,35 @@ def gestion_atenciones_validar_evidencia(request, atencion_id):
             messages.error(request, "Acceso denegado: No puedes validar evidencias de otra delegación.")
             return redirect('gestion_atenciones')
 
-    if not atencion.actividad:
-        atencion.save()
-
     actividad = atencion.actividad
-    funcionario_actual = ctx['funcionario_actual'] or Funcionario.objects.first()
+    if not actividad:
+        messages.error(request, "Esta atención aún no tiene una actividad asociada para validar evidencias.")
+        return redirect('gestion_atenciones')
+
+    funcionario_actual = ctx['funcionario_actual']
+    if not funcionario_actual:
+        messages.error(request, "No se encontró un perfil de funcionario para registrar la validación.")
+        return redirect('gestion_atenciones')
 
     if request.method == 'POST':
         resultado = request.POST.get('resultado_evidencia', 'Aprobado').strip()
         observaciones = request.POST.get('observaciones', f'Validación de evidencia para atención {atencion.codigo_atencion}').strip()
+        if resultado not in {'Aprobado', 'Rechazado'}:
+            messages.error(request, "El resultado de validación no es válido.")
+            return redirect('gestion_atenciones')
+        if resultado == 'Aprobado':
+            evidence_files = actividad.evidencias.filter(
+                Q(imagen__gt='') | Q(archivo__gt='')
+            )
+            has_before = evidence_files.filter(momento='antes').exists()
+            has_after = evidence_files.filter(momento='despues').exists()
+            if not has_before or not has_after:
+                messages.error(
+                    request,
+                    "Para aprobar, adjunta al menos un archivo de evidencia de antes "
+                    "y otro de después del trabajo.",
+                )
+                return redirect('gestion_atenciones')
 
         val, _ = ValidacionEvidencia.objects.get_or_create(
             actividad=actividad,
@@ -1232,6 +1800,71 @@ def gestion_atenciones_validar_evidencia(request, atencion_id):
     return redirect('gestion_atenciones')
 
 
+@login_required
+def gestion_atenciones_subir_evidencia(request, atencion_id):
+    ctx = global_context(request)
+    if request.method != 'POST' or not ctx['permisos'].get('puede_ingresar_atencion', True):
+        messages.error(request, "No tienes autorización para adjuntar evidencias.")
+        return redirect('gestion_atenciones')
+
+    atencion = get_object_or_404(
+        AtencionCiudadana.objects.select_related('actividad', 'delegacion'),
+        id=atencion_id,
+    )
+    es_admin = ctx['permisos']['es_admin']
+    if not es_admin:
+        delegacion_activa = ctx['delegacion_activa']
+        if not delegacion_activa or atencion.delegacion != delegacion_activa:
+            messages.error(request, "No puedes adjuntar evidencias a atenciones de otra delegación.")
+            return redirect('gestion_atenciones')
+
+    actividad = atencion.actividad
+    if not actividad:
+        messages.error(request, "Esta atención aún no tiene una actividad asociada.")
+        return redirect('gestion_atenciones')
+    if actividad.estado_validacion() == 'Aprobado':
+        messages.error(request, "La evidencia ya fue aprobada y no se puede modificar.")
+        return redirect('gestion_atenciones')
+
+    momento = request.POST.get('momento', '').strip()
+    imagenes = request.FILES.getlist('imagenes')
+    archivos = request.FILES.getlist('archivos')
+    if momento not in {'antes', 'despues'}:
+        messages.error(request, "Selecciona si la evidencia corresponde al antes o después del trabajo.")
+        return redirect('gestion_atenciones')
+    if not imagenes and not archivos:
+        messages.error(request, "Selecciona al menos una imagen o archivo para adjuntar.")
+        return redirect('gestion_atenciones')
+
+    try:
+        imagenes = [forms.ImageField().clean(imagen) for imagen in imagenes]
+    except ValidationError:
+        messages.error(request, "Una de las imágenes no es válida. Selecciona archivos de imagen compatibles.")
+        return redirect('gestion_atenciones')
+
+    for imagen in imagenes:
+        Evidencia.objects.create(
+            actividad=actividad,
+            imagen=imagen,
+            momento=momento,
+        )
+    for archivo in archivos:
+        Evidencia.objects.create(
+            actividad=actividad,
+            archivo=archivo,
+            momento=momento,
+        )
+
+    validacion = ValidacionEvidencia.objects.filter(actividad=actividad).order_by('-created_at').first()
+    if validacion:
+        validacion.resultado = 'Pendiente'
+        validacion.observaciones = "Se adjuntó nueva evidencia; requiere revisión."
+        validacion.save(update_fields=['resultado', 'observaciones', 'updated_at'])
+
+    messages.success(request, "La evidencia se adjuntó correctamente y quedó pendiente de revisión.")
+    return redirect('gestion_atenciones')
+
+
 # --- 8. TIPO DE GESTIÓN ---
 
 @login_required
@@ -1249,12 +1882,36 @@ def gestion_tipo_gestion(request):
             messages.success(request, f"Tipo de Gestión '{nombre}' creado.")
             return redirect('gestion_tipo_gestion')
 
-    q = request.GET.get('q', '')
+    q = request.GET.get('q', '').strip()
+    filtro_estado = request.GET.get('estado', '').strip()
     tipos = TipoGestion.objects.all()
     if q:
-        tipos = tipos.filter(Q(nombre__icontains=q) | Q(descripcion__icontains=q))
+        tipos = tipos.filter(build_accent_query(['nombre', 'descripcion'], q))
+    if filtro_estado:
+        tipos = tipos.filter(estado__iexact=filtro_estado)
 
-    return render(request, 'gestion/tipo_gestion.html', {'tipos': tipos, 'q': q})
+    orden_opciones = [
+        ('id', 'Más antiguos'),
+        ('-id', 'Más recientes'),
+        ('nombre', 'Nombre A-Z'),
+        ('-nombre', 'Nombre Z-A'),
+        ('estado', 'Estado'),
+    ]
+    tipos, orden = _apply_list_ordering(tipos, request, orden_opciones, '-id')
+    page_size = _get_page_size(request)
+    total_tipos = tipos.count()
+    page_obj = Paginator(tipos, page_size).get_page(request.GET.get('page', 1))
+
+    return render(request, 'gestion/tipo_gestion.html', {
+        'tipos': page_obj.object_list,
+        'page_obj': page_obj,
+        'q': q,
+        'filtro_estado': filtro_estado,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
+        'total_tipos': total_tipos,
+    })
 
 
 @login_required
@@ -1296,18 +1953,27 @@ def gestion_vecinos(request):
         rut = request.POST.get('rut', '').strip()
         direccion = request.POST.get('direccion', '').strip()
         telefono = request.POST.get('telefono', '').strip()
-        territorio = request.POST.get('territorio', '').strip()
+        sector_id = request.POST.get('sector_id')
         tipo_gestion_id = request.POST.get('tipo_gestion_id')
         estado = request.POST.get('estado', 'Activo')
 
-        # Restricción territorial: no-admin siempre asigna su delegación activa
-        if es_admin:
-            delegacion_id = request.POST.get('delegacion_id')
-            del_obj = Delegacion.objects.filter(id=delegacion_id).first() if delegacion_id else del_activa
-        else:
+        # La delegación queda estrictamente bloqueada según la delegación activa
+        if del_activa:
             del_obj = del_activa
-            if not territorio and del_activa:
-                territorio = del_activa.nombre
+        elif es_admin:
+            delegacion_id = request.POST.get('delegacion_id')
+            del_obj = Delegacion.objects.filter(id=delegacion_id).first() if delegacion_id else Delegacion.objects.first()
+        else:
+            del_obj = None
+
+        sector_obj = None
+        if sector_id and sector_id.isdigit():
+            sec_qs = Sector.objects.filter(id=int(sector_id), estado='Activo')
+            if del_obj:
+                sec_qs = sec_qs.filter(delegacion=del_obj)
+            sector_obj = sec_qs.first()
+
+        territorio = sector_obj.nombre if sector_obj else (request.POST.get('territorio', '').strip() or (del_obj.nombre if del_obj else ''))
 
         if nombre and rut:
             Vecino.objects.create(
@@ -1316,19 +1982,22 @@ def gestion_vecinos(request):
                 direccion=direccion,
                 telefono=telefono,
                 delegacion=del_obj,
+                sector=sector_obj,
                 territorio=territorio,
                 tipo_gestion_id=tipo_gestion_id if tipo_gestion_id else None,
                 estado=estado
             )
-            messages.success(request, f"Vecino/a '{nombre}' registrado exitosamente.")
+            messages.success(request, f"Vecino/a '{nombre}' registrado exitosamente en {del_obj.nombre if del_obj else 'el padrón'}.")
             return redirect('gestion_vecinos')
         else:
             messages.error(request, "El nombre y RUT son obligatorios.")
 
     q = request.GET.get('q', '').strip()
-    filtro_delegacion = request.GET.get('delegacion', '').strip()
+    filtro_delegacion_raw = request.GET.get('delegacion')
+    filtro_delegacion = filtro_delegacion_raw.strip() if filtro_delegacion_raw is not None else None
+    filtro_estado = request.GET.get('estado', '').strip()
 
-    qs = Vecino.objects.select_related('tipo_gestion', 'delegacion').order_by('id')
+    qs = Vecino.objects.select_related('tipo_gestion', 'delegacion', 'sector').order_by('-id')
 
     # Scoping territorial estricto
     delegacion_seleccionada = None
@@ -1339,26 +2008,64 @@ def gestion_vecinos(request):
             qs = qs.none()
         delegacion_seleccionada = del_activa
     else:
-        if filtro_delegacion and filtro_delegacion.isdigit():
-            delegacion_seleccionada = Delegacion.objects.filter(id=int(filtro_delegacion)).first()
-            if delegacion_seleccionada:
-                qs = qs.filter(delegacion=delegacion_seleccionada)
+        if filtro_delegacion_raw is not None:
+            # El administrador interactuó con el filtro de la tabla de forma independiente
+            if filtro_delegacion and filtro_delegacion.isdigit():
+                delegacion_seleccionada = Delegacion.objects.filter(id=int(filtro_delegacion), estado='Activa').first()
+                if delegacion_seleccionada:
+                    qs = qs.filter(delegacion=delegacion_seleccionada)
+            else:
+                # El administrador eligió explícitamente "Todas" en la tabla
+                delegacion_seleccionada = None
+        elif del_activa:
+            # Si no viene en la URL, se inicializa con la delegación activa
+            delegacion_seleccionada = del_activa
+            qs = qs.filter(delegacion=del_activa)
 
     if q:
-        qs = qs.filter(
-            Q(nombre__icontains=q) | Q(rut__icontains=q) | Q(direccion__icontains=q) | Q(territorio__icontains=q)
-        )
+        qs = qs.filter(build_accent_query([
+            'nombre', 'rut', 'direccion', 'territorio', 'sector__nombre', 'tipo_gestion__nombre',
+            'delegacion__nombre',
+        ], q))
+    if filtro_estado:
+        qs = qs.filter(estado__iexact=filtro_estado)
+
+    orden_opciones = [
+        ('id', 'Más antiguos'),
+        ('-id', 'Más recientes'),
+        ('nombre', 'Nombre A-Z'),
+        ('-nombre', 'Nombre Z-A'),
+        ('rut', 'RUT'),
+        ('delegacion__nombre', 'Delegación'),
+    ]
+    qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-id')
 
     tipos_gestion = TipoGestion.objects.all()
+    page_size = _get_page_size(request)
+    total_vecinos = qs.count()
+    page_obj = Paginator(qs, page_size).get_page(request.GET.get('page', 1))
+
+    if del_activa:
+        sectores_vecinos = Sector.objects.filter(delegacion=del_activa, estado='Activo').order_by('nombre')
+    elif delegacion_seleccionada:
+        sectores_vecinos = Sector.objects.filter(delegacion=delegacion_seleccionada, estado='Activo').order_by('nombre')
+    else:
+        sectores_vecinos = Sector.objects.filter(estado='Activo').order_by('delegacion__nombre', 'nombre')
 
     return render(request, 'gestion/vecinos.html', {
-        'vecinos': qs,
+        'vecinos': page_obj.object_list,
+        'page_obj': page_obj,
         'tipos_gestion': tipos_gestion,
         'todas_delegaciones': todas_delegaciones,
         'delegacion_seleccionada': delegacion_seleccionada,
+        'sectores': sectores_vecinos,
         'es_admin': es_admin,
         'q': q,
-        'total_vecinos': qs.count()
+        'filtro_estado': filtro_estado,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
+        'total_vecinos': total_vecinos
     })
 
 
@@ -1384,8 +2091,18 @@ def gestion_vecinos_editar(request, vecino_id):
         vecino.rut = request.POST.get('rut', vecino.rut).strip()
         vecino.direccion = request.POST.get('direccion', vecino.direccion).strip()
         vecino.telefono = request.POST.get('telefono', vecino.telefono).strip()
-        vecino.territorio = request.POST.get('territorio', vecino.territorio).strip()
-        if es_admin:
+
+        # Actualizar sector si fue seleccionado
+        sec_id = request.POST.get('sector_id')
+        if sec_id and sec_id.isdigit():
+            sec_obj = Sector.objects.filter(id=int(sec_id)).first()
+            if sec_obj:
+                vecino.sector = sec_obj
+                vecino.territorio = sec_obj.nombre
+        else:
+            vecino.territorio = request.POST.get('territorio', vecino.territorio).strip()
+
+        if es_admin and not del_activa:
             del_id = request.POST.get('delegacion_id')
             if del_id:
                 vecino.delegacion = Delegacion.objects.filter(id=del_id).first()
@@ -1424,6 +2141,164 @@ def gestion_vecinos_eliminar(request, vecino_id):
     return redirect('gestion_vecinos')
 
 
+# --- 10. SECTORES Y TERRITORIOS POR DELEGACIÓN ---
+
+@login_required
+def gestion_sectores(request):
+    ctx = global_context(request)
+    if not ctx['permisos'].get('ver_sectores', True):
+        messages.error(request, "Acceso denegado: No cuentas con permisos para gestionar sectores territoriales.")
+        return redirect('gestion_inicio')
+
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+    todas_delegaciones = Delegacion.objects.filter(estado='Activa').order_by('id')
+
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        codigo = request.POST.get('codigo', '').strip().upper()
+        descripcion = request.POST.get('descripcion', '').strip()
+        estado = request.POST.get('estado', 'Activo')
+
+        if del_activa:
+            del_obj = del_activa
+        elif es_admin:
+            delegacion_id = request.POST.get('delegacion_id')
+            del_obj = Delegacion.objects.filter(id=delegacion_id).first() if delegacion_id else None
+        else:
+            del_obj = None
+
+        if not nombre:
+            messages.error(request, "El nombre del sector o territorio es obligatorio.")
+        elif not del_obj:
+            messages.error(request, "Debes seleccionar o contar con una delegación territorial activa.")
+        else:
+            if not codigo:
+                count = Sector.all_objects.filter(delegacion=del_obj).count() + 1
+                codigo = f"SEC{count:02d}"
+            Sector.objects.create(
+                codigo=codigo,
+                nombre=nombre,
+                delegacion=del_obj,
+                descripcion=descripcion,
+                estado=estado
+            )
+            messages.success(request, f"Sector/Territorio '{nombre}' registrado exitosamente para {del_obj.nombre}.")
+            return redirect('gestion_sectores')
+
+    q = request.GET.get('q', '').strip()
+    filtro_delegacion_raw = request.GET.get('delegacion')
+    filtro_delegacion = filtro_delegacion_raw.strip() if filtro_delegacion_raw is not None else None
+    filtro_estado = request.GET.get('estado', '').strip()
+
+    qs = Sector.objects.select_related('delegacion').order_by('delegacion__nombre', 'nombre')
+
+    delegacion_seleccionada = None
+    if not es_admin:
+        if del_activa:
+            qs = qs.filter(delegacion=del_activa)
+        else:
+            qs = qs.none()
+        delegacion_seleccionada = del_activa
+    else:
+        if filtro_delegacion_raw is not None:
+            if filtro_delegacion and filtro_delegacion.isdigit():
+                delegacion_seleccionada = Delegacion.objects.filter(id=int(filtro_delegacion), estado='Activa').first()
+                if delegacion_seleccionada:
+                    qs = qs.filter(delegacion=delegacion_seleccionada)
+            else:
+                delegacion_seleccionada = None
+        elif del_activa:
+            delegacion_seleccionada = del_activa
+            qs = qs.filter(delegacion=del_activa)
+
+    if q:
+        qs = qs.filter(build_accent_query(['codigo', 'nombre', 'descripcion', 'delegacion__nombre'], q))
+    if filtro_estado:
+        qs = qs.filter(estado__iexact=filtro_estado)
+
+    orden_opciones = [
+        ('nombre', 'Nombre A-Z'),
+        ('-nombre', 'Nombre Z-A'),
+        ('codigo', 'Código'),
+        ('delegacion__nombre', 'Delegación'),
+        ('estado', 'Estado'),
+    ]
+    qs, orden = _apply_list_ordering(qs, request, orden_opciones, 'nombre')
+
+    if request.GET.get('export') == 'excel':
+        headers = ['Código', 'Sector / Territorio', 'Delegación', 'Descripción', 'Estado']
+        rows = [[s.get_codigo(), s.nombre, s.delegacion.nombre, s.descripcion or '', s.estado] for s in qs]
+        return export_to_excel_csv("sectores_territoriales", headers, rows)
+
+    page_size = _get_page_size(request)
+    paginator = Paginator(qs, page_size)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    return render(request, 'gestion/sectores.html', {
+        'page_obj': page_obj,
+        'sectores': page_obj.object_list,
+        'todas_delegaciones': todas_delegaciones,
+        'delegacion_seleccionada': delegacion_seleccionada,
+        'es_admin': es_admin,
+        'q': q,
+        'filtro_estado': filtro_estado,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
+        'total_registros': qs.count()
+    })
+
+
+@login_required
+def gestion_sectores_editar(request, sector_id):
+    ctx = global_context(request)
+    sector = get_object_or_404(Sector, id=sector_id)
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+
+    if not es_admin and del_activa and sector.delegacion != del_activa:
+        messages.error(request, "Acceso denegado: No puedes modificar sectores de otra delegación.")
+        return redirect('gestion_sectores')
+
+    if request.method == 'POST':
+        sector.nombre = request.POST.get('nombre', sector.nombre).strip()
+        sector.codigo = request.POST.get('codigo', sector.codigo).strip().upper()
+        sector.descripcion = request.POST.get('descripcion', sector.descripcion).strip()
+        sector.estado = request.POST.get('estado', sector.estado)
+        if es_admin and not del_activa:
+            del_id = request.POST.get('delegacion_id')
+            if del_id:
+                del_obj = Delegacion.objects.filter(id=del_id).first()
+                if del_obj:
+                    sector.delegacion = del_obj
+        sector.save()
+        messages.success(request, f"Sector '{sector.nombre}' actualizado exitosamente.")
+    return redirect('gestion_sectores')
+
+
+@login_required
+def gestion_sectores_eliminar(request, sector_id):
+    ctx = global_context(request)
+    sector = get_object_or_404(Sector, id=sector_id)
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+
+    if not es_admin and del_activa and sector.delegacion != del_activa:
+        messages.error(request, "Acceso denegado.")
+        return redirect('gestion_sectores')
+
+    if request.method == 'POST':
+        if Vecino.objects.filter(sector=sector).exists():
+            messages.error(request, f"No se puede eliminar el sector '{sector.nombre}' porque está asignado a vecinos en el padrón.")
+            return redirect('gestion_sectores')
+
+        nombre = sector.nombre
+        sector.delete()
+        messages.success(request, f"Sector '{nombre}' eliminado exitosamente.")
+    return redirect('gestion_sectores')
+
+
 # --- MÓDULOS DE COMPLEMENTO Y REPORTES ---
 
 @login_required
@@ -1441,13 +2316,101 @@ def gestion_funcionarios_eliminar(request, funcionario_id):
 
 @login_required
 def gestion_actividades(request):
-    actividades = Actividad.objects.select_related('funcionario__user', 'item', 'periodo').all()[:50]
+    if request.method == 'POST':
+        fecha_actividad = request.POST.get('fecha_actividad', '').strip()
+        descripcion = request.POST.get('descripcion_solicitud', '').strip()
+        accion = request.POST.get('accion_ejecutada', '').strip()
+        funcionario_id = request.POST.get('funcionario_id', '')
+        item_id = request.POST.get('item_id', '')
+        periodo_id = request.POST.get('periodo_id', '')
+
+        if not all((fecha_actividad, descripcion, accion, funcionario_id, item_id, periodo_id)):
+            messages.error(request, "Completa todos los campos obligatorios de la actividad.")
+            return redirect('gestion_actividades')
+        if not all(value.isdigit() for value in (funcionario_id, item_id, periodo_id)):
+            messages.error(request, "Selecciona un funcionario, ítem y período válidos.")
+            return redirect('gestion_actividades')
+
+        funcionario = Funcionario.objects.filter(id=int(funcionario_id)).first()
+        item = ItemMedicion.objects.filter(id=int(item_id)).first()
+        periodo = Periodo.objects.filter(id=int(periodo_id)).first()
+        if not all((funcionario, item, periodo)):
+            messages.error(request, "Selecciona un funcionario, ítem y período válidos.")
+            return redirect('gestion_actividades')
+
+        try:
+            fecha_actividad = forms.DateField().clean(fecha_actividad)
+        except ValidationError:
+            messages.error(request, "La fecha de la actividad no es válida.")
+            return redirect('gestion_actividades')
+
+        if not periodo.fecha_inicio <= fecha_actividad <= periodo.fecha_termino:
+            messages.error(request, "La fecha de la actividad debe estar dentro del período seleccionado.")
+            return redirect('gestion_actividades')
+
+        actividad = Actividad.objects.create(
+            fecha_actividad=fecha_actividad,
+            descripcion_solicitud=descripcion,
+            accion_ejecutada=accion,
+            contacto_nombre=request.POST.get('contacto_nombre', '').strip(),
+            contacto_telefono=request.POST.get('contacto_telefono', '').strip(),
+            funcionario=funcionario,
+            item=item,
+            periodo=periodo,
+        )
+        messages.success(request, f"Actividad '{actividad.codigo_evidencia_unico}' registrada correctamente.")
+        return redirect('gestion_actividades')
+
+    q = request.GET.get('q', '').strip()
+    filtro_validacion = request.GET.get('validacion', '').strip()
+    actividades = Actividad.objects.select_related(
+        'funcionario__user', 'item', 'periodo'
+    ).prefetch_related('evidencias').annotate(
+        estado_validacion_actual=Subquery(
+            ValidacionEvidencia.objects.filter(
+                actividad_id=OuterRef('pk')
+            ).order_by('-created_at').values('resultado')[:1]
+        )
+    )
+    if q:
+        actividades = actividades.filter(build_accent_query([
+            'codigo_evidencia_unico', 'descripcion_solicitud', 'accion_ejecutada',
+            'contacto_nombre', 'funcionario__user__first_name',
+            'funcionario__user__username', 'item__nombre_item',
+        ], q))
+        if filtro_validacion == 'Pendiente':
+            actividades = actividades.filter(estado_validacion_actual__isnull=True)
+        elif filtro_validacion in ('Aprobado', 'Rechazado'):
+            actividades = actividades.filter(
+                estado_validacion_actual__iexact=filtro_validacion
+            )
+
+    orden_opciones = [
+        ('-fecha_actividad', 'Fecha: recientes primero'),
+        ('fecha_actividad', 'Fecha: antiguas primero'),
+        ('codigo_evidencia_unico', 'Código A-Z'),
+        ('funcionario__user__first_name', 'Funcionario A-Z'),
+        ('item__nombre_item', 'Ítem A-Z'),
+    ]
+    actividades, orden = _apply_list_ordering(
+        actividades, request, orden_opciones, '-fecha_actividad'
+    )
+    page_size = _get_page_size(request)
+    page_obj = Paginator(actividades, page_size).get_page(request.GET.get('page', 1))
+
     funcionarios = Funcionario.objects.select_related('user').filter(estado='Activo')
     items = ItemMedicion.objects.all()
     periodos = Periodo.objects.all()
 
     return render(request, 'gestion/actividades.html', {
-        'actividades': actividades,
+        'actividades': page_obj.object_list,
+        'page_obj': page_obj,
+        'q': q,
+        'filtro_validacion': filtro_validacion,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
+        'total_registros': actividades.count(),
         'funcionarios': funcionarios,
         'items': items,
         'periodos': periodos,
@@ -1456,6 +2419,30 @@ def gestion_actividades(request):
 @login_required
 def gestion_actividades_editar(request, actividad_id):
     actividad = get_object_or_404(Actividad, id=actividad_id)
+    if request.method == 'POST':
+        try:
+            fecha_actividad = forms.DateField().clean(
+                request.POST.get('fecha_actividad', '').strip()
+            )
+        except ValidationError:
+            messages.error(request, "La fecha de la actividad no es válida.")
+            return redirect('gestion_actividades')
+
+        actividad.fecha_actividad = fecha_actividad
+        actividad.descripcion_solicitud = request.POST.get(
+            'descripcion_solicitud', actividad.descripcion_solicitud
+        ).strip()
+        actividad.accion_ejecutada = request.POST.get(
+            'accion_ejecutada', actividad.accion_ejecutada
+        ).strip()
+        actividad.contacto_nombre = request.POST.get(
+            'contacto_nombre', actividad.contacto_nombre
+        ).strip()
+        actividad.contacto_telefono = request.POST.get(
+            'contacto_telefono', actividad.contacto_telefono
+        ).strip()
+        actividad.save()
+        messages.success(request, "Actividad actualizada correctamente.")
     return redirect('gestion_actividades')
 
 @login_required
@@ -1467,9 +2454,45 @@ def gestion_actividades_eliminar(request, actividad_id):
 
 @login_required
 def gestion_agenda(request):
-    compromisos = CompromisoAgenda.objects.select_related('responsable__user', 'actividad_origen').all()[:50]
+    q = request.GET.get('q', '').strip()
+    filtro_estado = request.GET.get('estado', '').strip()
+    compromisos = CompromisoAgenda.objects.select_related(
+        'responsable__user', 'actividad_origen'
+    ).all()
+    if q:
+        compromisos = compromisos.filter(build_accent_query([
+            'solicitante', 'territorio', 'area_apoyo', 'observacion',
+            'responsable__user__first_name', 'responsable__user__username',
+        ], q))
+    if filtro_estado:
+        compromisos = compromisos.filter(estado__iexact=filtro_estado)
+    orden_opciones = [
+        ('-fecha_comprometida', 'Fecha: próximas primero'),
+        ('fecha_comprometida', 'Fecha: lejanas primero'),
+        ('solicitante', 'Solicitante A-Z'),
+        ('-solicitante', 'Solicitante Z-A'),
+        ('estado', 'Estado'),
+    ]
+    compromisos, orden = _apply_list_ordering(
+        compromisos, request, orden_opciones, '-fecha_comprometida'
+    )
+    page_size = _get_page_size(request)
+    page_obj = Paginator(compromisos, page_size).get_page(request.GET.get('page', 1))
     funcionarios = Funcionario.objects.select_related('user').filter(estado='Activo')
-    return render(request, 'gestion/agenda.html', {'compromisos': compromisos, 'funcionarios': funcionarios})
+    return render(request, 'gestion/agenda.html', {
+        'compromisos': page_obj.object_list,
+        'page_obj': page_obj,
+        'q': q,
+        'filtro_estado': filtro_estado,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
+        'total_registros': compromisos.count(),
+        'estados': CompromisoAgenda.objects.values_list(
+            'estado', flat=True
+        ).distinct().order_by('estado'),
+        'funcionarios': funcionarios,
+    })
 
 @login_required
 def gestion_agenda_editar(request, compromiso_id):
@@ -1482,12 +2505,40 @@ def gestion_agenda_eliminar(request, compromiso_id):
 
 @login_required
 def gestion_configuracion(request):
-    metas = ConfiguracionMeta.objects.select_related('item', 'periodo', 'funcionario__user').all()[:50]
+    q = request.GET.get('q', '').strip()
+    metas = ConfiguracionMeta.objects.select_related(
+        'item', 'periodo', 'funcionario__user'
+    ).all()
+    if q:
+        metas = metas.filter(build_accent_query([
+            'item__nombre_item', 'item__descripcion', 'periodo__estado',
+            'funcionario__user__first_name', 'funcionario__user__username',
+        ], q))
+    orden_opciones = [
+        ('id', 'Más antiguas'),
+        ('-id', 'Más recientes'),
+        ('item__nombre_item', 'Ítem A-Z'),
+        ('-item__nombre_item', 'Ítem Z-A'),
+        ('periodo__fecha_inicio', 'Período: antiguos primero'),
+        ('-periodo__fecha_inicio', 'Período: recientes primero'),
+    ]
+    metas, orden = _apply_list_ordering(metas, request, orden_opciones, '-id')
+    page_size = _get_page_size(request)
+    page_obj = Paginator(metas, page_size).get_page(request.GET.get('page', 1))
     items = ItemMedicion.objects.all()
     periodos = Periodo.objects.all()
     funcionarios = Funcionario.objects.select_related('user').all()
     return render(request, 'gestion/configuracion.html', {
-        'metas': metas, 'items': items, 'periodos': periodos, 'funcionarios': funcionarios
+        'metas': page_obj.object_list,
+        'page_obj': page_obj,
+        'q': q,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
+        'total_registros': metas.count(),
+        'items': items,
+        'periodos': periodos,
+        'funcionarios': funcionarios,
     })
 
 @login_required
@@ -1584,6 +2635,7 @@ def gestion_reportes(request):
 
     es_admin = ctx['permisos']['es_admin']
     del_activa = ctx['delegacion_activa']
+    q = request.GET.get('q', '').strip()
     todas_delegaciones = Delegacion.objects.filter(estado='Activa').order_by('id')
 
     # Scoping territorial estricto en el servidor
@@ -1612,6 +2664,23 @@ def gestion_reportes(request):
             metas_qs = metas_qs.none()
     elif delegacion_seleccionada:
         metas_qs = metas_qs.filter(funcionario__delegacion=delegacion_seleccionada)
+
+    if q:
+        metas_qs = metas_qs.filter(build_accent_query([
+            'item__nombre_item', 'item__descripcion', 'periodo__estado',
+            'funcionario__user__first_name', 'funcionario__user__username',
+        ], q))
+    orden_opciones = [
+        ('id', 'Más antiguas'),
+        ('-id', 'Más recientes'),
+        ('item__nombre_item', 'Ítem A-Z'),
+        ('-item__nombre_item', 'Ítem Z-A'),
+        ('periodo__fecha_inicio', 'Período: antiguo primero'),
+        ('-periodo__fecha_inicio', 'Período: reciente primero'),
+    ]
+    metas_qs, orden = _apply_list_ordering(
+        metas_qs, request, orden_opciones, '-id'
+    )
 
     # Exportación a Excel/CSV respetando los permisos de delegación
     if request.GET.get('export') == 'excel':
@@ -1643,6 +2712,8 @@ def gestion_reportes(request):
     verdes = sum(1 for m in metas_list if m.estado_semaforo() == 'VERDE')
     ambares = sum(1 for m in metas_list if m.estado_semaforo() == 'AMBAR')
     rojos = sum(1 for m in metas_list if m.estado_semaforo() == 'ROJO')
+    page_size = _get_page_size(request)
+    page_obj = Paginator(metas_list, page_size).get_page(request.GET.get('page', 1))
 
     # Validaciones y evidencias territoriales
     val_qs = ValidacionEvidencia.objects.select_related('actividad__funcionario__delegacion')
@@ -1675,7 +2746,8 @@ def gestion_reportes(request):
     pct_resueltas = round((atenciones_resueltas / total_atenciones) * 100, 1) if total_atenciones > 0 else 0.0
 
     context = {
-        'metas': metas_list,
+        'metas': page_obj.object_list,
+        'page_obj': page_obj,
         'verdes': verdes,
         'ambares': ambares,
         'rojos': rojos,
@@ -1687,8 +2759,13 @@ def gestion_reportes(request):
         'atenciones_resueltas': atenciones_resueltas,
         'atenciones_proceso': atenciones_proceso,
         'pct_resueltas': pct_resueltas,
+        'total_metas': len(metas_list),
         'todas_delegaciones': todas_delegaciones,
         'delegacion_seleccionada': delegacion_seleccionada,
         'es_admin': es_admin,
+        'q': q,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
     }
     return render(request, 'gestion/reportes.html', context)

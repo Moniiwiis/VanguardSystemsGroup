@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block title %}Sectores y Territorios — Sistema Municipal La Serena{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Encabezado de Página -->
+  <div class="bg-white rounded-3xl p-6 sm:p-7 border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
+    <div class="space-y-1">
+      <div class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+        <span>Gestión Territorial</span>
+        <span class="text-slate-300">/</span>
+        <span class="text-[#C41230]">Sectores y Territorios</span>
+      </div>
+      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
+        Sectores Territoriales por Delegación
+      </h1>
+      <p class="text-xs text-slate-500 max-w-xl">
+        {% if delegacion_activa %}
+          Catálogo oficial de sectores vecinales y subdivisiones territoriales correspondientes a <strong>{{ delegacion_activa.nombre }}</strong>.
+        {% else %}
+          Supervisión global de sectores territoriales pertenecientes a todas las delegaciones de la comuna de La Serena.
+        {% endif %}
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 shrink-0">
+      {% if delegacion_activa %}
+      <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-red-50 text-[#C41230] border border-red-200/90 text-xs font-bold">
+        <i data-lucide="map-pin" class="w-4 h-4 text-[#C41230]"></i>
+        <span>Delegación: <strong>{{ delegacion_activa.nombre }}</strong></span>
+      </div>
+      {% endif %}
+
+      <button type="button" onclick="document.getElementById('modal-crear-sector').classList.remove('hidden')" 
+              class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
+        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+        <span>Nuevo Sector</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Barra de Filtros y Búsqueda -->
+  <div class="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+    <form method="GET" action="{% url 'gestion_sectores' %}" class="flex-1 flex flex-wrap items-center gap-3">
+      <div class="relative flex-1 min-w-[240px]">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+          <i data-lucide="search" class="w-4 h-4"></i>
+        </div>
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por código, sector o delegación..." 
+               class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230] font-medium" />
+      </div>
+
+      {% if es_admin and not delegacion_activa %}
+      <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs">
+        <i data-lucide="filter" class="w-4 h-4 text-[#C41230]"></i>
+        <label for="filtro-del" class="font-bold text-slate-600">Delegación:</label>
+        <select id="filtro-del" name="delegacion" onchange="this.form.submit()" 
+                class="max-w-[170px] truncate font-bold bg-transparent text-slate-900 focus:outline-none cursor-pointer">
+          <option value="" {% if not delegacion_seleccionada %}selected{% endif %}>Todas</option>
+          {% for d in todas_delegaciones %}
+            <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
+              {{ d.get_codigo }} — {{ d.nombre }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <select name="estado" onchange="this.form.submit()"
+              class="px-3 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+        <option value="">Filtrar Estado: Todos</option>
+        <option value="Activo" {% if filtro_estado == 'Activo' %}selected{% endif %}>Activo</option>
+        <option value="Inactivo" {% if filtro_estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
+      </select>
+      {% include "gestion/includes/ordering_control.html" %}
+
+      {% if q or filtro_estado or delegacion_seleccionada and es_admin %}
+        <a href="{% url 'gestion_sectores' %}" class="text-xs text-[#C41230] font-bold hover:underline py-2">Limpiar filtros</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Tabla de Sectores -->
+  <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="w-full">
+      <table class="w-full text-left text-xs text-slate-700">
+        <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+          <tr>
+            <th class="py-3.5 px-4 whitespace-nowrap">Código</th>
+            <th class="py-3.5 px-4">Sector / Territorio</th>
+            <th class="py-3.5 px-4 whitespace-nowrap">Delegación</th>
+            <th class="py-3.5 px-4">Descripción</th>
+            <th class="py-3.5 px-4 text-center w-24 whitespace-nowrap">Estado</th>
+            <th class="py-3.5 px-4 text-center w-28 whitespace-nowrap">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 font-medium">
+          {% for s in sectores %}
+          <tr class="hover:bg-slate-50/80 transition-colors">
+            <td class="py-3 px-4 font-mono font-bold text-[#C41230] whitespace-nowrap">
+              {{ s.get_codigo }}
+            </td>
+            <td class="py-3 px-4 font-bold text-slate-900">
+              <div class="flex items-center gap-1.5">
+                <i data-lucide="map-pin" class="w-3.5 h-3.5 text-[#C41230]"></i>
+                <span>{{ s.nombre }}</span>
+              </div>
+            </td>
+            <td class="py-3 px-4 text-slate-700 whitespace-nowrap">
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                {{ s.delegacion.nombre }}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-slate-500 max-w-xs truncate">
+              {{ s.descripcion|default:"Sin descripción complementaria" }}
+            </td>
+            <td class="py-3 px-4 text-center whitespace-nowrap">
+              {% if s.estado == 'Activo' %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Activo
+                </span>
+              {% else %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-600 border border-slate-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Inactivo
+                </span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-center whitespace-nowrap">
+              <div class="flex items-center justify-center gap-1.5">
+                <button type="button" 
+                        onclick="abrirModalEditarSector('{{ s.id }}', '{{ s.codigo|default:''|escapejs }}', '{{ s.nombre|escapejs }}', '{{ s.delegacion.id }}', '{{ s.delegacion.nombre|escapejs }}', '{{ s.descripcion|default:''|escapejs }}', '{{ s.estado }}')"
+                        class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Editar Sector">
+                  <i data-lucide="edit-3" class="w-4 h-4"></i>
+                </button>
+                <form method="POST" action="{% url 'gestion_sectores_eliminar' s.id %}" onsubmit="return confirmDelete(this, '{{ s.nombre|escapejs }}');" class="inline">
+                  {% csrf_token %}
+                  <button type="submit" class="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all" title="Eliminar Sector">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="py-8 text-center text-slate-400 font-medium">
+              No se encontraron sectores o territorios registrados.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% include "gestion/includes/paginator.html" %}
+  </div>
+
+</div>
+
+<!-- Modal Crear Sector -->
+<div id="modal-crear-sector" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-lg space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div>
+        <h3 class="text-base font-extrabold text-slate-900">Registrar Sector / Territorio</h3>
+        <p class="text-[11px] text-slate-400">Subdivisión territorial por delegación</p>
+      </div>
+      <button type="button" onclick="document.getElementById('modal-crear-sector').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+    </div>
+
+    <form method="POST" action="{% url 'gestion_sectores' %}" class="space-y-3.5">
+      {% csrf_token %}
+
+      <!-- Delegación Asignada (Bloqueada a la delegación activa) -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">
+          Delegación Territorial <span class="text-[#C41230]">*</span>
+        </label>
+        {% if delegacion_activa %}
+          <div class="relative">
+            <input type="text" readonly value="{{ delegacion_activa.nombre }}" 
+                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 cursor-not-allowed select-none" />
+            <input type="hidden" name="delegacion_id" value="{{ delegacion_activa.id }}">
+            <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+              <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+            </div>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-0.5">Bloqueada según tu delegación activa asignada</p>
+        {% elif es_admin %}
+          <select name="delegacion_id" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+            {% for d in todas_delegaciones %}
+              <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>{{ d.nombre }}</option>
+            {% endfor %}
+          </select>
+        {% endif %}
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Nombre del Sector <span class="text-[#C41230]">*</span></label>
+          <input type="text" name="nombre" required placeholder="Ej: Alta Compañía, Casco Histórico..."
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Código (Opcional)</label>
+          <input type="text" name="codigo" placeholder="Autogenerado"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none uppercase font-mono" />
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Descripción territorial</label>
+        <textarea name="descripcion" rows="2" placeholder="Límites, referencias o barrios que integran este sector..."
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium"></textarea>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Estado</label>
+        <select name="estado" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <button type="button" onclick="document.getElementById('modal-crear-sector').classList.add('hidden')" 
+                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cancelar</button>
+        <button type="submit" class="px-5 py-2 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-md transition-all">Guardar Sector</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Editar Sector -->
+<div id="modal-editar-sector" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-lg space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div>
+        <h3 class="text-base font-extrabold text-slate-900">Editar Sector / Territorio</h3>
+        <p class="text-[11px] text-slate-400">Actualizar información de la subdivisión</p>
+      </div>
+      <button type="button" onclick="document.getElementById('modal-editar-sector').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+    </div>
+
+    <form id="form-editar-sector" method="POST" action="" class="space-y-3.5">
+      {% csrf_token %}
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Delegación Territorial</label>
+        <div class="relative">
+          <input type="text" id="edit-sector-del" readonly 
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 cursor-not-allowed select-none" />
+          <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+            <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Nombre del Sector <span class="text-[#C41230]">*</span></label>
+          <input type="text" id="edit-sector-nombre" name="nombre" required 
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Código</label>
+          <input type="text" id="edit-sector-codigo" name="codigo" 
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none uppercase font-mono" />
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Descripción territorial</label>
+        <textarea id="edit-sector-desc" name="descripcion" rows="2" 
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium"></textarea>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Estado</label>
+        <select id="edit-sector-estado" name="estado" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <button type="button" onclick="document.getElementById('modal-editar-sector').classList.add('hidden')" 
+                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cancelar</button>
+        <button type="submit" class="px-5 py-2 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-md transition-all">Actualizar Sector</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function abrirModalEditarSector(id, codigo, nombre, delId, delNombre, desc, estado) {
+    const form = document.getElementById('form-editar-sector');
+    if (form) form.action = `/gestion/sectores/${id}/editar/`;
+
+    document.getElementById('edit-sector-codigo').value = codigo;
+    document.getElementById('edit-sector-nombre').value = nombre;
+    document.getElementById('edit-sector-del').value = delNombre;
+    document.getElementById('edit-sector-desc').value = desc;
+    document.getElementById('edit-sector-estado').value = estado;
+
+    document.getElementById('modal-editar-sector').classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+  }
+</script>
+{% endblock %}

@@ -14,7 +14,7 @@
     <button onclick="document.getElementById('modal-crear').classList.remove('hidden')" 
             class="px-4 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
       <i data-lucide="plus" class="w-4 h-4"></i>
-      <span>+ Nuevo registro</span>
+      <span>Nuevo registro</span>
     </button>
   </div>
 
@@ -31,7 +31,7 @@
 
       {% if permisos.es_admin %}
       <select name="delegacion" onchange="this.form.submit()" 
-              class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+              class="w-full max-w-[150px] px-2 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
         <option value="">Filtrar Delegación: Todas</option>
         {% for d in todas_delegaciones %}
           <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
@@ -47,9 +47,10 @@
         <option value="Activo" {% if filtro_estado == 'Activo' %}selected{% endif %}>Activo</option>
         <option value="Inactivo" {% if filtro_estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
       </select>
+      {% include "gestion/includes/ordering_control.html" %}
     </form>
 
-    <a href="?q={{ q }}&estado={{ filtro_estado }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}&export=excel" 
+    <a href="?q={{ q }}&estado={{ filtro_estado }}&orden={{ orden }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}&export=excel"
        class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
       <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
       <span>Exportar a Excel</span>
@@ -63,7 +64,9 @@
         <thead class="bg-slate-50/80 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
           <tr>
             <th class="py-3 px-6">Nombre</th>
+            <th class="py-3 px-6">Usuario</th>
             <th class="py-3 px-6">Correo</th>
+            <th class="py-3 px-6">Cargo</th>
             <th class="py-3 px-6">Rol</th>
             <th class="py-3 px-6">Delegación</th>
             <th class="py-3 px-6 text-center">Acciones</th>
@@ -73,7 +76,9 @@
           {% for f in funcionarios %}
           <tr class="hover:bg-slate-50/70 transition-colors">
             <td class="py-3.5 px-6 font-bold text-slate-900">{{ f.user.first_name|default:f.user.username }}</td>
+            <td class="py-3.5 px-6 font-mono text-slate-700">{{ f.user.username }}</td>
             <td class="py-3.5 px-6 text-slate-600">{{ f.user.email|default:"—" }}</td>
+            <td class="py-3.5 px-6 text-slate-700">{{ f.cargo.nombre_cargo|default:"—" }}</td>
             <td class="py-3.5 px-6">
               {% with f.funcionariorol_set.first as rol_entry %}
                 {% if rol_entry and rol_entry.rol %}
@@ -90,14 +95,14 @@
               <div class="flex items-center justify-center gap-1.5">
                 <!-- Ver Detalle -->
                 <button type="button" 
-                        onclick="verDetalle('{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.nombre_rol|default:'Funcionario'|escapejs }}', '{{ f.delegacion.nombre|default:'Global'|escapejs }}', '{{ f.estado|escapejs }}', '{{ f.identificador_institucional|escapejs }}')"
+                        onclick="verDetalle('{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.cargo.nombre_cargo|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.nombre_rol|default:'Funcionario'|escapejs }}', '{{ f.delegacion.nombre|default:'Global'|escapejs }}', '{{ f.estado|escapejs }}', '{{ f.identificador_institucional|escapejs }}')"
                         title="Ver detalle"
                         class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
                 <!-- Editar -->
                 <button type="button" 
-                        onclick="editarRegistro('{{ f.id }}', '{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.id|default:'' }}', '{{ f.delegacion.id|default:'' }}', '{{ f.estado|escapejs }}')"
+                        onclick="editarRegistro('{{ f.id }}', '{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.id|default:'' }}', '{{ f.delegacion.id|default:'' }}', '{{ f.estado|escapejs }}', '{{ f.cargo_id }}')"
                         title="Editar usuario"
                         class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all">
                   <i data-lucide="edit-3" class="w-4 h-4"></i>
@@ -114,7 +119,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="5" class="py-8 text-center text-slate-400 font-medium">
+            <td colspan="7" class="py-8 text-center text-slate-400 font-medium">
               No se encontraron usuarios para la búsqueda o filtro aplicado.
             </td>
           </tr>
@@ -132,7 +137,7 @@
       {% if page_obj.has_other_pages %}
       <div class="flex items-center gap-1.5">
         {% if page_obj.has_previous %}
-          <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&estado={{ filtro_estado }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
+          <a href="?page={{ page_obj.previous_page_number }}&page_size={{ page_size }}&q={{ q }}&estado={{ filtro_estado }}&orden={{ orden }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold">
             Anterior
           </a>
@@ -142,13 +147,13 @@
           {% if p == page_obj.number %}
             <span class="px-3 py-1.5 rounded-lg bg-[#C41230] text-white font-bold">{{ p }}</span>
           {% else %}
-            <a href="?page={{ p }}&q={{ q }}&estado={{ filtro_estado }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
+            <a href="?page={{ p }}&page_size={{ page_size }}&q={{ q }}&estado={{ filtro_estado }}&orden={{ orden }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
                class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50">{{ p }}</a>
           {% endif %}
         {% endfor %}
 
         {% if page_obj.has_next %}
-          <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&estado={{ filtro_estado }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
+          <a href="?page={{ page_obj.next_page_number }}&page_size={{ page_size }}&q={{ q }}&estado={{ filtro_estado }}&orden={{ orden }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold">
             Siguiente
           </a>
@@ -164,7 +169,7 @@
 
 <!-- Modal Ver Detalle -->
 <div id="modal-ver" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-md space-y-4">
+  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-md max-h-[90vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
       <h3 class="text-base font-extrabold text-slate-900">Consulta de Usuario</h3>
       <button onclick="document.getElementById('modal-ver').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
@@ -172,7 +177,9 @@
     <div class="space-y-3 text-xs">
       <div><span class="font-bold text-slate-500">ID Institucional:</span> <span id="ver-id" class="font-mono font-bold text-slate-900"></span></div>
       <div><span class="font-bold text-slate-500">Nombre Completo:</span> <span id="ver-nombre" class="font-bold text-slate-900"></span></div>
+      <div><span class="font-bold text-slate-500">Usuario:</span> <span id="ver-usuario" class="font-mono text-slate-800"></span></div>
       <div><span class="font-bold text-slate-500">Correo Electrónico:</span> <span id="ver-correo" class="text-slate-800"></span></div>
+      <div><span class="font-bold text-slate-500">Cargo:</span> <span id="ver-cargo" class="text-slate-800"></span></div>
       <div><span class="font-bold text-slate-500">Rol:</span> <span id="ver-rol" class="font-bold text-slate-800"></span></div>
       <div><span class="font-bold text-slate-500">Delegación Asignada:</span> <span id="ver-del" class="text-slate-800"></span></div>
       <div><span class="font-bold text-slate-500">Estado:</span> <span id="ver-estado" class="font-bold"></span></div>
@@ -186,26 +193,44 @@
 
 <!-- Modal Crear Usuario -->
 <div id="modal-crear" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-md space-y-4">
+  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-md max-h-[90vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
       <h3 class="text-base font-extrabold text-slate-900">Nuevo Usuario</h3>
       <button onclick="document.getElementById('modal-crear').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
     </div>
     <form method="POST" action="{% url 'gestion_usuarios' %}" class="space-y-4">
       {% csrf_token %}
+      <p class="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        Se asignará la contraseña temporal <strong>User1234!</strong>; el usuario deberá cambiarla en su primer inicio.
+      </p>
       <div>
         <label class="block text-xs font-bold text-slate-700 mb-1">Nombre Completo *</label>
-        <input type="text" name="nombre" required placeholder="Ej: Ana Ejemplo" 
+        <input type="text" name="nombre" required placeholder="Nombre y apellidos"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Nombre de usuario *</label>
+        <input type="text" name="username" required autocomplete="username"
                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
       </div>
       <div>
         <label class="block text-xs font-bold text-slate-700 mb-1">Correo Electrónico *</label>
-        <input type="email" name="correo" required placeholder="ana@example.test" 
+        <input type="email" name="correo" required placeholder="correo@dominio.cl"
                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Cargo *</label>
+        <select name="cargo_id" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          <option value="">Seleccionar cargo</option>
+          {% for cargo in cargos %}
+            <option value="{{ cargo.id }}">{{ cargo.nombre_cargo }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div>
         <label class="block text-xs font-bold text-slate-700 mb-1">Rol *</label>
         <select name="rol_id" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          <option value="">Seleccionar rol</option>
           {% for r in roles %}
             <option value="{{ r.id }}">{{ r.nombre_rol }} ({{ r.alcance }})</option>
           {% endfor %}
@@ -215,6 +240,7 @@
       <div>
         <label class="block text-xs font-bold text-slate-700 mb-1">Delegación Asignada</label>
         <select name="delegacion_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          <option value="">Sin delegación / Global</option>
           {% for d in delegaciones %}
             <option value="{{ d.id }}">{{ d.get_codigo }} — {{ d.nombre }}</option>
           {% endfor %}
@@ -258,6 +284,14 @@
                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
       </div>
       <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Cargo</label>
+        <select id="edit-cargo" name="cargo_id" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          {% for cargo in cargos %}
+            <option value="{{ cargo.id }}">{{ cargo.nombre_cargo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
         <label class="block text-xs font-bold text-slate-700 mb-1">Rol</label>
         <select id="edit-rol" name="rol_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
           {% for r in roles %}
@@ -269,6 +303,7 @@
       <div>
         <label class="block text-xs font-bold text-slate-700 mb-1">Delegación</label>
         <select id="edit-del" name="delegacion_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          <option value="">Sin delegación / Global</option>
           {% for d in delegaciones %}
             <option value="{{ d.id }}">{{ d.get_codigo }} — {{ d.nombre }}</option>
           {% endfor %}
@@ -296,25 +331,30 @@
 
 {% block extra_js %}
 <script>
-  function verDetalle(nombre, correo, rol, delegacion, estado, idInst) {
+  function verDetalle(nombre, usuario, correo, cargo, rol, delegacion, estado, idInst) {
     document.getElementById('ver-id').textContent = idInst || '—';
     document.getElementById('ver-nombre').textContent = nombre;
+    document.getElementById('ver-usuario').textContent = usuario;
     document.getElementById('ver-correo').textContent = correo;
+    document.getElementById('ver-cargo').textContent = cargo || '—';
     document.getElementById('ver-rol').textContent = rol;
     document.getElementById('ver-del').textContent = delegacion;
     document.getElementById('ver-estado').textContent = estado;
     document.getElementById('modal-ver').classList.remove('hidden');
   }
 
-  function editarRegistro(id, nombre, correo, rolId, delId, estado) {
+  function editarRegistro(id, nombre, correo, rolId, delId, estado, cargoId) {
     document.getElementById('form-editar').action = `/gestion/usuarios/${id}/editar/`;
     document.getElementById('edit-nombre').value = nombre;
     document.getElementById('edit-correo').value = correo;
     if (rolId && document.getElementById('edit-rol')) {
       document.getElementById('edit-rol').value = rolId;
     }
-    if (delId && document.getElementById('edit-del')) {
+    if (document.getElementById('edit-del')) {
       document.getElementById('edit-del').value = delId;
+    }
+    if (cargoId && document.getElementById('edit-cargo')) {
+      document.getElementById('edit-cargo').value = cargoId;
     }
     document.getElementById('edit-estado').value = estado;
     document.getElementById('modal-editar').classList.remove('hidden');

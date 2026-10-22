@@ -5,117 +5,236 @@
 {% block content %}
 <div class="space-y-6">
 
-  <!-- Migas de pan y Encabezado (Wireframe C6 - Diseño 11) -->
-  <div>
-    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Gestión municipal / Atenciones</p>
-    <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
-      {% if permisos.es_consultor %}Consulta de Atenciones Ciudadanas{% else %}Ingreso de atención{% endif %}
-    </h1>
+  <!-- Migas de pan y Encabezado con Botón Nueva Atención -->
+  <div class="bg-white rounded-3xl p-6 sm:p-7 border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div class="space-y-1">
+      <div class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+        <span>Gestión Municipal</span>
+        <span class="text-slate-300">/</span>
+        <span class="text-[#C41230]">Atenciones Ciudadanas</span>
+      </div>
+      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
+        {% if permisos.es_consultor %}Consulta de Atenciones Ciudadanas{% else %}Atenciones Ciudadanas{% endif %}
+      </h1>
+      <p class="text-xs text-slate-500 max-w-xl">
+        Registro, derivación y seguimiento de requerimientos vecinales vinculados al catálogo municipal de servicios y evidencias SGR.
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 shrink-0">
+      <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl {% if delegacion_activa %}bg-red-50 text-[#C41230] border border-red-200/90{% elif delegacion_seleccionada %}bg-red-50 text-[#C41230] border border-red-200/90{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %} text-xs font-bold">
+        <i data-lucide="{% if delegacion_activa or delegacion_seleccionada %}map-pin{% else %}globe{% endif %}" class="w-4 h-4"></i>
+        <span>Delegación Activa: <strong>{% if delegacion_activa %}{{ delegacion_activa.nombre }}{% elif delegacion_seleccionada %}{{ delegacion_seleccionada.nombre }}{% else %}Global (Todas){% endif %}</strong></span>
+      </div>
+
+      {% if not permisos.es_consultor %}
+      <button type="button" 
+              onclick="abrirModalNuevaAtencion()" 
+              class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2 shrink-0">
+        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+        <span>Nueva Atención</span>
+      </button>
+      {% endif %}
+    </div>
   </div>
 
   {% if not permisos.es_consultor %}
-  <!-- Formulario de Ingreso de Atención (Diseño 11) -->
-  <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-[rgba(196,18,48,0.18)]">
-    <form id="form-atencion" method="POST" action="{% url 'gestion_atenciones' %}" class="space-y-5">
-      {% csrf_token %}
+  <!-- Modal Nueva Atención Ciudadana (Creación mediante Modal) -->
+  <div id="modal-nueva-atencion" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[92vh] overflow-y-auto space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <h3 class="text-base font-extrabold text-slate-900">Ingreso de Atención Ciudadana</h3>
+          <p class="text-[11px] text-slate-400">Requerimiento territorial de vecino o vecina</p>
+        </div>
+        <button type="button" onclick="cerrarModalNuevaAtencion()" class="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
+      </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-        
-        <!-- 1. Vecino o Solicitante -->
-        <div class="space-y-1.5">
-          <label class="block text-xs font-bold text-slate-800">
-            Vecino o solicitante <span class="text-[#C41230]">*</span>
-          </label>
-          <div class="relative">
-            <input type="text" id="solicitante" name="solicitante" required list="vecinos-list"
-                   placeholder="Buscar por identificador o nombre..." 
-                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none transition-all placeholder:text-slate-400 font-medium" />
-            <datalist id="vecinos-list">
-              {% for v in vecinos %}
-                <option value="{{ v.nombre }} ({{ v.rut }})">{{ v.territorio }}</option>
-              {% endfor %}
-            </datalist>
+      <form id="form-atencion" method="POST" action="{% url 'gestion_atenciones' %}" enctype="multipart/form-data" class="space-y-4">
+        {% csrf_token %}
+
+        <!-- Selector de Modo de Vecino: Existente o Nuevo -->
+        <div class="space-y-2">
+          <div class="bg-slate-100/80 p-1 rounded-2xl border border-slate-200 flex items-center gap-1">
+            <button type="button" id="tab-vecino-existente" onclick="cambiarModoVecino('existente')"
+                    class="flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 bg-white text-[#C41230] shadow-sm border border-slate-200/80">
+              <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
+              <span>Vecino Existente</span>
+            </button>
+            <button type="button" id="tab-vecino-nuevo" onclick="cambiarModoVecino('nuevo')"
+                    class="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900">
+              <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+              <span>Registrar Nuevo Vecino</span>
+            </button>
           </div>
-          <p class="text-[10px] text-slate-400">Ingresa el RUT o nombre completo del solicitante</p>
+          <input type="hidden" name="modo_vecino" id="modo_vecino" value="existente">
+
+          <!-- Opción 1: Vecino Existente -->
+          <div id="seccion-vecino-existente" class="space-y-1">
+            <label class="block text-xs font-bold text-slate-800">
+              Vecino o solicitante registrado <span class="text-[#C41230]">*</span>
+            </label>
+            <div class="relative">
+              <input type="text" id="solicitante" name="solicitante" required list="vecinos-list" oninput="sincronizarVecinoExistente(this.value)"
+                     placeholder="Buscar por RUT o nombre completo..." 
+                     class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none font-medium" />
+              <input type="hidden" id="vecino_id" name="vecino_id" value="">
+              <datalist id="vecinos-list">
+                {% for v in vecinos %}
+                  <option value="{{ v.nombre }} ({{ v.rut }})" data-id="{{ v.id }}">{{ v.territorio|default:v.delegacion.nombre|default:"Vecino Activo" }}</option>
+                {% endfor %}
+              </datalist>
+            </div>
+            <p class="text-[10px] text-slate-400">Selecciona del padrón vecinal o escribe su RUT / Nombre</p>
+          </div>
+
+          <!-- Opción 2: Registrar Nuevo Vecino -->
+          <div id="seccion-vecino-nuevo" class="hidden space-y-3 p-3.5 bg-red-50/40 rounded-2xl border border-red-100">
+            <div class="flex items-center gap-2 text-[#C41230] text-xs font-extrabold">
+              <i data-lucide="user-plus" class="w-4 h-4"></i>
+              <span>Nuevo vecino (se creará en la base de datos y se vinculará a la solicitud)</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Nombre completo <span class="text-[#C41230]">*</span></label>
+                <input type="text" id="nuevo_vecino_nombre" name="nuevo_vecino_nombre" placeholder="Ej: Patricia Morales Castro"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium">
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">RUT <span class="text-[#C41230]">*</span></label>
+                <input type="text" id="nuevo_vecino_rut" name="nuevo_vecino_rut" placeholder="Ej: 16.789.123-4"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium">
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Teléfono</label>
+                <input type="text" id="nuevo_vecino_telefono" name="nuevo_vecino_telefono" placeholder="+56 9 8765 4321"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium">
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Dirección</label>
+                <input type="text" id="nuevo_vecino_direccion" name="nuevo_vecino_direccion" placeholder="Calle / Pasaje y número"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium">
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Delegación Asignada</label>
+                <div class="relative">
+                  <input type="text" readonly 
+                         value="{% if delegacion_activa %}{{ delegacion_activa.nombre }}{% elif delegacion_seleccionada %}{{ delegacion_seleccionada.nombre }}{% else %}Delegación Territorial Activa{% endif %}" 
+                         class="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-100 text-xs font-bold text-slate-700 cursor-not-allowed select-none">
+                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
+                    <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+                  </div>
+                </div>
+              </div>
+              <div class="space-y-1 sm:col-span-2">
+                <label class="block text-[11px] font-bold text-slate-700">Sector / Territorio <span class="text-[#C41230]">*</span></label>
+                <select id="nuevo_vecino_sector_id" name="nuevo_vecino_sector_id"
+                        class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+                  <option value="">Seleccione sector / territorio...</option>
+                  {% for s in sectores %}
+                    <option value="{{ s.id }}">{{ s.nombre }}{% if permisos.es_admin and not delegacion_activa %} ({{ s.delegacion.nombre }}){% endif %}</option>
+                  {% endfor %}
+                </select>
+                <p class="text-[10px] text-slate-400">Sector territorial perteneciente a la delegación activa</p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- 2. Delegación de Atención (Contexto Asignado por Perfil) -->
-        <div class="space-y-1.5">
-          <label class="block text-xs font-bold text-slate-800">
-            Delegación de atención
-          </label>
-          <div class="relative">
-            <input type="text" readonly 
-                   value="{{ delegacion_activa.get_codigo }} · {{ delegacion_activa.nombre }}" 
-                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 cursor-not-allowed select-none" />
-            <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
-              <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+        <!-- Delegación y Representante / Encargado -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Delegación de Atención -->
+          <div class="space-y-1">
+            <label class="block text-xs font-bold text-slate-800">
+              Delegación de atención
+            </label>
+            <div class="relative">
+              <input type="text" readonly 
+                     value="{% if delegacion_activa %}{{ delegacion_activa.get_codigo }} · {{ delegacion_activa.nombre }}{% else %}Ámbito Global / Central{% endif %}" 
+                     class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 cursor-not-allowed select-none" />
+              <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+                <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+              </div>
             </div>
           </div>
 
+          <!-- Representante / Encargado asignado -->
+          <div class="space-y-1">
+            <label class="block text-xs font-bold text-slate-800">
+              Representante / Encargado asignado <span class="text-[#C41230]">*</span>
+            </label>
+            <select id="responsable_id" name="responsable_id"
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none font-bold">
+              {% for rep in representantes_disponibles %}
+                <option value="{{ rep.id }}" {% if rep.es_actual %}selected{% endif %}>
+                  {% if rep.es_actual %}★ (Yo) {% endif %}{{ rep.label }}
+                </option>
+              {% endfor %}
+            </select>
+            <p class="text-[10px] text-slate-400">Solo funcionarios asignados a {% if delegacion_activa %}{{ delegacion_activa.nombre }}{% elif delegacion_seleccionada %}{{ delegacion_seleccionada.nombre }}{% else %}la delegación activa{% endif %}</p>
+          </div>
         </div>
 
-        <!-- 3. Tipo de Atención -->
-        <div class="space-y-1.5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Tipo de Atención -->
+          <div class="space-y-1">
+            <label class="block text-xs font-bold text-slate-800">
+              Tipo de Atención <span class="text-[#C41230]">*</span>
+            </label>
+            <select id="tipo_atencion_id" name="tipo_atencion_id" required onchange="cargarSubAtenciones(this.value)"
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none font-bold">
+              <option value="">Seleccione un Tipo de Atención...</option>
+              {% for t in tipos_activos %}
+                <option value="{{ t.id }}">{{ t.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Sub Atención -->
+          <div class="space-y-1">
+            <label class="block text-xs font-bold text-slate-800">
+              Sub Atención <span class="text-[#C41230]">*</span>
+            </label>
+            <select id="sub_atencion_id" name="sub_atencion_id" required
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none font-bold">
+              <option value="">Primero seleccione un Tipo de Atención</option>
+            </select>
+            <p id="sub-helper" class="text-[10px] text-slate-400">Opciones activas según el tipo elegido</p>
+          </div>
+        </div>
+
+        <!-- Descripción de la Atención -->
+        <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-800">
-            Tipo de Atención <span class="text-[#C41230]">*</span>
+            Descripción de la atención <span class="text-[#C41230]">*</span>
           </label>
-          <select id="tipo_atencion_id" name="tipo_atencion_id" required onchange="cargarSubAtenciones(this.value)"
-                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none font-bold">
-            <option value="">Seleccione un Tipo de Atención...</option>
-            {% for t in tipos_activos %}
-              <option value="{{ t.id }}">{{ t.nombre }}</option>
-            {% endfor %}
-          </select>
+          <textarea id="descripcion" name="descripcion" required rows="3"
+                    placeholder="Describa la solicitud y los antecedentes necesarios."
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none font-medium"></textarea>
         </div>
 
-        <!-- 4. Sub Atención (Dependiente de Tipo de Atención) -->
-        <div class="space-y-1.5">
-          <label class="block text-xs font-bold text-slate-800">
-            Sub Atención <span class="text-[#C41230]">*</span>
-          </label>
-          <select id="sub_atencion_id" name="sub_atencion_id" required
-                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none font-bold">
-            <option value="">Primero seleccione un Tipo de Atención</option>
-          </select>
-          <p id="sub-helper" class="text-[10px] text-slate-400">Solo muestra opciones activas asociadas al tipo elegido</p>
+        <!-- Footer Informativo y Botones de Acción -->
+        <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div class="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Creado por: <strong class="text-slate-800">{{ request.user.first_name|default:request.user.username }}</strong> </span>
+          </div>
+
+          <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button type="button" onclick="cerrarModalNuevaAtencion()"
+                    class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
+              Cancelar
+            </button>
+            
+            <button type="submit" id="btn-guardar"
+                    class="px-5 py-2 bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center gap-2">
+              <i data-lucide="save" class="w-4 h-4"></i>
+              <span id="btn-text">Guardar atención</span>
+            </button>
+          </div>
         </div>
-
-      </div>
-
-      <!-- 5. Descripción de la Atención -->
-      <div class="space-y-1.5">
-        <label class="block text-xs font-bold text-slate-800">
-          Descripción de la atención <span class="text-[#C41230]">*</span>
-        </label>
-        <textarea id="descripcion" name="descripcion" required rows="3"
-                  placeholder="Describa la solicitud y los antecedentes necesarios."
-                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none transition-all placeholder:text-slate-400 font-medium"></textarea>
-      </div>
-
-      <!-- Footer Informativo y Botones de Acción (Mockup C6) -->
-      <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div class="text-[11px] text-slate-500 font-medium">
-          Responsable: <strong class="text-slate-800">{{ request.user.first_name|default:request.user.username }}</strong> 
-          <span class="mx-1 text-slate-300">|</span> 
-          Fecha y hora: <span class="text-slate-600 font-bold">automáticas</span>
-        </div>
-
-        <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
-          <!-- Cancelar no crea registros -->
-          <button type="button" onclick="cancelarAtencion()"
-                  class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
-            Cancelar
-          </button>
-          
-          <!-- Guardar Atención con prevención de doble envío -->
-          <button type="submit" id="btn-guardar"
-                  class="px-6 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center gap-2">
-            <i data-lucide="save" class="w-4 h-4"></i>
-            <span id="btn-text">Guardar atención</span>
-          </button>
-        </div>
-    </form>
+      </form>
+    </div>
   </div>
   {% else %}
   <!-- Banner Informativo para Perfil Consultor (Solo Lectura) -->
@@ -142,6 +261,85 @@
   {% endif %}
 
 
+  <!-- Métricas de Estado de Solicitudes Ciudadanas -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <!-- Registradas -->
+    <a href="?q={{ q }}&tipo={{ filtro_tipo }}&estado=Registrada{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
+       class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'Registrada' %}border-blue-500 ring-2 ring-blue-100{% else %}border-slate-200/80 hover:border-blue-300{% endif %} shadow-sm transition-all hover:shadow group block">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Registradas</span>
+        <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="inbox" class="w-4 h-4"></i>
+        </div>
+      </div>
+      <div class="mt-2 flex items-baseline gap-2">
+        <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">{{ total_registradas }}</span>
+        <span class="text-[10px] text-slate-400 font-semibold">solicitudes</span>
+      </div>
+      <div class="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-blue-600">
+        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+        <span>Ingresadas recientemente</span>
+      </div>
+    </a>
+
+    <!-- En proceso -->
+    <a href="?q={{ q }}&tipo={{ filtro_tipo }}&estado=En+proceso{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
+       class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'En proceso' %}border-amber-500 ring-2 ring-amber-100{% else %}border-slate-200/80 hover:border-amber-300{% endif %} shadow-sm transition-all hover:shadow group block">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">En proceso</span>
+        <div class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="clock" class="w-4 h-4"></i>
+        </div>
+      </div>
+      <div class="mt-2 flex items-baseline gap-2">
+        <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">{{ total_en_proceso }}</span>
+        <span class="text-[10px] text-slate-400 font-semibold">solicitudes</span>
+      </div>
+      <div class="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-amber-600">
+        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+        <span>En gestión territorial</span>
+      </div>
+    </a>
+
+    <!-- Resueltas -->
+    <a href="?q={{ q }}&tipo={{ filtro_tipo }}&estado=Resuelta{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
+       class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'Resuelta' %}border-emerald-500 ring-2 ring-emerald-100{% else %}border-slate-200/80 hover:border-emerald-300{% endif %} shadow-sm transition-all hover:shadow group block">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Resueltas</span>
+        <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+        </div>
+      </div>
+      <div class="mt-2 flex items-baseline gap-2">
+        <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">{{ total_resueltas }}</span>
+        <span class="text-[10px] text-slate-400 font-semibold">solicitudes</span>
+      </div>
+      <div class="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        <span>Completadas con éxito</span>
+      </div>
+    </a>
+
+    <!-- Canceladas -->
+    <a href="?q={{ q }}&tipo={{ filtro_tipo }}&estado=Cancelada{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
+       class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'Cancelada' %}border-red-500 ring-2 ring-red-100{% else %}border-slate-200/80 hover:border-red-300{% endif %} shadow-sm transition-all hover:shadow group block">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Canceladas</span>
+        <div class="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="x-circle" class="w-4 h-4"></i>
+        </div>
+      </div>
+      <div class="mt-2 flex items-baseline gap-2">
+        <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">{{ total_canceladas }}</span>
+        <span class="text-[10px] text-slate-400 font-semibold">solicitudes</span>
+      </div>
+      <div class="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-red-600">
+        <span class="w-2 h-2 rounded-full bg-red-500"></span>
+        <span>Requerimientos descartados</span>
+      </div>
+    </a>
+  </div>
+
   <!-- Historial de Atenciones Registradas Recientemente -->
   <div class="space-y-4 pt-4 border-t border-slate-200">
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -149,7 +347,7 @@
         <h2 class="text-lg font-extrabold text-slate-900">Historial de atenciones registradas</h2>
         <p class="text-xs text-slate-500 font-medium">Consulta y seguimiento de casos ingresados en el sistema</p>
       </div>
-      <a href="?q={{ q }}&tipo={{ filtro_tipo }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}&export=excel" 
+      <a href="?q={{ q }}&tipo={{ filtro_tipo }}&estado={{ filtro_estado }}&orden={{ orden }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}&export=excel"
          class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-sm shrink-0">
         <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
         <span>Exportar a Excel</span>
@@ -169,7 +367,7 @@
 
         {% if permisos.es_admin %}
         <select name="delegacion" onchange="this.form.submit()" 
-                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+                class="w-full max-w-[150px] px-2 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
           <option value="">Filtrar Delegación: Todas</option>
           {% for d in todas_delegaciones %}
             <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
@@ -186,6 +384,15 @@
             <option value="{{ t.nombre }}" {% if filtro_tipo == t.nombre %}selected{% endif %}>{{ t.nombre }}</option>
           {% endfor %}
         </select>
+        <select name="estado" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+          <option value="">Filtrar Estado: Todos</option>
+          <option value="Registrada" {% if filtro_estado == 'Registrada' %}selected{% endif %}>Registrada</option>
+          <option value="En proceso" {% if filtro_estado == 'En proceso' %}selected{% endif %}>En proceso</option>
+          <option value="Resuelta" {% if filtro_estado == 'Resuelta' %}selected{% endif %}>Resuelta</option>
+          <option value="Cancelada" {% if filtro_estado == 'Cancelada' %}selected{% endif %}>Cancelada</option>
+        </select>
+        {% include "gestion/includes/ordering_control.html" %}
       </form>
     </div>
 
@@ -200,7 +407,7 @@
               <th class="py-2.5 px-3 whitespace-nowrap">Delegación</th>
               <th class="py-2.5 px-3">Tipo / Sub Atención</th>
               <th class="py-2.5 px-3 whitespace-nowrap">Evidencia SGR</th>
-              <th class="py-2.5 px-3 whitespace-nowrap">Responsable</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Responsable / Creador</th>
               <th class="py-2.5 px-3 whitespace-nowrap">Fecha</th>
               <th class="py-2.5 px-3 text-center whitespace-nowrap">Estado</th>
               <th class="py-2.5 px-3 text-center whitespace-nowrap w-14 sticky right-0 bg-slate-50/95 backdrop-blur-sm shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acción</th>
@@ -218,6 +425,21 @@
               </td>
               <td class="py-2.5 px-3 whitespace-nowrap">
                 <span class="font-mono font-bold text-slate-800 text-[11px] block leading-tight">{{ a.get_evidencia_codigo }}</span>
+                {% if a.actividad %}
+                  <div class="flex flex-col text-[10px]">
+                    {% for evidencia in a.actividad.evidencias.all %}
+                      <div class="flex items-center gap-1.5">
+                        <span class="text-slate-500">{{ evidencia.get_momento_display }}:</span>
+                      {% if evidencia.imagen %}
+                        <a href="{{ evidencia.imagen.url }}" target="_blank" rel="noopener" class="text-[#C41230] hover:underline">Ver imagen</a>
+                      {% endif %}
+                      {% if evidencia.archivo %}
+                        <a href="{{ evidencia.archivo.url }}" target="_blank" rel="noopener" class="text-[#C41230] hover:underline">Ver archivo</a>
+                      {% endif %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
                 {% if a.estado_evidencia == 'Aprobado' %}
                   <span class="inline-flex items-center gap-1 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Aprobada
@@ -232,7 +454,15 @@
                   </span>
                 {% endif %}
               </td>
-              <td class="py-2.5 px-3 text-slate-600 text-[11px] whitespace-nowrap">{{ a.usuario_responsable.first_name|default:a.usuario_responsable.username }}</td>
+              <td class="py-2.5 px-3 text-[11px] whitespace-nowrap">
+                <div class="font-bold text-slate-900 flex items-center gap-1">
+                  <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#C41230]"></i>
+                  <span>{{ a.usuario_responsable.get_full_name|default:a.usuario_responsable.username }}</span>
+                </div>
+                <div class="text-[10px] text-slate-400 mt-0.5">
+                  Creado por: <span class="text-slate-600 font-semibold">{% if a.creado_por %}{{ a.creado_por.get_full_name|default:a.creado_por.username }}{% else %}Sistema{% endif %}</span>
+                </div>
+              </td>
               <td class="py-2.5 px-3 text-slate-500 font-mono text-[11px] whitespace-nowrap">{{ a.created_at|date:"d/m/Y H:i" }}</td>
               <td class="py-2.5 px-3 text-center whitespace-nowrap">
                 {% if a.estado == 'Resuelta' %}
@@ -255,11 +485,40 @@
               </td>
               <td class="py-2.5 px-3 text-center whitespace-nowrap w-14 sticky right-0 bg-white group-hover:bg-slate-50 transition-colors shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
                 <button type="button" 
-                        onclick="verDetalleAtencion('{{ a.id }}', '{{ a.codigo_atencion|escapejs }}', '{{ a.solicitante|escapejs }}', '{{ a.delegacion.nombre|escapejs }}', '{{ a.tipo_atencion.nombre|escapejs }}', '{{ a.sub_atencion.nombre|escapejs }}', '{{ a.descripcion|escapejs }}', '{{ a.usuario_responsable.get_full_name|default:a.usuario_responsable.username|escapejs }}', '{{ a.created_at|date:'d/m/Y H:i' }}', '{{ a.estado|escapejs }}', '{{ a.get_evidencia_codigo|escapejs }}', '{{ a.estado_evidencia|escapejs }}')"
+                        onclick="verDetalleAtencion('{{ a.id }}', '{{ a.codigo_atencion|escapejs }}', '{{ a.solicitante|escapejs }}', '{{ a.delegacion.nombre|escapejs }}', '{{ a.tipo_atencion.nombre|escapejs }}', '{{ a.sub_atencion.nombre|escapejs }}', '{{ a.descripcion|escapejs }}', '{{ a.usuario_responsable.get_full_name|default:a.usuario_responsable.username|escapejs }}', '{% if a.creado_por %}{{ a.creado_por.get_full_name|default:a.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ a.created_at|date:'d/m/Y H:i' }}', '{{ a.estado|escapejs }}', '{{ a.get_evidencia_codigo|escapejs }}', '{{ a.estado_evidencia|escapejs }}')"
                         title="Ver detalle"
                         class="p-1.5 rounded-lg text-slate-500 hover:text-[#C41230] hover:bg-red-50 transition-all inline-flex items-center justify-center">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
+              </td>
+            </tr>
+            <tr class="hidden">
+              <td colspan="9">
+                <div id="evidencias-atencion-{{ a.id }}" class="space-y-3">
+                  {% if a.actividad %}
+                    {% for evidencia in a.actividad.evidencias.all %}
+                      <div class="evidence-item rounded-xl border border-slate-200 bg-white p-3" data-momento="{{ evidencia.momento }}">
+                        <p class="mb-2 text-[11px] font-extrabold text-slate-700">{{ evidencia.get_momento_display }}</p>
+                        <div class="flex flex-wrap items-start gap-3">
+                          {% if evidencia.imagen %}
+                            <a href="{{ evidencia.imagen.url }}" target="_blank" rel="noopener" class="block">
+                              <img src="{{ evidencia.imagen.url }}" alt="Evidencia {{ evidencia.get_momento_display }}" class="h-24 w-24 rounded-lg border border-slate-200 object-cover">
+                            </a>
+                          {% endif %}
+                          {% if evidencia.archivo %}
+                            <a href="{{ evidencia.archivo.url }}" target="_blank" rel="noopener" class="text-xs font-semibold text-[#C41230] hover:underline">
+                              {{ evidencia.archivo.name|cut:"evidencias/archivos/" }}
+                            </a>
+                          {% endif %}
+                        </div>
+                      </div>
+                    {% empty %}
+                      <p class="text-xs text-slate-500">Aún no se han adjuntado evidencias.</p>
+                    {% endfor %}
+                  {% else %}
+                    <p class="text-xs text-slate-500">Esta atención aún no tiene una actividad asociada.</p>
+                  {% endif %}
+                </div>
               </td>
             </tr>
             {% empty %}
@@ -273,31 +532,7 @@
         </table>
       </div>
 
-      <!-- Paginador -->
-      <div class="px-6 py-4 bg-slate-50/50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 font-medium">
-        <div>
-          Mostrando {{ page_obj.start_index|default:0 }} a {{ page_obj.end_index|default:0 }} de {{ total_registros }} registros
-        </div>
-        {% if page_obj.has_other_pages %}
-        <div class="flex items-center gap-1.5">
-          {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&tipo={{ filtro_tipo }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
-               class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold">Anterior</a>
-          {% endif %}
-          {% for p in page_obj.paginator.page_range %}
-            {% if p == page_obj.number %}
-              <span class="px-3 py-1.5 rounded-lg bg-[#C41230] text-white font-bold">{{ p }}</span>
-            {% else %}
-              <a href="?page={{ p }}&q={{ q }}&tipo={{ filtro_tipo }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50">{{ p }}</a>
-            {% endif %}
-          {% endfor %}
-          {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&tipo={{ filtro_tipo }}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
-               class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold">Siguiente</a>
-          {% endif %}
-        </div>
-        {% endif %}
-      </div>
+      {% include "gestion/includes/paginator.html" %}
     </div>
   </div>
 
@@ -305,7 +540,7 @@
 
 <!-- Modal Ver Detalle de Atención -->
 <div id="modal-detalle-atencion" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 w-full max-w-lg space-y-4">
+  <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
       <div>
         <span id="at-cod" class="font-mono text-xs font-extrabold text-[#C41230] bg-red-50 px-2.5 py-1 rounded-lg"></span>
@@ -325,12 +560,21 @@
         <div id="at-desc" class="p-3 bg-slate-50 rounded-xl text-slate-700 leading-relaxed border border-slate-200"></div>
       </div>
       <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-[11px]">
-        <div><span class="font-bold text-slate-500">Responsable:</span> <span id="at-resp" class="text-slate-800"></span></div>
-        <div><span class="font-bold text-slate-500">Fecha/Hora:</span> <span id="at-fecha" class="text-slate-800 font-mono"></span></div>
+        <div>
+          <span class="font-bold text-slate-500 block">Representante asignado:</span>
+          <span id="at-resp" class="font-bold text-slate-900"></span>
+        </div>
+        <div>
+          <span class="font-bold text-slate-500 block">Creado por (registro):</span>
+          <span id="at-creador" class="font-bold text-slate-700"></span>
+        </div>
       </div>
-      <div class="flex items-center gap-2 pt-1 text-xs">
-        <span class="font-bold text-slate-500">Estado Atención:</span>
-        <span id="at-estado-actual" class="font-extrabold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200"></span>
+      <div class="grid grid-cols-2 gap-2 text-[11px]">
+        <div><span class="font-bold text-slate-500">Fecha y Hora:</span> <span id="at-fecha" class="text-slate-800 font-mono"></span></div>
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold text-slate-500">Estado:</span>
+          <span id="at-estado-actual" class="font-extrabold px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-800 border border-slate-200"></span>
+        </div>
       </div>
     </div>
 
@@ -348,14 +592,30 @@
         <span id="at-evi-cod" class="font-mono font-extrabold text-[#C41230]"></span>
       </div>
       <div class="flex items-center justify-between text-[11px]">
-        <span class="text-slate-500 font-bold">Documento Adjunto:</span>
-        <span class="text-slate-700 font-semibold flex items-center gap-1">
-          <i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-400"></i>
-          Ficha digital de verificación y terreno
-        </span>
+        <span class="text-slate-500 font-bold">Archivos para revisar:</span>
+        <span class="text-slate-700 font-semibold">Revisa las imágenes y documentos antes de decidir.</span>
+      </div>
+      <div id="at-evidencias-lista" class="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
+        <p class="text-xs text-slate-500">No hay evidencias adjuntas.</p>
       </div>
 
       {% if not permisos.es_consultor %}
+      <form id="form-subir-evidencia" method="POST" enctype="multipart/form-data" action="" class="space-y-2 border-t border-slate-200 pt-3">
+        {% csrf_token %}
+        <p class="text-[11px] font-extrabold text-slate-700">Adjunta evidencia antes y después del trabajo</p>
+        <select name="momento" required class="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs">
+          <option value="">Selecciona el momento</option>
+          <option value="antes">Antes del trabajo</option>
+          <option value="despues">Después del trabajo</option>
+        </select>
+        <label class="block text-[11px] font-semibold text-slate-600">Imágenes
+          <input type="file" name="imagenes" multiple accept="image/*" class="mt-1 block w-full rounded-lg border border-slate-300 p-2 text-xs">
+        </label>
+        <label class="block text-[11px] font-semibold text-slate-600">Otros archivos
+          <input type="file" name="archivos" multiple class="mt-1 block w-full rounded-lg border border-slate-300 p-2 text-xs">
+        </label>
+        <button type="submit" class="rounded-lg bg-slate-800 px-3 py-2 text-[11px] font-bold text-white hover:bg-slate-700">Adjuntar archivos</button>
+      </form>
       <div class="pt-2 border-t border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <span class="text-[11px] text-slate-600 font-bold">Auditoría / Validación SGR:</span>
         <div class="flex items-center gap-2">
@@ -377,6 +637,9 @@
           </form>
         </div>
       </div>
+      <p id="at-evidencia-aprobacion-ayuda" class="hidden text-[11px] font-semibold text-amber-700">
+        Para aprobar, debe haber al menos un archivo de antes y otro de después del trabajo.
+      </p>
       {% endif %}
     </div>
 
@@ -445,14 +708,92 @@
     }
   }
 
-  // Cancelar atención: no crea registros
+  // Alternar entre selección de vecino existente y registro de nuevo vecino
+  function cambiarModoVecino(modo) {
+    const modoInput = document.getElementById('modo_vecino');
+    const tabExistente = document.getElementById('tab-vecino-existente');
+    const tabNuevo = document.getElementById('tab-vecino-nuevo');
+    const secExistente = document.getElementById('seccion-vecino-existente');
+    const secNuevo = document.getElementById('seccion-vecino-nuevo');
+    const inputSolicitante = document.getElementById('solicitante');
+    const inputNuevoNombre = document.getElementById('nuevo_vecino_nombre');
+    const inputNuevoRut = document.getElementById('nuevo_vecino_rut');
+    const selectNuevoSector = document.getElementById('nuevo_vecino_sector_id');
+
+    if (modo === 'nuevo') {
+      if (modoInput) modoInput.value = 'nuevo';
+      if (secExistente) secExistente.classList.add('hidden');
+      if (secNuevo) secNuevo.classList.remove('hidden');
+      if (inputSolicitante) inputSolicitante.removeAttribute('required');
+      if (inputNuevoNombre) inputNuevoNombre.setAttribute('required', 'required');
+      if (inputNuevoRut) inputNuevoRut.setAttribute('required', 'required');
+      if (selectNuevoSector) selectNuevoSector.setAttribute('required', 'required');
+
+      if (tabNuevo) {
+        tabNuevo.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 bg-white text-[#C41230] shadow-sm border border-slate-200/80';
+      }
+      if (tabExistente) {
+        tabExistente.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
+      }
+    } else {
+      if (modoInput) modoInput.value = 'existente';
+      if (secExistente) secExistente.classList.remove('hidden');
+      if (secNuevo) secNuevo.classList.add('hidden');
+      if (inputSolicitante) inputSolicitante.setAttribute('required', 'required');
+      if (inputNuevoNombre) inputNuevoNombre.removeAttribute('required');
+      if (inputNuevoRut) inputNuevoRut.removeAttribute('required');
+      if (selectNuevoSector) selectNuevoSector.removeAttribute('required');
+
+      if (tabExistente) {
+        tabExistente.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 bg-white text-[#C41230] shadow-sm border border-slate-200/80';
+      }
+      if (tabNuevo) {
+        tabNuevo.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
+      }
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
+  function sincronizarVecinoExistente(val) {
+    const list = document.getElementById('vecinos-list');
+    const hiddenId = document.getElementById('vecino_id');
+    if (!list || !hiddenId) return;
+    hiddenId.value = '';
+    const options = list.querySelectorAll('option');
+    for (let opt of options) {
+      if (opt.value === val) {
+        hiddenId.value = opt.getAttribute('data-id') || '';
+        break;
+      }
+    }
+  }
+
+  function abrirModalNuevaAtencion() {
+    const modal = document.getElementById('modal-nueva-atencion');
+    if (modal) {
+      modal.classList.remove('hidden');
+      cambiarModoVecino('existente');
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+
+  function cerrarModalNuevaAtencion() {
+    cancelarAtencion();
+  }
+
+  // Cancelar atención: descarta cambios y cierra el modal
   function cancelarAtencion() {
+    const modal = document.getElementById('modal-nueva-atencion');
     const form = document.getElementById('form-atencion');
-    if (!form) return;
+    if (!form) {
+      if (modal) modal.classList.add('hidden');
+      return;
+    }
     const desc = document.getElementById('descripcion')?.value;
     const sol = document.getElementById('solicitante')?.value;
+    const nuevoNom = document.getElementById('nuevo_vecino_nombre')?.value;
 
-    if (desc || sol) {
+    if (desc || sol || nuevoNom) {
       Swal.fire({
         title: '¿Descartar cambios?',
         text: 'Se cancelará el ingreso y no se creará ningún registro en el sistema.',
@@ -466,12 +807,18 @@
       }).then((result) => {
         if (result.isConfirmed) {
           form.reset();
+          cambiarModoVecino('existente');
           const sub = document.getElementById('sub_atencion_id');
           if (sub) sub.innerHTML = '<option value="">Primero seleccione un Tipo de Atención</option>';
+          if (modal) modal.classList.add('hidden');
         }
       });
     } else {
       form.reset();
+      cambiarModoVecino('existente');
+      const sub = document.getElementById('sub_atencion_id');
+      if (sub) sub.innerHTML = '<option value="">Primero seleccione un Tipo de Atención</option>';
+      if (modal) modal.classList.add('hidden');
     }
   }
 
@@ -496,7 +843,7 @@
   }
 
   // Modal Ver Detalle y Gestión de Estado y Evidencia
-  function verDetalleAtencion(id, cod, sol, del, tipo, sub, desc, resp, fecha, estado, eviCod, eviEstado) {
+  function verDetalleAtencion(id, cod, sol, del, tipo, sub, desc, resp, creador, fecha, estado, eviCod, eviEstado) {
     document.getElementById('at-cod').textContent = cod;
     document.getElementById('at-solicitante').textContent = sol;
     document.getElementById('at-del').textContent = del;
@@ -504,6 +851,8 @@
     document.getElementById('at-sub').textContent = sub;
     document.getElementById('at-desc').textContent = desc;
     document.getElementById('at-resp').textContent = resp;
+    const creadorEl = document.getElementById('at-creador');
+    if (creadorEl) creadorEl.textContent = creador || 'No registrado';
     document.getElementById('at-fecha').textContent = fecha;
 
     const estadoEl = document.getElementById('at-estado-actual');
@@ -539,6 +888,38 @@
 
     const formRechazar = document.getElementById('form-rechazar-evidencia');
     if (formRechazar) formRechazar.action = `/gestion/atenciones/${id}/validar-evidencia/`;
+
+    const uploadForm = document.getElementById('form-subir-evidencia');
+    if (uploadForm) uploadForm.action = `/gestion/atenciones/${id}/evidencia/`;
+    const evidenceSource = document.getElementById(`evidencias-atencion-${id}`);
+    const evidenceTarget = document.getElementById('at-evidencias-lista');
+    if (evidenceTarget) {
+      evidenceTarget.replaceChildren();
+      if (evidenceSource && evidenceSource.children.length) {
+        Array.from(evidenceSource.children).forEach((item) => {
+          evidenceTarget.appendChild(item.cloneNode(true));
+        });
+      } else {
+        const empty = document.createElement('p');
+        empty.className = 'text-xs text-slate-500';
+        empty.textContent = 'No hay evidencias adjuntas.';
+        evidenceTarget.appendChild(empty);
+      }
+    }
+    const evidenceMoments = new Set(
+      Array.from(evidenceTarget?.querySelectorAll('.evidence-item') || [])
+        .filter((item) => item.querySelector('a[href]'))
+        .map((item) => item.dataset.momento)
+    );
+    const approvalButton = formAprobar?.querySelector('button');
+    const approvalHelp = document.getElementById('at-evidencia-aprobacion-ayuda');
+    const readyToApprove = evidenceMoments.has('antes') && evidenceMoments.has('despues');
+    if (approvalButton) {
+      approvalButton.disabled = !readyToApprove;
+      approvalButton.classList.toggle('opacity-50', !readyToApprove);
+      approvalButton.classList.toggle('cursor-not-allowed', !readyToApprove);
+    }
+    if (approvalHelp) approvalHelp.classList.toggle('hidden', readyToApprove);
 
     document.getElementById('modal-detalle-atencion').classList.remove('hidden');
   }
