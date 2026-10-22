@@ -12,7 +12,7 @@
     </div>
     <button onclick="document.getElementById('modal-compromiso').showModal()" class="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-[#C41230] text-white hover:bg-[#8B1D19] shadow-md transition-all flex items-center gap-2 cursor-pointer">
       <i data-lucide="plus-circle" class="w-4 h-4"></i>
-      <span>+ Nuevo Compromiso</span>
+      <span>Nuevo Compromiso</span>
     </button>
   </div>
 
@@ -28,7 +28,7 @@
       {% csrf_token %}
       <div>
         <label class="block text-slate-700 mb-1">Solicitante (Vecino / JJVV / Organización) *</label>
-        <input type="text" name="solicitante" required placeholder="ej: JJVV Doña Gabriela" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+        <input type="text" name="solicitante" required placeholder="Nombre de la persona u organización" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
       </div>
       <div>
         <label class="block text-slate-700 mb-1">Funcionario Responsable *</label>
@@ -42,11 +42,11 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-slate-700 mb-1">Territorio / Sector</label>
-          <input type="text" name="territorio" placeholder="ej: Las Compañías" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+          <input type="text" name="territorio" placeholder="Sector o territorio" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
         </div>
         <div>
           <label class="block text-slate-700 mb-1">Área de Apoyo</label>
-          <input type="text" name="area_apoyo" placeholder="ej: Tránsito / DOM" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+          <input type="text" name="area_apoyo" placeholder="Área responsable" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
         </div>
       </div>
       <div>
@@ -55,7 +55,7 @@
       </div>
       <div>
         <label class="block text-slate-700 mb-1">Observaciones / Detalle</label>
-        <textarea name="observacion" rows="2" placeholder="ej: Compromiso de reunión técnica en terreno para evaluar demarcación vial" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal"></textarea>
+        <textarea name="observacion" rows="2" placeholder="Observaciones" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal"></textarea>
       </div>
       <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
         <button type="button" onclick="document.getElementById('modal-compromiso').close()" class="px-4 py-2.5 rounded-2xl bg-slate-100 text-slate-600 hover:bg-slate-200">Cancelar</button>
@@ -63,6 +63,18 @@
       </div>
     </form>
   </dialog>
+
+  <form method="GET" action="{% url 'gestion_agenda' %}" class="bg-white p-4 rounded-2xl border border-slate-200 flex flex-wrap items-center gap-3">
+    <input type="search" name="q" value="{{ q }}" placeholder="Buscar solicitante, territorio o responsable..."
+           class="flex-1 min-w-[220px] px-3 py-2 rounded-xl border border-slate-200 text-xs" />
+    <select name="estado" onchange="this.form.submit()" class="px-3 py-2 rounded-xl border border-slate-200 text-xs">
+      <option value="">Todos los estados</option>
+      {% for estado in estados %}
+        <option value="{{ estado }}" {% if filtro_estado == estado %}selected{% endif %}>{{ estado }}</option>
+      {% endfor %}
+    </select>
+    {% include "gestion/includes/ordering_control.html" %}
+  </form>
 
   <!-- Tabla de Compromisos -->
   <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden">
@@ -168,6 +180,16 @@
       </table>
     </div>
   </div>
+  {% if page_obj.paginator.num_pages > 1 %}
+  <nav class="flex justify-center items-center gap-2 text-xs" aria-label="Paginación de compromisos">
+    {% if page_obj.has_previous %}
+      <a class="px-3 py-2 rounded-lg border" href="?page={{ page_obj.previous_page_number }}&page_size={{ page_size }}&q={{ q }}&estado={{ filtro_estado }}&orden={{ orden }}">Anterior</a>
+    {% endif %}
+    <span class="px-3 py-2 text-slate-600">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a class="px-3 py-2 rounded-lg border" href="?page={{ page_obj.next_page_number }}&page_size={{ page_size }}&q={{ q }}&estado={{ filtro_estado }}&orden={{ orden }}">Siguiente</a>
+    {% endif %}
+  </nav>
+  {% endif %}
 </div>
 {% endblock %}
-

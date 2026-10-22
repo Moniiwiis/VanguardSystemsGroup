@@ -1,5 +1,7 @@
 from django.contrib import admin
 from django.urls import path
+from django.conf import settings
+from django.conf.urls.static import static
 from core import views
 
 urlpatterns = [
@@ -13,10 +15,12 @@ urlpatterns = [
     path('reenviar-codigo/', views.reenviar_codigo_view, name='reenviar_codigo'),
     path('validar-codigo/', views.validar_codigo_view, name='validar_codigo'),
     path('nueva-contrasena/', views.nueva_contrasena_view, name='nueva_contrasena'),
+    path('cambiar-contrasena-inicial/', views.cambiar_contrasena_inicial_view, name='cambiar_contrasena_inicial'),
 
     # Contexto y APIs
     path('gestion/cambiar-delegacion/<int:del_id>/', views.cambiar_delegacion_view, name='cambiar_delegacion'),
     path('gestion/api/subatenciones/<int:tipo_id>/', views.api_subatenciones, name='api_subatenciones'),
+    path('gestion/api/sectores/<int:delegacion_id>/', views.api_sectores_por_delegacion, name='api_sectores'),
 
     # Inicio
     path('', views.gestion_inicio, name='gestion_inicio'),
@@ -57,6 +61,7 @@ urlpatterns = [
     path('gestion/atenciones/', views.gestion_atenciones, name='gestion_atenciones'),
     path('gestion/atenciones/<int:atencion_id>/estado/', views.gestion_atenciones_estado, name='gestion_atenciones_estado'),
     path('gestion/atenciones/<int:atencion_id>/validar-evidencia/', views.gestion_atenciones_validar_evidencia, name='gestion_atenciones_validar_evidencia'),
+    path('gestion/atenciones/<int:atencion_id>/evidencia/', views.gestion_atenciones_subir_evidencia, name='gestion_atenciones_subir_evidencia'),
     path('gestion/evidencias/<int:actividad_id>/validar/', views.gestion_evidencias_validar, name='gestion_evidencias_validar'),
     path('gestion/metas/<int:meta_id>/simular-evidencia/', views.gestion_metas_simular_evidencia, name='gestion_metas_simular_evidencia'),
 
@@ -69,6 +74,11 @@ urlpatterns = [
     path('gestion/vecinos/', views.gestion_vecinos, name='gestion_vecinos'),
     path('gestion/vecinos/<int:vecino_id>/editar/', views.gestion_vecinos_editar, name='gestion_vecinos_editar'),
     path('gestion/vecinos/<int:vecino_id>/eliminar/', views.gestion_vecinos_eliminar, name='gestion_vecinos_eliminar'),
+
+    # 10. Sectores / Territorios CRUD
+    path('gestion/sectores/', views.gestion_sectores, name='gestion_sectores'),
+    path('gestion/sectores/<int:sector_id>/editar/', views.gestion_sectores_editar, name='gestion_sectores_editar'),
+    path('gestion/sectores/<int:sector_id>/eliminar/', views.gestion_sectores_eliminar, name='gestion_sectores_eliminar'),
 
     # Legacy routes
     path('gestion/funcionarios/', views.gestion_funcionarios, name='gestion_funcionarios'),
@@ -89,3 +99,6 @@ urlpatterns = [
 
     path('gestion/reportes/', views.gestion_reportes, name='gestion_reportes'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -38,8 +38,16 @@ class Actividad(BaseModel):
         return f"Actividad {self.codigo_evidencia_unico}"
 
 class Evidencia(BaseModel):
+    MOMENTO_CHOICES = [
+        ('antes', 'Antes del trabajo'),
+        ('despues', 'Después del trabajo'),
+    ]
+
     actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE, related_name='evidencias')
-    ruta_archivo_url = models.CharField(max_length=255)
+    ruta_archivo_url = models.CharField(max_length=255, blank=True)
+    imagen = models.ImageField(upload_to='evidencias/imagenes/', null=True, blank=True)
+    archivo = models.FileField(upload_to='evidencias/archivos/', null=True, blank=True)
+    momento = models.CharField(max_length=10, choices=MOMENTO_CHOICES, default='despues')
     metadatos = models.TextField(null=True, blank=True)
 
 class ValidacionEvidencia(BaseModel):
@@ -75,9 +83,18 @@ class Vecino(BaseModel):
     direccion = models.CharField(max_length=200, null=True, blank=True)
     telefono = models.CharField(max_length=30, null=True, blank=True)
     delegacion = models.ForeignKey("accounts.Delegacion", on_delete=models.SET_NULL, null=True, blank=True)
+    sector = models.ForeignKey("accounts.Sector", on_delete=models.SET_NULL, null=True, blank=True, related_name='vecinos')
     territorio = models.CharField(max_length=100, null=True, blank=True)
     tipo_gestion = models.ForeignKey(TipoGestion, on_delete=models.SET_NULL, null=True, blank=True)
     estado = models.CharField(max_length=20, default='Activo')
+
+    def save(self, *args, **kwargs):
+        if self.sector:
+            if not self.territorio:
+                self.territorio = self.sector.nombre
+            if not self.delegacion:
+                self.delegacion = self.sector.delegacion
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.nombre} ({self.rut})"
@@ -91,6 +108,7 @@ class AtencionCiudadana(BaseModel):
     sub_atencion = models.ForeignKey("configuration.SubAtencion", on_delete=models.RESTRICT)
     descripcion = models.TextField()
     usuario_responsable = models.ForeignKey("auth.User", on_delete=models.RESTRICT)
+    creado_por = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name='atenciones_creadas', verbose_name="Creado por")
     fecha_registro = models.DateTimeField(auto_now_add=True)
     estado = models.CharField(max_length=30, default='Registrada')
     actividad = models.ForeignKey(Actividad, on_delete=models.SET_NULL, null=True, blank=True, related_name='atenciones')
@@ -113,6 +131,8 @@ class AtencionCiudadana(BaseModel):
             next_num = (last.id + 1) if last else 1
             uid = uuid.uuid4().hex[:4].upper()
             self.codigo_atencion = f"AT-{year}-{next_num:04d}-{uid}"
+        if not self.creado_por and self.usuario_responsable:
+            self.creado_por = self.usuario_responsable
         super().save(*args, **kwargs)
 
         if not self.actividad:

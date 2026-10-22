@@ -1,6 +1,11 @@
 from django.contrib import admin
+from django.db.models import Q
 from core.admin import BaseScopedModelAdmin
-from .models import Actividad, Evidencia, ValidacionEvidencia, AtencionSocialGestion, AtencionCiudadana
+from .models import (
+    Actividad, Evidencia, ValidacionEvidencia,
+    AtencionSocialGestion, AtencionCiudadana,
+    Vecino, TipoGestion
+)
 
 class EvidenciaInline(admin.TabularInline):
     model = Evidencia
@@ -69,13 +74,15 @@ class ActividadAdmin(BaseScopedModelAdmin):
         if request.user.is_superuser:
             return qs
         if hasattr(request.user, 'funcionario') and request.user.funcionario.delegacion:
-            return qs.filter(funcionario__delegacion=request.user.funcionario.delegacion)
+            del_user = request.user.funcionario.delegacion
+            return qs.filter(Q(funcionario__delegacion=del_user) | Q(atenciones__delegacion=del_user)).distinct()
         return qs
 
 @admin.register(Evidencia)
 class EvidenciaAdmin(BaseScopedModelAdmin):
-    list_display = ('actividad', 'ruta_archivo_url', 'created_at')
-    search_fields = ('actividad__codigo_evidencia_unico', 'ruta_archivo_url')
+    list_display = ('id', 'actividad', 'imagen', 'archivo', 'momento', 'created_at')
+    list_filter = ('momento', 'created_at')
+    search_fields = ('actividad__codigo_evidencia_unico', 'imagen', 'archivo', 'ruta_archivo_url')
     list_select_related = ('actividad',)
 
     def get_queryset(self, request):
@@ -83,7 +90,8 @@ class EvidenciaAdmin(BaseScopedModelAdmin):
         if request.user.is_superuser:
             return qs
         if hasattr(request.user, 'funcionario') and request.user.funcionario.delegacion:
-            return qs.filter(actividad__funcionario__delegacion=request.user.funcionario.delegacion)
+            del_user = request.user.funcionario.delegacion
+            return qs.filter(Q(actividad__funcionario__delegacion=del_user) | Q(actividad__atenciones__delegacion=del_user)).distinct()
         return qs
 
 @admin.register(ValidacionEvidencia)
@@ -103,7 +111,8 @@ class ValidacionEvidenciaAdmin(BaseScopedModelAdmin):
         if request.user.is_superuser:
             return qs
         if hasattr(request.user, 'funcionario') and request.user.funcionario.delegacion:
-            return qs.filter(actividad__funcionario__delegacion=request.user.funcionario.delegacion)
+            del_user = request.user.funcionario.delegacion
+            return qs.filter(Q(actividad__funcionario__delegacion=del_user) | Q(actividad__atenciones__delegacion=del_user)).distinct()
         return qs
 
 @admin.register(AtencionSocialGestion)
@@ -123,10 +132,10 @@ class AtencionSocialGestionAdmin(BaseScopedModelAdmin):
 
 @admin.register(AtencionCiudadana)
 class AtencionCiudadanaAdmin(BaseScopedModelAdmin):
-    list_display = ('codigo_atencion', 'solicitante', 'delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'created_at', 'estado')
+    list_display = ('codigo_atencion', 'solicitante', 'delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'creado_por', 'created_at', 'estado')
     search_fields = ('codigo_atencion', 'solicitante', 'descripcion')
     list_filter = ('delegacion', 'tipo_atencion', 'estado', 'created_at')
-    list_select_related = ('delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable')
+    list_select_related = ('delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'creado_por')
     readonly_fields = ('created_at', 'updated_at', 'codigo_atencion')
 
     def get_queryset(self, request):
@@ -136,3 +145,26 @@ class AtencionCiudadanaAdmin(BaseScopedModelAdmin):
         if hasattr(request.user, 'funcionario') and request.user.funcionario.delegacion:
             return qs.filter(delegacion=request.user.funcionario.delegacion)
         return qs
+
+@admin.register(Vecino)
+class VecinoAdmin(BaseScopedModelAdmin):
+    list_display = ('rut', 'nombre', 'delegacion', 'telefono', 'territorio', 'tipo_gestion', 'estado', 'created_at')
+    search_fields = ('rut', 'nombre', 'telefono', 'direccion', 'territorio')
+    list_filter = ('delegacion', 'estado', 'tipo_gestion', 'created_at')
+    list_select_related = ('delegacion', 'tipo_gestion')
+    readonly_fields = ('created_at', 'updated_at')
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        if hasattr(request.user, 'funcionario') and request.user.funcionario.delegacion:
+            return qs.filter(delegacion=request.user.funcionario.delegacion)
+        return qs
+
+@admin.register(TipoGestion)
+class TipoGestionAdmin(BaseScopedModelAdmin):
+    list_display = ('nombre', 'estado', 'created_at')
+    search_fields = ('nombre', 'descripcion')
+    list_filter = ('estado', 'created_at')
+    readonly_fields = ('created_at', 'updated_at')

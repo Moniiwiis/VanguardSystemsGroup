@@ -31,17 +31,12 @@ def global_context(request):
     delegacion_activa = None
     if es_admin:
         delegaciones_autorizadas = todas_activas
-        can_switch = len(todas_activas) > 1
+        can_switch = True
         delegacion_sesion_id = request.session.get('delegacion_activa_id')
-        if delegacion_sesion_id:
-            delegacion_activa = Delegacion.objects.filter(id=delegacion_sesion_id).first()
-        if not delegacion_activa:
-            if funcionario and funcionario.delegacion:
-                delegacion_activa = funcionario.delegacion
-            elif todas_activas:
-                delegacion_activa = todas_activas[0]
-            if delegacion_activa:
-                request.session['delegacion_activa_id'] = delegacion_activa.id
+        if delegacion_sesion_id and delegacion_sesion_id != 'global' and str(delegacion_sesion_id) != '0':
+            delegacion_activa = Delegacion.objects.filter(id=delegacion_sesion_id, estado='Activa').first()
+        else:
+            delegacion_activa = None  # Ámbito Global comunal
     else:
         # Fijo estrictamente en su delegación asignada para delegados y otros usuarios no admin
         if funcionario and funcionario.delegacion:
@@ -81,6 +76,7 @@ def global_context(request):
         'ver_atenciones': True, # Todos pueden acceder al flujo de atenciones
         'ver_tipo_gestion': es_admin or es_coordinador,
         'ver_vecinos': es_admin or es_coordinador or es_delegado or es_operador,
+        'ver_sectores': es_admin or es_coordinador or es_delegado or es_operador,
         'ver_reportes': es_admin or es_coordinador or es_delegado,
     }
 

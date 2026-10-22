@@ -65,55 +65,68 @@
       </a>
 
       <!-- Centro: Distintivo de Delegación Activa según el Perfil (Requisito Crítico A2 / Wireframes) -->
+      <!-- Centro: Distintivo de Delegación Activa según el Perfil (Requisito Crítico A2 / Wireframes) -->
       <div class="flex items-center">
-        {% if delegacion_activa %}
-          {% if can_switch_delegacion %}
-            <!-- Selector Desplegable de Delegación para Perfiles Autorizados (ej: Administrador) -->
-            <div class="relative" id="delegacionDropdownContainer">
-              <button type="button" 
-                      id="delegacionDropdownBtn"
-                      onclick="toggleDelegacionDropdown(event)"
-                      aria-haspopup="true"
-                      aria-expanded="false"
-                      class="flex items-center gap-2.5 bg-[#700F17]/95 hover:bg-[#5C0A10] active:scale-95 text-white text-xs font-bold px-4 py-2 rounded-full border border-white/30 shadow-md transition-all cursor-pointer select-none">
-                <i data-lucide="building-2" class="w-3.5 h-3.5 text-white/90"></i>
-                <span>{{ delegacion_activa.get_codigo }} · {{ delegacion_activa.nombre }}</span>
-                <i data-lucide="chevron-down" id="delegacionChevron" class="w-3.5 h-3.5 text-white/80 transition-transform duration-200"></i>
-              </button>
-              
-              <!-- Menú Desplegable con Click Toggle (Permite seleccionar con total tranquilidad) -->
-              <div id="delegacionDropdownMenu" 
-                   class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-2.5 z-50 text-slate-800 text-xs animate-in fade-in slide-in-from-top-1 duration-150">
-                <div class="px-4 py-1.5 flex items-center justify-between border-b border-slate-100 mb-1">
-                  <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Cambiar Delegación Activa</span>
-                  <span class="text-[10px] font-semibold text-slate-400">{{ delegaciones_autorizadas|length }} disponibles</span>
-                </div>
-                <div class="max-h-64 overflow-y-auto divide-y divide-slate-50">
-                  {% for d in delegaciones_autorizadas %}
-                    <a href="{% url 'cambiar_delegacion' d.id %}" 
-                       class="flex items-center justify-between px-4 py-2.5 hover:bg-red-50 text-slate-700 hover:text-[#C41230] transition-colors rounded-xl mx-1.5 {% if d.id == delegacion_activa.id %}font-extrabold text-[#C41230] bg-red-50/80 shadow-sm{% endif %}">
-                      <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full {% if d.id == delegacion_activa.id %}bg-[#C41230]{% else %}bg-slate-300{% endif %}"></span>
-                        <div class="flex flex-col">
-                          <span class="font-bold text-xs">{{ d.nombre }}</span>
-                          <span class="text-[10px] text-slate-400 font-mono">{{ d.get_codigo }} · {{ d.comuna|default:"La Serena" }}</span>
-                        </div>
+        {% if can_switch_delegacion %}
+          <div class="relative" id="delegacionDropdownContainer">
+            <button type="button" 
+                    id="delegacionDropdownBtn"
+                    onclick="toggleDelegacionDropdown(event)"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    class="flex items-center gap-2.5 bg-[#700F17]/95 hover:bg-[#5C0A10] active:scale-95 text-white text-xs font-bold px-4 py-2 rounded-full border border-white/30 shadow-md transition-all cursor-pointer select-none">
+              <i data-lucide="{% if delegacion_activa %}building-2{% else %}globe{% endif %}" class="w-3.5 h-3.5 text-white/90"></i>
+              <span>{% if delegacion_activa %}{{ delegacion_activa.get_codigo }} · {{ delegacion_activa.nombre }}{% else %}Global · Todas las delegaciones{% endif %}</span>
+              <i data-lucide="chevron-down" id="delegacionChevron" class="w-3.5 h-3.5 text-white/80 transition-transform duration-200"></i>
+            </button>
+            
+            <!-- Menú Desplegable con Click Toggle -->
+            <div id="delegacionDropdownMenu" 
+                 class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-2.5 z-50 text-slate-800 text-xs animate-in fade-in slide-in-from-top-1 duration-150">
+              <div class="px-4 py-1.5 flex items-center justify-between border-b border-slate-100 mb-1">
+                <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Cambiar Delegación Activa</span>
+                <span class="text-[10px] font-semibold text-slate-400">{{ delegaciones_autorizadas|length }} disponibles</span>
+              </div>
+              <div class="max-h-64 overflow-y-auto divide-y divide-slate-50">
+                <!-- Opción Ámbito Global -->
+                <a href="{% url 'cambiar_delegacion' 0 %}" 
+                   class="flex items-center justify-between px-4 py-2.5 hover:bg-red-50 text-slate-700 hover:text-[#C41230] transition-colors rounded-xl mx-1.5 {% if not delegacion_activa %}font-extrabold text-[#C41230] bg-red-50/80 shadow-sm{% endif %}">
+                  <div class="flex items-center gap-2">
+                    <i data-lucide="globe" class="w-4 h-4 {% if not delegacion_activa %}text-[#C41230]{% else %}text-slate-400{% endif %}"></i>
+                    <div class="flex flex-col">
+                      <span class="font-bold text-xs">Global</span>
+                      <span class="text-[10px] text-slate-400">Todas las delegaciones comunales</span>
+                    </div>
+                  </div>
+                  {% if not delegacion_activa %}
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#C41230] text-white">Activa</span>
+                  {% endif %}
+                </a>
+
+                {% for d in delegaciones_autorizadas %}
+                  <a href="{% url 'cambiar_delegacion' d.id %}" 
+                     class="flex items-center justify-between px-4 py-2.5 hover:bg-red-50 text-slate-700 hover:text-[#C41230] transition-colors rounded-xl mx-1.5 {% if delegacion_activa and d.id == delegacion_activa.id %}font-extrabold text-[#C41230] bg-red-50/80 shadow-sm{% endif %}">
+                    <div class="flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full {% if delegacion_activa and d.id == delegacion_activa.id %}bg-[#C41230]{% else %}bg-slate-300{% endif %}"></span>
+                      <div class="flex flex-col">
+                        <span class="font-bold text-xs">{{ d.nombre }}</span>
+                        <span class="text-[10px] text-slate-400 font-mono">{{ d.get_codigo }} · {{ d.comuna|default:"La Serena" }}</span>
                       </div>
-                      {% if d.id == delegacion_activa.id %}
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#C41230] text-white">Activa</span>
-                      {% endif %}
-                    </a>
-                  {% endfor %}
-                </div>
+                    </div>
+                    {% if delegacion_activa and d.id == delegacion_activa.id %}
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#C41230] text-white">Activa</span>
+                    {% endif %}
+                  </a>
+                {% endfor %}
               </div>
             </div>
-          {% else %}
-            <!-- Contexto Territorial Fijo para Operadores / Delegados Monodelegación -->
-            <div class="flex items-center gap-2 bg-[#700F17]/90 text-white text-xs font-bold px-3.5 py-1.5 rounded-full border border-white/25 shadow-inner">
-              <i data-lucide="map-pin" class="w-3.5 h-3.5 text-white/90"></i>
-              <span>{{ delegacion_activa.get_codigo }} | {{ delegacion_activa.nombre }}</span>
-            </div>
-          {% endif %}
+          </div>
+        {% elif delegacion_activa %}
+          <!-- Contexto Territorial Fijo para Operadores / Delegados Monodelegación -->
+          <div class="flex items-center gap-2 bg-[#700F17]/90 text-white text-xs font-bold px-3.5 py-1.5 rounded-full border border-white/25 shadow-inner">
+            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-white/90"></i>
+            <span>{{ delegacion_activa.get_codigo }} | {{ delegacion_activa.nombre }}</span>
+          </div>
         {% endif %}
       </div>
 
@@ -224,6 +237,15 @@
              class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_vecinos' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
             <i data-lucide="user-check" class="w-4 h-4 shrink-0"></i>
             <span>Vecinos</span>
+          </a>
+        {% endif %}
+
+        <!-- 8b. Sectores / Territorio por Delegación -->
+        {% if permisos.ver_sectores %}
+          <a href="{% url 'gestion_sectores' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_sectores' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="map-pin" class="w-4 h-4 shrink-0"></i>
+            <span>Sectores / Territorio</span>
           </a>
         {% endif %}
 

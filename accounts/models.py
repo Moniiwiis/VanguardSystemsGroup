@@ -18,6 +18,26 @@ class Delegacion(BaseModel):
     def __str__(self):
         return f"{self.get_codigo()} - {self.nombre}"
 
+class Sector(BaseModel):
+    codigo = models.CharField(max_length=20, null=True, blank=True)
+    nombre = models.CharField(max_length=150)
+    delegacion = models.ForeignKey(Delegacion, on_delete=models.CASCADE, related_name='sectores')
+    descripcion = models.TextField(null=True, blank=True)
+    estado = models.CharField(max_length=20, default='Activo')
+
+    def get_codigo(self):
+        if self.codigo:
+            return self.codigo
+        return f"SEC{self.id:02d}" if self.id else "SEC01"
+
+    def __str__(self):
+        return f"{self.nombre} ({self.delegacion.nombre})"
+
+    class Meta:
+        verbose_name = "Sector / Territorio"
+        verbose_name_plural = "Sectores / Territorios"
+        ordering = ['delegacion', 'nombre']
+
 class Cargo(BaseModel):
     nombre_cargo = models.CharField(max_length=100)
     descripcion = models.TextField(null=True, blank=True)
@@ -31,6 +51,7 @@ class Funcionario(BaseModel):
     delegacion = models.ForeignKey(Delegacion, on_delete=models.RESTRICT, null=True, blank=True)
     cargo = models.ForeignKey(Cargo, on_delete=models.RESTRICT)
     estado = models.CharField(max_length=20, default='Activo')
+    debe_cambiar_contrasena = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.user.username} - {self.identificador_institucional}"

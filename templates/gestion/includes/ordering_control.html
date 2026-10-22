@@ -1,0 +1,20 @@
+<label class="flex items-center gap-2 text-xs font-semibold text-slate-600">
+  <span>Ordenar:</span>
+  <select name="orden" onchange="this.form.submit()"
+          class="px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+    {% for valor, etiqueta in orden_opciones %}
+      <option value="{{ valor }}" {% if orden == valor %}selected{% endif %}>{{ etiqueta }}</option>
+    {% endfor %}
+  </select>
+</label>
+{% if page_size %}
+<label class="flex items-center gap-2 text-xs font-semibold text-slate-600">
+  <span>Mostrar:</span>
+  <select name="page_size" onchange="this.form.submit()"
+          class="px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+    <option value="5" {% if page_size == 5 %}selected{% endif %}>5</option>
+    <option value="15" {% if page_size == 15 %}selected{% endif %}>15</option>
+    <option value="30" {% if page_size == 30 %}selected{% endif %}>30</option>
+  </select>
+</label>
+{% endif %}
