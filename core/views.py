@@ -453,14 +453,22 @@ def cambiar_delegacion_view(request, del_id):
         messages.error(request, "Tu perfil de usuario tiene asignado un contexto territorial fijo.")
         return redirect(request.META.get('HTTP_REFERER', 'gestion_inicio'))
 
+    from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+    from django.urls import reverse
+
     referer = request.META.get('HTTP_REFERER', '')
+    # Rutas que no procesan el parámetro ?delegacion= en URL (usan solo la sesión)
+    inicio_path = reverse('gestion_inicio')
 
     if del_id == 0:
         request.session['delegacion_activa_id'] = 'global'
+        request.session.modified = True
         messages.success(request, "Contexto territorial cambiado a 'Global (Todas las delegaciones)'.")
         if referer:
-            from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
             u = urlparse(referer)
+            # Si el referer es la página de inicio, redirigir directamente sin parámetros
+            if u.path.rstrip('/') == inicio_path.rstrip('/'):
+                return redirect('gestion_inicio')
             q = parse_qs(u.query)
             q.pop('delegacion', None)
             q.pop('page', None)
@@ -470,11 +478,14 @@ def cambiar_delegacion_view(request, del_id):
 
     nueva_del = get_object_or_404(Delegacion, id=del_id, estado='Activa')
     request.session['delegacion_activa_id'] = nueva_del.id
+    request.session.modified = True
     messages.success(request, f"Contexto territorial cambiado a '{nueva_del.nombre}'.")
 
     if referer:
-        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
         u = urlparse(referer)
+        # Si el referer es la página de inicio, redirigir directamente (inicio usa solo la sesión)
+        if u.path.rstrip('/') == inicio_path.rstrip('/'):
+            return redirect('gestion_inicio')
         q = parse_qs(u.query)
         q['delegacion'] = [str(nueva_del.id)]
         q.pop('page', None)
@@ -491,12 +502,18 @@ def gestion_inicio(request):
     del_activa = ctx['delegacion_activa']
     es_admin = ctx['permisos']['es_admin']
 
-    # Métricas territoriales específicas de la delegación activa
+    # Métricas territoriales: si hay delegación activa usa esa, si admin en global usa todas
     if del_activa:
         atenciones_del_qs = AtencionCiudadana.objects.filter(delegacion=del_activa)
         funcionarios_del_qs = Funcionario.objects.filter(delegacion=del_activa)
         metas_del_qs = ConfiguracionMeta.objects.filter(funcionario__delegacion=del_activa).select_related('periodo', 'item', 'funcionario')
         val_del_qs = ValidacionEvidencia.objects.filter(actividad__funcionario__delegacion=del_activa)
+    elif es_admin:
+        # Modo Global: admin ve datos consolidados de todas las delegaciones
+        atenciones_del_qs = AtencionCiudadana.objects.all()
+        funcionarios_del_qs = Funcionario.objects.all()
+        metas_del_qs = ConfiguracionMeta.objects.all().select_related('periodo', 'item', 'funcionario')
+        val_del_qs = ValidacionEvidencia.objects.all()
     else:
         atenciones_del_qs = AtencionCiudadana.objects.none()
         funcionarios_del_qs = Funcionario.objects.none()
@@ -1630,12 +1647,28 @@ def gestion_atenciones(request):
     page_obj = paginator.get_page(page_number)
 
     tipos_activos = TipoAtencion.objects.filter(estado='Activo')
-    vecinos_catalogo = Vecino.objects.filter(estado='Activo').order_by('nombre')
-    if not ctx['permisos']['es_admin'] and del_activa:
-        vecinos_catalogo = vecinos_catalogo.filter(
-            Q(delegacion=del_activa) | (Q(delegacion__isnull=True) & Q(territorio__icontains=del_activa.nombre))
+    vecinos_base = Vecino.objects.filter(estado='Activo').order_by('nombre')
+    # Filtrar vecinos por delegación activa/seleccionada.
+    # Casos incluidos:
+    #   1. Vecinos con delegación asignada directamente (FK delegacion = delegacion_ref)
+    #   2. Vecinos sin delegación cuyo territorio esté contenido en el nombre de la delegación
+    #      Ejemplo: territorio='Centro' está dentro de 'Delegación Centro'
+    #      (La dirección correcta es: nombre_delegacion.contains(territorio), no al revés)
+    #   3. Vecinos sin delegación y sin territorio — sin asignar (se incluyen para no ocultar registros)
+    delegacion_ref = del_activa or delegacion_seleccionada
+    if delegacion_ref:
+        del_nombre_lower = delegacion_ref.nombre.lower()
+        # Candidatos sin delegacion asignada: filtramos en Python para verificar la dirección correcta
+        sin_delegacion_ids = [
+            v.pk for v in vecinos_base.filter(delegacion__isnull=True)
+            if not v.territorio or del_nombre_lower.find(v.territorio.lower()) != -1
+        ]
+        vecinos_catalogo = vecinos_base.filter(
+            Q(delegacion=delegacion_ref) | Q(pk__in=sin_delegacion_ids)
         )
-    vecinos_catalogo = vecinos_catalogo[:150]
+    else:
+        vecinos_catalogo = vecinos_base
+    vecinos_catalogo = vecinos_catalogo.order_by('nombre')[:150]
 
     # Representantes / Funcionarios disponibles para asignación (filtrados exclusivamente por delegación)
     delegacion_efectiva = del_activa or delegacion_seleccionada

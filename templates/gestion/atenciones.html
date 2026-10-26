@@ -81,7 +81,7 @@
               <input type="hidden" id="vecino_id" name="vecino_id" value="">
               <datalist id="vecinos-list">
                 {% for v in vecinos %}
-                  <option value="{{ v.nombre }} ({{ v.rut }})" data-id="{{ v.id }}">{{ v.territorio|default:v.delegacion.nombre|default:"Vecino Activo" }}</option>
+                  <option value="{{ v.nombre }} ({{ v.rut }})" data-id="{{ v.id }}">{% if v.territorio %}{{ v.territorio }}{% elif v.delegacion %}{{ v.delegacion.nombre }}{% else %}Vecino Activo{% endif %}</option>
                 {% endfor %}
               </datalist>
             </div>
