@@ -419,7 +419,7 @@
               <th class="py-2.5 px-3 whitespace-nowrap">Responsable / Creador</th>
               <th class="py-2.5 px-3 whitespace-nowrap">Fecha</th>
               <th class="py-2.5 px-3 text-center whitespace-nowrap">Estado</th>
-              <th class="py-2.5 px-3 text-center whitespace-nowrap w-14 sticky right-0 bg-slate-50/95 backdrop-blur-sm shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acción</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap w-24 sticky right-0 bg-slate-50/95 backdrop-blur-sm shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acciones</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 font-medium">
@@ -468,6 +468,7 @@
                   <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#C41230]"></i>
                   <span>{{ a.usuario_responsable.get_full_name|default:a.usuario_responsable.username }}</span>
                 </div>
+                <div class="text-[10px] text-slate-500">{{ a.responsable_rol }}</div>
                 <div class="text-[10px] text-slate-400 mt-0.5">
                   Creado por: <span class="text-slate-600 font-semibold">{% if a.creado_por %}{{ a.creado_por.get_full_name|default:a.creado_por.username }}{% else %}Sistema{% endif %}</span>
                 </div>
@@ -492,13 +493,33 @@
                   </span>
                 {% endif %}
               </td>
-              <td class="py-2.5 px-3 text-center whitespace-nowrap w-14 sticky right-0 bg-white group-hover:bg-slate-50 transition-colors shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
+              <td class="py-2.5 px-3 text-center whitespace-nowrap sticky right-0 bg-white group-hover:bg-slate-50 transition-colors shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
+                <div class="flex items-center justify-center gap-1">
                 <button type="button" 
-                        onclick="verDetalleAtencion('{{ a.id }}', '{{ a.codigo_atencion|escapejs }}', '{{ a.solicitante|escapejs }}', '{{ a.delegacion.nombre|escapejs }}', '{{ a.tipo_atencion.nombre|escapejs }}', '{{ a.sub_atencion.nombre|escapejs }}', '{{ a.descripcion|escapejs }}', '{{ a.usuario_responsable.get_full_name|default:a.usuario_responsable.username|escapejs }}', '{% if a.creado_por %}{{ a.creado_por.get_full_name|default:a.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ a.created_at|date:'d/m/Y H:i' }}', '{{ a.estado|escapejs }}', '{{ a.get_evidencia_codigo|escapejs }}', '{{ a.estado_evidencia|escapejs }}')"
+                        onclick="verDetalleAtencion('{{ a.id }}', '{{ a.codigo_atencion|escapejs }}', '{{ a.solicitante|escapejs }}', '{{ a.delegacion.nombre|escapejs }}', '{{ a.tipo_atencion.nombre|escapejs }}', '{{ a.sub_atencion.nombre|escapejs }}', '{{ a.descripcion|escapejs }}', '{{ a.usuario_responsable.get_full_name|default:a.usuario_responsable.username|escapejs }}', '{% if a.creado_por %}{{ a.creado_por.get_full_name|default:a.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ a.created_at|date:'d/m/Y H:i' }}', '{{ a.estado|escapejs }}', '{{ a.get_evidencia_codigo|escapejs }}', '{{ a.estado_evidencia|escapejs }}', '{{ a.usuario_responsable_id }}', '{{ a.responsable_rol|escapejs }}', '{{ a.delegacion_id }}')"
                         title="Ver detalle"
                         class="p-1.5 rounded-lg text-slate-500 hover:text-[#C41230] hover:bg-red-50 transition-all inline-flex items-center justify-center">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
+                {% if not permisos.es_consultor %}
+                  {% if a.estado != 'Cancelada' %}
+                    <button type="button"
+                       onclick="verDetalleAtencion('{{ a.id }}', '{{ a.codigo_atencion|escapejs }}', '{{ a.solicitante|escapejs }}', '{{ a.delegacion.nombre|escapejs }}', '{{ a.tipo_atencion.nombre|escapejs }}', '{{ a.sub_atencion.nombre|escapejs }}', '{{ a.descripcion|escapejs }}', '{{ a.usuario_responsable.get_full_name|default:a.usuario_responsable.username|escapejs }}', '{% if a.creado_por %}{{ a.creado_por.get_full_name|default:a.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ a.created_at|date:'d/m/Y H:i' }}', '{{ a.estado|escapejs }}', '{{ a.get_evidencia_codigo|escapejs }}', '{{ a.estado_evidencia|escapejs }}', '{{ a.usuario_responsable_id }}', '{{ a.responsable_rol|escapejs }}', '{{ a.delegacion_id }}'); activarEdicionAtencion()"
+                       title="Editar atención"
+                       class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all inline-flex items-center justify-center">
+                      <i data-lucide="edit-3" class="w-4 h-4"></i>
+                    </button>
+                  {% endif %}
+                  <form method="POST" action="{% url 'gestion_atenciones_eliminar' a.id %}"
+                        onsubmit="return confirmDelete(this, '{{ a.codigo_atencion|escapejs }}');" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" title="Eliminar atención"
+                            class="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all inline-flex items-center justify-center">
+                      <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                  </form>
+                {% endif %}
+                </div>
               </td>
             </tr>
             <tr class="hidden">
@@ -549,22 +570,63 @@
 
 <!-- Modal Ver Detalle de Atención -->
 <div id="modal-detalle-atencion" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto space-y-4">
+  <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
       <div>
         <span id="at-cod" class="font-mono text-xs font-extrabold text-[#C41230] bg-red-50 px-2.5 py-1 rounded-lg"></span>
         <h3 class="text-base font-extrabold text-slate-900 mt-1">Ficha de Atención Ciudadana</h3>
       </div>
-      <button onclick="document.getElementById('modal-detalle-atencion').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+      <div class="flex items-center gap-2">
+        {% if not permisos.es_consultor %}
+          <button type="button" id="at-btn-editar" onclick="activarEdicionAtencion()"
+                  class="px-3 py-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold flex items-center gap-1.5">
+            <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Editar
+          </button>
+        {% endif %}
+        <button onclick="document.getElementById('modal-detalle-atencion').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+      </div>
     </div>
     <div class="space-y-3 text-xs">
-      <div><span class="font-bold text-slate-500">Solicitante:</span> <span id="at-solicitante" class="font-bold text-slate-900"></span></div>
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-bold text-slate-500">Vecino solicitante:</span>
+        <span id="at-solicitante" class="font-bold text-slate-900"></span>
+      </div>
       <div><span class="font-bold text-slate-500">Delegación:</span> <span id="at-del" class="text-slate-800"></span></div>
       <div class="grid grid-cols-2 gap-2">
         <div><span class="font-bold text-slate-500">Tipo de Atención:</span> <span id="at-tipo" class="font-bold text-slate-800"></span></div>
         <div><span class="font-bold text-slate-500">Sub Atención:</span> <span id="at-sub" class="font-bold text-slate-800"></span></div>
       </div>
-      <div>
+      {% if not permisos.es_consultor %}
+      <form id="form-editar-atencion" method="POST" action="" class="hidden space-y-3 rounded-2xl border border-blue-200 bg-blue-50/50 p-4">
+        {% csrf_token %}
+        <div>
+          <label for="at-edit-descripcion" class="block text-[11px] font-bold text-slate-700">Descripción de la atención</label>
+          <textarea id="at-edit-descripcion" name="descripcion" required rows="3"
+                    class="hidden w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"></textarea>
+          <p id="at-desc-lectura" class="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700"></p>
+        </div>
+        <div>
+          <label for="at-edit-responsable" class="block text-[11px] font-bold text-slate-700">Encargado del trabajo</label>
+          <select id="at-edit-responsable" name="responsable_id" required
+                  class="hidden w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold">
+            <option value="">Selecciona encargado</option>
+            {% for encargado in encargados_edicion %}
+              <option value="{{ encargado.id }}" data-delegacion-id="{{ encargado.delegacion_id }}">
+                {{ encargado.label }} — {{ encargado.delegacion_nombre|default:'' }}
+              </option>
+            {% endfor %}
+          </select>
+          <p id="at-resp-lectura" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-900"></p>
+        </div>
+        <div class="flex justify-end gap-2 border-t border-blue-100 pt-2">
+          <button type="button" onclick="cancelarEdicionAtencion()"
+                  class="rounded-lg bg-white px-3 py-2 text-[11px] font-bold text-slate-700 border border-slate-200">Cancelar</button>
+          <button type="submit"
+                  class="rounded-lg bg-[#C41230] px-4 py-2 text-[11px] font-extrabold text-white hover:bg-[#8B1D19]">Guardar cambios</button>
+        </div>
+      </form>
+      {% endif %}
+      <div id="at-descripcion-vista">
         <span class="font-bold text-slate-500 block mb-1">Descripción:</span>
         <div id="at-desc" class="p-3 bg-slate-50 rounded-xl text-slate-700 leading-relaxed border border-slate-200"></div>
       </div>
@@ -852,17 +914,52 @@
   }
 
   // Modal Ver Detalle y Gestión de Estado y Evidencia
-  function verDetalleAtencion(id, cod, sol, del, tipo, sub, desc, resp, creador, fecha, estado, eviCod, eviEstado) {
+  function verDetalleAtencion(id, cod, sol, del, tipo, sub, desc, resp, creador, fecha, estado, eviCod, eviEstado, responsableId, responsableRol, delegacionId) {
+    cancelarEdicionAtencion();
     document.getElementById('at-cod').textContent = cod;
     document.getElementById('at-solicitante').textContent = sol;
     document.getElementById('at-del').textContent = del;
     document.getElementById('at-tipo').textContent = tipo;
     document.getElementById('at-sub').textContent = sub;
     document.getElementById('at-desc').textContent = desc;
-    document.getElementById('at-resp').textContent = resp;
+    document.getElementById('at-resp').textContent = responsableRol ? `${resp} · ${responsableRol}` : resp;
     const creadorEl = document.getElementById('at-creador');
     if (creadorEl) creadorEl.textContent = creador || 'No registrado';
     document.getElementById('at-fecha').textContent = fecha;
+
+    const formEditar = document.getElementById('form-editar-atencion');
+    const editButton = document.getElementById('at-btn-editar');
+    const descReadonly = document.getElementById('at-desc-lectura');
+    const responsableReadonly = document.getElementById('at-resp-lectura');
+    const descInput = document.getElementById('at-edit-descripcion');
+    const responsableSelect = document.getElementById('at-edit-responsable');
+    if (formEditar) {
+      formEditar.action = `/gestion/atenciones/${id}/editar/`;
+      formEditar.dataset.delegacionId = delegacionId || '';
+      formEditar.dataset.responsableId = responsableId || '';
+      formEditar.dataset.solicitante = sol || '';
+      if (descReadonly) descReadonly.textContent = desc;
+      if (responsableReadonly) {
+        responsableReadonly.textContent = responsableRol ? `${resp} · ${responsableRol}` : resp;
+      }
+      if (descInput) descInput.value = desc;
+      if (responsableSelect) {
+        const existing = Array.from(responsableSelect.options).some(option => option.value === responsableId);
+        if (responsableId && !existing) {
+          const currentOption = new Option(
+            `${resp} · ${responsableRol || 'Sin rol registrado'} (actual)`,
+            responsableId
+          );
+          currentOption.dataset.delegacionId = delegacionId || '';
+          responsableSelect.add(currentOption);
+        }
+        Array.from(responsableSelect.options).forEach((option) => {
+          if (option.value) option.hidden = option.dataset.delegacionId !== delegacionId;
+        });
+        responsableSelect.value = responsableId || '';
+      }
+      if (editButton) editButton.classList.toggle('hidden', estado === 'Cancelada');
+    }
 
     const estadoEl = document.getElementById('at-estado-actual');
     if (estadoEl) {
@@ -931,6 +1028,33 @@
     if (approvalHelp) approvalHelp.classList.toggle('hidden', readyToApprove);
 
     document.getElementById('modal-detalle-atencion').classList.remove('hidden');
+  }
+
+  function activarEdicionAtencion() {
+    const form = document.getElementById('form-editar-atencion');
+    if (!form) return;
+    form.classList.remove('hidden');
+    document.getElementById('at-descripcion-vista').classList.add('hidden');
+    document.getElementById('at-desc-lectura').classList.add('hidden');
+    document.getElementById('at-edit-descripcion').classList.remove('hidden');
+    document.getElementById('at-resp').classList.add('hidden');
+    document.getElementById('at-resp-lectura').classList.add('hidden');
+    document.getElementById('at-edit-responsable').classList.remove('hidden');
+    document.getElementById('at-btn-editar').classList.add('hidden');
+  }
+
+  function cancelarEdicionAtencion() {
+    const form = document.getElementById('form-editar-atencion');
+    if (!form) return;
+    form.classList.add('hidden');
+    document.getElementById('at-descripcion-vista').classList.remove('hidden');
+    document.getElementById('at-desc-lectura').classList.remove('hidden');
+    document.getElementById('at-edit-descripcion').classList.add('hidden');
+    document.getElementById('at-resp').classList.remove('hidden');
+    document.getElementById('at-resp-lectura').classList.remove('hidden');
+    document.getElementById('at-edit-responsable').classList.add('hidden');
+    document.getElementById('at-btn-editar').classList.remove('hidden');
+    document.getElementById('at-solicitante').textContent = form.dataset.solicitante || '';
   }
 </script>
 {% endblock %}
