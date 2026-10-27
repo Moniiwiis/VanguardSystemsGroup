@@ -28,12 +28,18 @@
       </div>
 
       {% if not permisos.es_consultor %}
+      {% if not permisos.es_admin or delegacion_activa %}
       <button type="button" 
               onclick="abrirModalNuevaAtencion()" 
               class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2 shrink-0">
         <i data-lucide="plus-circle" class="w-4 h-4"></i>
         <span>Nueva Atención</span>
       </button>
+      {% else %}
+      <span class="max-w-xs text-right text-xs font-semibold text-slate-500">
+        Selecciona una delegación activa en la cabecera para ingresar una atención.
+      </span>
+      {% endif %}
       {% endif %}
     </div>
   </div>
@@ -85,6 +91,9 @@
                 {% endfor %}
               </datalist>
             </div>
+            {% if not vecinos %}
+            <p class="text-[10px] text-amber-700">No hay vecinos activos registrados para la delegación activa.</p>
+            {% endif %}
             <p class="text-[10px] text-slate-400">Selecciona del padrón vecinal o escribe su RUT / Nombre</p>
           </div>
 

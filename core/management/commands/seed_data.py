@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User, Permission
 from django.utils import timezone
 import datetime
-from accounts.models import Delegacion, Cargo, Funcionario, Rol, FuncionarioRol
+from accounts.models import Delegacion, Cargo, Funcionario, Rol, FuncionarioRol, Sector
 from configuration.models import (
     Periodo, CatalogoActividad, ItemMedicion, ConfiguracionMeta,
     TipoAtencion, SubAtencion
@@ -52,12 +52,12 @@ class Command(BaseCommand):
 
         del_sur, _ = Delegacion.all_objects.get_or_create(
             nombre="Delegación Sur",
-            defaults={'codigo': 'DEL03', 'direccion': 'Av. Cuatro Esquinas 890', 'comuna': 'La Serena', 'estado': 'Inactiva', 'ambito': 'Sector Sur'}
+            defaults={'codigo': 'DEL03', 'direccion': 'Av. Cuatro Esquinas 890', 'comuna': 'La Serena', 'estado': 'Activa', 'ambito': 'Sector Sur'}
         )
         del_sur.codigo = 'DEL03'
         del_sur.comuna = 'La Serena'
         del_sur.direccion = 'Av. Cuatro Esquinas 890'
-        del_sur.estado = 'Inactiva'
+        del_sur.estado = 'Activa'
         del_sur.deleted_at = None
         del_sur.save()
 
@@ -71,6 +71,47 @@ class Command(BaseCommand):
         del_rural.estado = 'Activa'
         del_rural.deleted_at = None
         del_rural.save()
+
+        # 1.1 Sectores Territoriales por Delegación
+        sectores_data = [
+            # Centro
+            ('SEC-CEN01', 'Casco Histórico', del_centro, 'Sector fundacional, Plaza de Armas y La Recova'),
+            ('SEC-CEN02', 'Balmaceda y Estadio', del_centro, 'Eje comercial y deportivo'),
+            ('SEC-CEN03', 'La Florida y El Pino', del_centro, 'Sectores residenciales tradicionales del centro alto'),
+            ('SEC-CEN04', 'Caleta San Pedro', del_centro, 'Borde costero y caleta de pescadores'),
+            ('SEC-CEN05', 'Costanera y Av. del Mar', del_centro, 'Franja turística y residencial costera'),
+            # Norte (Las Compañías)
+            ('SEC-NOR01', 'Compañía Alta', del_norte, 'Población Juan Soldado y El Romero norte'),
+            ('SEC-NOR02', 'Compañía Baja', del_norte, 'Sindicato, Villa Las Rosas y ribera río Elqui'),
+            ('SEC-NOR03', 'Villa Lambert y Parque Islon', del_norte, 'Área residencial y equipamiento comunitario'),
+            ('SEC-NOR04', 'Villa Los Aromos', del_norte, 'Sector residencial oriente de Las Compañías'),
+            ('SEC-NOR05', 'El Romero Urbano', del_norte, 'Poblaciones de expansión norte'),
+            # Sur (La Pampa / El Milagro)
+            ('SEC-SUR01', 'San Joaquín', del_sur, 'Barrio residencial consolidado'),
+            ('SEC-SUR02', 'El Milagro I y II', del_sur, 'Sectores residenciales de crecimiento sur-oriente'),
+            ('SEC-SUR03', 'La Pampa Tradicional', del_sur, 'Eje Cuatro Esquinas y Larraín Alcalde'),
+            ('SEC-SUR04', 'Barrio Universitario', del_sur, 'Zona universitaria y residencias'),
+            ('SEC-SUR05', 'Colina El Pino Sur', del_sur, 'Límite sur urbano'),
+            # Rural
+            ('SEC-RUR01', 'Algarrobito', del_rural, 'Localidad rural tradicional Valle del Elqui'),
+            ('SEC-RUR02', 'Altovalsol', del_rural, 'Comunidad agrícola y villorrios rurales'),
+            ('SEC-RUR03', 'Las Rojas', del_rural, 'Poblado rural histórico'),
+            ('SEC-RUR04', 'Lambert Rural', del_rural, 'Comunidad minera y agrícola tradicional'),
+            ('SEC-RUR05', 'Pelícana y Quebrada de Talca', del_rural, 'Sectores rurales del interior'),
+        ]
+        sectores_dict = {}
+        for cod, nom, del_obj, desc in sectores_data:
+            sec, _ = Sector.all_objects.get_or_create(
+                codigo=cod,
+                defaults={'nombre': nom, 'delegacion': del_obj, 'descripcion': desc, 'estado': 'Activo'}
+            )
+            sec.nombre = nom
+            sec.delegacion = del_obj
+            sec.descripcion = desc
+            sec.estado = 'Activo'
+            sec.deleted_at = None
+            sec.save()
+            sectores_dict[cod] = sec
 
         # 2. Roles (Wireframe C3)
         rol_admin, _ = Rol.all_objects.get_or_create(
@@ -147,7 +188,7 @@ class Command(BaseCommand):
             content_type__app_label__in=['accounts', 'activities', 'agenda', 'configuration', 'analytics']
         )
 
-        # a) Superadministrador
+        # a) Superadministrador (Ámbito Global Comunal)
         u_admin, _ = User.objects.get_or_create(
             username="admin_sgr",
             defaults={'email': "admin@laserena.cl", 'first_name': "Administrador General", 'is_staff': True, 'is_superuser': True}
@@ -159,12 +200,20 @@ class Command(BaseCommand):
         u_admin.save()
         f_admin, _ = Funcionario.all_objects.get_or_create(
             user=u_admin,
-            defaults={'identificador_institucional': "ADM-001", 'delegacion': del_centro, 'cargo': cargo_coord, 'estado': "Activo"}
+            defaults={'identificador_institucional': "ADM-001", 'delegacion': None, 'cargo': cargo_coord, 'estado': "Activo"}
         )
-        f_admin.delegacion = del_centro
+        f_admin.delegacion = None
         f_admin.deleted_at = None
         f_admin.save()
         assign_role(f_admin, rol_admin)
+
+        # Si existe el usuario 'admin' en la base local, configurarlo también como Global
+        u_admin_local = User.objects.filter(username="admin").first()
+        if u_admin_local:
+            f_admin_local = Funcionario.all_objects.filter(user=u_admin_local).first()
+            if f_admin_local:
+                f_admin_local.delegacion = None
+                f_admin_local.save()
 
         # b) Coordinador General
         u_coord, _ = User.objects.get_or_create(
@@ -264,6 +313,46 @@ class Command(BaseCommand):
         f_ana.deleted_at = None
         f_ana.save()
         assign_role(f_ana, rol_consultor)
+
+        # g) Delegado Sur
+        u_sur, _ = User.objects.get_or_create(
+            username="delegado_sur",
+            defaults={'email': "delegado.sur@laserena.cl", 'first_name': "Gonzalo Herrera", 'is_staff': True, 'is_superuser': False}
+        )
+        u_sur.first_name = "Gonzalo Herrera"
+        u_sur.email = "delegado.sur@laserena.cl"
+        u_sur.set_password("User1234!")
+        u_sur.is_active = True
+        u_sur.save()
+        u_sur.user_permissions.set(all_perms)
+        f_sur, _ = Funcionario.all_objects.get_or_create(
+            user=u_sur,
+            defaults={'identificador_institucional': "DEL-003", 'delegacion': del_sur, 'cargo': cargo_coord, 'estado': "Activo"}
+        )
+        f_sur.delegacion = del_sur
+        f_sur.deleted_at = None
+        f_sur.save()
+        assign_role(f_sur, rol_delegado)
+
+        # h) Delegado Rural
+        u_rural, _ = User.objects.get_or_create(
+            username="delegado_rural",
+            defaults={'email': "delegado.rural@laserena.cl", 'first_name': "Patricia Vega", 'is_staff': True, 'is_superuser': False}
+        )
+        u_rural.first_name = "Patricia Vega"
+        u_rural.email = "delegado.rural@laserena.cl"
+        u_rural.set_password("User1234!")
+        u_rural.is_active = True
+        u_rural.save()
+        u_rural.user_permissions.set(all_perms)
+        f_rural, _ = Funcionario.all_objects.get_or_create(
+            user=u_rural,
+            defaults={'identificador_institucional': "DEL-004", 'delegacion': del_rural, 'cargo': cargo_coord, 'estado': "Activo"}
+        )
+        f_rural.delegacion = del_rural
+        f_rural.deleted_at = None
+        f_rural.save()
+        assign_role(f_rural, rol_delegado)
 
         # 5. Período
         periodo_actual, _ = Periodo.all_objects.get_or_create(
@@ -404,68 +493,179 @@ class Command(BaseCommand):
             defaults={'descripcion': 'Reclamos vecinales', 'estado': 'Activo'}
         )
 
-        # 11. Vecinos
-        vec1, _ = Vecino.all_objects.get_or_create(
-            rut="12.345.678-9",
-            defaults={'nombre': 'Ana González', 'direccion': 'Av. Balmaceda 120', 'telefono': '+56 9 8765 4321', 'territorio': 'Centro', 'tipo_gestion': tg_sol, 'estado': 'Activo'}
-        )
-        vec2, _ = Vecino.all_objects.get_or_create(
-            rut="9.876.543-2",
-            defaults={'nombre': 'Pedro Rojas', 'direccion': "Calle O'Higgins 455", 'telefono': '+56 9 7654 3210', 'territorio': 'Norte', 'tipo_gestion': tg_rec, 'estado': 'Activo'}
-        )
-        vec3, _ = Vecino.all_objects.get_or_create(
-            rut="15.234.567-1",
-            defaults={'nombre': 'María Castillo', 'direccion': 'Pasaje Los Pinos 89', 'telefono': '+56 9 6543 2109', 'territorio': 'Sur', 'tipo_gestion': tg_sol, 'estado': 'Activo'}
-        )
+        # 11. Vecinos (Padrón Territorial Comunal)
+        vecinos_data = [
+            # Centro
+            ('12.345.678-9', 'Ana González', 'Av. Balmaceda 120', '+56 9 8765 4321', del_centro, sectores_dict.get('SEC-CEN01'), tg_sol),
+            ('14.892.311-K', 'Jorge Valenzuela Silva', 'Calle Prat 540', '+56 9 7812 3456', del_centro, sectores_dict.get('SEC-CEN01'), tg_sol),
+            ('16.450.812-3', 'Carmen Gloria Tapia', 'Pasaje Los Naranjos 231, La Florida', '+56 9 9123 4567', del_centro, sectores_dict.get('SEC-CEN03'), tg_sol),
+            ('11.782.903-4', 'Héctor Pizarro Godoy', 'Calle Pescadores 78, Caleta San Pedro', '+56 9 8234 5678', del_centro, sectores_dict.get('SEC-CEN04'), tg_rec),
+            # Norte (Las Compañías)
+            ('9.876.543-2', 'Pedro Rojas', "Calle O'Higgins 455", '+56 9 7654 3210', del_norte, sectores_dict.get('SEC-NOR01'), tg_rec),
+            ('17.345.901-8', 'Marcela Araya Barraza', 'Av. Monjitas Oriente 1205', '+56 9 6543 2198', del_norte, sectores_dict.get('SEC-NOR02'), tg_sol),
+            ('13.567.890-5', 'Guillermo Cortés Núñez', 'Pasaje La Cantera 44, Villa Lambert', '+56 9 7432 1890', del_norte, sectores_dict.get('SEC-NOR03'), tg_sol),
+            ('19.012.435-6', 'Francisca Morales Díaz', 'Calle Los Aromos 312', '+56 9 8321 0987', del_norte, sectores_dict.get('SEC-NOR04'), tg_sol),
+            # Sur (La Pampa / El Milagro)
+            ('15.234.567-1', 'María Castillo', 'Pasaje Los Pinos 89', '+56 9 6543 2109', del_sur, sectores_dict.get('SEC-SUR01'), tg_sol),
+            ('18.234.901-2', 'Rodrigo Santander Vega', 'Av. Cuatro Esquinas 1420', '+56 9 9456 7812', del_sur, sectores_dict.get('SEC-SUR03'), tg_rec),
+            ('20.123.876-4', 'Camila Herrera Bravo', 'Calle Los Plátanos 650, El Milagro', '+56 9 6123 9874', del_sur, sectores_dict.get('SEC-SUR02'), tg_sol),
+            # Rural
+            ('10.456.789-0', 'Esteban Barraza Pastén', 'Calle Principal s/n, Algarrobito', '+56 9 7654 0981', del_rural, sectores_dict.get('SEC-RUR01'), tg_sol),
+            ('12.987.654-3', 'Rosa Elena Villalobos', 'Camino Interior Parcela 14, Altovalsol', '+56 9 8543 2109', del_rural, sectores_dict.get('SEC-RUR02'), tg_sol),
+            ('14.321.789-7', 'Luis Aguilera Carvajal', 'Sector La Cancha, Las Rojas', '+56 9 9876 5432', del_rural, sectores_dict.get('SEC-RUR03'), tg_rec),
+        ]
+        vecinos_dict = {}
+        for rut_v, nom_v, dir_v, tel_v, del_v, sec_v, tg_v in vecinos_data:
+            v_obj, _ = Vecino.all_objects.get_or_create(
+                rut=rut_v,
+                defaults={
+                    'nombre': nom_v,
+                    'direccion': dir_v,
+                    'telefono': tel_v,
+                    'delegacion': del_v,
+                    'sector': sec_v,
+                    'territorio': sec_v.nombre if sec_v else (del_v.nombre if del_v else 'Centro'),
+                    'tipo_gestion': tg_v,
+                    'estado': 'Activo'
+                }
+            )
+            v_obj.nombre = nom_v
+            v_obj.direccion = dir_v
+            v_obj.telefono = tel_v
+            v_obj.delegacion = del_v
+            v_obj.sector = sec_v
+            v_obj.territorio = sec_v.nombre if sec_v else (del_v.nombre if del_v else 'Centro')
+            v_obj.tipo_gestion = tg_v
+            v_obj.estado = 'Activo'
+            v_obj.deleted_at = None
+            v_obj.save()
+            vecinos_dict[rut_v] = v_obj
 
         # 12. Atenciones Ciudadanas (Wireframe C6)
-        at1, _ = AtencionCiudadana.all_objects.get_or_create(
-            codigo_atencion="AT-2026-0001",
-            defaults={
-                'solicitante': 'Ana González (12.345.678-9)',
-                'vecino': vec1,
-                'delegacion': del_centro,
-                'tipo_atencion': ta_social,
-                'sub_atencion': sa_social,
-                'descripcion': 'Solicitud de subsidio familiar por emergencia habitacional en sector centro.',
-                'usuario_responsable': u_juan,
-                'estado': 'Registrada'
-            }
-        )
-        at2, _ = AtencionCiudadana.all_objects.get_or_create(
-            codigo_atencion="AT-2026-0002",
-            defaults={
-                'solicitante': 'Pedro Rojas (9.876.543-2)',
-                'vecino': vec2,
-                'delegacion': del_norte,
-                'tipo_atencion': ta_salud,
-                'sub_atencion': sa_salud,
-                'descripcion': 'Derivación para atención geriátrica preventiva en CESFAM Las Compañías.',
-                'usuario_responsable': u_comp,
-                'estado': 'En proceso'
-            }
-        )
-        at3, _ = AtencionCiudadana.all_objects.get_or_create(
-            codigo_atencion="AT-2026-0003",
-            defaults={
-                'solicitante': 'María Castillo (15.234.567-1)',
-                'vecino': vec3,
-                'delegacion': del_centro,
-                'tipo_atencion': ta_educ,
-                'sub_atencion': sa_educ,
-                'descripcion': 'Postulación a beca municipal de transporte escolar enseñanza media.',
-                'usuario_responsable': u_juan,
-                'estado': 'Resuelta'
-            }
-        )
+        atenciones_data = [
+            (
+                "AT-2026-0001",
+                "Ana González (12.345.678-9)",
+                vecinos_dict.get('12.345.678-9'),
+                del_centro,
+                ta_social,
+                sa_social,
+                "Solicitud de subsidio familiar por emergencia habitacional en sector centro.",
+                u_juan,
+                "Registrada"
+            ),
+            (
+                "AT-2026-0002",
+                "Pedro Rojas (9.876.543-2)",
+                vecinos_dict.get('9.876.543-2'),
+                del_norte,
+                ta_salud,
+                sa_salud,
+                "Derivación para atención geriátrica preventiva en CESFAM Las Compañías.",
+                u_comp,
+                "En proceso"
+            ),
+            (
+                "AT-2026-0003",
+                "María Castillo (15.234.567-1)",
+                vecinos_dict.get('15.234.567-1'),
+                del_sur,
+                ta_educ,
+                sa_educ,
+                "Postulación a beca municipal de transporte escolar enseñanza media.",
+                u_sur,
+                "Resuelta"
+            ),
+            (
+                "AT-2026-0004",
+                "Jorge Valenzuela Silva (14.892.311-K)",
+                vecinos_dict.get('14.892.311-K'),
+                del_centro,
+                ta_social,
+                sa_social,
+                "Orientación y postulación a programa de mejoramiento térmico de vivienda.",
+                u_centro,
+                "Registrada"
+            ),
+            (
+                "AT-2026-0005",
+                "Marcela Araya Barraza (17.345.901-8)",
+                vecinos_dict.get('17.345.901-8'),
+                del_norte,
+                ta_educ,
+                sa_educ,
+                "Asesoría para regularización de estudios y nivelación de adultos mayores.",
+                u_comp,
+                "En proceso"
+            ),
+            (
+                "AT-2026-0006",
+                "Esteban Barraza Pastén (10.456.789-0)",
+                vecinos_dict.get('10.456.789-0'),
+                del_rural,
+                ta_social,
+                sa_social,
+                "Requerimiento de apoyo social y abastecimiento hídrico en Algarrobito.",
+                u_rural,
+                "Registrada"
+            ),
+            (
+                "AT-2026-0007",
+                "Héctor Pizarro Godoy (11.782.903-4)",
+                vecinos_dict.get('11.782.903-4'),
+                del_centro,
+                ta_salud,
+                sa_salud,
+                "Coordinación de operativo de vacunación e higiene en Caleta San Pedro.",
+                u_juan,
+                "Derivada"
+            ),
+            (
+                "AT-2026-0008",
+                "Camila Herrera Bravo (20.123.876-4)",
+                vecinos_dict.get('20.123.876-4'),
+                del_sur,
+                ta_social,
+                sa_social,
+                "Inscripción en talleres deportivos y comunitarios de la Delegación Sur.",
+                u_sur,
+                "Resuelta"
+            ),
+        ]
+        for cod_at, sol, vec_obj, del_at, ta_at, sa_at, desc_at, resp_at, est_at in atenciones_data:
+            at_obj, _ = AtencionCiudadana.all_objects.get_or_create(
+                codigo_atencion=cod_at,
+                defaults={
+                    'solicitante': sol,
+                    'vecino': vec_obj,
+                    'delegacion': del_at,
+                    'tipo_atencion': ta_at,
+                    'sub_atencion': sa_at,
+                    'descripcion': desc_at,
+                    'usuario_responsable': resp_at,
+                    'estado': est_at
+                }
+            )
+            at_obj.solicitante = sol
+            at_obj.vecino = vec_obj
+            at_obj.delegacion = del_at
+            at_obj.tipo_atencion = ta_at
+            at_obj.sub_atencion = sa_at
+            at_obj.descripcion = desc_at
+            at_obj.usuario_responsable = resp_at
+            at_obj.estado = est_at
+            at_obj.deleted_at = None
+            at_obj.save()
 
         self.stdout.write(self.style.SUCCESS("[OK] Base de datos SGR poblada exitosamente con datos semillas oficiales."))
         self.stdout.write("--------------------------------------------------")
         self.stdout.write("CUENTAS DE ACCESO LISTAS PARA PRUEBAS Y EVALUACIÓN:")
-        self.stdout.write("  1) admin_sgr        | Clave: Admin1234! | Rol: Administrador       (Acceso Global + Multi-delegación)")
-        self.stdout.write("  2) coordinador_sgr  | Clave: User1234!  | Rol: Coordinador         (Metas, Atenciones, Reportes)")
-        self.stdout.write("  3) delegado_centro  | Clave: User1234!  | Rol: Delegado Municipal  (Delegación Centro)")
-        self.stdout.write("  4) delegado_companias| Clave: User1234! | Rol: Delegado Municipal  (Delegación Norte / Las Compañías)")
-        self.stdout.write("  5) funcionario_juan | Clave: User1234!  | Rol: Operador            (Ingreso de Atención Centro)")
-        self.stdout.write("  6) consultor_ana    | Clave: User1234!  | Rol: Consultor           (Solo Lectura)")
+        self.stdout.write("  1) admin_sgr         | Clave: Admin1234! | Rol: Administrador       (Acceso Global + Multi-delegación)")
+        self.stdout.write("  2) coordinador_sgr   | Clave: User1234!  | Rol: Coordinador         (Metas, Atenciones, Reportes)")
+        self.stdout.write("  3) delegado_centro   | Clave: User1234!  | Rol: Delegado Municipal  (Delegación Centro)")
+        self.stdout.write("  4) delegado_companias| Clave: User1234!  | Rol: Delegado Municipal  (Delegación Norte / Las Compañías)")
+        self.stdout.write("  5) delegado_sur      | Clave: User1234!  | Rol: Delegado Municipal  (Delegación Sur)")
+        self.stdout.write("  6) delegado_rural    | Clave: User1234!  | Rol: Delegado Municipal  (Delegación Rural)")
+        self.stdout.write("  7) funcionario_juan  | Clave: User1234!  | Rol: Operador            (Ingreso de Atención Centro)")
+        self.stdout.write("  8) consultor_ana     | Clave: User1234!  | Rol: Consultor           (Solo Lectura)")
         self.stdout.write("--------------------------------------------------")
