@@ -462,14 +462,22 @@ def cambiar_delegacion_view(request, del_id):
         messages.error(request, "Tu perfil de usuario tiene asignado un contexto territorial fijo.")
         return redirect(request.META.get('HTTP_REFERER', 'gestion_inicio'))
 
+    from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+    from django.urls import reverse
+
     referer = request.META.get('HTTP_REFERER', '')
+    # Rutas que no procesan el parámetro ?delegacion= en URL (usan solo la sesión)
+    inicio_path = reverse('gestion_inicio')
 
     if del_id == 0:
         request.session['delegacion_activa_id'] = 'global'
+        request.session.modified = True
         messages.success(request, "Contexto territorial cambiado a 'Global (Todas las delegaciones)'.")
         if referer:
-            from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
             u = urlparse(referer)
+            # Si el referer es la página de inicio, redirigir directamente sin parámetros
+            if u.path.rstrip('/') == inicio_path.rstrip('/'):
+                return redirect('gestion_inicio')
             q = parse_qs(u.query)
             q.pop('delegacion', None)
             q.pop('page', None)
@@ -479,11 +487,14 @@ def cambiar_delegacion_view(request, del_id):
 
     nueva_del = get_object_or_404(Delegacion, id=del_id, estado='Activa')
     request.session['delegacion_activa_id'] = nueva_del.id
+    request.session.modified = True
     messages.success(request, f"Contexto territorial cambiado a '{nueva_del.nombre}'.")
 
     if referer:
-        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
         u = urlparse(referer)
+        # Si el referer es la página de inicio, redirigir directamente (inicio usa solo la sesión)
+        if u.path.rstrip('/') == inicio_path.rstrip('/'):
+            return redirect('gestion_inicio')
         q = parse_qs(u.query)
         q['delegacion'] = [str(nueva_del.id)]
         q.pop('page', None)
