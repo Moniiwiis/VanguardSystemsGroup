@@ -43,7 +43,7 @@
       <div class="flex items-center gap-2">
         <div class="w-2.5 h-2.5 rounded-full bg-[#C41230] animate-pulse"></div>
         <h2 class="text-xs sm:text-sm font-extrabold text-slate-900 uppercase tracking-wider">
-          Métricas Territoriales: <span class="text-[#C41230]">{{ delegacion_activa.nombre }}</span>
+          Métricas Territoriales: <span class="text-[#C41230]">{% if delegacion_activa %}{{ delegacion_activa.nombre }}{% else %}Global — Todas las Delegaciones{% endif %}</span>
         </h2>
       </div>
       {% if es_admin %}
@@ -255,7 +255,7 @@
       <div class="flex items-center gap-2">
         <i data-lucide="history" class="w-4 h-4 text-[#C41230]"></i>
         <h3 class="font-extrabold text-slate-900 text-sm">
-          Últimas Atenciones Ciudadanas — {{ delegacion_activa.nombre }}
+          Últimas Atenciones Ciudadanas{% if delegacion_activa %} — {{ delegacion_activa.nombre }}{% else %} — Todas las Delegaciones{% endif %}
         </h3>
       </div>
       <a href="{% url 'gestion_atenciones' %}" class="text-xs font-bold text-[#C41230] hover:underline flex items-center gap-1">
@@ -302,7 +302,7 @@
     {% else %}
     <div class="py-10 text-center text-slate-400 space-y-2">
       <i data-lucide="inbox" class="w-8 h-8 mx-auto text-slate-300"></i>
-      <p class="text-xs font-medium">Aún no se han registrado atenciones ciudadanas en {{ delegacion_activa.nombre }}.</p>
+      <p class="text-xs font-medium">Aún no se han registrado atenciones ciudadanas{% if delegacion_activa %} en {{ delegacion_activa.nombre }}{% endif %}.</p>
       {% if permisos.puede_ingresar_atencion %}
       <a href="{% url 'gestion_atenciones' %}" class="inline-block mt-2 px-4 py-2 text-xs font-bold bg-[#C41230] text-white rounded-xl hover:bg-[#8B1D19]">
         Registrar primera atención en esta delegación
