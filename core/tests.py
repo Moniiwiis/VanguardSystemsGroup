@@ -440,6 +440,126 @@ class AtencionCiudadanaEnhancementTests(TestCase):
         self.tipo = TipoAtencion.objects.create(nombre='Social', estado='Activo')
         self.sub = SubAtencion.objects.create(nombre='Subvención', tipo_atencion=self.tipo, estado='Activa')
 
+    def test_admin_dashboard_global_consolida_datos_de_todas_las_delegaciones(self):
+        delegacion2 = Delegacion.objects.create(nombre='Delegación Centro', estado='Activa')
+        user2 = User.objects.create_user(
+            username='funcionario_centro',
+            first_name='Luis',
+            last_name='Centro',
+            password='Prueba123!',
+        )
+        Funcionario.objects.create(
+            user=user2,
+            identificador_institucional='FUNC-CEN03',
+            cargo=self.cargo,
+            delegacion=delegacion2,
+            estado='Activo',
+        )
+        AtencionCiudadana.objects.create(
+            solicitante='Vecino Las Compañías',
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Atención registrada en la primera delegación.',
+            usuario_responsable=self.creador,
+            estado='Resuelta',
+        )
+        AtencionCiudadana.objects.create(
+            solicitante='Vecino Centro',
+            delegacion=delegacion2,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Atención registrada en la segunda delegación.',
+            usuario_responsable=user2,
+            estado='En proceso',
+        )
+        admin_user = User.objects.create_superuser(
+            username='admin_dashboard',
+            email='admin_dashboard@example.test',
+            password='Prueba123!',
+        )
+        self.client.force_login(admin_user)
+
+        global_response = self.client.get(reverse('gestion_inicio'))
+        self.assertEqual(global_response.status_code, 200)
+        self.assertTrue(global_response.context['es_admin_global'])
+        self.assertEqual(global_response.context['total_atenciones_del'], 2)
+        self.assertEqual(global_response.context['total_funcionarios_del'], 3)
+        self.assertEqual(
+            {atencion.delegacion_id for atencion in global_response.context['ultimas_atenciones']},
+            {self.delegacion.id, delegacion2.id},
+        )
+
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+        territorial_response = self.client.get(reverse('gestion_inicio'))
+        self.assertFalse(territorial_response.context['es_admin_global'])
+        self.assertEqual(territorial_response.context['total_atenciones_del'], 1)
+        self.assertEqual(territorial_response.context['total_funcionarios_del'], 2)
+
+    def test_vecinos_disponibles_se_limita_a_delegacion_activa_incluso_para_admin(self):
+        delegacion2 = Delegacion.objects.create(nombre='Delegación Centro', estado='Activa')
+        vecino1 = Vecino.objects.create(
+            nombre='Vecina Las Compañías',
+            rut='11.111.111-1',
+            delegacion=self.delegacion,
+            estado='Activo',
+        )
+        vecino2 = Vecino.objects.create(
+            nombre='Vecino Centro',
+            rut='22.222.222-2',
+            delegacion=delegacion2,
+            estado='Activo',
+        )
+        admin_user = User.objects.create_superuser(
+            username='admin_vecinos',
+            email='admin_vecinos@example.test',
+            password='Prueba123!',
+        )
+        self.client.force_login(admin_user)
+
+        global_response = self.client.get(reverse('gestion_atenciones'))
+        self.assertEqual(list(global_response.context['vecinos']), [])
+
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+        response = self.client.get(reverse('gestion_atenciones'))
+        vecino_ids = {vecino.id for vecino in response.context['vecinos']}
+        self.assertIn(vecino1.id, vecino_ids)
+        self.assertNotIn(vecino2.id, vecino_ids)
+
+    def test_atencion_no_acepta_vecino_de_otra_delegacion(self):
+        delegacion2 = Delegacion.objects.create(nombre='Delegación Centro', estado='Activa')
+        vecino_externo = Vecino.objects.create(
+            nombre='Vecino Centro',
+            rut='33.333.333-3',
+            delegacion=delegacion2,
+            estado='Activo',
+        )
+        admin_user = User.objects.create_superuser(
+            username='admin_atencion',
+            email='admin_atencion@example.test',
+            password='Prueba123!',
+        )
+        self.client.force_login(admin_user)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        response = self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'existente',
+            'solicitante': f'{vecino_externo.nombre} ({vecino_externo.rut})',
+            'vecino_id': vecino_externo.id,
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Atención intentando vincular un vecino de otro territorio.',
+        })
+
+        self.assertRedirects(response, reverse('gestion_atenciones'))
+        self.assertFalse(AtencionCiudadana.objects.exists())
+
     def test_creacion_con_nuevo_vecino_y_representante(self):
         self.client.force_login(self.creador)
         post_data = {
@@ -686,6 +806,35 @@ class SectorYTerritorioTests(TestCase):
         self.assertIn(v2.id, vecinos_ids_2)
         # La delegación activa en cabecera sigue siendo delegacion1
         self.assertEqual(resp_del2.context['delegacion_activa'], self.delegacion1)
+
+    def test_admin_modo_global_renderiza_sin_errores(self):
+        admin_user = User.objects.create_superuser(
+            username='admin_global',
+            email='admin_global@example.test',
+            password='Prueba123!',
+        )
+        self.client.force_login(admin_user)
+
+        # Cambiar a modo Global (0)
+        resp_cambio = self.client.get(reverse('cambiar_delegacion', args=[0]))
+        self.assertEqual(resp_cambio.status_code, 302)
+
+        # Vecino sin delegación y con delegación
+        Vecino.objects.create(nombre='Vecino Sin Del', rut='3.333.333-3', delegacion=None, estado='Activo')
+        Vecino.objects.create(nombre='Vecino Con Del', rut='4.444.444-4', delegacion=self.delegacion1, estado='Activo')
+
+        # Comprobar que gestion_vecinos carga con status 200 sin errores de lookup
+        resp_vecinos = self.client.get(reverse('gestion_vecinos'))
+        self.assertEqual(resp_vecinos.status_code, 200)
+        self.assertIsNone(resp_vecinos.context.get('delegacion_activa'))
+
+        # Comprobar que gestion_atenciones carga con status 200
+        resp_atenciones = self.client.get(reverse('gestion_atenciones'))
+        self.assertEqual(resp_atenciones.status_code, 200)
+
+        # Comprobar que gestion_sectores carga con status 200
+        resp_sectores = self.client.get(reverse('gestion_sectores'))
+        self.assertEqual(resp_sectores.status_code, 200)
 
 
 

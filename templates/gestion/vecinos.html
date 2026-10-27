@@ -147,7 +147,7 @@
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
                 <button type="button" 
-                        onclick="openEditVecino('{{ v.id }}', '{{ v.nombre|escapejs }}', '{{ v.rut|escapejs }}', '{{ v.direccion|default:''|escapejs }}', '{{ v.telefono|default:''|escapejs }}', '{{ v.sector.id|default:'' }}', '{{ v.delegacion.id|default:'' }}', '{{ v.delegacion.nombre|default:delegacion_activa.nombre|default:'Sin delegación'|escapejs }}', '{{ v.tipo_gestion.id|default:'' }}', '{{ v.estado|escapejs }}')" 
+                        onclick="openEditVecino('{{ v.id }}', '{{ v.nombre|escapejs }}', '{{ v.rut|escapejs }}', '{{ v.direccion|default:''|escapejs }}', '{{ v.telefono|default:''|escapejs }}', '{{ v.sector.id|default:'' }}', '{{ v.delegacion.id|default:'' }}', '{% if v.delegacion %}{{ v.delegacion.nombre|escapejs }}{% elif delegacion_activa %}{{ delegacion_activa.nombre|escapejs }}{% else %}Sin delegación{% endif %}', '{{ v.tipo_gestion.id|default:'' }}', '{{ v.estado|escapejs }}')" 
                         title="Editar vecino"
                         class="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all">
                   <i data-lucide="edit-3" class="w-4 h-4"></i>

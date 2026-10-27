@@ -95,7 +95,6 @@ ALLOWED_PAGE_SIZES = {5, 15, 30}
 
 def _get_page_size(request, session_key='page_size'):
     """
-    Clase 10 (Diapositivas 15-16):
     Paginación profesional con persistencia en sesión (5, 15, 30).
     - Valida contra whitelist ALLOWED_PAGE_SIZES.
     - Si llega por GET, actualiza request.session (si está disponible).
@@ -122,7 +121,7 @@ def _get_page_size(request, session_key='page_size'):
 
 def _paginate_queryset(request, queryset, session_key='page_size'):
     """
-    Clase 10 (Diapositiva 17):
+
     Conserva la consulta al paginar:
     params = request.GET.copy()
     params.pop('page', None)
@@ -178,7 +177,17 @@ def login_view(request):
             
             # Inicializar delegación activa en sesión
             func = Funcionario.all_objects.filter(user=user).first()
-            if func and func.delegacion:
+            is_user_admin = user.is_superuser
+            if not is_user_admin and func:
+                f_rol = FuncionarioRol.objects.filter(funcionario=func).select_related('rol').first()
+                if f_rol and f_rol.rol and f_rol.rol.nombre_rol.lower() in ['administrador', 'superadministrador']:
+                    is_user_admin = True
+                elif user.is_staff and not f_rol:
+                    is_user_admin = True
+
+            if is_user_admin:
+                request.session['delegacion_activa_id'] = 'global'
+            elif func and func.delegacion:
                 request.session['delegacion_activa_id'] = func.delegacion.id
             else:
                 first_del = Delegacion.objects.filter(estado='Activa').first()
@@ -491,12 +500,17 @@ def gestion_inicio(request):
     del_activa = ctx['delegacion_activa']
     es_admin = ctx['permisos']['es_admin']
 
-    # Métricas territoriales específicas de la delegación activa
+    # En contexto global, el administrador consulta el agregado de todas las delegaciones.
     if del_activa:
         atenciones_del_qs = AtencionCiudadana.objects.filter(delegacion=del_activa)
         funcionarios_del_qs = Funcionario.objects.filter(delegacion=del_activa)
         metas_del_qs = ConfiguracionMeta.objects.filter(funcionario__delegacion=del_activa).select_related('periodo', 'item', 'funcionario')
         val_del_qs = ValidacionEvidencia.objects.filter(actividad__funcionario__delegacion=del_activa)
+    elif es_admin:
+        atenciones_del_qs = AtencionCiudadana.objects.all()
+        funcionarios_del_qs = Funcionario.objects.all()
+        metas_del_qs = ConfiguracionMeta.objects.all().select_related('periodo', 'item', 'funcionario')
+        val_del_qs = ValidacionEvidencia.objects.all()
     else:
         atenciones_del_qs = AtencionCiudadana.objects.none()
         funcionarios_del_qs = Funcionario.objects.none()
@@ -569,6 +583,7 @@ def gestion_inicio(request):
         'total_subatenciones': total_subatenciones,
         'total_roles': total_roles,
         'es_admin': es_admin,
+        'es_admin_global': es_admin and not del_activa,
     }
     return render(request, 'gestion/inicio.html', context)
 
@@ -1413,6 +1428,15 @@ def api_sectores_por_delegacion(request, delegacion_id):
 
 # --- 7. INGRESO DE ATENCIÓN CIUDADANA (Wireframe C6 - Diseño 11) ---
 
+def _vecinos_activos_para_delegacion(delegacion):
+    if not delegacion:
+        return Vecino.objects.none()
+    return Vecino.objects.filter(estado='Activo').filter(
+        Q(delegacion=delegacion)
+        | (Q(delegacion__isnull=True) & Q(territorio__icontains=delegacion.nombre))
+    )
+
+
 @login_required
 def gestion_atenciones(request):
     ctx = global_context(request)
@@ -1422,6 +1446,9 @@ def gestion_atenciones(request):
     if request.method == 'POST':
         if not ctx['permisos'].get('puede_ingresar_atencion', True):
             messages.error(request, "Acceso denegado: El perfil Consultor opera exclusivamente en modo solo lectura y no puede ingresar atenciones.")
+            return redirect('gestion_atenciones')
+        if not del_activa:
+            messages.error(request, "Selecciona una delegación activa antes de ingresar una atención.")
             return redirect('gestion_atenciones')
 
         modo_vecino = request.POST.get('modo_vecino', 'existente')
@@ -1468,6 +1495,9 @@ def gestion_atenciones(request):
                     estado='Activo'
                 )
             else:
+                if not _vecinos_activos_para_delegacion(del_activa).filter(id=vecino_obj.id).exists():
+                    messages.error(request, "Ese RUT ya está registrado en otra delegación.")
+                    return redirect('gestion_atenciones')
                 actualizado = False
                 if nuevo_nombre and vecino_obj.nombre != nuevo_nombre:
                     vecino_obj.nombre = nuevo_nombre
@@ -1489,8 +1519,13 @@ def gestion_atenciones(request):
                     vecino_obj.save()
             solicitante = f"{vecino_obj.nombre} ({vecino_obj.rut})"
         elif vecino_id and vecino_id.isdigit():
-            vecino_obj = Vecino.objects.filter(id=int(vecino_id)).first()
-            if vecino_obj and not solicitante:
+            vecino_obj = _vecinos_activos_para_delegacion(del_activa).filter(
+                id=int(vecino_id)
+            ).first()
+            if not vecino_obj:
+                messages.error(request, "El vecino seleccionado no pertenece a la delegación activa.")
+                return redirect('gestion_atenciones')
+            if not solicitante:
                 solicitante = f"{vecino_obj.nombre} ({vecino_obj.rut})"
 
         # Determinar representante asignado para la atención
@@ -1630,11 +1665,7 @@ def gestion_atenciones(request):
     page_obj = paginator.get_page(page_number)
 
     tipos_activos = TipoAtencion.objects.filter(estado='Activo')
-    vecinos_catalogo = Vecino.objects.filter(estado='Activo').order_by('nombre')
-    if not ctx['permisos']['es_admin'] and del_activa:
-        vecinos_catalogo = vecinos_catalogo.filter(
-            Q(delegacion=del_activa) | (Q(delegacion__isnull=True) & Q(territorio__icontains=del_activa.nombre))
-        )
+    vecinos_catalogo = _vecinos_activos_para_delegacion(del_activa).order_by('nombre')
     vecinos_catalogo = vecinos_catalogo[:150]
 
     # Representantes / Funcionarios disponibles para asignación (filtrados exclusivamente por delegación)
