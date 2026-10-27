@@ -14,6 +14,7 @@ from django.core.mail import send_mail
 from django.core.mail.message import BadHeaderError
 from django.core.paginator import Paginator
 from django.core.validators import validate_email
+from django.db import transaction
 from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponseForbidden
@@ -1674,6 +1675,42 @@ def gestion_atenciones(request):
     paginator = Paginator(qs, page_size)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
+    atenciones_pagina = list(page_obj.object_list)
+    delegacion_ids = {atencion.delegacion_id for atencion in atenciones_pagina}
+    responsable_ids = {atencion.usuario_responsable_id for atencion in atenciones_pagina}
+
+    roles_por_usuario = {}
+    for user_id, rol_nombre in FuncionarioRol.objects.filter(
+        funcionario__user_id__in=responsable_ids,
+        rol__estado__iexact='Activo',
+    ).values_list('funcionario__user_id', 'rol__nombre_rol'):
+        roles_por_usuario.setdefault(user_id, []).append(rol_nombre)
+    for atencion in atenciones_pagina:
+        atencion.responsable_rol = ', '.join(roles_por_usuario.get(atencion.usuario_responsable_id, [])) or 'Sin rol registrado'
+
+    encargados_edicion = []
+    funcionarios_edicion = Funcionario.objects.filter(
+        delegacion_id__in=delegacion_ids,
+        estado__iexact='Activo',
+        user__is_active=True,
+    ).select_related('user', 'delegacion').order_by('user__first_name', 'user__username')
+    funcionarios_ids = [funcionario.id for funcionario in funcionarios_edicion]
+    roles_encargados = {}
+    for funcionario_id, rol_nombre in FuncionarioRol.objects.filter(
+        funcionario_id__in=funcionarios_ids,
+        rol__estado__iexact='Activo',
+    ).values_list('funcionario_id', 'rol__nombre_rol'):
+        roles_encargados.setdefault(funcionario_id, []).append(rol_nombre)
+    for funcionario in funcionarios_edicion:
+        nombre = funcionario.user.get_full_name() or funcionario.user.username
+        roles = ', '.join(roles_encargados.get(funcionario.id, [])) or 'Sin rol registrado'
+        encargados_edicion.append({
+            'id': funcionario.user_id,
+            'nombre': nombre,
+            'delegacion_id': funcionario.delegacion_id,
+            'delegacion_nombre': funcionario.delegacion.nombre,
+            'label': f"{nombre} · {roles}",
+        })
 
     tipos_activos = TipoAtencion.objects.filter(estado='Activo')
     vecinos_catalogo = _vecinos_activos_para_delegacion(del_activa).order_by('nombre')
@@ -1720,6 +1757,7 @@ def gestion_atenciones(request):
     return render(request, 'gestion/atenciones.html', {
         'page_obj': page_obj,
         'atenciones': page_obj.object_list,
+        'encargados_edicion': encargados_edicion,
         'tipos_activos': tipos_activos,
         'vecinos': vecinos_catalogo,
         'sectores': sectores_disponibles,
@@ -1739,6 +1777,101 @@ def gestion_atenciones(request):
         'total_canceladas': total_canceladas,
         'total_general': total_general,
     })
+
+
+@login_required
+def gestion_atenciones_editar(request, atencion_id):
+    ctx = global_context(request)
+    if request.method != 'POST' or not ctx['permisos'].get('puede_ingresar_atencion', True):
+        messages.error(request, "Acceso denegado: El perfil Consultor opera exclusivamente en modo solo lectura.")
+        return redirect('gestion_atenciones')
+
+    atencion = get_object_or_404(
+        AtencionCiudadana.objects.select_related(
+            'delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'actividad'
+        ),
+        id=atencion_id,
+    )
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+    if not es_admin and (not del_activa or atencion.delegacion != del_activa):
+        messages.error(request, "Acceso denegado: No tienes autorización para modificar atenciones de otra delegación.")
+        return redirect('gestion_atenciones')
+    if atencion.estado == 'Cancelada':
+        messages.error(request, "No se pueden editar atenciones canceladas.")
+        return redirect('gestion_atenciones')
+
+    descripcion = request.POST.get('descripcion', '').strip()
+    responsable_id = request.POST.get('responsable_id', '').strip()
+    responsable = User.objects.filter(id=responsable_id, is_active=True).first() if responsable_id.isdigit() else None
+    funcionario_nuevo = None
+    if responsable:
+        funcionario_nuevo = Funcionario.objects.filter(
+            user=responsable,
+            delegacion=atencion.delegacion,
+            estado__iexact='Activo',
+        ).first()
+
+    errores = []
+    if not descripcion:
+        errores.append("La descripción es obligatoria.")
+    if not responsable:
+        errores.append("Selecciona un encargado con una cuenta activa.")
+    elif not funcionario_nuevo:
+        errores.append("El nuevo encargado debe ser un funcionario activo de la misma delegación.")
+
+    if errores:
+        for error in errores:
+            messages.error(request, error)
+        return redirect('gestion_atenciones')
+
+    funcionario_anterior = Funcionario.objects.filter(user=atencion.usuario_responsable).first()
+    cambios_atencion = {
+        'descripcion': descripcion,
+        'usuario_responsable': responsable,
+        'updated_at': timezone.now(),
+    }
+    with transaction.atomic():
+        AtencionCiudadana.all_objects.filter(id=atencion.id).update(**cambios_atencion)
+        if (
+            atencion.actividad
+            and funcionario_anterior
+            and atencion.actividad.funcionario_id == funcionario_anterior.id
+        ):
+            Actividad.objects.filter(id=atencion.actividad_id).update(
+                funcionario=funcionario_nuevo,
+                updated_at=timezone.now(),
+            )
+
+    messages.success(request, f"Atención {atencion.codigo_atencion} actualizada exitosamente.")
+    return redirect('gestion_atenciones')
+
+
+@login_required
+def gestion_atenciones_eliminar(request, atencion_id):
+    ctx = global_context(request)
+    if request.method != 'POST' or not ctx['permisos'].get('puede_ingresar_atencion', True):
+        messages.error(request, "No tienes autorización para eliminar atenciones.")
+        return redirect('gestion_atenciones')
+
+    atencion = get_object_or_404(AtencionCiudadana, id=atencion_id)
+    if not ctx['permisos']['es_admin']:
+        del_activa = ctx['delegacion_activa']
+        if not del_activa or atencion.delegacion != del_activa:
+            messages.error(request, "Acceso denegado: No tienes autorización para eliminar atenciones de otra delegación.")
+            return redirect('gestion_atenciones')
+
+    codigo = atencion.codigo_atencion
+    now = timezone.now()
+    AtencionCiudadana.all_objects.filter(id=atencion.id).update(
+        deleted_at=now,
+        updated_at=now,
+    )
+    messages.success(
+        request,
+        f"Atención {codigo} eliminada del listado. Sus evidencias y registros asociados se conservaron.",
+    )
+    return redirect('gestion_atenciones')
 
 
 @login_required
@@ -1999,14 +2132,12 @@ def gestion_vecinos(request):
         tipo_gestion_id = request.POST.get('tipo_gestion_id')
         estado = request.POST.get('estado', 'Activo')
 
-        # La delegación queda estrictamente bloqueada según la delegación activa
-        if del_activa:
-            del_obj = del_activa
-        elif es_admin:
-            delegacion_id = request.POST.get('delegacion_id')
-            del_obj = Delegacion.objects.filter(id=delegacion_id).first() if delegacion_id else Delegacion.objects.first()
-        else:
-            del_obj = None
+        if not del_activa:
+            messages.error(request, "Selecciona una delegación activa antes de registrar un vecino.")
+            return redirect('gestion_vecinos')
+
+        # Los vecinos nuevos siempre se registran en el contexto territorial activo.
+        del_obj = del_activa
 
         sector_obj = None
         if sector_id and sector_id.isdigit():
@@ -2129,27 +2260,42 @@ def gestion_vecinos_editar(request, vecino_id):
             return redirect('gestion_vecinos')
 
     if request.method == 'POST':
+        delegacion_anterior = vecino.delegacion
+        if es_admin:
+            del_id = request.POST.get('delegacion_id', '').strip()
+            if del_id:
+                del_obj = Delegacion.objects.filter(id=del_id).first()
+                if not del_obj or (del_obj.estado != 'Activa' and del_obj != delegacion_anterior):
+                    messages.error(request, "Selecciona una delegación activa válida.")
+                    return redirect('gestion_vecinos')
+            else:
+                del_obj = None
+        else:
+            del_obj = del_activa
+
+        sec_id = request.POST.get('sector_id', '').strip()
+        sec_obj = None
+        if sec_id:
+            sec_obj = Sector.objects.filter(
+                id=sec_id,
+                delegacion=del_obj,
+                estado='Activo',
+            ).first() if del_obj else None
+            if not sec_obj:
+                messages.error(request, "El sector seleccionado no pertenece a la delegación del vecino.")
+                return redirect('gestion_vecinos')
+
         vecino.nombre = request.POST.get('nombre', vecino.nombre).strip()
         vecino.rut = request.POST.get('rut', vecino.rut).strip()
         vecino.direccion = request.POST.get('direccion', vecino.direccion).strip()
         vecino.telefono = request.POST.get('telefono', vecino.telefono).strip()
-
-        # Actualizar sector si fue seleccionado
-        sec_id = request.POST.get('sector_id')
-        if sec_id and sec_id.isdigit():
-            sec_obj = Sector.objects.filter(id=int(sec_id)).first()
-            if sec_obj:
-                vecino.sector = sec_obj
-                vecino.territorio = sec_obj.nombre
-        else:
-            vecino.territorio = request.POST.get('territorio', vecino.territorio).strip()
-
-        if es_admin and not del_activa:
-            del_id = request.POST.get('delegacion_id')
-            if del_id:
-                vecino.delegacion = Delegacion.objects.filter(id=del_id).first()
-        elif del_activa:
-            vecino.delegacion = del_activa
+        vecino.delegacion = del_obj
+        if sec_obj:
+            vecino.sector = sec_obj
+            vecino.territorio = sec_obj.nombre
+        elif del_obj != delegacion_anterior:
+            vecino.sector = None
+            vecino.territorio = del_obj.nombre if del_obj else ''
 
         tg_id = request.POST.get('tipo_gestion_id')
         vecino.tipo_gestion_id = tg_id if tg_id else None

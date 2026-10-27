@@ -597,6 +597,132 @@ class AtencionCiudadanaEnhancementTests(TestCase):
         self.assertIn('total_canceladas', page_response.context)
         self.assertGreaterEqual(page_response.context['total_registradas'], 1)
 
+    def test_editar_atencion_permite_reasignar_encargado_en_la_delegacion(self):
+        self.client.force_login(self.creador)
+        tipo_nuevo = TipoAtencion.objects.create(nombre='Nuevo tipo', estado='Activo')
+        sub_nueva = SubAtencion.objects.create(
+            nombre='Nueva subatención',
+            tipo_atencion=tipo_nuevo,
+            estado='Activa',
+        )
+        atencion = AtencionCiudadana.objects.create(
+            solicitante='Solicitante original',
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Descripción original',
+            usuario_responsable=self.creador,
+        )
+        response_get = self.client.get(reverse('gestion_atenciones'))
+        self.assertEqual(response_get.status_code, 200)
+        self.assertContains(response_get, 'Vecino solicitante:')
+        self.assertNotContains(response_get, 'Cambiar vecino')
+        self.assertContains(response_get, 'at-edit-responsable')
+        self.assertContains(response_get, 'max-w-4xl')
+
+        response = self.client.post(reverse('gestion_atenciones_editar', args=[atencion.id]), {
+            'descripcion': 'Descripción actualizada',
+            'responsable_id': self.representante.id,
+            'tipo_atencion_id': tipo_nuevo.id,
+            'sub_atencion_id': sub_nueva.id,
+        })
+
+        self.assertRedirects(response, reverse('gestion_atenciones'))
+        atencion.refresh_from_db()
+        self.assertEqual(atencion.solicitante, 'Solicitante original')
+        self.assertEqual(atencion.descripcion, 'Descripción actualizada')
+        self.assertEqual(atencion.usuario_responsable, self.representante)
+        self.assertEqual(atencion.tipo_atencion, self.tipo)
+        self.assertEqual(atencion.sub_atencion, self.sub)
+        if atencion.actividad_id:
+            atencion.actividad.refresh_from_db()
+            self.assertEqual(atencion.actividad.funcionario, self.func_rep)
+
+    def test_editar_atencion_rechaza_encargado_de_otra_delegacion(self):
+        otra_delegacion = Delegacion.objects.create(nombre='Delegación Centro', estado='Activa')
+        usuario_externo = User.objects.create_user(
+            username='encargado_externo',
+            password='Prueba123!',
+        )
+        Funcionario.objects.create(
+            user=usuario_externo,
+            identificador_institucional='FUNC-EXT01',
+            cargo=self.cargo,
+            delegacion=otra_delegacion,
+            estado='Activo',
+        )
+        self.client.force_login(self.creador)
+        atencion = AtencionCiudadana.objects.create(
+            solicitante='Solicitante',
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Descripción',
+            usuario_responsable=self.creador,
+        )
+
+        response = self.client.post(reverse('gestion_atenciones_editar', args=[atencion.id]), {
+            'descripcion': 'Descripción',
+            'responsable_id': usuario_externo.id,
+        })
+
+        self.assertRedirects(response, reverse('gestion_atenciones'))
+        atencion.refresh_from_db()
+        self.assertEqual(atencion.usuario_responsable, self.creador)
+
+    def test_editar_atencion_no_permite_cambiar_vecino_solicitante(self):
+        vecino_actual = Vecino.objects.create(
+            nombre='Vecina original',
+            rut='31.111.111-1',
+            delegacion=self.delegacion,
+            estado='Activo',
+        )
+        self.client.force_login(self.creador)
+        atencion = AtencionCiudadana.objects.create(
+            solicitante=f'{vecino_actual.nombre} ({vecino_actual.rut})',
+            vecino=vecino_actual,
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Descripción',
+            usuario_responsable=self.creador,
+        )
+
+        response = self.client.post(reverse('gestion_atenciones_editar', args=[atencion.id]), {
+            'solicitante': 'Cambio no autorizado',
+            'vecino_id': vecino_actual.id + 100,
+            'cambiar_vecino': '1',
+            'descripcion': 'Descripción actualizada',
+            'responsable_id': self.creador.id,
+        })
+        self.assertRedirects(response, reverse('gestion_atenciones'))
+        atencion.refresh_from_db()
+        self.assertEqual(atencion.solicitante, f'{vecino_actual.nombre} ({vecino_actual.rut})')
+        self.assertEqual(atencion.vecino, vecino_actual)
+
+    def test_eliminar_atencion_es_borrado_logico_y_conserva_actividad(self):
+        self.client.force_login(self.creador)
+        atencion = AtencionCiudadana.objects.create(
+            solicitante='Solicitante',
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Descripción',
+            usuario_responsable=self.creador,
+        )
+        actividad_id = atencion.actividad_id
+        total_actividades = Actividad.objects.count()
+
+        response = self.client.post(reverse('gestion_atenciones_eliminar', args=[atencion.id]))
+
+        self.assertRedirects(response, reverse('gestion_atenciones'))
+        self.assertFalse(AtencionCiudadana.objects.filter(id=atencion.id).exists())
+        atencion_eliminada = AtencionCiudadana.all_objects.get(id=atencion.id)
+        self.assertIsNotNone(atencion_eliminada.deleted_at)
+        self.assertEqual(Actividad.objects.count(), total_actividades)
+        if actividad_id:
+            self.assertTrue(Actividad.objects.filter(id=actividad_id).exists())
+
     def test_representantes_filtrados_por_delegacion(self):
         # Crear otra delegación y otro funcionario
         otra_del = Delegacion.objects.create(nombre='Delegación Centro', estado='Activa')
@@ -724,6 +850,85 @@ class SectorYTerritorioTests(TestCase):
         self.assertEqual(vecino.sector, self.sector1)
         self.assertEqual(vecino.territorio, 'Villa Lambert')
 
+    def test_admin_puede_cambiar_delegacion_y_sector_de_vecino(self):
+        admin_user = User.objects.create_superuser(
+            username='admin_mudanza',
+            email='admin_mudanza@example.test',
+            password='Prueba123!',
+        )
+        vecino = Vecino.objects.create(
+            nombre='Vecina en mudanza',
+            rut='12.345.678-5',
+            delegacion=self.delegacion1,
+            sector=self.sector1,
+            estado='Activo',
+        )
+        self.client.force_login(admin_user)
+
+        response = self.client.post(reverse('gestion_vecinos_editar', args=[vecino.id]), {
+            'nombre': vecino.nombre,
+            'rut': vecino.rut,
+            'direccion': '',
+            'telefono': '',
+            'delegacion_id': self.delegacion2.id,
+            'sector_id': self.sector2.id,
+            'estado': 'Activo',
+        })
+
+        self.assertRedirects(response, reverse('gestion_vecinos'))
+        vecino.refresh_from_db()
+        self.assertEqual(vecino.delegacion, self.delegacion2)
+        self.assertEqual(vecino.sector, self.sector2)
+        self.assertEqual(vecino.territorio, self.sector2.nombre)
+
+        response = self.client.post(reverse('gestion_vecinos_editar', args=[vecino.id]), {
+            'nombre': vecino.nombre,
+            'rut': vecino.rut,
+            'direccion': '',
+            'telefono': '',
+            'delegacion_id': self.delegacion1.id,
+            'sector_id': self.sector2.id,
+            'estado': 'Activo',
+        })
+
+        self.assertRedirects(response, reverse('gestion_vecinos'))
+        vecino.refresh_from_db()
+        self.assertEqual(vecino.delegacion, self.delegacion2)
+        self.assertEqual(vecino.sector, self.sector2)
+
+    def test_creacion_admin_exige_delegacion_activa_y_la_usa(self):
+        admin_user = User.objects.create_superuser(
+            username='admin_alta_vecinos',
+            email='admin_alta_vecinos@example.test',
+            password='Prueba123!',
+        )
+        self.client.force_login(admin_user)
+
+        response = self.client.post(reverse('gestion_vecinos'), {
+            'nombre': 'Vecino en contexto activo',
+            'rut': '13.345.678-5',
+            'delegacion_id': self.delegacion2.id,
+            'sector_id': self.sector1.id,
+            'estado': 'Activo',
+        })
+        self.assertRedirects(response, reverse('gestion_vecinos'))
+        self.assertFalse(Vecino.objects.filter(rut='13.345.678-5').exists())
+
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion1.id
+        session.save()
+        response = self.client.post(reverse('gestion_vecinos'), {
+            'nombre': 'Vecino en contexto activo',
+            'rut': '13.345.678-5',
+            'delegacion_id': self.delegacion2.id,
+            'sector_id': self.sector1.id,
+            'estado': 'Activo',
+        })
+
+        self.assertRedirects(response, reverse('gestion_vecinos'))
+        vecino = Vecino.objects.get(rut='13.345.678-5')
+        self.assertEqual(vecino.delegacion, self.delegacion1)
+
     def test_atencion_con_nuevo_vecino_guarda_sector_y_delegacion_bloqueada(self):
         self.client.force_login(self.user_delegado)
 
@@ -827,6 +1032,11 @@ class SectorYTerritorioTests(TestCase):
         resp_vecinos = self.client.get(reverse('gestion_vecinos'))
         self.assertEqual(resp_vecinos.status_code, 200)
         self.assertIsNone(resp_vecinos.context.get('delegacion_activa'))
+        self.assertContains(
+            resp_vecinos,
+            "Selecciona una delegación activa en la cabecera para registrar un vecino.",
+        )
+        self.assertNotContains(resp_vecinos, ">Nuevo Vecino</span>")
 
         # Comprobar que gestion_atenciones carga con status 200
         resp_atenciones = self.client.get(reverse('gestion_atenciones'))
@@ -835,6 +1045,3 @@ class SectorYTerritorioTests(TestCase):
         # Comprobar que gestion_sectores carga con status 200
         resp_sectores = self.client.get(reverse('gestion_sectores'))
         self.assertEqual(resp_sectores.status_code, 200)
-
-
-
