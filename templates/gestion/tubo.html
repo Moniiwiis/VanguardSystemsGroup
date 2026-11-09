@@ -1,0 +1,918 @@
+{% extends 'base.html' %}
+
+{% block title %}Tubo SGR de Trabajo — Ilustre Municipalidad de La Serena{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header de Módulo con colores del proyecto -->
+  <div class="bg-white p-6 sm:p-7 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
+    <div class="space-y-1">
+      <div class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+        <span>Gestión Territorial</span>
+        <span class="text-slate-300">/</span>
+        <span class="text-[#C41230]">Tubo SGR</span>
+      </div>
+      <h1 class="font-display text-xl sm:text-2xl font-extrabold text-[#8B1D19] flex items-center gap-2.5">
+        <i data-lucide="git-pull-request" class="w-6 h-6 text-[#C41230]"></i>
+        <span>Módulo: Tubo SGR de Trabajo Territorial</span>
+      </h1>
+      <p class="text-xs text-slate-500 max-w-2xl leading-relaxed">
+        Seguimiento de compromisos territoriales a futuro, estatus operativo y cumplimiento de plazos conforme a la Matriz SGR (Las Compañías, La Antena y territorios comunales). <em>"En el tubo va todo compromiso que sea a futuro".</em>
+      </p>
+    </div>
+
+    <!-- Panel de Acciones Superior -->
+    <div class="flex flex-wrap items-center gap-3 shrink-0">
+      {% if not es_admin and delegacion_activa %}
+        <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-red-50 text-[#C41230] border border-red-200/90 text-xs font-bold">
+          <i data-lucide="shield-check" class="w-4 h-4 text-[#C41230]"></i>
+          <span>Territorio: <strong>{{ delegacion_activa.nombre }}</strong></span>
+        </div>
+      {% endif %}
+
+      <a href="?export=excel&q={{ q }}&orden={{ orden }}&tab={{ tab }}{% if delegacion_seleccionada %}&delegacion={{ delegacion_seleccionada.id }}{% elif es_admin %}&delegacion=todas{% endif %}"
+         class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-slate-900 hover:bg-slate-800 text-white transition-all flex items-center gap-2 shadow-sm">
+        <i data-lucide="download" class="w-4 h-4"></i>
+        <span>Exportar Excel</span>
+      </a>
+
+      <a href="{% url 'gestion_atenciones' %}"
+         class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white shadow-md border border-red-700/50 transition-all flex items-center gap-2">
+        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+        <span>+ Nuevo Ingreso al Tubo</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Métricas Principales del Tubo SGR (Tarjetas Clickables que filtran automáticamente por Estado) -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+    <!-- Total en Tubo -->
+    <a href="?tab={{ tab }}&q={{ q }}&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="bg-white p-4 rounded-3xl border {% if not filtro_estado %}border-[#C41230] ring-2 ring-red-100 shadow-md{% else %}border-slate-200/90 hover:border-red-300 shadow-sm{% endif %} transition-all hover:shadow block group">
+      <div class="flex items-center justify-between">
+        <span class="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">Total Tubo</span>
+        <i data-lucide="layers" class="w-4 h-4 text-[#C41230] group-hover:scale-110 transition-transform"></i>
+      </div>
+      <span class="text-2xl font-black font-mono text-slate-900 block mt-1">{{ tubo_total_count }}</span>
+      <span class="text-[10px] text-slate-500 font-medium">Requerimientos</span>
+    </a>
+
+    <!-- Ingresados -->
+    <a href="?tab={{ tab }}&q={{ q }}&estado=Registrada&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="bg-white p-4 rounded-3xl border {% if filtro_estado == 'Registrada' %}border-blue-500 ring-2 ring-blue-100 shadow-md{% else %}border-blue-100 hover:border-blue-300 shadow-sm{% endif %} bg-blue-50/20 transition-all hover:shadow block group">
+      <div class="flex items-center justify-between">
+        <span class="text-[10px] font-extrabold text-blue-700 uppercase tracking-wider block">Ingresados</span>
+        <i data-lucide="inbox" class="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform"></i>
+      </div>
+      <span class="text-2xl font-black font-mono text-blue-800 block mt-1">{{ ingresados_count }}</span>
+      <span class="text-[10px] text-blue-600 font-medium">En espera inicial</span>
+    </a>
+
+    <!-- En Proceso -->
+    <a href="?tab={{ tab }}&q={{ q }}&estado=En+proceso&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="bg-white p-4 rounded-3xl border {% if filtro_estado == 'En proceso' %}border-amber-500 ring-2 ring-amber-100 shadow-md{% else %}border-amber-100 hover:border-amber-300 shadow-sm{% endif %} bg-amber-50/20 transition-all hover:shadow block group">
+      <div class="flex items-center justify-between">
+        <span class="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider block">En Proceso</span>
+        <i data-lucide="clock" class="w-4 h-4 text-amber-600 group-hover:scale-110 transition-transform"></i>
+      </div>
+      <span class="text-2xl font-black font-mono text-amber-800 block mt-1">{{ proceso_count }}</span>
+      <span class="text-[10px] text-amber-600 font-medium">Gestión activa</span>
+    </a>
+
+    <!-- Pendientes con Alerta del 10% -->
+    <a href="?tab={{ tab }}&q={{ q }}&estado=Pendiente&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="bg-white p-4 rounded-3xl border {% if filtro_estado == 'Pendiente' %}border-red-500 ring-2 ring-red-100 shadow-md{% elif alerta_pendientes_10 %}border-red-300 hover:border-red-400 bg-red-50/40{% else %}border-orange-100 hover:border-orange-300 bg-orange-50/20{% endif %} shadow-sm transition-all hover:shadow block group">
+      <div class="flex items-center justify-between">
+        <span class="text-[10px] font-extrabold text-red-700 uppercase tracking-wider">Pendientes</span>
+        {% if alerta_pendientes_10 %}
+          <span class="w-2 h-2 rounded-full bg-red-500 animate-ping" title="Supera el 10% tolerable"></span>
+        {% else %}
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-orange-500 group-hover:scale-110 transition-transform"></i>
+        {% endif %}
+      </div>
+      <span class="text-2xl font-black font-mono {% if alerta_pendientes_10 %}text-red-700{% else %}text-orange-800{% endif %} block mt-1">
+        {{ pendientes_count }}
+      </span>
+      <span class="text-[10px] {% if alerta_pendientes_10 %}text-red-600 font-extrabold{% else %}text-slate-500{% endif %}">
+        {{ pct_pendientes }}% {% if alerta_pendientes_10 %}⚠ &gt;10%{% else %}(meta &lt;10%){% endif %}
+      </span>
+    </a>
+
+    <!-- Realizados -->
+    <a href="?tab={{ tab }}&q={{ q }}&estado=Resuelta&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="bg-white p-4 rounded-3xl border {% if filtro_estado == 'Resuelta' %}border-emerald-500 ring-2 ring-emerald-100 shadow-md{% else %}border-emerald-100 hover:border-emerald-300 shadow-sm{% endif %} bg-emerald-50/20 transition-all hover:shadow block group">
+      <div class="flex items-center justify-between">
+        <span class="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider block">Realizados</span>
+        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform"></i>
+      </div>
+      <span class="text-2xl font-black font-mono text-emerald-800 block mt-1">{{ realizados_count }}</span>
+      <span class="text-[10px] text-emerald-600 font-medium">Finalizados</span>
+    </a>
+
+    <!-- % Realizado -->
+    <div class="bg-gradient-to-br from-[#8B1D19] to-[#C41230] p-4 rounded-3xl text-white shadow-sm space-y-1">
+      <span class="text-[10px] font-extrabold text-red-100 uppercase tracking-wider block">% Cumplimiento</span>
+      <span class="text-2xl font-black font-mono text-white block">{{ pct_realizado }}%</span>
+      <div class="w-full bg-black/20 h-1.5 rounded-full overflow-hidden mt-1">
+        <div class="bg-emerald-400 h-full rounded-full transition-all" style="width: {{ pct_realizado }}%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra de Pestañas: 1. Requerimientos en Tubo | 2. Resumen por Colaborador -->
+  <div class="flex items-center gap-2 border-b border-slate-200">
+    <a href="?tab=requerimientos{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_responsable %}&responsable={{ filtro_responsable }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="pb-3 px-4 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all {% if tab == 'requerimientos' %}border-[#C41230] text-[#C41230]{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+      <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+      <span>Requerimientos en Tubo</span>
+      <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold {% if tab == 'requerimientos' %}bg-red-50 text-[#C41230]{% else %}bg-slate-100 text-slate-600{% endif %}">
+        {{ tubo_total_count }}
+      </span>
+    </a>
+
+    <a href="?tab=colaboradores{% if q_colab %}&q_colab={{ q_colab }}{% endif %}{% if filtro_cumplimiento %}&cumplimiento={{ filtro_cumplimiento }}{% endif %}{% if orden_colab %}&orden_colab={{ orden_colab }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="pb-3 px-4 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all {% if tab == 'colaboradores' %}border-[#C41230] text-[#C41230]{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+      <i data-lucide="users" class="w-4 h-4"></i>
+      <span>Resumen por Colaborador</span>
+      <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold {% if tab == 'colaboradores' %}bg-red-50 text-[#C41230]{% else %}bg-slate-100 text-slate-600{% endif %}">
+        {{ colaboradores_total_count }}
+      </span>
+    </a>
+  </div>
+
+  <!-- PESTAÑA 1: Tabla Principal de Requerimientos en Tubo -->
+  {% if tab == 'requerimientos' %}
+  <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden space-y-0">
+
+    <!-- Encabezado y Filtros del Tubo -->
+    <div class="p-4 sm:p-5 bg-slate-50/70 border-b border-slate-200/80 space-y-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="font-extrabold text-sm uppercase tracking-wider text-slate-800 flex items-center gap-2">
+            <i data-lucide="list-filter" class="w-4 h-4 text-[#C41230]"></i>
+            <span>Seguimiento Territorial de Requerimientos</span>
+          </h2>
+          <p class="text-[11px] text-slate-400">Filtrado por delegación, responsable y estado del compromiso</p>
+        </div>
+
+        {% if filtro_estado or q or filtro_origen or filtro_responsable %}
+          <a href="?tab=requerimientos{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+             class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1 self-start sm:self-auto">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            <span>Limpiar todos los filtros</span>
+          </a>
+        {% endif %}
+      </div>
+
+      <!-- Barra de Filtros Activos -->
+      <form method="GET" action="" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-1">
+        <input type="hidden" name="tab" value="requerimientos">
+        
+        <!-- Búsqueda General -->
+        <div class="relative lg:col-span-2">
+          <input type="text" name="q" value="{{ q }}" placeholder="Buscar por N° Tubo, solicitante, descripción o apoyo..."
+                 class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-[#C41230] focus:outline-none bg-white">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+        </div>
+
+        <!-- Filtro Delegación (Admin) -->
+        {% if es_admin %}
+        <div>
+          <select name="delegacion" onchange="this.form.submit()"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-[#C41230] focus:outline-none bg-white">
+            <option value="todas">Delegación: Todas</option>
+            {% for d in todas_delegaciones %}
+              <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
+                {{ d.nombre }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+
+        <!-- Filtro Estado -->
+        <div>
+          <select name="estado" onchange="this.form.submit()"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-[#C41230] focus:outline-none bg-white">
+            <option value="">Estado: Todos</option>
+            <option value="Registrada" {% if filtro_estado == 'Registrada' %}selected{% endif %}>Ingresado (Registrada)</option>
+            <option value="En proceso" {% if filtro_estado == 'En proceso' %}selected{% endif %}>En Proceso</option>
+            <option value="Pendiente" {% if filtro_estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
+            <option value="Resuelta" {% if filtro_estado == 'Resuelta' %}selected{% endif %}>Realizado (Resuelta)</option>
+            <option value="Cancelada" {% if filtro_estado == 'Cancelada' %}selected{% endif %}>Cancelada</option>
+          </select>
+        </div>
+
+        <!-- Filtro Responsable -->
+        <div>
+          <select name="responsable" onchange="this.form.submit()"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-[#C41230] focus:outline-none bg-white">
+            <option value="">Responsable: Todos</option>
+            {% for resp in responsables_filtro %}
+              <option value="{{ resp.id }}" {% if filtro_responsable == resp.id|stringformat:"s" %}selected{% endif %}>
+                {{ resp.get_full_name|default:resp.username }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      </form>
+    </div>
+
+    <!-- Tabla del Tubo de Trabajo -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs text-slate-700">
+        <thead class="bg-slate-50 text-slate-700 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-3.5 whitespace-nowrap">N° Tubo</th>
+            <th class="py-3 px-3.5 whitespace-nowrap">Fecha Solicitud</th>
+            <th class="py-3 px-3.5">Solicitante</th>
+            <th class="py-3 px-3.5 whitespace-nowrap">Territorio</th>
+            <th class="py-3 px-3.5">Tipo / Sub Atención</th>
+            <th class="py-3 px-3.5 whitespace-nowrap">Evidencia SGR</th>
+            <th class="py-3 px-3.5">Responsable</th>
+            <th class="py-3 px-3.5 whitespace-nowrap">Fecha Compromiso</th>
+            <th class="py-3 px-3.5">Área de Apoyo</th>
+            <th class="py-3 px-3.5">Avance / Observaciones</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap">Estatus</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap sticky right-0 bg-slate-50 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 font-medium">
+          {% for at in atenciones_tubo %}
+          <tr class="hover:bg-slate-50/80 transition-colors">
+            <!-- N° Tubo -->
+            <td class="py-3 px-3.5 font-mono whitespace-nowrap">
+              <span class="font-extrabold text-[#C41230] block">{{ at.codigo_atencion }}</span>
+              <span class="text-[10px] font-bold text-slate-400">{{ at.origen|default:"EXT" }}</span>
+            </td>
+
+            <!-- Fecha Solicitud -->
+            <td class="py-3 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+              {{ at.created_at|date:"d/m/Y" }}
+            </td>
+
+            <!-- Solicitante -->
+            <td class="py-3 px-3.5">
+              <div class="font-bold text-slate-900">{{ at.solicitante }}</div>
+              {% if at.telefono_contacto %}
+                <span class="text-[10px] text-slate-400 font-mono">{{ at.telefono_contacto }}</span>
+              {% endif %}
+            </td>
+
+            <!-- Territorio -->
+            <td class="py-3 px-3.5 text-[11px] whitespace-nowrap">
+              <span class="font-bold text-slate-800">{{ at.delegacion.nombre }}</span>
+              {% if at.vecino and at.vecino.territorio %}
+                <span class="text-[10px] text-slate-400 block font-normal">{{ at.vecino.territorio }}</span>
+              {% endif %}
+            </td>
+
+            <!-- Tipo / Sub Atención -->
+            <td class="py-3 px-3.5">
+              <span class="font-bold text-slate-800 block leading-tight">{{ at.tipo_atencion.nombre }}</span>
+              <span class="text-slate-400 block text-[10px] mt-0.5">{{ at.sub_atencion.nombre }}</span>
+            </td>
+
+            <!-- Evidencia SGR -->
+            <td class="py-3 px-3.5 whitespace-nowrap">
+              <span class="font-mono font-bold text-slate-800 text-[11px] block leading-tight">{{ at.get_evidencia_codigo }}</span>
+              {% if at.actividad %}
+                <div id="evidencias-atencion-{{ at.id }}" class="flex flex-col text-[10px]">
+                  {% for evidencia in at.actividad.evidencias.all %}
+                    <div class="evidence-item flex items-center gap-1.5" data-momento="{{ evidencia.momento }}">
+                      <span class="text-slate-500">{{ evidencia.get_momento_display }}:</span>
+                      {% if evidencia.imagen %}
+                        <a href="{{ evidencia.imagen.url }}" target="_blank" rel="noopener" class="text-[#C41230] hover:underline font-semibold">Ver imagen</a>
+                      {% endif %}
+                      {% if evidencia.archivo %}
+                        <a href="{{ evidencia.archivo.url }}" target="_blank" rel="noopener" class="text-[#C41230] hover:underline font-semibold">Ver archivo</a>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+
+              {% if at.estado_evidencia == 'Aprobado' %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Aprobada
+                </span>
+              {% elif at.estado_evidencia == 'Rechazado' %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-extrabold bg-red-50 text-red-700 border border-red-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Rechazada
+                </span>
+              {% else %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Pendiente
+                </span>
+              {% endif %}
+            </td>
+
+            <!-- Responsable -->
+            <td class="py-3 px-3.5 text-[11px] whitespace-nowrap">
+              <div class="font-bold text-slate-900 flex items-center gap-1">
+                <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#C41230]"></i>
+                <span>{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username }}</span>
+              </div>
+              <div class="text-[10px] text-slate-400">{{ at.responsable_rol }}</div>
+            </td>
+
+            <!-- Fecha Compromiso -->
+            <td class="py-3 px-3.5 font-mono text-[11px] whitespace-nowrap">
+              {% if at.fecha_compromiso %}
+                <span class="font-bold text-slate-900">{{ at.fecha_compromiso|date:"d/m/Y" }}</span>
+              {% else %}
+                <span class="text-slate-400 italic">Por definir</span>
+              {% endif %}
+            </td>
+
+            <!-- Área de Apoyo -->
+            <td class="py-3 px-3.5 text-[11px] font-semibold text-slate-700">
+              {{ at.area_apoyo|default:"—" }}
+            </td>
+
+            <!-- Avance / Observaciones -->
+            <td class="py-3 px-3.5 max-w-[240px]">
+              <div class="desc-roll text-slate-600 text-[11px]">
+                {{ at.avance_observaciones|default:"Sin observaciones registradas" }}
+              </div>
+            </td>
+
+            <!-- Estatus -->
+            <td class="py-3 px-3.5 text-center whitespace-nowrap">
+              {% if at.estado == 'Resuelta' or at.estado == 'Realizado' %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> REALIZADO
+                </span>
+              {% elif at.estado == 'En proceso' %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> EN PROCESO
+                </span>
+              {% elif at.estado == 'Pendiente' %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-red-50 text-red-700 border border-red-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> PENDIENTE
+                </span>
+              {% else %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> INGRESADO
+                </span>
+              {% endif %}
+            </td>
+
+            <!-- Acciones Idénticas a Atenciones -->
+            <td class="py-3 px-3.5 text-center whitespace-nowrap sticky right-0 bg-white shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
+              <div class="flex items-center justify-center gap-1">
+                <button type="button"
+                        onclick="verDetalleAtencion('{{ at.id }}', '{{ at.codigo_atencion|escapejs }}', '{{ at.solicitante|escapejs }}', '{{ at.delegacion.nombre|escapejs }}', '{{ at.tipo_atencion.nombre|escapejs }}', '{{ at.sub_atencion.nombre|escapejs }}', '{{ at.descripcion|escapejs }}', '{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username|escapejs }}', '{% if at.creado_por %}{{ at.creado_por.get_full_name|default:at.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ at.created_at|date:'d/m/Y H:i' }}', '{{ at.estado|escapejs }}', '{{ at.get_evidencia_codigo|escapejs }}', '{{ at.estado_evidencia|escapejs }}', '{{ at.usuario_responsable_id }}', '{{ at.responsable_rol|escapejs }}', '{{ at.delegacion_id }}', '{{ at.va_a_tubo|yesno:'1,0' }}', '{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}', '{{ at.area_apoyo|default:''|escapejs }}', '{{ at.avance_observaciones|default:''|escapejs }}')"
+                        title="Ver ficha completa y evidencias"
+                        class="p-1.5 rounded-lg text-slate-500 hover:text-[#C41230] hover:bg-red-50 transition-all inline-flex items-center justify-center">
+                  <i data-lucide="eye" class="w-4 h-4"></i>
+                </button>
+                {% if not permisos.es_consultor %}
+                  {% if at.estado != 'Cancelada' %}
+                    <button type="button"
+                            onclick="verDetalleAtencion('{{ at.id }}', '{{ at.codigo_atencion|escapejs }}', '{{ at.solicitante|escapejs }}', '{{ at.delegacion.nombre|escapejs }}', '{{ at.tipo_atencion.nombre|escapejs }}', '{{ at.sub_atencion.nombre|escapejs }}', '{{ at.descripcion|escapejs }}', '{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username|escapejs }}', '{% if at.creado_por %}{{ at.creado_por.get_full_name|default:at.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ at.created_at|date:'d/m/Y H:i' }}', '{{ at.estado|escapejs }}', '{{ at.get_evidencia_codigo|escapejs }}', '{{ at.estado_evidencia|escapejs }}', '{{ at.usuario_responsable_id }}', '{{ at.responsable_rol|escapejs }}', '{{ at.delegacion_id }}', '{{ at.va_a_tubo|yesno:'1,0' }}', '{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}', '{{ at.area_apoyo|default:''|escapejs }}', '{{ at.avance_observaciones|default:''|escapejs }}'); activarEdicionAtencion()"
+                            title="Editar requerimiento en Tubo"
+                            class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all inline-flex items-center justify-center">
+                      <i data-lucide="edit-3" class="w-4 h-4"></i>
+                    </button>
+                  {% endif %}
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="12" class="p-10 text-center text-slate-400">
+              <i data-lucide="inbox" class="w-10 h-10 mx-auto mb-2 text-slate-300"></i>
+              <p class="font-extrabold text-slate-700 text-sm">No hay requerimientos en el Tubo SGR</p>
+              <p class="text-xs text-slate-400 mt-1">Los requerimientos con compromisos territoriales a futuro se visualizan en este tablero.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% include "gestion/includes/paginator.html" with total_registros=tubo_total_count %}
+  </div>
+  {% endif %}
+
+  <!-- PESTAÑA 2: Resumen Completo por Colaborador con Búsqueda, Filtros y Paginador -->
+  {% if tab == 'colaboradores' %}
+  <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden space-y-0">
+    <div class="p-4 sm:p-5 bg-slate-50/70 border-b border-slate-200/80 space-y-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="font-extrabold text-sm uppercase tracking-wider text-slate-800 flex items-center gap-2">
+            <i data-lucide="users" class="w-4 h-4 text-[#C41230]"></i>
+            <span>Matriz de Desempeño por Colaborador Territorial</span>
+          </h2>
+          <p class="text-[11px] text-slate-400">Distribución de compromisos asignados, pendientes y nivel de cumplimiento por funcionario</p>
+        </div>
+
+        {% if q_colab or filtro_cumplimiento or orden_colab != '-total' %}
+          <a href="?tab=colaboradores{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+             class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1 self-start sm:self-auto">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            <span>Limpiar filtros</span>
+          </a>
+        {% endif %}
+      </div>
+
+      <!-- Filtros de Colaboradores -->
+      <form method="GET" action="" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+        <input type="hidden" name="tab" value="colaboradores">
+        {% if delegacion_seleccionada and es_admin %}
+          <input type="hidden" name="delegacion" value="{{ delegacion_seleccionada.id }}">
+        {% endif %}
+
+        <!-- Búsqueda por Nombre o Cargo -->
+        <div class="relative lg:col-span-2">
+          <input type="text" name="q_colab" value="{{ q_colab }}" placeholder="Buscar por nombre, usuario, cargo o delegación..."
+                 class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-[#C41230] focus:outline-none bg-white">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+        </div>
+
+        <!-- Filtro por Nivel de Cumplimiento -->
+        <div>
+          <select name="cumplimiento" onchange="this.form.submit()"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-[#C41230] focus:outline-none bg-white">
+            <option value="">Nivel de Cumplimiento: Todos</option>
+            <option value="optimo" {% if filtro_cumplimiento == 'optimo' %}selected{% endif %}>Óptimo (≥ 80%)</option>
+            <option value="medio" {% if filtro_cumplimiento == 'medio' %}selected{% endif %}>Medio (50% - 79%)</option>
+            <option value="bajo" {% if filtro_cumplimiento == 'bajo' %}selected{% endif %}>Bajo (&lt; 50%)</option>
+            <option value="con_pendientes" {% if filtro_cumplimiento == 'con_pendientes' %}selected{% endif %}>Con compromisos pendientes</option>
+          </select>
+        </div>
+
+        <!-- Ordenamiento -->
+        <div>
+          <select name="orden_colab" onchange="this.form.submit()"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-[#C41230] focus:outline-none bg-white">
+            <option value="-total" {% if orden_colab == '-total' %}selected{% endif %}>Ordenar: Más Asignados</option>
+            <option value="total" {% if orden_colab == 'total' %}selected{% endif %}>Ordenar: Menos Asignados</option>
+            <option value="-realizados" {% if orden_colab == '-realizados' %}selected{% endif %}>Ordenar: Más Realizados</option>
+            <option value="-pct" {% if orden_colab == '-pct' %}selected{% endif %}>Ordenar: Mayor % Cumplimiento</option>
+            <option value="nombre" {% if orden_colab == 'nombre' %}selected{% endif %}>Ordenar: Nombre A-Z</option>
+          </select>
+        </div>
+      </form>
+    </div>
+
+    <!-- Tabla de Colaboradores -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs text-slate-700">
+        <thead class="bg-slate-50 text-slate-700 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-3.5">Colaborador / Funcionario</th>
+            <th class="py-3 px-3.5">Cargo / Rol</th>
+            <th class="py-3 px-3.5 whitespace-nowrap">Territorio</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap">Total Tubo</th>
+            <th class="py-3 px-3.5 text-center text-blue-700 whitespace-nowrap">Ingresados</th>
+            <th class="py-3 px-3.5 text-center text-amber-700 whitespace-nowrap">En Proceso</th>
+            <th class="py-3 px-3.5 text-center text-red-700 whitespace-nowrap">Pendientes</th>
+            <th class="py-3 px-3.5 text-center text-emerald-700 whitespace-nowrap">Realizados</th>
+            <th class="py-3 px-3.5 text-center font-black whitespace-nowrap">% Cumplimiento</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap">Acción</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 font-medium">
+          {% for c in resumen_colaboradores %}
+          <tr class="hover:bg-slate-50/80 transition-colors">
+            <td class="py-3 px-3.5 font-bold text-slate-900">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#C41230]"></span>
+                <span>{{ c.nombre }}</span>
+              </div>
+              <span class="text-[10px] text-slate-400 font-mono ml-4.5">{{ c.username }}</span>
+            </td>
+            <td class="py-3 px-3.5 text-slate-600 font-semibold">{{ c.cargo }}</td>
+            <td class="py-3 px-3.5 text-slate-600 whitespace-nowrap">{{ c.delegacion_nombre|default:"Comunal" }}</td>
+            <td class="py-3 px-3.5 text-center font-mono font-bold text-slate-900 text-sm">{{ c.total }}</td>
+            <td class="py-3 px-3.5 text-center font-mono font-semibold text-blue-700">{{ c.ingresados }}</td>
+            <td class="py-3 px-3.5 text-center font-mono font-bold text-amber-700">{{ c.en_proceso }}</td>
+            <td class="py-3 px-3.5 text-center font-mono font-bold {% if c.pendientes > 0 %}text-red-700 bg-red-50/60 rounded-xl{% else %}text-slate-400{% endif %}">
+              {{ c.pendientes }}
+            </td>
+            <td class="py-3 px-3.5 text-center font-mono font-bold text-emerald-700">{{ c.realizados }}</td>
+            <td class="py-3 px-3.5 text-center font-mono">
+              <span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-extrabold {% if c.pct_realizado >= 80 %}bg-emerald-100 text-emerald-800 border border-emerald-200{% elif c.pct_realizado >= 50 %}bg-amber-100 text-amber-800 border border-amber-200{% else %}bg-red-100 text-red-800 border border-red-200{% endif %}">
+                {{ c.pct_realizado }}%
+              </span>
+            </td>
+            <td class="py-3 px-3.5 text-center whitespace-nowrap">
+              <a href="?tab=requerimientos&responsable={{ c.user_id }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+                 class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-[#C41230] hover:text-white text-slate-700 transition-all inline-flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                <span>Ver Requerimientos</span>
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="10" class="p-8 text-center text-slate-400">
+              <i data-lucide="user-x" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+              <p class="font-bold text-slate-700 text-xs">No se encontraron colaboradores con los filtros seleccionados.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Paginador de Colaboradores -->
+    {% if page_obj_colab.paginator.num_pages > 1 %}
+    <div class="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 font-bold bg-slate-50/50">
+      <span>Página {{ page_obj_colab.number }} de {{ page_obj_colab.paginator.num_pages }} ({{ colaboradores_total_count }} colaboradores)</span>
+      <div class="flex items-center gap-1">
+        {% if page_obj_colab.has_previous %}
+          <a href="?tab=colaboradores&page_colab={{ page_obj_colab.previous_page_number }}{% if q_colab %}&q_colab={{ q_colab }}{% endif %}{% if filtro_cumplimiento %}&cumplimiento={{ filtro_cumplimiento }}{% endif %}{% if orden_colab %}&orden_colab={{ orden_colab }}{% endif %}"
+             class="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100">Anterior</a>
+        {% endif %}
+        {% if page_obj_colab.has_next %}
+          <a href="?tab=colaboradores&page_colab={{ page_obj_colab.next_page_number }}{% if q_colab %}&q_colab={{ q_colab }}{% endif %}{% if filtro_cumplimiento %}&cumplimiento={{ filtro_cumplimiento }}{% endif %}{% if orden_colab %}&orden_colab={{ orden_colab }}{% endif %}"
+             class="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100">Siguiente</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Modal Ver Detalle de Atención y Edición Bidireccional con Tubo SGR (Idéntico a Atenciones) -->
+<div id="modal-detalle-atencion" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] overflow-y-auto space-y-4">
+    <!-- Encabezado Modal -->
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div>
+        <span id="at-cod" class="font-mono text-xs font-extrabold text-[#C41230] bg-red-50 px-2.5 py-1 rounded-lg"></span>
+        <h3 class="text-base font-extrabold text-slate-900 mt-1">Ficha de Atención y Tubo Territorial</h3>
+      </div>
+      <div class="flex items-center gap-2">
+        {% if not permisos.es_consultor %}
+        <button type="button" id="at-btn-editar" onclick="activarEdicionAtencion()"
+                class="px-3.5 py-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold flex items-center gap-1.5 transition-all">
+          <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+          <span>Editar Requerimiento</span>
+        </button>
+        {% endif %}
+        <button type="button" onclick="document.getElementById('modal-detalle-atencion').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-2xl leading-none">&times;</button>
+      </div>
+    </div>
+
+    <!-- Vista Modo Lectura -->
+    <div id="at-detalle-lectura" class="space-y-3.5 text-xs">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200/80">
+        <div>
+          <span class="font-bold text-slate-500 block text-[11px]">Vecino solicitante:</span>
+          <span id="at-solicitante" class="font-extrabold text-slate-900 text-sm"></span>
+        </div>
+        <div>
+          <span class="font-bold text-slate-500 block text-[11px]">Delegación:</span>
+          <span id="at-del" class="font-bold text-slate-800"></span>
+        </div>
+        <div>
+          <span class="font-bold text-slate-500 block text-[11px]">Tipo de Atención:</span>
+          <span id="at-tipo" class="font-bold text-slate-800"></span>
+        </div>
+        <div>
+          <span class="font-bold text-slate-500 block text-[11px]">Sub Atención:</span>
+          <span id="at-sub" class="font-bold text-slate-800"></span>
+        </div>
+        <div>
+          <span class="font-bold text-slate-500 block text-[11px]">Representante Asignado:</span>
+          <span id="at-resp" class="font-bold text-slate-900"></span>
+        </div>
+        <div>
+          <span class="font-bold text-slate-500 block text-[11px]">Creado por:</span>
+          <span id="at-creador" class="font-semibold text-slate-700"></span>
+        </div>
+        <div>
+          <span class="font-bold text-slate-500 block text-[11px]">Fecha y Hora:</span>
+          <span id="at-fecha" class="text-slate-800 font-mono"></span>
+        </div>
+        <div>
+          <span class="font-bold text-slate-500 block text-[11px]">Estado Actual:</span>
+          <span id="at-estado-actual" class="font-extrabold px-2.5 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-800 border border-slate-200 inline-block mt-0.5"></span>
+        </div>
+      </div>
+
+      <!-- Descripción -->
+      <div class="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-1">
+        <span class="font-bold text-slate-500 block text-[11px]">Descripción de la Atención:</span>
+        <p id="at-desc-lectura" class="text-slate-700 text-xs font-normal whitespace-pre-line"></p>
+      </div>
+
+      <!-- Conexión Tubo SGR (Modo Lectura) -->
+      <div class="p-3.5 rounded-2xl bg-red-50/40 border border-red-100 space-y-2">
+        <div class="flex items-center justify-between border-b border-red-100 pb-1.5">
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="git-pull-request" class="w-3.5 h-3.5 text-[#C41230]"></i>
+            <span class="font-extrabold text-[#8B1D19] uppercase tracking-wider text-[11px]">Seguimiento Tubo de Trabajo SGR</span>
+          </div>
+          <span id="at-tubo-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold"></span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+          <div>
+            <span class="font-bold text-slate-500">Fecha de Compromiso:</span>
+            <span id="at-tubo-fecha" class="font-mono font-bold text-slate-800 ml-1"></span>
+          </div>
+          <div>
+            <span class="font-bold text-slate-500">Área o Persona de Apoyo:</span>
+            <span id="at-tubo-area" class="font-bold text-slate-800 ml-1"></span>
+          </div>
+        </div>
+        <div class="text-[11px] pt-1">
+          <span class="font-bold text-slate-500 block">Avance u Observaciones:</span>
+          <p id="at-tubo-avance" class="text-slate-700 font-normal mt-0.5 whitespace-pre-line"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Formulario de Edición Bidireccional (Atención <-> Tubo SGR) -->
+    {% if not permisos.es_consultor %}
+    <form id="form-editar-atencion" method="POST" action="" class="hidden space-y-4 rounded-3xl border border-blue-200 bg-blue-50/40 p-5 text-xs font-bold">
+      {% csrf_token %}
+      <div class="flex items-center justify-between border-b border-blue-200 pb-2">
+        <div class="flex items-center gap-2 text-blue-900">
+          <i data-lucide="edit" class="w-4 h-4 text-blue-600"></i>
+          <span class="font-extrabold text-sm">Modificar Atención y Sincronizar con Tubo SGR</span>
+        </div>
+        <span class="text-[10px] text-blue-700 font-medium">Los cambios se sincronizan en ambos módulos</span>
+      </div>
+
+      <div class="space-y-1">
+        <label for="at-edit-descripcion" class="block text-slate-700">Descripción de la atención <span class="text-[#C41230]">*</span></label>
+        <textarea id="at-edit-descripcion" name="descripcion" required rows="3" maxlength="500"
+                  class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="space-y-1">
+          <label for="at-edit-responsable" class="block text-slate-700">Encargado del trabajo <span class="text-[#C41230]">*</span></label>
+          <select id="at-edit-responsable" name="responsable_id" required
+                  class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="">Selecciona encargado</option>
+            {% for encargado in encargados_edicion %}
+              <option value="{{ encargado.id }}" data-delegacion-id="{{ encargado.delegacion_id }}">
+                {{ encargado.label }} — {{ encargado.delegacion_nombre|default:'' }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="space-y-1">
+          <label for="at-edit-estado" class="block text-slate-700">Estado de la Atención y Tubo <span class="text-[#C41230]">*</span></label>
+          <select id="at-edit-estado" name="estado" required
+                  class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="Registrada">Registrada (Ingresada)</option>
+            <option value="En proceso">En proceso (En gestión territorial)</option>
+            <option value="Pendiente">Pendiente (A la espera de insumos o respuesta)</option>
+            <option value="Resuelta">Resuelta (Compromiso completado)</option>
+            <option value="Cancelada">Cancelada</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Sección Tubo de Trabajo en Edición -->
+      <div class="p-3.5 rounded-2xl bg-white border border-blue-200 space-y-3">
+        <div class="flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-1.5">
+          <i data-lucide="git-pull-request" class="w-4 h-4 text-[#C41230]"></i>
+          <span class="font-extrabold text-xs">Parámetros del Tubo de Trabajo SGR</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="space-y-1">
+            <label for="at-edit-vatubo" class="block text-slate-700 text-[11px]">¿Gestionar en Tubo?</label>
+            <select id="at-edit-vatubo" name="va_a_tubo"
+                    class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+              <option value="true">Sí (En Tubo de Trabajo)</option>
+              <option value="false">No (Registro Regular)</option>
+            </select>
+          </div>
+          <div class="space-y-1">
+            <label for="at-edit-fechacomp" class="block text-slate-700 text-[11px]">Fecha de Compromiso</label>
+            <input type="date" id="at-edit-fechacomp" name="fecha_compromiso"
+                   class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-medium focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          </div>
+          <div class="space-y-1">
+            <label for="at-edit-areaapoyo" class="block text-slate-700 text-[11px]">Área de Apoyo</label>
+            <input type="text" id="at-edit-areaapoyo" name="area_apoyo" maxlength="100" placeholder="Ej: DISERCO, Cuadrilla OOCC..."
+                   class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          </div>
+        </div>
+        <div class="space-y-1">
+          <label for="at-edit-avanceobs" class="block text-slate-700 text-[11px]">Avance u Observaciones Territoriales</label>
+          <textarea id="at-edit-avanceobs" name="avance_observaciones" rows="2" maxlength="1000"
+                    placeholder="Registra avances, acuerdos de cuadrilla o coordinaciones..."
+                    class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 border-t border-blue-200 pt-3">
+        <button type="button" onclick="cancelarEdicionAtencion()"
+                class="rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-700 border border-slate-300 hover:bg-slate-50 transition-all">
+          Cancelar
+        </button>
+        <button type="submit"
+                class="rounded-xl bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] px-5 py-2 text-xs font-extrabold text-white shadow-md transition-all flex items-center gap-2">
+          <i data-lucide="save" class="w-4 h-4"></i>
+          <span>Guardar Cambios</span>
+        </button>
+      </div>
+    </form>
+    {% endif %}
+
+    <!-- Evidencia Territorial SGR Disponible para Revisar / Aprobar -->
+    <div class="p-4 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-2.5 text-xs">
+      <div class="flex items-center justify-between">
+        <span class="font-extrabold text-slate-900 flex items-center gap-1.5">
+          <i data-lucide="file-check" class="w-4 h-4 text-[#C41230]"></i>
+          Evidencia de Respaldo Territorial (SGR)
+        </span>
+        <span id="at-evi-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800"></span>
+      </div>
+      <div class="flex items-center justify-between text-[11px] pt-0.5">
+        <span class="text-slate-500 font-bold">Código de Evidencia:</span>
+        <span id="at-evi-cod" class="font-mono font-extrabold text-[#C41230]"></span>
+      </div>
+      <div class="flex items-center justify-between text-[11px]">
+        <span class="text-slate-500 font-bold">Archivos de Respaldo:</span>
+        <span class="text-slate-700 font-semibold">Fotografías antes y después del trabajo</span>
+      </div>
+      <div id="at-evidencias-lista" class="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
+        <p class="text-xs text-slate-500">No hay evidencias adjuntas.</p>
+      </div>
+    </div>
+
+    <!-- Pie del Modal -->
+    <div class="flex justify-end pt-2 border-t border-slate-100">
+      <button type="button" onclick="document.getElementById('modal-detalle-atencion').classList.add('hidden')" 
+              class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
+        Cerrar
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Modal Ver Detalle y Gestión de Estado y Evidencia (con Tubo SGR)
+  function verDetalleAtencion(id, cod, sol, del, tipo, sub, desc, resp, creador, fecha, estado, eviCod, eviEstado, responsableId, responsableRol, delegacionId, vaTubo, fechaComp, areaApoyo, avanceObs) {
+    cancelarEdicionAtencion();
+    const codEl = document.getElementById('at-cod');
+    if (codEl) codEl.textContent = cod;
+    const solEl = document.getElementById('at-solicitante');
+    if (solEl) solEl.textContent = sol;
+    const delEl = document.getElementById('at-del');
+    if (delEl) delEl.textContent = del;
+    const tipoEl = document.getElementById('at-tipo');
+    if (tipoEl) tipoEl.textContent = tipo;
+    const subEl = document.getElementById('at-sub');
+    if (subEl) subEl.textContent = sub;
+    const descReadonly = document.getElementById('at-desc-lectura');
+    if (descReadonly) descReadonly.textContent = desc || 'Sin descripción registrada';
+    const respEl = document.getElementById('at-resp');
+    if (respEl) respEl.textContent = responsableRol ? `${resp} · ${responsableRol}` : resp;
+    const creadorEl = document.getElementById('at-creador');
+    if (creadorEl) creadorEl.textContent = creador || 'No registrado';
+    const fechaEl = document.getElementById('at-fecha');
+    if (fechaEl) fechaEl.textContent = fecha;
+
+    const estadoEl = document.getElementById('at-estado-actual');
+    if (estadoEl) estadoEl.textContent = estado;
+
+    // Datos Tubo SGR en Modo Lectura
+    const isTubo = (vaTubo === '1' || vaTubo === 'true' || vaTubo === true);
+    const tuboBadge = document.getElementById('at-tubo-badge');
+    if (tuboBadge) {
+      if (isTubo) {
+        tuboBadge.textContent = 'En Tubo de Trabajo';
+        tuboBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-[#C41230] border border-red-200';
+      } else {
+        tuboBadge.textContent = 'Registro Regular';
+        tuboBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-600 border border-slate-200';
+      }
+    }
+    const tuboFecha = document.getElementById('at-tubo-fecha');
+    if (tuboFecha) tuboFecha.textContent = fechaComp || 'Sin fecha de compromiso';
+    const tuboArea = document.getElementById('at-tubo-area');
+    if (tuboArea) tuboArea.textContent = areaApoyo || 'Sin área asignada';
+    const tuboAvance = document.getElementById('at-tubo-avance');
+    if (tuboAvance) tuboAvance.textContent = avanceObs || 'Sin observaciones registradas';
+
+    // Formulario de edición
+    const formEditar = document.getElementById('form-editar-atencion');
+    const editButton = document.getElementById('at-btn-editar');
+    const descInput = document.getElementById('at-edit-descripcion');
+    const responsableSelect = document.getElementById('at-edit-responsable');
+    const estadoSelect = document.getElementById('at-edit-estado');
+    const vaTuboSelect = document.getElementById('at-edit-vatubo');
+    const fechaCompInput = document.getElementById('at-edit-fechacomp');
+    const areaApoyoInput = document.getElementById('at-edit-areaapoyo');
+    const avanceObsInput = document.getElementById('at-edit-avanceobs');
+
+    if (formEditar) {
+      formEditar.action = `/gestion/atenciones/${id}/editar/`;
+      formEditar.dataset.delegacionId = delegacionId || '';
+      formEditar.dataset.responsableId = responsableId || '';
+      formEditar.dataset.solicitante = sol || '';
+
+      if (descInput) descInput.value = desc || '';
+      if (estadoSelect) estadoSelect.value = estado || 'Registrada';
+      if (vaTuboSelect) vaTuboSelect.value = isTubo ? 'true' : 'false';
+      if (fechaCompInput) fechaCompInput.value = fechaComp || '';
+      if (areaApoyoInput) areaApoyoInput.value = areaApoyo || '';
+      if (avanceObsInput) avanceObsInput.value = avanceObs || '';
+
+      if (responsableSelect) {
+        const existing = Array.from(responsableSelect.options).some(option => option.value === responsableId);
+        if (responsableId && !existing) {
+          const currentOption = new Option(
+            `${resp} · ${responsableRol || 'Sin rol registrado'} (actual)`,
+            responsableId
+          );
+          currentOption.dataset.delegacionId = delegacionId || '';
+          responsableSelect.add(currentOption);
+        }
+        Array.from(responsableSelect.options).forEach((option) => {
+          if (option.value) option.hidden = option.dataset.delegacionId !== delegacionId;
+        });
+        responsableSelect.value = responsableId || '';
+      }
+      if (editButton) editButton.classList.toggle('hidden', estado === 'Cancelada');
+    }
+
+    // Evidencias SGR
+    const eviCodEl = document.getElementById('at-evi-cod');
+    if (eviCodEl) eviCodEl.textContent = eviCod || 'EVI-GENERADA';
+
+    const eviBadge = document.getElementById('at-evi-badge');
+    if (eviBadge) {
+      eviBadge.textContent = eviEstado || 'Pendiente';
+      if (eviEstado === 'Aprobado') {
+        eviBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200';
+      } else if (eviEstado === 'Rechazado') {
+        eviBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-800 border border-red-200';
+      } else {
+        eviBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200';
+      }
+    }
+
+    const evidenceSource = document.getElementById(`evidencias-atencion-${id}`);
+    const evidenceTarget = document.getElementById('at-evidencias-lista');
+    if (evidenceTarget) {
+      evidenceTarget.replaceChildren();
+      if (evidenceSource && evidenceSource.children.length) {
+        Array.from(evidenceSource.children).forEach((item) => {
+          evidenceTarget.appendChild(item.cloneNode(true));
+        });
+      } else {
+        const empty = document.createElement('p');
+        empty.className = 'text-xs text-slate-500';
+        empty.textContent = 'No hay evidencias adjuntas.';
+        evidenceTarget.appendChild(empty);
+      }
+    }
+
+    document.getElementById('modal-detalle-atencion').classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+  }
+
+  function activarEdicionAtencion() {
+    const form = document.getElementById('form-editar-atencion');
+    const lectura = document.getElementById('at-detalle-lectura');
+    const btnEditar = document.getElementById('at-btn-editar');
+    if (form) form.classList.remove('hidden');
+    if (lectura) lectura.classList.add('hidden');
+    if (btnEditar) btnEditar.classList.add('hidden');
+    if (window.lucide) lucide.createIcons();
+  }
+
+  function cancelarEdicionAtencion() {
+    const form = document.getElementById('form-editar-atencion');
+    const lectura = document.getElementById('at-detalle-lectura');
+    const btnEditar = document.getElementById('at-btn-editar');
+    if (form) form.classList.add('hidden');
+    if (lectura) lectura.classList.remove('hidden');
+    if (btnEditar) btnEditar.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      const modal = document.getElementById('modal-detalle-atencion');
+      if (modal && !modal.classList.contains('hidden')) {
+        modal.classList.add('hidden');
+      }
+    }
+  });
+
+  document.addEventListener('click', function(e) {
+    const modal = document.getElementById('modal-detalle-atencion');
+    if (modal && e.target === modal) {
+      modal.classList.add('hidden');
+    }
+  });
+</script>
+{% endblock %}

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from core import views
@@ -16,6 +16,14 @@ urlpatterns = [
     path('validar-codigo/', views.validar_codigo_view, name='validar_codigo'),
     path('nueva-contrasena/', views.nueva_contrasena_view, name='nueva_contrasena'),
     path('cambiar-contrasena-inicial/', views.cambiar_contrasena_inicial_view, name='cambiar_contrasena_inicial'),
+    path('perfil/', views.perfil_usuario, name='perfil_usuario'),
+
+    # Portal Ciudadano / Cliente (Evaluación Sumativa 3)
+    path('portal-cliente/', views.portal_cliente, name='portal_cliente'),
+    path('portal-cliente/atenciones/<int:atencion_id>/', views.portal_cliente_detalle, name='portal_cliente_detalle'),
+
+    # WebSocket Real-Time Chat & Monitoring
+    path('chat/', include('websocket.urls')),
 
     # Contexto y APIs
     path('gestion/cambiar-delegacion/<int:del_id>/', views.cambiar_delegacion_view, name='cambiar_delegacion'),
@@ -77,7 +85,12 @@ urlpatterns = [
     path('gestion/vecinos/<int:vecino_id>/editar/', views.gestion_vecinos_editar, name='gestion_vecinos_editar'),
     path('gestion/vecinos/<int:vecino_id>/eliminar/', views.gestion_vecinos_eliminar, name='gestion_vecinos_eliminar'),
 
-    # 10. Sectores / Territorios CRUD
+    # 10. Organizaciones Comunitarias / JJVV (Coherencia Excel JJVV)
+    path('gestion/organizaciones/', views.gestion_organizaciones, name='gestion_organizaciones'),
+    path('gestion/organizaciones/<int:org_id>/editar/', views.gestion_organizaciones_editar, name='gestion_organizaciones_editar'),
+    path('gestion/organizaciones/<int:org_id>/eliminar/', views.gestion_organizaciones_eliminar, name='gestion_organizaciones_eliminar'),
+
+    # 11. Sectores / Territorios CRUD
     path('gestion/sectores/', views.gestion_sectores, name='gestion_sectores'),
     path('gestion/sectores/<int:sector_id>/editar/', views.gestion_sectores_editar, name='gestion_sectores_editar'),
     path('gestion/sectores/<int:sector_id>/eliminar/', views.gestion_sectores_eliminar, name='gestion_sectores_eliminar'),
@@ -100,7 +113,18 @@ urlpatterns = [
     path('gestion/configuracion/<int:meta_id>/eliminar/', views.gestion_configuracion_eliminar, name='gestion_configuracion_eliminar'),
 
     path('gestion/reportes/', views.gestion_reportes, name='gestion_reportes'),
+    path('gestion/reportes/ajustes/', views.gestion_ajuste_desempenio, name='gestion_ajuste_desempenio'),
+
+    # 15. Módulo Tubo SGR de Trabajo (Matriz Excel)
+    path('gestion/tubo/', views.gestion_tubo, name='gestion_tubo'),
+    path('gestion/tubo/<int:atencion_id>/cambiar-estado/', views.gestion_tubo_cambiar_estado, name='gestion_tubo_cambiar_estado'),
 ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Custom Error Handlers (Evaluación Sumativa 3)
+handler400 = 'core.views.error_400'
+handler403 = 'core.views.error_403'
+handler404 = 'core.views.error_404'
+handler500 = 'core.views.error_500'

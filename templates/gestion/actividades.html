@@ -59,6 +59,16 @@
           {% endfor %}
         </select>
       </div>
+      <!-- Tipo de Registro -->
+      <div>
+        <label class="block text-slate-700 mb-1">Tipo de Registro *</label>
+        <select name="tipo_registro" required class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-semibold text-slate-700">
+          <option value="accion" selected>Acción realizada</option>
+          <option value="coordinacion">Coordinación / Gestión interna</option>
+          <option value="felicitacion">Felicitación / Reconocimiento</option>
+          <option value="otro">Otra gestión</option>
+        </select>
+      </div>
       <div>
         <label class="block text-slate-700 mb-1">Descripción de la Solicitud / Problema *</label>
         <textarea name="descripcion_solicitud" required rows="2" placeholder="Describe la solicitud" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal"></textarea>
@@ -67,14 +77,22 @@
         <label class="block text-slate-700 mb-1">Acción Ejecutada en Terreno *</label>
         <textarea name="accion_ejecutada" required rows="2" placeholder="Describe la acción realizada" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal"></textarea>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label class="block text-slate-700 mb-1">Contacto Nombre</label>
-          <input type="text" name="contacto_nombre" placeholder="Nombre de contacto" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+      <!-- Datos del usuario atendido -->
+      <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+        <div class="text-[11px] text-slate-500 font-medium flex items-center gap-1">
+          <i data-lucide="info" class="w-3.5 h-3.5 text-[#C41230]"></i>
+          <span>Información de contacto del solicitante / usuario</span>
         </div>
-        <div>
-          <label class="block text-slate-700 mb-1">Contacto Teléfono</label>
-          <input type="text" name="contacto_telefono" placeholder="Teléfono de contacto" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-700 mb-1">Nombre Solicitante / Contacto *</label>
+            <input type="text" name="contacto_nombre" placeholder="Nombre completo del usuario" class="w-full p-2.5 rounded-xl border border-slate-200 bg-white focus:border-[#C41230] outline-none font-normal" />
+          </div>
+          <div>
+            <label class="block text-slate-700 mb-1">Teléfono Solicitante / Contacto *</label>
+            <input type="text" name="contacto_telefono" maxlength="15" placeholder="+56 9 1234 5678" class="w-full p-2.5 rounded-xl border border-slate-200 bg-white focus:border-[#C41230] outline-none font-mono" />
+            <div class="tel-feedback"></div>
+          </div>
         </div>
       </div>
       <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
@@ -118,7 +136,12 @@
         <tbody class="divide-y divide-slate-100">
           {% for act in actividades %}
           <tr class="hover:bg-red-50/30 transition-colors">
-            <td class="p-4 font-mono font-bold text-[#C41230]">{{ act.codigo_evidencia_unico }}</td>
+            <td class="p-4">
+              <span class="font-mono font-bold text-[#C41230] block">{{ act.codigo_evidencia_unico }}</span>
+              <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[9px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                {{ act.get_tipo_registro_display }}
+              </span>
+            </td>
             <td class="p-4">{{ act.fecha_actividad|date:"d/m/Y" }}</td>
             <td class="p-4 font-bold text-slate-900">{{ act.funcionario }}</td>
             <td class="p-4">{{ act.item }}</td>
@@ -189,6 +212,15 @@
                       <label class="block text-slate-700 mb-1">Contacto Teléfono</label>
                       <input type="text" name="contacto_telefono" value="{{ act.contacto_telefono|default:'' }}" class="w-full p-2.5 rounded-xl border border-slate-200" />
                     </div>
+                  </div>
+                  <div>
+                    <label class="block text-slate-700 mb-1">Tipo de Registro</label>
+                    <select name="tipo_registro" class="w-full p-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700">
+                      <option value="accion" {% if act.tipo_registro == 'accion' %}selected{% endif %}>Acción realizada</option>
+                      <option value="coordinacion" {% if act.tipo_registro == 'coordinacion' %}selected{% endif %}>Coordinación interna</option>
+                      <option value="felicitacion" {% if act.tipo_registro == 'felicitacion' %}selected{% endif %}>Felicitación / Reconocimiento</option>
+                      <option value="otro" {% if act.tipo_registro == 'otro' %}selected{% endif %}>Otra gestión</option>
+                    </select>
                   </div>
                   <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
                     <button type="button" onclick="document.getElementById('modal-edit-act-{{ act.id }}').close()" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-600">Cancelar</button>

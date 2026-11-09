@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Analítica e Informes — Ilustre Municipalidad de La Serena{% endblock %}
+{% block title %}Analítica, Semáforos e Informes — Ilustre Municipalidad de La Serena{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -14,7 +14,7 @@
         <span class="text-[#C41230]">Analítica</span>
       </div>
       <h1 class="font-display text-xl sm:text-2xl font-extrabold text-[#8B1D19]">
-        Módulo: Analítica e Informes de Desempeño
+        Módulo: Analítica, Semáforos e Informes de Desempeño
       </h1>
       <p class="text-xs text-slate-500 max-w-xl">
         {% if es_admin %}
@@ -25,7 +25,7 @@
       </p>
     </div>
 
-    <!-- Panel de Acciones Superior -->
+    <!-- Panel de Acciones Superior con colores corporativos del proyecto -->
     <div class="flex flex-wrap items-center gap-3 shrink-0">
       {% if not es_admin and delegacion_activa %}
         <!-- Indicador de Contexto Territorial Fijo para Delegado / Coordinador -->
@@ -36,10 +36,43 @@
       {% endif %}
 
       <a href="?export=excel&q={{ q }}&orden={{ orden }}{% if delegacion_seleccionada %}&delegacion={{ delegacion_seleccionada.id }}{% elif es_admin %}&delegacion=todas{% endif %}"
-         class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-[#C41230] text-white hover:bg-[#8B1D19] transition-all flex items-center gap-2 shadow-sm">
+         class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-slate-900 hover:bg-slate-800 text-white transition-all flex items-center gap-2 shadow-sm">
         <i data-lucide="download" class="w-4 h-4"></i>
         <span>Exportar Excel</span>
       </a>
+
+      <!-- Botón de Ajuste de Metas con colores institucionales -->
+      <button type="button" onclick="abrirModalAjuste()"
+              class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white shadow-md border border-red-700/50 transition-all flex items-center gap-2 cursor-pointer"
+              title="Ajustar metas por vacaciones, días administrativos o licencias médicas">
+        <i data-lucide="calendar-plus" class="w-4 h-4 text-amber-200"></i>
+        <span>+ Ajuste Meta (Días Libres / Licencias)</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Banner Destacado: Puntaje de Equipo SGR -->
+  <div class="bg-gradient-to-r from-red-950 via-[#8B1D19] to-[#C41230] text-white p-6 sm:p-7 rounded-3xl shadow-lg border border-red-900 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+    <div class="space-y-2 max-w-2xl">
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-white/20 text-white backdrop-blur-sm border border-white/20">
+        <i data-lucide="users" class="w-3.5 h-3.5"></i>
+        <span>Tubo SGR · Visión Colectiva de Equipo</span>
+      </div>
+      <h2 class="text-lg sm:text-xl font-black tracking-tight text-white">Puntaje SGR del Equipo Territorial</h2>
+      <p class="text-xs text-white/90 leading-relaxed font-medium">
+        Los puntajes se evalúan a nivel de equipo: juntos suman de manera equilibrada y sinérgica. El avance colectivo refleja la coordinación integral de la delegación.
+      </p>
+    </div>
+
+    <div class="flex items-center gap-4 bg-white/10 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/20 shrink-0 w-full sm:w-auto justify-between sm:justify-start">
+      <div class="text-left sm:text-right">
+        <span class="block text-[10px] text-white/80 font-bold uppercase tracking-wider">Score Ponderado de Equipo</span>
+        <span class="block text-3xl font-black font-mono text-white">{{ puntaje_equipo_total|default:"0.0" }} pts</span>
+        <span class="block text-[11px] text-emerald-300 font-extrabold">Efectividad Global: {{ pct_equipo_global|default:"0.0" }}%</span>
+      </div>
+      <div class="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white shrink-0">
+        <i data-lucide="trophy" class="w-6 h-6"></i>
+      </div>
     </div>
   </div>
 
@@ -142,7 +175,7 @@
             Metas y Desempeño Territorial — {{ delegacion_activa.nombre }}
           {% endif %}
         </h3>
-        <p class="text-[11px] text-slate-500 mt-0.5">Indicadores evaluados con evidencias auditables</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">Indicadores evaluados con evidencias auditables y topes SGR</p>
       </div>
       <span class="text-[11px] font-bold text-slate-500 bg-white/80 px-3 py-1 rounded-xl border border-red-100 self-start sm:self-auto">Total: {{ total_metas }} metas</span>
     </div>
@@ -225,10 +258,27 @@
                 <span class="italic text-slate-400">Global Cargo</span>
               {% endif %}
             </td>
-            <td class="p-4 text-center font-mono font-bold">{{ m.valor_objetivo }}</td>
+            <td class="p-4 text-center font-mono">
+              <span class="font-bold text-slate-900 block">{{ m.valor_objetivo }}</span>
+              {% if m.total_ajuste_desempenio > 0 %}
+                <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200" title="Ajustado por días libres o licencias autorizados">
+                  Obj. ajustado: {{ m.valor_objetivo_ajustado }} (-{{ m.total_ajuste_desempenio }}%)
+                </span>
+              {% endif %}
+            </td>
             <td class="p-4 text-center font-bold text-[#C41230]">{{ m.ponderacion }}%</td>
-            <td class="p-4 text-center font-bold text-slate-800">{{ m.porcentaje_cumplimiento }}%</td>
-            <td class="p-4 text-center font-extrabold text-slate-900 font-mono">{{ m.cumplimiento_ponderado }}%</td>
+            <td class="p-4 text-center">
+              <span class="font-bold text-slate-900 block">{{ m.porcentaje_cumplimiento }}%</span>
+              {% if m.porcentaje_cumplimiento >= 120 %}
+                <span class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-purple-100 text-purple-800" title="Tope máximo 120% alcanzado">Tope 120%</span>
+              {% endif %}
+            </td>
+            <td class="p-4 text-center font-extrabold text-slate-900 font-mono">
+              {{ m.cumplimiento_ponderado }}%
+              {% if m.porcentaje_cumplimiento >= 120 %}
+                <span class="text-[9px] text-purple-700 block font-normal">(con tope)</span>
+              {% endif %}
+            </td>
             <td class="p-4 text-center">
               {% if m.estado_semaforo == 'VERDE' %}
                 <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 inline-flex items-center gap-1">
@@ -270,5 +320,179 @@
     {% include "gestion/includes/paginator.html" with total_registros=total_metas %}
   </div>
 
+  <!-- Sección: Registro y Auditoría de Ajustes de Metas por el Delegado -->
+  <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm p-6 space-y-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+          <i data-lucide="calendar-check" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="font-extrabold text-slate-900 text-sm">Ajustes de Desempeño Autorizados en Semáforo</h3>
+          <p class="text-[11px] text-slate-500">Días libres, vacaciones, días administrativos y licencias médicas ingresados por el Delegado</p>
+        </div>
+      </div>
+      <button type="button" onclick="abrirModalAjuste()"
+              class="px-4 py-2 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-2 self-start sm:self-auto cursor-pointer">
+        <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+        <span>Ingresar Nuevo Ajuste</span>
+      </button>
+    </div>
+
+    {% if ajustes_desempenio %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-600">
+          <thead class="bg-slate-50 text-slate-700 font-extrabold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+            <tr>
+              <th class="py-2.5 px-3">Funcionario</th>
+              <th class="py-2.5 px-3">Período</th>
+              <th class="py-2.5 px-3">Concepto</th>
+              <th class="py-2.5 px-3 text-center">% Ajuste</th>
+              <th class="py-2.5 px-3">Motivo / Justificación</th>
+              <th class="py-2.5 px-3">Autorizado por</th>
+              <th class="py-2.5 px-3 text-center">Fecha</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for aj in ajustes_desempenio %}
+            <tr class="hover:bg-slate-50/60">
+              <td class="py-2.5 px-3 font-bold text-slate-900">{{ aj.funcionario }}</td>
+              <td class="py-2.5 px-3">{{ aj.periodo }}</td>
+              <td class="py-2.5 px-3">
+                <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                  {{ aj.concepto }}
+                </span>
+              </td>
+              <td class="py-2.5 px-3 text-center font-mono font-bold text-blue-700">-{{ aj.valor_porcentaje }}%</td>
+              <td class="py-2.5 px-3 text-slate-600">{{ aj.motivo }}</td>
+              <td class="py-2.5 px-3 text-slate-700 font-medium">{{ aj.autorizador }}</td>
+              <td class="py-2.5 px-3 text-center font-mono text-[10px] text-slate-400">{{ aj.created_at|date:"d/m/Y" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="p-6 text-center text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+        <i data-lucide="calendar" class="w-6 h-6 mx-auto mb-1 text-slate-300"></i>
+        <p class="text-xs font-semibold text-slate-600">No hay ajustes de desempeño registrados en este ámbito</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">El Delegado puede registrar ajustes por vacaciones, licencias o días libres cuando corresponda.</p>
+      </div>
+    {% endif %}
+  </div>
+
 </div>
+
+<!-- Modal para que el Delegado ingrese Ajuste de Desempeño -->
+<div id="modal-ajuste-desempenio" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-red-100 w-full max-w-lg space-y-4 text-xs font-bold text-left">
+    <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-xl bg-red-50 text-[#C41230] flex items-center justify-center">
+          <i data-lucide="calendar-plus" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <h3 class="font-display font-extrabold text-base text-[#8B1D19]">Ajuste de Metas en Semáforo</h3>
+          <p class="text-[10px] text-slate-400 font-normal">Ajuste de metas por días libres, vacaciones o licencias médicas</p>
+        </div>
+      </div>
+      <button type="button" onclick="cerrarModalAjuste()" class="text-slate-400 hover:text-slate-600 font-bold text-2xl leading-none">&times;</button>
+    </div>
+
+    <form method="POST" action="{% url 'gestion_ajuste_desempenio' %}" class="space-y-3.5">
+      {% csrf_token %}
+      <div class="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 font-medium">
+        ℹ Los días libres, de vacaciones, días administrativos y licencias deben ser ingresados por el delegado en la pestaña de semáforo para el ajuste equitativo de las metas.
+      </div>
+
+      <div class="space-y-1">
+        <label class="block text-slate-700 font-bold">Funcionario a Ajustar <span class="text-[#C41230]">*</span></label>
+        <select name="funcionario_id" required class="w-full px-3 py-2 rounded-xl border border-slate-300 font-normal text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+          <option value="">-- Seleccionar Funcionario --</option>
+          {% for f in funcionarios_ajuste %}
+            <option value="{{ f.id }}">{{ f.user.get_full_name|default:f.user.username }} ({{ f.cargo.nombre_cargo }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="space-y-1">
+        <label class="block text-slate-700 font-bold">Período de Medición <span class="text-[#C41230]">*</span></label>
+        <select name="periodo_id" required class="w-full px-3 py-2 rounded-xl border border-slate-300 font-normal text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+          {% for p in periodos_ajuste %}
+            <option value="{{ p.id }}">{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="space-y-1">
+          <label class="block text-slate-700 font-bold">Concepto de Ajuste <span class="text-[#C41230]">*</span></label>
+          <select name="concepto" required class="w-full px-3 py-2 rounded-xl border border-slate-300 font-normal text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="Vacaciones">Vacaciones</option>
+            <option value="Días Administrativos">Días Administrativos</option>
+            <option value="Licencia Médica">Licencia Médica</option>
+            <option value="Días Libres">Días Libres / Compensatorios</option>
+            <option value="Comisión de Servicio">Comisión de Servicio</option>
+          </select>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-slate-700 font-bold">% Reducción de Meta <span class="text-[#C41230]">*</span></label>
+          <input type="number" step="0.5" min="1" max="50" name="valor_porcentaje" value="5.0" required
+                 class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono font-bold text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <span class="text-[10px] text-slate-400 font-normal">Porcentaje deducible del objetivo</span>
+        </div>
+      </div>
+
+      <div class="space-y-1">
+        <label class="block text-slate-700 font-bold">Motivo / Respaldo Formal <span class="text-[#C41230]">*</span></label>
+        <textarea name="motivo" required rows="2" placeholder="Detalle formal de la resolución, licencia o autorización del delegado"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-300 font-normal text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+        <button type="button" onclick="cerrarModalAjuste()"
+                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
+          Cancelar
+        </button>
+        <button type="submit"
+                class="px-5 py-2 bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center gap-2">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span>Guardar Ajuste</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function abrirModalAjuste() {
+    const m = document.getElementById('modal-ajuste-desempenio');
+    if (m) {
+      m.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+
+  function cerrarModalAjuste() {
+    const m = document.getElementById('modal-ajuste-desempenio');
+    if (m) {
+      m.classList.add('hidden');
+    }
+  }
+
+  // Cerrar modal al hacer clic en el fondo oscuro
+  document.addEventListener('click', function(e) {
+    const m = document.getElementById('modal-ajuste-desempenio');
+    if (m && e.target === m) {
+      cerrarModalAjuste();
+    }
+  });
+
+  // Cerrar con Escape
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      cerrarModalAjuste();
+    }
+  });
+</script>
 {% endblock %}

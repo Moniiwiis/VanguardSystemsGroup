@@ -109,8 +109,8 @@
               <span class="font-bold text-slate-900 block leading-tight">{{ v.nombre }}</span>
               <span class="font-mono text-slate-500 font-bold text-[11px] block mt-0.5">{{ v.rut }}</span>
             </td>
-            <td class="py-3.5 px-4">
-              <span class="text-slate-700 block leading-tight">{{ v.direccion|default:"—" }}</span>
+            <td class="py-3.5 px-4 min-w-[160px] max-w-[240px]">
+              <div class="desc-roll text-slate-700 leading-tight">{{ v.direccion|default:"—" }}</div>
               {% if v.telefono %}
                 <span class="font-mono text-slate-500 text-[11px] block mt-0.5">{{ v.telefono }}</span>
               {% endif %}
@@ -206,22 +206,24 @@
       {% csrf_token %}
       <div class="sm:col-span-2">
         <label class="block text-xs font-bold text-slate-700 mb-1">Nombre Completo <span class="text-[#C41230]">*</span></label>
-        <input type="text" name="nombre" required placeholder="Nombre y apellidos"
+        <input type="text" name="nombre" required maxlength="150" placeholder="Nombre y apellidos (máx 150 caracteres)"
                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
       </div>
       <div>
         <label class="block text-xs font-bold text-slate-700 mb-1">RUT <span class="text-[#C41230]">*</span></label>
-        <input type="text" name="rut" required placeholder="12.345.678-9" 
-               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        <input type="text" id="crear-vecino-rut" name="rut" required data-rut="true" maxlength="12" placeholder="Ej: 12.345.678-5" 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
+        <div id="crear-vecino-rut_feedback" class="rut-feedback"></div>
       </div>
       <div>
         <label class="block text-xs font-bold text-slate-700 mb-1">Teléfono</label>
-        <input type="text" name="telefono" placeholder="+56 9 8765 4321" 
-               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        <input type="text" name="telefono" maxlength="15" placeholder="+56 9 8765 4321" 
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
+        <div class="tel-feedback"></div>
       </div>
       <div class="sm:col-span-2">
         <label class="block text-xs font-bold text-slate-700 mb-1">Dirección</label>
-        <input type="text" name="direccion" placeholder="Calle y número"
+        <input type="text" name="direccion" maxlength="200" placeholder="Calle, pasaje y número (máx 200 caracteres)"
                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
       </div>
 
@@ -289,22 +291,26 @@
       {% csrf_token %}
       <div class="sm:col-span-2">
         <label class="block text-xs font-bold text-slate-700 mb-1">Nombre Completo <span class="text-[#C41230]">*</span></label>
-        <input type="text" id="edit-vecino-nombre" name="nombre" required 
+        <input type="text" id="edit-vecino-nombre" name="nombre" required maxlength="150"
+               placeholder="Nombre y apellidos (máx 150 caracteres)"
                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
       </div>
       <div>
         <label class="block text-xs font-bold text-slate-700 mb-1">RUT <span class="text-[#C41230]">*</span></label>
-        <input type="text" id="edit-vecino-rut" name="rut" required 
-               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        <input type="text" id="edit-vecino-rut" name="rut" required data-rut="true" maxlength="12"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
+        <div id="edit-vecino-rut_feedback" class="rut-feedback"></div>
       </div>
       <div>
         <label class="block text-xs font-bold text-slate-700 mb-1">Teléfono</label>
-        <input type="text" id="edit-vecino-telefono" name="telefono" 
-               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        <input type="text" id="edit-vecino-telefono" name="telefono" maxlength="15" placeholder="+56 9 8765 4321"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
+        <div class="tel-feedback"></div>
       </div>
       <div class="sm:col-span-2">
         <label class="block text-xs font-bold text-slate-700 mb-1">Dirección</label>
-        <input type="text" id="edit-vecino-direccion" name="direccion" 
+        <input type="text" id="edit-vecino-direccion" name="direccion" maxlength="200"
+               placeholder="Calle, pasaje y número (máx 200 caracteres)"
                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
       </div>
 
@@ -510,5 +516,49 @@
     document.getElementById('edit-vecino-estado').value = estado;
     document.getElementById('modal-editar-vecino').classList.remove('hidden');
   }
+
+  // WebSocket Live Sync para módulo Vecinos
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const wsUrl = wsProtocol + window.location.host + '/ws/crud/vecinos/';
+  let vecinosSocket = null;
+
+  function connectVecinosWS() {
+    try {
+      vecinosSocket = new WebSocket(wsUrl);
+      vecinosSocket.onmessage = function(e) {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === 'module_changed' && data.module === 'vecinos') {
+            const toast = Swal.mixin({
+              toast: true,
+              position: 'top-end',
+              showConfirmButton: false,
+              timer: 3000,
+              timerProgressBar: true
+            });
+            toast.fire({
+              icon: 'info',
+              title: `Vecino actualizado: ${data.action}`
+            });
+            // Recargar tabla silenciosamente sin F5
+            fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+              .then(res => res.text())
+              .then(html => {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const newTbody = doc.querySelector('tbody');
+                const curTbody = document.querySelector('tbody');
+                if (newTbody && curTbody) curTbody.innerHTML = newTbody.innerHTML;
+                if (window.lucide) lucide.createIcons();
+              });
+          }
+        } catch(err) {}
+      };
+      vecinosSocket.onclose = () => setTimeout(connectVecinosWS, 4000);
+    } catch(e) {}
+  }
+
+  document.addEventListener("DOMContentLoaded", function() {
+    connectVecinosWS();
+  });
 </script>
 {% endblock %}
