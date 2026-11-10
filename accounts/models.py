@@ -52,6 +52,13 @@ class Funcionario(BaseModel):
     cargo = models.ForeignKey(Cargo, on_delete=models.RESTRICT)
     estado = models.CharField(max_length=20, default='Activo')
     debe_cambiar_contrasena = models.BooleanField(default=False)
+    foto = models.ImageField(upload_to='perfiles/', null=True, blank=True)
+    telefono = models.CharField(max_length=20, null=True, blank=True, verbose_name='Teléfono de contacto')
+
+    def get_foto_url(self):
+        if self.foto and hasattr(self.foto, 'url'):
+            return self.foto.url
+        return None
 
     def __str__(self):
         return f"{self.user.username} - {self.identificador_institucional}"

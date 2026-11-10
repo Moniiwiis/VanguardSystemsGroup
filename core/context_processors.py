@@ -51,11 +51,12 @@ def global_context(request):
         can_switch = False
 
     # Permisos por rol para visualización de menús y acceso (Página 10 del documento)
-    # Roles definidos: Administrador, Coordinador, Delegado Municipal, Operador/Funcionario, Consultor
+    # Roles definidos: Administrador, Coordinador, Delegado Municipal, Operador/Funcionario, Consultor, Cliente
     es_coordinador = es_admin or ('coordinador' in rol_name.lower())
     es_delegado = es_admin or ('delegado' in rol_name.lower())
     es_operador = ('operador' in rol_name.lower()) or ('funcionario' in rol_name.lower())
     es_consultor = ('consultor' in rol_name.lower())
+    es_cliente = ('cliente' in rol_name.lower())
 
     permisos = {
         'es_admin': es_admin,
@@ -63,21 +64,24 @@ def global_context(request):
         'es_delegado': es_delegado,
         'es_operador': es_operador,
         'es_consultor': es_consultor,
-        'puede_ingresar_atencion': not es_consultor,
-        'puede_cambiar_estado_atencion': not es_consultor,
+        'es_cliente': es_cliente,
+        'puede_ingresar_atencion': not (es_consultor or es_cliente),
+        'puede_cambiar_estado_atencion': not (es_consultor or es_cliente),
         # Módulos permitidos en el menú lateral:
-        'ver_inicio': True,
+        'ver_inicio': not es_cliente,
         'ver_delegaciones': es_admin,
         'ver_roles': es_admin,
         'ver_usuarios': es_admin or es_delegado,
         'ver_metas': es_admin or es_coordinador,
         'ver_tipo_atencion': es_admin or es_coordinador,
         'ver_sub_atencion': es_admin or es_coordinador,
-        'ver_atenciones': True, # Todos pueden acceder al flujo de atenciones
+        'ver_atenciones': not es_cliente,
+        'ver_organizaciones': es_admin or es_coordinador or es_delegado or es_operador,
         'ver_tipo_gestion': es_admin or es_coordinador,
         'ver_vecinos': es_admin or es_coordinador or es_delegado or es_operador,
         'ver_sectores': es_admin or es_coordinador or es_delegado or es_operador,
         'ver_reportes': es_admin or es_coordinador or es_delegado,
+        'ver_portal_cliente': es_cliente,
     }
 
     return {

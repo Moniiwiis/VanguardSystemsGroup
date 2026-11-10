@@ -20,10 +20,16 @@ from django.utils import timezone
 from django.http import JsonResponse, HttpResponseForbidden
 
 from core.context_processors import global_context
-from core.utils import export_to_excel_csv, build_accent_query
-from activities.models import (
-    Actividad, Evidencia, ValidacionEvidencia, TipoGestion, Vecino, AtencionCiudadana
+from core.utils import (
+    export_to_excel_csv, export_to_excel_xlsx, build_accent_query,
+    validar_rut, formatear_rut, validar_largo, validar_telefono_chileno,
+    formatear_telefono_chileno, validar_imagen_subida
 )
+from activities.models import (
+    Actividad, Evidencia, ValidacionEvidencia, TipoGestion, Vecino,
+    AtencionCiudadana, OrganizacionComunitaria
+)
+from websocket.services import publish_module_changed
 from agenda.models import CompromisoAgenda
 from configuration.models import (
     ConfiguracionMeta, Periodo, ItemMedicion, CatalogoActividad,
@@ -1471,6 +1477,29 @@ def gestion_atenciones(request):
         vecino_id = request.POST.get('vecino_id')
         responsable_id = request.POST.get('responsable_id')
 
+        # Campos adicionales coherentes con matriz SGR (Tubo de trabajo)
+        origen = request.POST.get('origen', 'EXT').strip().upper()
+        area_apoyo = request.POST.get('area_apoyo', '').strip()
+        fecha_compromiso_str = request.POST.get('fecha_compromiso', '').strip()
+        avance_observaciones = request.POST.get('avance_observaciones', '').strip()
+        telefono_contacto = request.POST.get('telefono_contacto', '').strip()
+
+        # Validaciones de límite de caracteres en servidor (Poner límite de caracteres en todo)
+        ok, err = validar_largo(solicitante, 150, "Solicitante")
+        if not ok: messages.error(request, err); return redirect('gestion_atenciones')
+        ok, err = validar_largo(descripcion, 500, "Descripción")
+        if not ok: messages.error(request, err); return redirect('gestion_atenciones')
+        ok, err = validar_largo(area_apoyo, 100, "Área de apoyo")
+        if not ok: messages.error(request, err); return redirect('gestion_atenciones')
+        ok, err = validar_largo(avance_observaciones, 500, "Avance u observaciones")
+        if not ok: messages.error(request, err); return redirect('gestion_atenciones')
+        ok, err = validar_largo(telefono_contacto, 30, "Teléfono de contacto")
+        if not ok: messages.error(request, err); return redirect('gestion_atenciones')
+        if telefono_contacto:
+            ok, err = validar_telefono_chileno(telefono_contacto)
+            if not ok: messages.error(request, err); return redirect('gestion_atenciones')
+            telefono_contacto = formatear_telefono_chileno(telefono_contacto)
+
         # Manejo de nuevo vecino si se ingresaron los datos en el formulario
         nuevo_nombre = request.POST.get('nuevo_vecino_nombre', '').strip()
         nuevo_rut = request.POST.get('nuevo_vecino_rut', '').strip()
@@ -1483,6 +1512,22 @@ def gestion_atenciones(request):
             if not nuevo_nombre or not nuevo_rut:
                 messages.error(request, "Para registrar un nuevo vecino debe ingresar al menos el Nombre completo y el RUT.")
                 return redirect('gestion_atenciones')
+
+            # Validación matemática rigurosa de RUT chileno (Módulo 11)
+            rut_valido, rut_formateado_o_err = validar_rut(nuevo_rut)
+            if not rut_valido:
+                messages.error(request, f"RUT de nuevo vecino inválido: {rut_formateado_o_err}")
+                return redirect('gestion_atenciones')
+            nuevo_rut = rut_formateado_o_err
+
+            ok, err = validar_largo(nuevo_nombre, 150, "Nombre completo")
+            if not ok: messages.error(request, err); return redirect('gestion_atenciones')
+            ok, err = validar_largo(nuevo_dir, 200, "Dirección")
+            if not ok: messages.error(request, err); return redirect('gestion_atenciones')
+            ok, err = validar_telefono_chileno(nuevo_tel)
+            if not ok: messages.error(request, err); return redirect('gestion_atenciones')
+            if nuevo_tel:
+                nuevo_tel = formatear_telefono_chileno(nuevo_tel)
 
             sector_obj = None
             if nuevo_sec_id and nuevo_sec_id.isdigit():
@@ -1547,6 +1592,18 @@ def gestion_atenciones(request):
             if user_encontrado:
                 responsable_user = user_encontrado
 
+        from accounts.models import FuncionarioRol as _FR
+        func_resp = Funcionario.all_objects.filter(user=responsable_user).first()
+        es_delegado_resp = False
+        if func_resp:
+            fr_resp = _FR.objects.filter(funcionario=func_resp).select_related('rol').first()
+            if fr_resp and fr_resp.rol and 'delegado' in fr_resp.rol.nombre_rol.lower():
+                es_delegado_resp = True
+
+        tipo_registro_val = request.POST.get('tipo_registro', 'accion').strip()
+        if tipo_registro_val not in ('accion', 'coordinacion', 'felicitacion', 'otro'):
+            tipo_registro_val = 'accion' 
+
         if not solicitante or not tipo_id or not sub_id or not descripcion:
             messages.error(request, "Todos los campos marcados con (*) son obligatorios.")
         elif not del_activa:
@@ -1568,6 +1625,19 @@ def gestion_atenciones(request):
                 messages.warning(request, f"La atención ya fue ingresada previamente con el código {duplicado.codigo_atencion}.")
                 return redirect('gestion_atenciones')
 
+            fecha_comp = None
+            if fecha_compromiso_str:
+                try:
+                    fecha_comp = datetime.date.fromisoformat(fecha_compromiso_str)
+                except ValueError:
+                    pass
+
+
+
+            # Lógica del Tubo SGR (Excel Matriz): En el tubo va todo compromiso territorial a futuro
+            va_a_tubo_post = request.POST.get('va_a_tubo', '').strip().lower()
+            va_a_tubo_val = va_a_tubo_post in ['1', 'true', 'on', 'si', 's'] or bool(fecha_comp)
+
             atencion = AtencionCiudadana.objects.create(
                 solicitante=solicitante,
                 vecino=vecino_obj,
@@ -1575,13 +1645,34 @@ def gestion_atenciones(request):
                 tipo_atencion=tipo_obj,
                 sub_atencion=sub_obj,
                 descripcion=descripcion,
+                origen=origen if origen in ['INT', 'EXT'] else 'EXT',
+                area_apoyo=area_apoyo,
+                fecha_compromiso=fecha_comp,
+                avance_observaciones=avance_observaciones,
+                telefono_contacto=telefono_contacto or (vecino_obj.telefono if vecino_obj else ''),
                 usuario_responsable=responsable_user,
                 creado_por=request.user,
-                estado='Registrada'
+                estado='Registrada',
+                tipo_registro=tipo_registro_val,
+                va_a_tubo=va_a_tubo_val,
             )
+
+            # Notificación en tiempo real por WebSocket (Channels) tras commit en BD
+            del_id_ws = del_activa.id if del_activa else "global"
+            def notificar_ws_creacion():
+                publish_module_changed("atenciones", del_id_ws, "create", atencion.id)
+            transaction.on_commit(notificar_ws_creacion)
+
             # Notificación y confirmación de atención generada
             messages.success(request, f"¡Atención ingresada exitosamente! Identificador generado: {atencion.codigo_atencion}")
             return redirect('gestion_atenciones')
+
+    # Contador de atenciones del día
+    hoy_inicio_get = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    atenciones_hoy_count = AtencionCiudadana.objects.filter(
+        creado_por=request.user,
+        created_at__gte=hoy_inicio_get
+    ).count()
 
     q = request.GET.get('q', '').strip()
     filtro_tipo = request.GET.get('tipo', '').strip()
@@ -1649,27 +1740,38 @@ def gestion_atenciones(request):
     ]
     qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-created_at')
 
-    # Exportar a Excel
+    # Exportar a Excel (.xlsx) nativo
     if request.GET.get('export') == 'excel':
-        headers = ['Identificador', 'Solicitante', 'Delegación', 'Tipo de Atención', 'Sub Atención', 'Responsable / Asignado', 'Creado Por', 'Fecha y Hora', 'Estado Atención', 'Código Evidencia', 'Estado Evidencia']
+        headers = [
+            'N° Atención', 'Fecha Solicitud', 'Solicitante', 'Delegación',
+            'Tipo de Atención', 'Sub Atención', 'Origen (Int/Ext)', 'Área Apoyo',
+            'Fecha Compromiso', 'Descripción de la Solicitud', 'Avance u Observaciones',
+            'Responsable', 'Creado Por', 'Estado', 'Código Evidencia', 'Estado Evidencia'
+        ]
         rows = []
         for a in qs:
             creador_nombre = a.creado_por.get_full_name() or a.creado_por.username if a.creado_por else 'Sistema'
             resp_nombre = a.usuario_responsable.get_full_name() or a.usuario_responsable.username
+            f_comp = a.fecha_compromiso.strftime('%d/%m/%Y') if getattr(a, 'fecha_compromiso', None) else '—'
             rows.append([
                 a.codigo_atencion,
+                a.created_at.strftime('%d/%m/%Y %H:%M'),
                 a.solicitante,
                 a.delegacion.nombre,
                 a.tipo_atencion.nombre,
                 a.sub_atencion.nombre,
+                getattr(a, 'origen', 'EXT'),
+                getattr(a, 'area_apoyo', '') or '—',
+                f_comp,
+                a.descripcion,
+                getattr(a, 'avance_observaciones', '') or '—',
                 resp_nombre,
                 creador_nombre,
-                a.created_at.strftime('%d/%m/%Y %H:%M'),
                 a.estado,
                 a.get_evidencia_codigo(),
                 a.estado_evidencia()
             ])
-        return export_to_excel_csv("atenciones_ciudadanas", headers, rows)
+        return export_to_excel_xlsx("atenciones_ciudadanas_SGR", "Tubo de Trabajo", headers, rows)
 
     page_size = _get_page_size(request)
     paginator = Paginator(qs, page_size)
@@ -1776,6 +1878,13 @@ def gestion_atenciones(request):
         'total_resueltas': total_resueltas,
         'total_canceladas': total_canceladas,
         'total_general': total_general,
+        'atenciones_hoy_count': atenciones_hoy_count,
+        'tipo_registro_choices': [
+            ('accion', 'Acción realizada'),
+            ('coordinacion', 'Coordinación interna'),
+            ('felicitacion', 'Felicitación'),
+            ('otro', 'Otra gestión'),
+        ],
     })
 
 
@@ -1815,6 +1924,9 @@ def gestion_atenciones_editar(request, atencion_id):
     errores = []
     if not descripcion:
         errores.append("La descripción es obligatoria.")
+    ok, err = validar_largo(descripcion, 500, "Descripción")
+    if not ok:
+        errores.append(err)
     if not responsable:
         errores.append("Selecciona un encargado con una cuenta activa.")
     elif not funcionario_nuevo:
@@ -1831,8 +1943,38 @@ def gestion_atenciones_editar(request, atencion_id):
         'usuario_responsable': responsable,
         'updated_at': timezone.now(),
     }
+    # Sincronización completa con el Tubo SGR: estado, avance, compromiso y área de apoyo
+    nuevo_estado = request.POST.get('estado', '').strip()
+    if nuevo_estado in ['Registrada', 'En proceso', 'Pendiente', 'Resuelta', 'Cancelada']:
+        cambios_atencion['estado'] = nuevo_estado
+
+    if 'avance_observaciones' in request.POST:
+        cambios_atencion['avance_observaciones'] = request.POST.get('avance_observaciones', '').strip()[:1000]
+
+    if 'area_apoyo' in request.POST:
+        cambios_atencion['area_apoyo'] = request.POST.get('area_apoyo', '').strip()[:100]
+
+    if 'fecha_compromiso' in request.POST:
+        f_comp_str = request.POST.get('fecha_compromiso', '').strip()
+        if f_comp_str:
+            try:
+                cambios_atencion['fecha_compromiso'] = datetime.date.fromisoformat(f_comp_str)
+            except ValueError:
+                pass
+        else:
+            cambios_atencion['fecha_compromiso'] = None
+
+    if 'va_a_tubo' in request.POST:
+        va_tubo_val = request.POST.get('va_a_tubo', '').strip().lower() in ['1', 'true', 'on', 'si', 's']
+        cambios_atencion['va_a_tubo'] = va_tubo_val
+
     with transaction.atomic():
         AtencionCiudadana.all_objects.filter(id=atencion.id).update(**cambios_atencion)
+        if atencion.actividad_id:
+            cambios_act = {'updated_at': timezone.now()}
+            if 'va_a_tubo' in cambios_atencion:
+                cambios_act['va_a_tubo'] = cambios_atencion['va_a_tubo']
+            Actividad.objects.filter(id=atencion.actividad_id).update(**cambios_act)
         if (
             atencion.actividad
             and funcionario_anterior
@@ -1843,8 +1985,14 @@ def gestion_atenciones_editar(request, atencion_id):
                 updated_at=timezone.now(),
             )
 
+    # Notificación WebSocket en tiempo real
+    del_id_ws = atencion.delegacion_id if atencion.delegacion_id else "global"
+    def notificar_ws_edicion():
+        publish_module_changed("atenciones", del_id_ws, "update", atencion.id)
+    transaction.on_commit(notificar_ws_edicion)
+
     messages.success(request, f"Atención {atencion.codigo_atencion} actualizada exitosamente.")
-    return redirect('gestion_atenciones')
+    return redirect(request.META.get('HTTP_REFERER') or 'gestion_atenciones')
 
 
 @login_required
@@ -1862,11 +2010,17 @@ def gestion_atenciones_eliminar(request, atencion_id):
             return redirect('gestion_atenciones')
 
     codigo = atencion.codigo_atencion
+    del_id_ws = atencion.delegacion_id if atencion.delegacion_id else "global"
     now = timezone.now()
     AtencionCiudadana.all_objects.filter(id=atencion.id).update(
         deleted_at=now,
         updated_at=now,
     )
+
+    def notificar_ws_elim():
+        publish_module_changed("atenciones", del_id_ws, "delete", atencion_id)
+    transaction.on_commit(notificar_ws_elim)
+
     messages.success(
         request,
         f"Atención {codigo} eliminada del listado. Sus evidencias y registros asociados se conservaron.",
@@ -1898,6 +2052,12 @@ def gestion_atenciones_estado(request, atencion_id):
             anterior = atencion.estado
             atencion.estado = nuevo_estado
             atencion.save()
+
+            del_id_ws = atencion.delegacion_id if atencion.delegacion_id else "global"
+            def notificar_ws_estado():
+                publish_module_changed("atenciones", del_id_ws, "status_change", atencion.id)
+            transaction.on_commit(notificar_ws_estado)
+
             messages.success(request, f"¡Atención {atencion.codigo_atencion} actualizada exitosamente a '{nuevo_estado}'!")
         else:
             messages.error(request, "Estado no válido.")
@@ -2136,6 +2296,32 @@ def gestion_vecinos(request):
             messages.error(request, "Selecciona una delegación activa antes de registrar un vecino.")
             return redirect('gestion_vecinos')
 
+        if not nombre or not rut:
+            messages.error(request, "El nombre y RUT son obligatorios.")
+            return redirect('gestion_vecinos')
+
+        # Validación matemática rigurosa de RUT chileno (Módulo 11)
+        rut_ok, rut_fmt = validar_rut(rut)
+        if not rut_ok:
+            messages.error(request, f"RUT inválido: {rut_fmt}")
+            return redirect('gestion_vecinos')
+        rut = rut_fmt
+
+        # Validaciones de límites de caracteres (Poner límite de caracteres en todo)
+        ok, err = validar_largo(nombre, 150, "Nombre Completo")
+        if not ok: messages.error(request, err); return redirect('gestion_vecinos')
+        ok, err = validar_largo(direccion, 200, "Dirección")
+        if not ok: messages.error(request, err); return redirect('gestion_vecinos')
+        ok, err = validar_telefono_chileno(telefono)
+        if not ok: messages.error(request, err); return redirect('gestion_vecinos')
+        if telefono:
+            telefono = formatear_telefono_chileno(telefono)
+
+        # Control de unicidad de RUT en padrón
+        if Vecino.objects.filter(rut=rut).exists():
+            messages.error(request, f"El RUT {rut} ya se encuentra registrado en el padrón vecinal.")
+            return redirect('gestion_vecinos')
+
         # Los vecinos nuevos siempre se registran en el contexto territorial activo.
         del_obj = del_activa
 
@@ -2148,22 +2334,26 @@ def gestion_vecinos(request):
 
         territorio = sector_obj.nombre if sector_obj else (request.POST.get('territorio', '').strip() or (del_obj.nombre if del_obj else ''))
 
-        if nombre and rut:
-            Vecino.objects.create(
-                nombre=nombre,
-                rut=rut,
-                direccion=direccion,
-                telefono=telefono,
-                delegacion=del_obj,
-                sector=sector_obj,
-                territorio=territorio,
-                tipo_gestion_id=tipo_gestion_id if tipo_gestion_id else None,
-                estado=estado
-            )
-            messages.success(request, f"Vecino/a '{nombre}' registrado exitosamente en {del_obj.nombre if del_obj else 'el padrón'}.")
-            return redirect('gestion_vecinos')
-        else:
-            messages.error(request, "El nombre y RUT son obligatorios.")
+        nuevo_v = Vecino.objects.create(
+            nombre=nombre,
+            rut=rut,
+            direccion=direccion,
+            telefono=telefono,
+            delegacion=del_obj,
+            sector=sector_obj,
+            territorio=territorio,
+            tipo_gestion_id=tipo_gestion_id if tipo_gestion_id else None,
+            estado=estado
+        )
+
+        # Notificación WebSocket en tiempo real
+        del_id_ws = del_obj.id if del_obj else "global"
+        def notificar_ws_vecino():
+            publish_module_changed("vecinos", del_id_ws, "create", nuevo_v.id)
+        transaction.on_commit(notificar_ws_vecino)
+
+        messages.success(request, f"Vecino/a '{nombre}' ({rut}) registrado exitosamente en {del_obj.nombre if del_obj else 'el padrón'}.")
+        return redirect('gestion_vecinos')
 
     q = request.GET.get('q', '').strip()
     filtro_delegacion_raw = request.GET.get('delegacion')
@@ -2212,6 +2402,24 @@ def gestion_vecinos(request):
         ('delegacion__nombre', 'Delegación'),
     ]
     qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-id')
+
+    # Exportar a Excel (.xlsx) nativo
+    if request.GET.get('export') == 'excel':
+        headers = ['#', 'Nombre Completo', 'RUT', 'Dirección', 'Teléfono', 'Delegación', 'Sector / Territorio', 'Tipo de Gestión', 'Estado']
+        rows = []
+        for i, v in enumerate(qs, start=1):
+            rows.append([
+                i,
+                v.nombre,
+                v.rut,
+                v.direccion or '—',
+                v.telefono or '—',
+                v.delegacion.nombre if v.delegacion else 'Sin delegación',
+                v.territorio or '—',
+                v.tipo_gestion.nombre if v.tipo_gestion else 'Solicitud',
+                v.estado
+            ])
+        return export_to_excel_xlsx("padron_vecinos", "Padrón Vecinal", headers, rows)
 
     tipos_gestion = TipoGestion.objects.all()
     page_size = _get_page_size(request)
@@ -2285,10 +2493,35 @@ def gestion_vecinos_editar(request, vecino_id):
                 messages.error(request, "El sector seleccionado no pertenece a la delegación del vecino.")
                 return redirect('gestion_vecinos')
 
-        vecino.nombre = request.POST.get('nombre', vecino.nombre).strip()
-        vecino.rut = request.POST.get('rut', vecino.rut).strip()
-        vecino.direccion = request.POST.get('direccion', vecino.direccion).strip()
-        vecino.telefono = request.POST.get('telefono', vecino.telefono).strip()
+        nuevo_nombre = request.POST.get('nombre', vecino.nombre).strip()
+        nuevo_rut = request.POST.get('rut', vecino.rut).strip()
+        nueva_dir = request.POST.get('direccion', vecino.direccion).strip()
+        nuevo_tel = request.POST.get('telefono', vecino.telefono).strip()
+
+        # Validación matemática de RUT chileno (Módulo 11)
+        rut_ok, rut_fmt = validar_rut(nuevo_rut)
+        if not rut_ok:
+            messages.error(request, f"RUT inválido: {rut_fmt}")
+            return redirect('gestion_vecinos')
+
+        # Control de unicidad de RUT si cambió
+        if nuevo_rut != vecino.rut and Vecino.objects.filter(rut=rut_fmt).exclude(id=vecino.id).exists():
+            messages.error(request, f"El RUT {rut_fmt} ya pertenece a otro vecino.")
+            return redirect('gestion_vecinos')
+
+        ok, err = validar_largo(nuevo_nombre, 150, "Nombre Completo")
+        if not ok: messages.error(request, err); return redirect('gestion_vecinos')
+        ok, err = validar_largo(nueva_dir, 200, "Dirección")
+        if not ok: messages.error(request, err); return redirect('gestion_vecinos')
+        ok, err = validar_telefono_chileno(nuevo_tel)
+        if not ok: messages.error(request, err); return redirect('gestion_vecinos')
+        if nuevo_tel:
+            nuevo_tel = formatear_telefono_chileno(nuevo_tel)
+
+        vecino.nombre = nuevo_nombre
+        vecino.rut = rut_fmt
+        vecino.direccion = nueva_dir
+        vecino.telefono = nuevo_tel
         vecino.delegacion = del_obj
         if sec_obj:
             vecino.sector = sec_obj
@@ -2301,6 +2534,12 @@ def gestion_vecinos_editar(request, vecino_id):
         vecino.tipo_gestion_id = tg_id if tg_id else None
         vecino.estado = request.POST.get('estado', vecino.estado)
         vecino.save()
+
+        del_id_ws = del_obj.id if del_obj else "global"
+        def notificar_ws_edit():
+            publish_module_changed("vecinos", del_id_ws, "update", vecino.id)
+        transaction.on_commit(notificar_ws_edit)
+
         messages.success(request, f"Vecino/a '{vecino.nombre}' actualizado/a exitosamente.")
     return redirect('gestion_vecinos')
 
@@ -2324,7 +2563,13 @@ def gestion_vecinos_eliminar(request, vecino_id):
 
     if request.method == 'POST':
         nombre = vecino.nombre
+        del_id_ws = vecino.delegacion_id if vecino.delegacion_id else "global"
         vecino.delete()
+
+        def notificar_ws_del():
+            publish_module_changed("vecinos", del_id_ws, "delete", vecino_id)
+        transaction.on_commit(notificar_ws_del)
+
         messages.success(request, f"Vecino/a '{nombre}' eliminado/a.")
     return redirect('gestion_vecinos')
 
@@ -2536,15 +2781,30 @@ def gestion_actividades(request):
             messages.error(request, "La fecha de la actividad debe estar dentro del período seleccionado.")
             return redirect('gestion_actividades')
 
+        tipo_reg_act = request.POST.get('tipo_registro', 'accion').strip()
+        if tipo_reg_act not in ('accion', 'coordinacion', 'felicitacion', 'otro'):
+            tipo_reg_act = 'accion'
+
+        from accounts.models import FuncionarioRol as _FR_Act
+        es_del_act = False
+        fr_act = _FR_Act.objects.filter(funcionario=funcionario).select_related('rol').first()
+        if fr_act and fr_act.rol and 'delegado' in fr_act.rol.nombre_rol.lower():
+            es_del_act = True
+
+        contacto_nombre_act = request.POST.get('contacto_nombre', '').strip()
+        contacto_telefono_act = request.POST.get('contacto_telefono', '').strip()
+
         actividad = Actividad.objects.create(
             fecha_actividad=fecha_actividad,
             descripcion_solicitud=descripcion,
             accion_ejecutada=accion,
-            contacto_nombre=request.POST.get('contacto_nombre', '').strip(),
-            contacto_telefono=request.POST.get('contacto_telefono', '').strip(),
+            contacto_nombre=contacto_nombre_act,
+            contacto_telefono=contacto_telefono_act,
             funcionario=funcionario,
             item=item,
             periodo=periodo,
+            tipo_registro=tipo_reg_act,
+            es_gestion_delegado=es_del_act,
         )
         messages.success(request, f"Actividad '{actividad.codigo_evidencia_unico}' registrada correctamente.")
         return redirect('gestion_actividades')
@@ -2602,6 +2862,12 @@ def gestion_actividades(request):
         'funcionarios': funcionarios,
         'items': items,
         'periodos': periodos,
+        'tipo_registro_choices': [
+            ('accion', 'Acción realizada'),
+            ('coordinacion', 'Coordinación interna'),
+            ('felicitacion', 'Felicitación / Reconocimiento'),
+            ('otro', 'Otra gestión'),
+        ],
     })
 
 @login_required
@@ -2629,6 +2895,10 @@ def gestion_actividades_editar(request, actividad_id):
         actividad.contacto_telefono = request.POST.get(
             'contacto_telefono', actividad.contacto_telefono
         ).strip()
+        # Actualizar tipo_registro si viene en el formulario de edición
+        tipo_reg_edit = request.POST.get('tipo_registro', '').strip()
+        if tipo_reg_edit in ('accion', 'coordinacion', 'felicitacion', 'otro'):
+            actividad.tipo_registro = tipo_reg_edit
         actividad.save()
         messages.success(request, "Actividad actualizada correctamente.")
     return redirect('gestion_actividades')
@@ -2933,6 +3203,28 @@ def gestion_reportes(request):
     atenciones_proceso = atenciones_qs.filter(estado__iexact='En proceso').count()
     pct_resueltas = round((atenciones_resueltas / total_atenciones) * 100, 1) if total_atenciones > 0 else 0.0
 
+    # ── Puntaje de Equipo SGR (Visión colectiva equilibrada) ──
+    suma_cumplimiento_equipo = sum(m.cumplimiento_ponderado() for m in metas_list)
+    suma_ponderacion_equipo = sum(float(m.ponderacion or 0) for m in metas_list)
+    pct_equipo_global = round((suma_cumplimiento_equipo / suma_ponderacion_equipo * 100), 1) if suma_ponderacion_equipo > 0 else 0.0
+
+    # ── Ajustes de Desempeño cargados en el Semáforo por el Delegado ──
+    from agenda.models import AjusteDesempenio
+    ajustes_qs = AjusteDesempenio.objects.select_related('funcionario__user', 'periodo', 'autorizador__user').order_by('-created_at')
+    if not es_admin:
+        if del_activa:
+            ajustes_qs = ajustes_qs.filter(funcionario__delegacion=del_activa)
+        else:
+            ajustes_qs = ajustes_qs.none()
+    elif delegacion_seleccionada:
+        ajustes_qs = ajustes_qs.filter(funcionario__delegacion=delegacion_seleccionada)
+
+    # Funcionarios y períodos para el modal del Delegado
+    funcionarios_ajuste = Funcionario.objects.select_related('user', 'delegacion').filter(estado='Activo')
+    if not es_admin and del_activa:
+        funcionarios_ajuste = funcionarios_ajuste.filter(delegacion=del_activa)
+    periodos_ajuste = Periodo.objects.filter(estado='Abierto') or Periodo.objects.all()
+
     context = {
         'metas': page_obj.object_list,
         'page_obj': page_obj,
@@ -2951,9 +3243,1121 @@ def gestion_reportes(request):
         'todas_delegaciones': todas_delegaciones,
         'delegacion_seleccionada': delegacion_seleccionada,
         'es_admin': es_admin,
+        'es_delegado': ctx['permisos'].get('es_delegado', False),
         'q': q,
         'orden': orden,
         'orden_opciones': orden_opciones,
         'page_size': page_size,
+        'puntaje_equipo_total': suma_cumplimiento_equipo,
+        'pct_equipo_global': pct_equipo_global,
+        'ajustes_desempenio': list(ajustes_qs[:20]),
+        'funcionarios_ajuste': funcionarios_ajuste,
+        'periodos_ajuste': periodos_ajuste,
     }
     return render(request, 'gestion/reportes.html', context)
+
+
+@login_required
+def gestion_ajuste_desempenio(request):
+    """
+    Ajustes de desempeño en el Semáforo:
+    Los días libres, vacaciones, días administrativos y licencias deben ser
+    ingresados por el Delegado en la pestaña de semáforo para el ajuste de las metas.
+    """
+    ctx = global_context(request)
+    es_delegado = ctx['permisos'].get('es_delegado', False)
+    es_admin = ctx['permisos'].get('es_admin', False)
+
+    if not (es_delegado or es_admin):
+        messages.error(request, "Acceso denegado: Solo el Delegado Municipal o Administrador puede ingresar ajustes de desempeño.")
+        return redirect('gestion_reportes')
+
+    if request.method == 'POST':
+        funcionario_id = request.POST.get('funcionario_id')
+        periodo_id = request.POST.get('periodo_id')
+        concepto = request.POST.get('concepto', '').strip()
+        valor_porcentaje_raw = request.POST.get('valor_porcentaje', '0').strip()
+        motivo = request.POST.get('motivo', '').strip()
+
+        if not all((funcionario_id, periodo_id, concepto, motivo)):
+            messages.error(request, "Todos los campos marcados con (*) son obligatorios.")
+            return redirect('gestion_reportes')
+
+        func_obj = Funcionario.objects.filter(id=funcionario_id).first()
+        periodo_obj = Periodo.objects.filter(id=periodo_id).first()
+        autorizador_obj = ctx['funcionario_actual'] or Funcionario.objects.first()
+
+        try:
+            val_pct = float(valor_porcentaje_raw)
+            if val_pct <= 0 or val_pct > 100:
+                raise ValueError()
+        except ValueError:
+            messages.error(request, "El porcentaje de ajuste debe ser un número entre 0.1% y 100%.")
+            return redirect('gestion_reportes')
+
+        from agenda.models import AjusteDesempenio
+        AjusteDesempenio.objects.create(
+            funcionario=func_obj,
+            periodo=periodo_obj,
+            concepto=concepto,
+            valor_porcentaje=val_pct,
+            motivo=motivo,
+            autorizador=autorizador_obj,
+        )
+        messages.success(
+            request,
+            f"¡Ajuste de meta por '{concepto}' ({val_pct}%) registrado exitosamente por el Delegado para {func_obj}! "
+            "Las metas en el semáforo han sido recalculadas automáticamente."
+        )
+    return redirect('gestion_reportes')
+
+
+# =====================================================================
+# 11. ORGANIZACIONES COMUNITARIAS Y JUNTAS DE VECINOS (JJVV)
+# Coherente con 'base datos JJVV sin verificar.xlsx' y descriptor de funciones OROC
+# =====================================================================
+
+@login_required
+def gestion_organizaciones(request):
+    ctx = global_context(request)
+    if not ctx['permisos']['ver_organizaciones']:
+        messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para ver organizaciones comunitarias.")
+        return redirect('gestion_inicio')
+
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+    todas_delegaciones = Delegacion.objects.filter(estado='Activa').order_by('id')
+
+    # Procesar creación de nueva organización comunitaria / JJVV
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        tipo_org = request.POST.get('tipo_organizacion', 'Junta de Vecinos').strip()
+        domicilio = request.POST.get('domicilio_legal', '').strip()
+        # Nuevos campos del template
+        rut_org = request.POST.get('rut', '').strip()
+        personalidad_jur = request.POST.get('personalidad_juridica', '').strip()
+        representante = request.POST.get('representante_legal', '').strip()
+        tel_contacto = request.POST.get('telefono_contacto', '').strip()
+        email_contacto = request.POST.get('email_contacto', '').strip()
+        direccion_sede = request.POST.get('direccion_sede', '').strip()
+        directiva = request.POST.get('directiva_actual', '').strip()
+        observaciones = request.POST.get('observaciones', '').strip()
+        delegacion_id_post = request.POST.get('delegacion_id')
+        sector_id = request.POST.get('sector_id')
+        socios_activos = request.POST.get('socios_activos', '0').strip()
+        f_const = request.POST.get('fecha_constitucion', '').strip()
+        num_pj = request.POST.get('numero_registro_pj', '').strip()
+        f_insc = request.POST.get('fecha_inscripcion_registro', '').strip()
+        reg_dir = request.POST.get('registro_directiva_numero', '').strip()
+        estado = request.POST.get('estado', 'Activa')
+
+        # Determinar delegación a usar
+        del_a_usar = del_activa
+        if es_admin and delegacion_id_post and delegacion_id_post.isdigit():
+            del_tmp = Delegacion.objects.filter(id=int(delegacion_id_post), estado='Activa').first()
+            if del_tmp:
+                del_a_usar = del_tmp
+
+        if not del_a_usar:
+            messages.error(request, "Selecciona una delegación activa antes de registrar una organización.")
+            return redirect('gestion_organizaciones')
+
+        if not nombre:
+            messages.error(request, "El nombre de la organización es obligatorio.")
+            return redirect('gestion_organizaciones')
+
+        # Validaciones de longitud en servidor (Poner límite de caracteres en todo)
+        ok, err = validar_largo(nombre, 200, "Nombre de la Organización")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(domicilio, 250, "Domicilio Legal")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(direccion_sede, 250, "Dirección Sede")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(rut_org, 20, "RUT Organización")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(representante, 150, "Representante Legal")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(tel_contacto, 20, "Teléfono Contacto")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        if tel_contacto:
+            ok, err = validar_telefono_chileno(tel_contacto)
+            if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+            tel_contacto = formatear_telefono_chileno(tel_contacto)
+        ok, err = validar_largo(num_pj, 50, "N° Reg. Personalidad Jurídica")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(reg_dir, 50, "Registro Directiva N°")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(directiva, 500, "Directiva Actual")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(observaciones, 1000, "Observaciones")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+
+        sector_obj = None
+        if sector_id and sector_id.isdigit():
+            sec_qs = Sector.objects.filter(id=int(sector_id), estado='Activo')
+            if del_a_usar:
+                sec_qs = sec_qs.filter(delegacion=del_a_usar)
+            sector_obj = sec_qs.first()
+
+        territorio = sector_obj.nombre if sector_obj else (del_a_usar.nombre if del_a_usar else '')
+
+        socios_num = 0
+        if socios_activos.isdigit():
+            socios_num = max(0, int(socios_activos))
+
+        fecha_constitucion_val = None
+        if f_const:
+            try:
+                fecha_constitucion_val = datetime.date.fromisoformat(f_const)
+            except ValueError:
+                pass
+
+        fecha_inscripcion_val = None
+        if f_insc:
+            try:
+                fecha_inscripcion_val = datetime.date.fromisoformat(f_insc)
+            except ValueError:
+                pass
+
+        nueva_org = OrganizacionComunitaria.objects.create(
+            nombre=nombre,
+            tipo_organizacion=tipo_org,
+            domicilio_legal=domicilio,
+            delegacion=del_a_usar,
+            sector=sector_obj,
+            territorio=territorio,
+            socios_activos=socios_num,
+            fecha_constitucion=fecha_constitucion_val,
+            numero_registro_pj=num_pj,
+            fecha_inscripcion_registro=fecha_inscripcion_val,
+            registro_directiva_numero=reg_dir,
+            estado=estado,
+            rut=rut_org or None,
+            personalidad_juridica=personalidad_jur or None,
+            representante_legal=representante or None,
+            telefono_contacto=tel_contacto or None,
+            email_contacto=email_contacto or None,
+            direccion_sede=direccion_sede or None,
+            directiva_actual=directiva or None,
+            observaciones=observaciones or None,
+        )
+
+        # Notificación en tiempo real por WebSocket
+        del_id_ws = del_activa.id if del_activa else "global"
+        def notificar_ws_org():
+            publish_module_changed("organizaciones", del_id_ws, "create", nueva_org.id)
+        transaction.on_commit(notificar_ws_org)
+
+        messages.success(request, f"Organización '{nombre}' registrada exitosamente en {del_activa.nombre}.")
+        return redirect('gestion_organizaciones')
+
+    q = request.GET.get('q', '').strip()
+    filtro_tipo = request.GET.get('tipo', '').strip()
+    filtro_estado = request.GET.get('estado', '').strip()
+    filtro_delegacion_raw = request.GET.get('delegacion')
+    filtro_delegacion = filtro_delegacion_raw.strip() if filtro_delegacion_raw is not None else None
+
+    qs = OrganizacionComunitaria.objects.select_related('delegacion', 'sector').order_by('-id')
+
+    delegacion_seleccionada = None
+    if not es_admin:
+        if del_activa:
+            qs = qs.filter(Q(delegacion=del_activa) | (Q(delegacion__isnull=True) & Q(territorio__icontains=del_activa.nombre)))
+        else:
+            qs = qs.none()
+        delegacion_seleccionada = del_activa
+    else:
+        if filtro_delegacion_raw is not None:
+            if filtro_delegacion and filtro_delegacion.isdigit():
+                delegacion_seleccionada = Delegacion.objects.filter(id=int(filtro_delegacion), estado='Activa').first()
+                if delegacion_seleccionada:
+                    qs = qs.filter(delegacion=delegacion_seleccionada)
+            else:
+                delegacion_seleccionada = None
+        elif del_activa:
+            delegacion_seleccionada = del_activa
+            qs = qs.filter(delegacion=del_activa)
+
+    if q:
+        qs = qs.filter(build_accent_query([
+            'nombre', 'tipo_organizacion', 'domicilio_legal', 'territorio',
+            'numero_registro_pj', 'registro_directiva_numero', 'sector__nombre', 'delegacion__nombre',
+            'rut', 'representante_legal', 'directiva_actual', 'observaciones', 'direccion_sede',
+        ], q))
+    if filtro_tipo:
+        qs = qs.filter(tipo_organizacion__iexact=filtro_tipo)
+    if filtro_estado:
+        qs = qs.filter(estado__iexact=filtro_estado)
+
+    orden_opciones = [
+        ('id', 'Más antiguas'),
+        ('-id', 'Más recientes'),
+        ('nombre', 'Nombre A-Z'),
+        ('-nombre', 'Nombre Z-A'),
+        ('socios_activos', 'Menor socios'),
+        ('-socios_activos', 'Mayor socios'),
+        ('delegacion__nombre', 'Delegación'),
+    ]
+    qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-id')
+
+    # Exportación nativa a .xlsx (coherente con columnas del archivo JJVV)
+    if request.GET.get('export') == 'excel':
+        headers = [
+            '#', 'Nombre Organización / JJVV', 'Tipo Organización', 'RUT',
+            'Personalidad Jurídica', 'Representante Legal', 'Teléfono Contacto', 'Email Contacto',
+            'Dirección Sede', 'Domicilio Legal', 'Directiva Actual',
+            'Delegación Territorial', 'Sector / Territorio', 'Socios Activos',
+            'Fecha Constitución', 'N° Reg. P.J.', 'Fecha Inscripción Registro',
+            'Reg. Directiva N°', 'Observaciones', 'Estado'
+        ]
+        rows = []
+        for i, org in enumerate(qs, start=1):
+            f_c = org.fecha_constitucion.strftime('%d/%m/%Y') if org.fecha_constitucion else '—'
+            f_i = org.fecha_inscripcion_registro.strftime('%d/%m/%Y') if org.fecha_inscripcion_registro else '—'
+            rows.append([
+                i,
+                org.nombre,
+                org.tipo_organizacion,
+                org.rut or '—',
+                org.personalidad_juridica or '—',
+                org.representante_legal or '—',
+                org.telefono_contacto or '—',
+                org.email_contacto or '—',
+                org.direccion_sede or '—',
+                org.domicilio_legal or '—',
+                org.directiva_actual or '—',
+                org.delegacion.nombre if org.delegacion else 'Sin delegación',
+                org.territorio or '—',
+                org.socios_activos,
+                f_c,
+                org.numero_registro_pj or '—',
+                f_i,
+                org.registro_directiva_numero or '—',
+                org.observaciones or '—',
+                org.estado
+            ])
+        return export_to_excel_xlsx("organizaciones_comunitarias_JJVV", "Organizaciones Comunitarias", headers, rows)
+
+    tipos_organizaciones = [c[0] for c in OrganizacionComunitaria.TIPO_CHOICES]
+    page_size = _get_page_size(request)
+    total_organizaciones = qs.count()
+    page_obj = Paginator(qs, page_size).get_page(request.GET.get('page', 1))
+
+    if del_activa:
+        sectores_org = Sector.objects.filter(delegacion=del_activa, estado='Activo').order_by('nombre')
+    elif delegacion_seleccionada:
+        sectores_org = Sector.objects.filter(delegacion=delegacion_seleccionada, estado='Activo').order_by('nombre')
+    else:
+        sectores_org = Sector.objects.filter(estado='Activo').order_by('delegacion__nombre', 'nombre')
+
+    return render(request, 'gestion/organizaciones.html', {
+        'organizaciones': page_obj.object_list,
+        'page_obj': page_obj,
+        'tipos_organizaciones': tipos_organizaciones,
+        'todas_delegaciones': todas_delegaciones,
+        'delegaciones': todas_delegaciones,  # alias para el template
+        'delegacion_seleccionada': delegacion_seleccionada,
+        'sectores': sectores_org,
+        'es_admin': es_admin,
+        'q': q,
+        'filtro_tipo': filtro_tipo,
+        'filtro_estado': filtro_estado,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
+        'total_organizaciones': total_organizaciones
+    })
+
+
+@login_required
+def gestion_organizaciones_editar(request, org_id):
+    ctx = global_context(request)
+    if not ctx['permisos']['ver_organizaciones']:
+        messages.error(request, "Acceso denegado.")
+        return redirect('gestion_inicio')
+
+    org = get_object_or_404(OrganizacionComunitaria, id=org_id)
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+
+    if not es_admin and org.delegacion and org.delegacion != del_activa:
+        messages.error(request, "Acceso denegado: No tienes autorización para modificar organizaciones de otra delegación.")
+        return redirect('gestion_organizaciones')
+
+    if request.method == 'POST':
+        delegacion_anterior = org.delegacion
+        if es_admin:
+            del_id = request.POST.get('delegacion_id', '').strip()
+            del_obj = Delegacion.objects.filter(id=del_id, estado='Activa').first() if del_id else None
+        else:
+            del_obj = del_activa
+
+        sec_id = request.POST.get('sector_id', '').strip()
+        sec_obj = Sector.objects.filter(id=sec_id, delegacion=del_obj, estado='Activo').first() if (sec_id and del_obj) else None
+
+        nuevo_nombre = request.POST.get('nombre', org.nombre).strip()
+        nuevo_domicilio = request.POST.get('domicilio_legal', org.domicilio_legal or '').strip()
+        num_pj = request.POST.get('numero_registro_pj', org.numero_registro_pj or '').strip()
+        reg_dir = request.POST.get('registro_directiva_numero', org.registro_directiva_numero or '').strip()
+        socios_activos = request.POST.get('socios_activos', str(org.socios_activos)).strip()
+        # Nuevos campos
+        rut_org = request.POST.get('rut', org.rut or '').strip()
+        personalidad_jur = request.POST.get('personalidad_juridica', org.personalidad_juridica or '').strip()
+        representante = request.POST.get('representante_legal', org.representante_legal or '').strip()
+        tel_contacto = request.POST.get('telefono_contacto', org.telefono_contacto or '').strip()
+        email_contacto_e = request.POST.get('email_contacto', org.email_contacto or '').strip()
+        direccion_sede_e = request.POST.get('direccion_sede', org.direccion_sede or '').strip()
+        directiva_e = request.POST.get('directiva_actual', org.directiva_actual or '').strip()
+        observaciones_e = request.POST.get('observaciones', org.observaciones or '').strip()
+
+        ok, err = validar_largo(nuevo_nombre, 200, "Nombre")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(nuevo_domicilio, 250, "Domicilio")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(direccion_sede_e, 250, "Dirección Sede")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(rut_org, 20, "RUT")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(representante, 150, "Representante Legal")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(tel_contacto, 20, "Teléfono Contacto")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        if tel_contacto:
+            ok, err = validar_telefono_chileno(tel_contacto)
+            if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+            tel_contacto = formatear_telefono_chileno(tel_contacto)
+        ok, err = validar_largo(num_pj, 50, "N° Reg. Personalidad Jurídica")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(reg_dir, 50, "Registro Directiva N°")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(directiva_e, 500, "Directiva Actual")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        ok, err = validar_largo(observaciones_e, 1000, "Observaciones")
+        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+
+        org.nombre = nuevo_nombre
+        org.tipo_organizacion = request.POST.get('tipo_organizacion', org.tipo_organizacion)
+        org.domicilio_legal = nuevo_domicilio
+        org.delegacion = del_obj
+        if sec_obj:
+            org.sector = sec_obj
+            org.territorio = sec_obj.nombre
+        elif del_obj != delegacion_anterior:
+            org.sector = None
+            org.territorio = del_obj.nombre if del_obj else ''
+
+        if socios_activos.isdigit():
+            org.socios_activos = max(0, int(socios_activos))
+
+        f_const = request.POST.get('fecha_constitucion', '').strip()
+        if f_const:
+            try: org.fecha_constitucion = datetime.date.fromisoformat(f_const)
+            except ValueError: pass
+
+        f_insc = request.POST.get('fecha_inscripcion_registro', '').strip()
+        if f_insc:
+            try: org.fecha_inscripcion_registro = datetime.date.fromisoformat(f_insc)
+            except ValueError: pass
+
+        org.numero_registro_pj = num_pj
+        org.registro_directiva_numero = reg_dir
+        org.estado = request.POST.get('estado', org.estado)
+        # Nuevos campos
+        org.rut = rut_org or None
+        org.personalidad_juridica = personalidad_jur or None
+        org.representante_legal = representante or None
+        org.telefono_contacto = tel_contacto or None
+        org.email_contacto = email_contacto_e or None
+        org.direccion_sede = direccion_sede_e or None
+        org.directiva_actual = directiva_e or None
+        org.observaciones = observaciones_e or None
+        org.save()
+
+        del_id_ws = del_obj.id if del_obj else "global"
+        def notificar_ws_edit_org():
+            publish_module_changed("organizaciones", del_id_ws, "update", org.id)
+        transaction.on_commit(notificar_ws_edit_org)
+
+        messages.success(request, f"Organización '{org.nombre}' actualizada exitosamente.")
+    return redirect('gestion_organizaciones')
+
+
+@login_required
+def gestion_organizaciones_eliminar(request, org_id):
+    ctx = global_context(request)
+    if not ctx['permisos']['ver_organizaciones']:
+        messages.error(request, "Acceso denegado.")
+        return redirect('gestion_inicio')
+
+    org = get_object_or_404(OrganizacionComunitaria, id=org_id)
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+
+    if not es_admin and org.delegacion and org.delegacion != del_activa:
+        messages.error(request, "Acceso denegado: No tienes autorización para eliminar organizaciones de otra delegación.")
+        return redirect('gestion_organizaciones')
+
+    if request.method == 'POST':
+        nombre = org.nombre
+        del_id_ws = org.delegacion_id if org.delegacion_id else "global"
+        org.delete()
+
+        def notificar_ws_del_org():
+            publish_module_changed("organizaciones", del_id_ws, "delete", org_id)
+        transaction.on_commit(notificar_ws_del_org)
+
+        messages.success(request, f"Organización '{nombre}' eliminada del registro.")
+    return redirect('gestion_organizaciones')
+
+
+# =====================================================================
+# 12. PERFIL DE USUARIO Y RECORTE DE FOTO CON CROPPR.JS (Criterio 13)
+# =====================================================================
+
+@login_required
+def perfil_usuario(request):
+    """
+    Vista de administración del perfil propio:
+    - Edición de nombre y correo electrónico propio con validación.
+    - Cambio de contraseña solicitando contraseña actual y confirmación de nueva contraseña.
+    - Carga de fotografía con recorte interactivo mediante Croppr.js y guardado del recorte exacto en servidor.
+    - Seguridad: Un usuario no puede alterar el perfil ni foto de otro usuario manipulando identificadores.
+    """
+    user = request.user
+    funcionario = Funcionario.all_objects.filter(user=user).first()
+
+    if request.method == 'POST':
+        action = request.POST.get('action') or request.POST.get('accion', '')
+
+        if action in ('datos', 'actualizar_datos'):
+            first_name = request.POST.get('first_name', '').strip()
+            last_name = request.POST.get('last_name', '').strip()
+            email = request.POST.get('email', '').strip()
+            telefono = request.POST.get('telefono', '').strip()
+
+            ok, err = validar_largo(first_name, 150, "Nombres")
+            if not ok: messages.error(request, err); return redirect('perfil_usuario')
+            ok, err = validar_largo(last_name, 150, "Apellidos")
+            if not ok: messages.error(request, err); return redirect('perfil_usuario')
+            ok, err = validar_largo(telefono, 20, "Teléfono")
+            if not ok: messages.error(request, err); return redirect('perfil_usuario')
+            if telefono:
+                ok, err = validar_telefono_chileno(telefono)
+                if not ok: messages.error(request, err); return redirect('perfil_usuario')
+                telefono = formatear_telefono_chileno(telefono)
+
+            if email:
+                try:
+                    validate_email(email)
+                except ValidationError:
+                    messages.error(request, "El correo electrónico no tiene un formato válido.")
+                    return redirect('perfil_usuario')
+
+            user.first_name = first_name
+            user.last_name = last_name
+            user.email = email
+            user.save()
+
+            if funcionario and telefono:
+                funcionario.telefono = telefono
+                funcionario.save(update_fields=['telefono'])
+
+            messages.success(request, "Tus datos personales fueron actualizados correctamente.")
+            return redirect('perfil_usuario')
+
+        elif action in ('password', 'cambiar_clave'):
+            current_pw = request.POST.get('current_password') or request.POST.get('password_actual', '')
+            new_pw1 = request.POST.get('new_password1') or request.POST.get('password_nueva', '')
+            new_pw2 = request.POST.get('new_password2') or request.POST.get('password_confirmacion', '')
+
+            if not user.check_password(current_pw):
+                messages.error(request, "La contraseña actual no es correcta.")
+                return redirect('perfil_usuario')
+
+            if new_pw1 != new_pw2:
+                messages.error(request, "Las nuevas contraseñas no coinciden.")
+                return redirect('perfil_usuario')
+
+            err_pw = _validate_password(new_pw1)
+            if err_pw:
+                messages.error(request, err_pw)
+                return redirect('perfil_usuario')
+
+            user.set_password(new_pw1)
+            user.save()
+            update_session_auth_hash(request, user)
+            if funcionario and funcionario.debe_cambiar_contrasena:
+                funcionario.debe_cambiar_contrasena = False
+                funcionario.save()
+
+            messages.success(request, "¡Contraseña actualizada exitosamente!")
+            return redirect('perfil_usuario')
+
+        elif action in ('foto', 'actualizar_foto'):
+            # Subida y recorte mediante Croppr (recibe DataURL Base64 de la imagen recortada o archivo directo)
+            foto_base64 = request.POST.get('foto_base64', '') or request.POST.get('foto_recortada', '')
+            foto_file = request.FILES.get('foto')
+
+            # Asegurar que el usuario tenga un Funcionario asignado para persistir la foto
+            if not funcionario:
+                from accounts.models import Cargo, Delegacion
+                cargo_def = Cargo.objects.first()
+                del_def = Delegacion.objects.first()
+                funcionario = Funcionario.objects.create(
+                    user=user,
+                    identificador_institucional=f"FUN-{user.id:04d}",
+                    cargo=cargo_def or Cargo.objects.create(nombre_cargo="Funcionario Municipal"),
+                    delegacion=del_def
+                )
+
+            if foto_base64 and 'base64,' in foto_base64:
+                import base64
+                from django.core.files.base import ContentFile
+                try:
+                    header_part, img_data_str = foto_base64.split(';base64,')
+                    ext = header_part.split('/')[-1]
+                    if ext not in ['jpeg', 'jpg', 'png']:
+                        ext = 'png'
+                    decoded_img = base64.b64decode(img_data_str)
+                    
+                    if len(decoded_img) > 2 * 1024 * 1024:
+                        messages.error(request, "La imagen recortada supera el límite máximo de 2 MiB.")
+                        return redirect('perfil_usuario')
+
+                    file_name = f"avatar_{user.username}_{timezone.now().strftime('%Y%m%d%H%M%S')}.{ext}"
+                    c_file = ContentFile(decoded_img, name=file_name)
+                    valido, err = validar_imagen_subida(c_file, max_mb=2)
+                    if not valido:
+                        messages.error(request, err)
+                        return redirect('perfil_usuario')
+
+                    funcionario.foto.save(file_name, c_file, save=True)
+                    messages.success(request, "¡Foto de perfil actualizada exitosamente con recorte Croppr.js!")
+                except Exception as e:
+                    messages.error(request, f"Error al procesar el recorte de la imagen: {str(e)}")
+            elif foto_file:
+                valido, err = validar_imagen_subida(foto_file, max_mb=2)
+                if not valido:
+                    messages.error(request, err)
+                    return redirect('perfil_usuario')
+                funcionario.foto = foto_file
+                funcionario.save()
+                messages.success(request, "Foto de perfil actualizada exitosamente.")
+            else:
+                messages.warning(request, "No se seleccionó ninguna imagen para guardar.")
+            return redirect('perfil_usuario')
+
+    return render(request, 'auth/perfil.html', {
+        'funcionario': funcionario,
+        'user': user,
+    })
+
+
+# =====================================================================
+# 13. PORTAL DEL CLIENTE FINAL (Criterio 14)
+# Visualiza únicamente los registros y solicitudes vinculadas a ese cliente
+# =====================================================================
+
+@login_required
+def portal_cliente(request):
+    """
+    Portal exclusivo para vecinos / usuarios con rol Cliente.
+    Aislamiento efectivo: Solo muestra las solicitudes ciudadanas propias y datos personales.
+    Bloquea acceso a listados administrativos y funciones de gestión.
+    """
+    user = request.user
+
+    # Identificar vecino asociado por username (RUT) o por identificador institucional
+    identificador = user.username
+    if hasattr(user, 'funcionario') and user.funcionario:
+        identificador = user.funcionario.identificador_institucional or user.username
+
+    vecino = Vecino.objects.filter(
+        Q(rut__iexact=identificador) | Q(rut__iexact=user.username)
+    ).first()
+
+    # Manejar nuevo requerimiento desde el portal ciudadano
+    if request.method == 'POST':
+        tipo_id = request.POST.get('tipo_atencion_id')
+        descripcion_portal = request.POST.get('descripcion', '').strip()
+
+        ok, err = validar_largo(descripcion_portal, 1000, 'Descripción')
+        if not ok:
+            messages.error(request, err)
+            return redirect('portal_cliente')
+
+        if not tipo_id or not descripcion_portal:
+            messages.error(request, 'Debes seleccionar un tipo y agregar una descripción.')
+            return redirect('portal_cliente')
+
+        tipo_obj = TipoAtencion.objects.filter(id=tipo_id, estado='Activo').first()
+        if not tipo_obj:
+            messages.error(request, 'Tipo de atención no válido.')
+            return redirect('portal_cliente')
+
+        delegacion_cliente = None
+        if vecino and vecino.sector:
+            delegacion_cliente = vecino.sector.delegacion
+        if not delegacion_cliente:
+            from accounts.models import Delegacion as _Delegacion
+            delegacion_cliente = _Delegacion.objects.filter(estado='Activa').first()
+
+        AtencionCiudadana.objects.create(
+            vecino=vecino,
+            tipo_atencion=tipo_obj,
+            descripcion=descripcion_portal,
+            delegacion=delegacion_cliente,
+            estado='Registrada',
+            creado_por=user,
+        )
+        messages.success(request, '¡Tu solicitud fue registrada exitosamente! Te avisaremos por esta misma plataforma.')
+        return redirect('portal_cliente')
+
+    # Filtro estricto: registros de negocio vinculados exclusivamente a este cliente
+    solicitudes_propias = AtencionCiudadana.objects.filter(
+        Q(creado_por=user) | (Q(vecino=vecino) if vecino else Q(pk__in=[]))
+    ).select_related('delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable').order_by('-created_at')
+
+    total_propias = solicitudes_propias.count()
+    resueltas = solicitudes_propias.filter(estado__iexact='Resuelta').count()
+    en_proceso = solicitudes_propias.filter(estado__iexact='En proceso').count()
+    registradas = solicitudes_propias.filter(estado__iexact='Registrada').count()
+
+    tipos_activos = TipoAtencion.objects.filter(estado='Activo').order_by('nombre')
+
+    return render(request, 'portal/cliente.html', {
+        'user': user,
+        'vecino': vecino,
+        'funcionario': getattr(user, 'funcionario', None),
+        'atenciones': solicitudes_propias,
+        'total_propias': total_propias,
+        'resueltas': resueltas,
+        'en_proceso': en_proceso,
+        'registradas': registradas,
+        'tipos_activos': tipos_activos,
+    })
+
+
+@login_required
+def portal_cliente_detalle(request, atencion_id):
+    """
+    Detalle de una solicitud propia del cliente final.
+    Rechaza con 404/403 cualquier intento de acceder a un registro ajeno.
+    """
+    user = request.user
+    identificador = user.username
+    if hasattr(user, 'funcionario') and user.funcionario:
+        identificador = user.funcionario.identificador_institucional or user.username
+
+    vecino = Vecino.objects.filter(
+        Q(rut__iexact=identificador) | Q(rut__iexact=user.username)
+    ).first()
+
+    # Seguridad: solo buscar dentro del ámbito propio del cliente
+    atencion = AtencionCiudadana.objects.filter(
+        id=atencion_id
+    ).filter(
+        Q(creado_por=user) | (Q(vecino=vecino) if vecino else Q(pk__in=[]))
+    ).select_related('delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable').first()
+
+    if not atencion:
+        # Responder 404 sin revelar si la solicitud de otro usuario existe
+        return error_404(request, exception=None)
+
+    return render(request, 'portal/cliente_detalle.html', {
+        'atencion': atencion,
+        'user': user,
+        'vecino': vecino,
+    })
+
+
+# =====================================================================
+# 14. PÁGINAS DE ERROR PERSONALIZADAS Y SEGURAS (Criterio 15)
+# 400, 403, 404, 500 sin exponer trazas, credenciales ni detalles técnicos
+# =====================================================================
+
+def error_400(request, exception=None):
+    return render(request, 'errors/400.html', status=400)
+
+def error_403(request, exception=None):
+    return render(request, 'errors/403.html', status=403)
+
+def error_404(request, exception=None):
+    return render(request, 'errors/404.html', status=404)
+
+def error_500(request):
+    return render(request, 'errors/500.html', status=500)
+
+
+# =====================================================================
+# 15. MÓDULO DEL TUBO SGR DE TRABAJO (Coherente con Matriz SGR Excel)
+# Seguimiento de compromisos territoriales a futuro, estatus y porcentajes
+# =====================================================================
+
+@login_required
+def gestion_tubo(request):
+    """
+    Módulo Tubo SGR de Trabajo (conforme a las hojas TUBO COMPAÑIAS y TUBO ANTENA):
+    "En el tubo va todo lo que sea a futuro".
+    Centraliza las atenciones y solicitudes marcadas para seguimiento con fecha de compromiso,
+    área de apoyo y estatus de ejecución (Ingresado, En Proceso, Pendiente, Realizado).
+    """
+    ctx = global_context(request)
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+
+    todas_delegaciones = Delegacion.objects.filter(estado='Activa').order_by('id')
+    delegacion_seleccionada = None
+
+    if es_admin:
+        del_param = request.GET.get('delegacion', '').strip()
+        if del_param and del_param.isdigit():
+            delegacion_seleccionada = Delegacion.objects.filter(id=int(del_param), estado='Activa').first()
+    else:
+        delegacion_seleccionada = del_activa
+
+    # Query base: requerimientos que van al Tubo SGR con prefetch de evidencias
+    qs_base = AtencionCiudadana.objects.filter(va_a_tubo=True).select_related(
+        'delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'creado_por', 'vecino', 'actividad'
+    ).prefetch_related('actividad__evidencias')
+
+    # Scoping territorial
+    if not es_admin:
+        if del_activa:
+            qs_base = qs_base.filter(delegacion=del_activa)
+        else:
+            qs_base = qs_base.none()
+    elif delegacion_seleccionada:
+        qs_base = qs_base.filter(delegacion=delegacion_seleccionada)
+
+    # Métricas consolidadas del Tubo (calculadas sobre el conjunto base territorial)
+    tubo_total_count = qs_base.count()
+    ingresados_count = qs_base.filter(estado__in=['Registrada', 'Ingresado']).count()
+    proceso_count = qs_base.filter(estado='En proceso').count()
+    pendientes_count = qs_base.filter(estado='Pendiente').count()
+    realizados_count = qs_base.filter(estado__in=['Resuelta', 'Realizado', 'REALIZADO']).count()
+    canceladas_count = qs_base.filter(estado='Cancelada').count()
+
+    pct_realizado = round((realizados_count / tubo_total_count * 100), 1) if tubo_total_count > 0 else 0.0
+    pct_pendientes = round((pendientes_count / tubo_total_count * 100), 1) if tubo_total_count > 0 else 0.0
+    alerta_pendientes_10 = pct_pendientes > 10.0  # Alerta del indicador: "PENDIENTES EN TUBO MENOR A 10%"
+
+    # Gestión de pestañas: 'requerimientos' (default) o 'colaboradores'
+    tab = request.GET.get('tab', 'requerimientos').strip().lower()
+    if tab not in ['requerimientos', 'colaboradores']:
+        tab = 'requerimientos'
+
+    # Filtros de la pestaña Requerimientos
+    q = request.GET.get('q', '').strip()
+    filtro_estado = request.GET.get('estado', '').strip()
+    filtro_origen = request.GET.get('origen', '').strip()
+    filtro_responsable = request.GET.get('responsable', '').strip()
+
+    qs = qs_base
+
+    if q:
+        qs = qs.filter(build_accent_query([
+            'codigo_atencion', 'solicitante', 'descripcion', 'avance_observaciones',
+            'area_apoyo', 'usuario_responsable__first_name', 'usuario_responsable__username',
+            'vecino__nombre', 'vecino__rut'
+        ], q))
+
+    if filtro_estado:
+        qs = qs.filter(estado__iexact=filtro_estado)
+
+    if filtro_origen:
+        qs = qs.filter(origen__iexact=filtro_origen)
+
+    if filtro_responsable and filtro_responsable.isdigit():
+        qs = qs.filter(usuario_responsable_id=int(filtro_responsable))
+
+    # Ordenamiento
+    orden_opciones = [
+        ('-fecha_registro', 'Fecha: recientes primero'),
+        ('fecha_registro', 'Fecha: antiguas primero'),
+        ('fecha_compromiso', 'Compromiso: más próximo'),
+        ('-fecha_compromiso', 'Compromiso: más lejano'),
+        ('solicitante', 'Solicitante A-Z'),
+        ('estado', 'Estado'),
+    ]
+    qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-fecha_registro')
+
+    # Exportación a Excel/CSV
+    if request.GET.get('export') == 'excel':
+        headers = [
+            'N° Tubo', 'Fecha Solicitud', 'Actividad / Solicitud', 'Int/Ext',
+            'Solicitante', 'Territorio / Delegación', 'Responsable',
+            'Fecha Compromiso', 'Área de Apoyo', 'Avance / Observaciones', 'Estatus'
+        ]
+        rows = []
+        for at in qs:
+            territorio_txt = at.delegacion.nombre if at.delegacion else ''
+            if at.vecino and at.vecino.territorio:
+                territorio_txt += f" ({at.vecino.territorio})"
+            rows.append([
+                at.codigo_atencion,
+                at.created_at.strftime('%d/%m/%Y'),
+                at.descripcion,
+                at.origen,
+                at.solicitante,
+                territorio_txt,
+                at.usuario_responsable.get_full_name() or at.usuario_responsable.username,
+                at.fecha_compromiso.strftime('%d/%m/%Y') if at.fecha_compromiso else 'Sin fecha',
+                at.area_apoyo or '',
+                at.avance_observaciones or '',
+                at.estado
+            ])
+        nom_del = delegacion_seleccionada.codigo if delegacion_seleccionada else ('todas' if es_admin else 'tubo')
+        return export_to_excel_csv(f"tubo_sgr_{nom_del}", headers, rows)
+
+    # Paginación de Requerimientos
+    page_size = _get_page_size(request)
+    page_obj = Paginator(qs, page_size).get_page(request.GET.get('page', 1))
+    atenciones_tubo_pagina = list(page_obj.object_list)
+
+    # Roles por usuario para las atenciones de la página (para mostrar en Ficha y Modales)
+    responsables_pagina_ids = {at.usuario_responsable_id for at in atenciones_tubo_pagina}
+    roles_por_usuario = {}
+    for user_id, rol_nombre in FuncionarioRol.objects.filter(
+        funcionario__user_id__in=responsables_pagina_ids,
+        rol__estado__iexact='Activo',
+    ).values_list('funcionario__user_id', 'rol__nombre_rol'):
+        roles_por_usuario.setdefault(user_id, []).append(rol_nombre)
+    for at in atenciones_tubo_pagina:
+        at.responsable_rol = ', '.join(roles_por_usuario.get(at.usuario_responsable_id, [])) or 'Sin rol registrado'
+
+    # Catálogo de encargados para edición idéntica a Atenciones
+    delegacion_ids = {at.delegacion_id for at in atenciones_tubo_pagina if at.delegacion_id}
+    if delegacion_seleccionada:
+        delegacion_ids.add(delegacion_seleccionada.id)
+    if del_activa:
+        delegacion_ids.add(del_activa.id)
+
+    encargados_edicion = []
+    funcionarios_edicion = Funcionario.objects.filter(
+        delegacion_id__in=delegacion_ids,
+        estado__iexact='Activo',
+        user__is_active=True,
+    ).select_related('user', 'delegacion').order_by('user__first_name', 'user__username')
+    funcionarios_ids = [funcionario.id for funcionario in funcionarios_edicion]
+    roles_encargados = {}
+    for funcionario_id, rol_nombre in FuncionarioRol.objects.filter(
+        funcionario_id__in=funcionarios_ids,
+        rol__estado__iexact='Activo',
+    ).values_list('funcionario_id', 'rol__nombre_rol'):
+        roles_encargados.setdefault(funcionario_id, []).append(rol_nombre)
+    for funcionario in funcionarios_edicion:
+        nombre = funcionario.user.get_full_name() or funcionario.user.username
+        roles = ', '.join(roles_encargados.get(funcionario.id, [])) or 'Sin rol registrado'
+        encargados_edicion.append({
+            'id': funcionario.user_id,
+            'nombre': nombre,
+            'delegacion_id': funcionario.delegacion_id,
+            'delegacion_nombre': funcionario.delegacion.nombre if funcionario.delegacion else '',
+            'label': f"{nombre} · {roles}",
+        })
+
+    # ── PESTAÑA 2: Resumen Completo por Colaborador con Búsqueda, Filtros y Paginación ──
+    from django.contrib.auth.models import User
+    funcionarios_scope = Funcionario.objects.filter(
+        estado='Activo', user__is_active=True
+    ).select_related('user', 'delegacion', 'cargo').order_by('user__first_name')
+    if not es_admin:
+        if del_activa:
+            funcionarios_scope = funcionarios_scope.filter(delegacion=del_activa)
+        else:
+            funcionarios_scope = funcionarios_scope.none()
+    elif delegacion_seleccionada:
+        funcionarios_scope = funcionarios_scope.filter(delegacion=delegacion_seleccionada)
+
+    uids_con_atencion = set(qs_base.values_list('usuario_responsable', flat=True).distinct())
+    resumen_colaboradores = []
+    procesados_uids = set()
+
+    for f in funcionarios_scope:
+        u = f.user
+        procesados_uids.add(u.id)
+        u_qs = qs_base.filter(usuario_responsable=u)
+        u_total = u_qs.count()
+        u_ing = u_qs.filter(estado__in=['Registrada', 'Ingresado']).count()
+        u_pend = u_qs.filter(estado='Pendiente').count()
+        u_proc = u_qs.filter(estado='En proceso').count()
+        u_real = u_qs.filter(estado__in=['Resuelta', 'Realizado', 'REALIZADO']).count()
+        u_pct = round((u_real / u_total * 100), 1) if u_total > 0 else 0.0
+        cargo_nom = f.cargo.nombre_cargo if f.cargo else 'Funcionario Municipal'
+        del_nom = f.delegacion.nombre if f.delegacion else ''
+        resumen_colaboradores.append({
+            'user_id': u.id,
+            'funcionario_id': f.id,
+            'usuario': u,
+            'nombre': u.get_full_name() or u.username,
+            'username': u.username,
+            'cargo': cargo_nom,
+            'delegacion_nombre': del_nom,
+            'total': u_total,
+            'ingresados': u_ing,
+            'pendientes': u_pend,
+            'en_proceso': u_proc,
+            'realizados': u_real,
+            'pct_realizado': u_pct,
+        })
+
+    # Otros usuarios con atenciones asignadas en Tubo
+    for uid in (uids_con_atencion - procesados_uids):
+        u = User.objects.filter(id=uid).first()
+        if not u: continue
+        u_qs = qs_base.filter(usuario_responsable=u)
+        u_total = u_qs.count()
+        u_ing = u_qs.filter(estado__in=['Registrada', 'Ingresado']).count()
+        u_pend = u_qs.filter(estado='Pendiente').count()
+        u_proc = u_qs.filter(estado='En proceso').count()
+        u_real = u_qs.filter(estado__in=['Resuelta', 'Realizado', 'REALIZADO']).count()
+        u_pct = round((u_real / u_total * 100), 1) if u_total > 0 else 0.0
+        resumen_colaboradores.append({
+            'user_id': u.id,
+            'funcionario_id': None,
+            'usuario': u,
+            'nombre': u.get_full_name() or u.username,
+            'username': u.username,
+            'cargo': 'Encargado de Gestión',
+            'delegacion_nombre': '',
+            'total': u_total,
+            'ingresados': u_ing,
+            'pendientes': u_pend,
+            'en_proceso': u_proc,
+            'realizados': u_real,
+            'pct_realizado': u_pct,
+        })
+
+    # Búsqueda en colaboradores
+    q_colab = request.GET.get('q_colab', '').strip()
+    if q_colab:
+        q_lower = q_colab.lower()
+        resumen_colaboradores = [
+            c for c in resumen_colaboradores
+            if (q_lower in c['nombre'].lower() or
+                q_lower in c['username'].lower() or
+                q_lower in c['cargo'].lower() or
+                q_lower in c['delegacion_nombre'].lower())
+        ]
+
+    # Filtro por cumplimiento de colaboradores
+    filtro_cumplimiento = request.GET.get('cumplimiento', '').strip()
+    if filtro_cumplimiento == 'optimo':
+        resumen_colaboradores = [c for c in resumen_colaboradores if c['pct_realizado'] >= 80]
+    elif filtro_cumplimiento == 'medio':
+        resumen_colaboradores = [c for c in resumen_colaboradores if 50 <= c['pct_realizado'] < 80]
+    elif filtro_cumplimiento == 'bajo':
+        resumen_colaboradores = [c for c in resumen_colaboradores if c['pct_realizado'] < 50]
+    elif filtro_cumplimiento == 'con_pendientes':
+        resumen_colaboradores = [c for c in resumen_colaboradores if c['pendientes'] > 0]
+
+    # Ordenamiento de colaboradores
+    orden_colab = request.GET.get('orden_colab', '-total').strip()
+    if orden_colab == 'total':
+        resumen_colaboradores.sort(key=lambda x: x['total'])
+    elif orden_colab == '-realizados':
+        resumen_colaboradores.sort(key=lambda x: x['realizados'], reverse=True)
+    elif orden_colab == '-pct':
+        resumen_colaboradores.sort(key=lambda x: x['pct_realizado'], reverse=True)
+    elif orden_colab == 'nombre':
+        resumen_colaboradores.sort(key=lambda x: x['nombre'].lower())
+    else:
+        resumen_colaboradores.sort(key=lambda x: x['total'], reverse=True)
+
+    # Paginación de colaboradores
+    colab_paginator = Paginator(resumen_colaboradores, page_size)
+    page_obj_colab = colab_paginator.get_page(request.GET.get('page_colab', 1))
+
+    # Catálogo de responsables para el dropdown de filtro
+    responsables_filtro = User.objects.filter(id__in=uids_con_atencion).order_by('first_name', 'username')
+
+    return render(request, 'gestion/tubo.html', {
+        'tab': tab,
+        'atenciones_tubo': atenciones_tubo_pagina,
+        'page_obj': page_obj,
+        'encargados_edicion': encargados_edicion,
+        'tubo_total_count': tubo_total_count,
+        'ingresados_count': ingresados_count,
+        'proceso_count': proceso_count,
+        'pendientes_count': pendientes_count,
+        'realizados_count': realizados_count,
+        'canceladas_count': canceladas_count,
+        'pct_realizado': pct_realizado,
+        'pct_pendientes': pct_pendientes,
+        'alerta_pendientes_10': alerta_pendientes_10,
+        'colaboradores_total_count': len(resumen_colaboradores),
+        'resumen_colaboradores': page_obj_colab.object_list,
+        'page_obj_colab': page_obj_colab,
+        'q_colab': q_colab,
+        'filtro_cumplimiento': filtro_cumplimiento,
+        'orden_colab': orden_colab,
+        'responsables_filtro': responsables_filtro,
+        'todas_delegaciones': todas_delegaciones,
+        'delegacion_seleccionada': delegacion_seleccionada,
+        'es_admin': es_admin,
+        'q': q,
+        'filtro_estado': filtro_estado,
+        'filtro_origen': filtro_origen,
+        'filtro_responsable': filtro_responsable,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
+    })
+
+
+@login_required
+def gestion_tubo_cambiar_estado(request, atencion_id):
+    """
+    Actualización y gestión de un requerimiento en el Tubo SGR.
+    Conectado directamente con la Atención Ciudadana: cualquier modificación se refleja en ambas partes.
+    """
+    if request.method != 'POST':
+        return redirect('gestion_tubo')
+
+    atencion = get_object_or_404(AtencionCiudadana, id=atencion_id)
+    nuevo_estado = request.POST.get('nuevo_estado', '').strip()
+    nuevo_avance = request.POST.get('avance_observaciones', '').strip()
+    nueva_area = request.POST.get('area_apoyo', '').strip()
+    nueva_fecha_comp = request.POST.get('fecha_compromiso', '').strip()
+    va_a_tubo_val = request.POST.get('va_a_tubo')
+
+    estados_validos = ['Registrada', 'En proceso', 'Pendiente', 'Resuelta', 'Cancelada']
+    if nuevo_estado in estados_validos:
+        atencion.estado = nuevo_estado
+
+    if nueva_area:
+        atencion.area_apoyo = nueva_area[:100]
+
+    if nueva_fecha_comp:
+        try:
+            atencion.fecha_compromiso = datetime.date.fromisoformat(nueva_fecha_comp)
+        except ValueError:
+            pass
+
+    if va_a_tubo_val is not None:
+        atencion.va_a_tubo = va_a_tubo_val in ['1', 'true', 'on', 'si', 's', True]
+
+    if nuevo_avance:
+        if atencion.avance_observaciones:
+            atencion.avance_observaciones = f"{atencion.avance_observaciones}\n[{timezone.now().strftime('%d/%m/%Y')}] {nuevo_avance}"[:1000]
+        else:
+            atencion.avance_observaciones = nuevo_avance[:1000]
+
+    atencion.save()
+
+    # Sincronizar actividad si existe
+    if atencion.actividad_id:
+        Actividad.objects.filter(id=atencion.actividad_id).update(
+            va_a_tubo=atencion.va_a_tubo,
+            updated_at=timezone.now()
+        )
+
+    # Publicar WebSocket en tiempo real
+    del_id_ws = atencion.delegacion.id if atencion.delegacion else "global"
+    publish_module_changed("atenciones", del_id_ws, "update", atencion.id)
+
+    messages.success(request, f"Requerimiento '{atencion.codigo_atencion}' actualizado exitosamente.")
+    return redirect(request.META.get('HTTP_REFERER') or 'gestion_tubo')
+
+

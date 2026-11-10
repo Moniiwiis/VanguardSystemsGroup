@@ -111,29 +111,75 @@ class ConfiguracionMeta(BaseModel):
         unique_together = ('item', 'periodo', 'funcionario')
 
     def calcular_avance(self):
+        """
+        Cálculo de avance: cuenta actividades con da_puntaje=True.
+        Excluye coordinaciones, gestiones del delegado, y actividades sin contacto.
+        """
         from activities.models import Actividad, ValidacionEvidencia
-        qs = Actividad.objects.filter(item=self.item, periodo=self.periodo)
+        qs = Actividad.objects.filter(
+            item=self.item,
+            periodo=self.periodo,
+            da_puntaje=True,
+        )
         if self.funcionario:
             qs = qs.filter(funcionario=self.funcionario)
-        
+
         valid_ids = ValidacionEvidencia.objects.filter(resultado__iexact='Aprobado').values_list('actividad_id', flat=True)
         if ValidacionEvidencia.objects.exists():
             qs = qs.filter(id__in=valid_ids)
         return qs.count()
 
+    def total_ajuste_desempenio(self):
+        """
+        Días libres, vacaciones, días administrativos y licencias
+        ingresados por el delegado en la pestaña de semáforo para el ajuste de metas.
+        """
+        if not self.funcionario:
+            return 0.0
+        from agenda.models import AjusteDesempenio
+        ajustes = AjusteDesempenio.objects.filter(
+            funcionario=self.funcionario,
+            periodo=self.periodo
+        )
+        total = sum(float(a.valor_porcentaje) for a in ajustes)
+        return min(total, 50.0)
+
+    def valor_objetivo_ajustado(self):
+        """
+        Valor objetivo corregido según los días libres o licencias ingresados por el delegado.
+        """
+        base = float(self.valor_objetivo) if self.valor_objetivo else 0.0
+        ajuste = self.total_ajuste_desempenio()
+        if ajuste > 0 and base > 0:
+            return round(base * (1.0 - (ajuste / 100.0)), 2)
+        return base
+
     def porcentaje_cumplimiento(self):
-        obj = float(self.valor_objetivo) if self.valor_objetivo else 0.0
+        obj = self.valor_objetivo_ajustado()
         if obj <= 0:
             return 0.0
         avance = self.calcular_avance()
         return round((avance / obj) * 100.0, 2)
 
+    def porcentaje_cumplimiento_tope_120(self):
+        """
+        Tope máximo computable del 120%.
+        Retorna el porcentaje real sin tope (para visualización), pero
+        cumplimiento_ponderado() usa el tope.
+        """
+        return min(self.porcentaje_cumplimiento(), 120.0)
+
     def cumplimiento_ponderado(self):
+        """
+        Tope máximo computable es 120% del objetivo.
+        El score se detiene en 120% para equilibrar los ítems de gestión.
+        """
         pct = self.porcentaje_cumplimiento()
+        # Aplicar tope fijo 120% (el campo maximo_computable puede ser mayor pero el tubo lo fija en 120)
+        pct_tope = min(pct, 120.0)
         pond = float(self.ponderacion) if self.ponderacion else 0.0
-        res = (pond * pct) / 100.0
-        max_comp = float(self.maximo_computable) if self.maximo_computable else 150.0
-        return round(min(res, max_comp), 2)
+        res = (pond * pct_tope) / 100.0
+        return round(res, 2)
 
     def estado_semaforo(self):
         pct = self.porcentaje_cumplimiento()

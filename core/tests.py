@@ -565,7 +565,7 @@ class AtencionCiudadanaEnhancementTests(TestCase):
         post_data = {
             'modo_vecino': 'nuevo',
             'nuevo_vecino_nombre': 'Pedro Vecino Nuevo',
-            'nuevo_vecino_rut': '12.345.678-9',
+            'nuevo_vecino_rut': '12.345.678-5',
             'nuevo_vecino_telefono': '+56987654321',
             'nuevo_vecino_direccion': 'Pasaje Los Aromos 123',
             'tipo_atencion_id': self.tipo.id,
@@ -577,7 +577,7 @@ class AtencionCiudadanaEnhancementTests(TestCase):
         self.assertRedirects(response, reverse('gestion_atenciones'))
 
         # 1. Verificar que el nuevo vecino fue creado en la BD
-        vecino = Vecino.objects.filter(rut='12.345.678-9').first()
+        vecino = Vecino.objects.filter(rut='12.345.678-5').first()
         self.assertIsNotNone(vecino)
         self.assertEqual(vecino.nombre, 'Pedro Vecino Nuevo')
 
@@ -834,7 +834,7 @@ class SectorYTerritorioTests(TestCase):
         # Intentar enviar otra delegacion en POST: debe quedar bloqueada a su delegación activa (delegacion1)
         response = self.client.post(reverse('gestion_vecinos'), {
             'nombre': 'Mariana Valenzuela',
-            'rut': '18.999.888-7',
+            'rut': '18.999.888-0',
             'telefono': '+56911223344',
             'direccion': 'Avenida Central 456',
             'delegacion_id': self.delegacion2.id,  # Intento de bypass
@@ -843,7 +843,7 @@ class SectorYTerritorioTests(TestCase):
         })
         self.assertRedirects(response, reverse('gestion_vecinos'))
 
-        vecino = Vecino.objects.filter(rut='18.999.888-7').first()
+        vecino = Vecino.objects.filter(rut='18.999.888-0').first()
         self.assertIsNotNone(vecino)
         # La delegación queda estrictamente bloqueada a la delegación activa
         self.assertEqual(vecino.delegacion, self.delegacion1)
@@ -919,14 +919,14 @@ class SectorYTerritorioTests(TestCase):
         session.save()
         response = self.client.post(reverse('gestion_vecinos'), {
             'nombre': 'Vecino en contexto activo',
-            'rut': '13.345.678-5',
+            'rut': '13.345.678-3',
             'delegacion_id': self.delegacion2.id,
             'sector_id': self.sector1.id,
             'estado': 'Activo',
         })
 
         self.assertRedirects(response, reverse('gestion_vecinos'))
-        vecino = Vecino.objects.get(rut='13.345.678-5')
+        vecino = Vecino.objects.get(rut='13.345.678-3')
         self.assertEqual(vecino.delegacion, self.delegacion1)
 
     def test_atencion_con_nuevo_vecino_guarda_sector_y_delegacion_bloqueada(self):
@@ -935,7 +935,7 @@ class SectorYTerritorioTests(TestCase):
         response = self.client.post(reverse('gestion_atenciones'), {
             'modo_vecino': 'nuevo',
             'nuevo_vecino_nombre': 'Rodrigo Tapia',
-            'nuevo_vecino_rut': '15.444.333-2',
+            'nuevo_vecino_rut': '15.444.333-9',
             'nuevo_vecino_telefono': '+56998877665',
             'nuevo_vecino_direccion': 'Calle del Sol 789',
             'nuevo_vecino_sector_id': self.sector1.id,
@@ -946,7 +946,7 @@ class SectorYTerritorioTests(TestCase):
         })
         self.assertRedirects(response, reverse('gestion_atenciones'))
 
-        vecino = Vecino.objects.filter(rut='15.444.333-2').first()
+        vecino = Vecino.objects.filter(rut='15.444.333-9').first()
         self.assertIsNotNone(vecino)
         self.assertEqual(vecino.delegacion, self.delegacion1)
         self.assertEqual(vecino.sector, self.sector1)

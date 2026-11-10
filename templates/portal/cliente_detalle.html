@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle de Solicitud {{ atencion.codigo_atencion }} — Portal Ciudadano{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-4xl mx-auto">
+
+  <!-- Header Card -->
+  <div class="bg-white rounded-3xl p-6 sm:p-7 border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="space-y-1">
+      <div class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+        <a href="{% url 'portal_cliente' %}" class="hover:text-[#C41230]">Portal Ciudadano</a>
+        <span class="text-slate-300">/</span>
+        <span class="text-[#C41230]">Ficha de Requerimiento</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
+          Solicitud {{ atencion.codigo_atencion }}
+        </h1>
+        {% if atencion.estado == 'Resuelta' %}
+          <span class="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            Resuelta
+          </span>
+        {% elif atencion.estado == 'En proceso' %}
+          <span class="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
+            En proceso
+          </span>
+        {% elif atencion.estado == 'Cancelada' %}
+          <span class="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-red-50 text-red-700 border border-red-200">
+            Cancelada
+          </span>
+        {% else %}
+          <span class="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+            Registrada
+          </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <a href="{% url 'portal_cliente' %}" 
+       class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition-all flex items-center gap-2 shrink-0">
+      <i data-lucide="arrow-left" class="w-4 h-4"></i>
+      <span>Volver a Mis Solicitudes</span>
+    </a>
+  </div>
+
+  <!-- Ficha Detallada -->
+  <div class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-6">
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b border-slate-100 text-xs">
+      <div>
+        <span class="font-bold text-slate-400 block uppercase tracking-wider text-[10px]">Tipo de Servicio</span>
+        <span class="font-extrabold text-slate-900 text-sm mt-0.5 block">{{ atencion.tipo_atencion.nombre }}</span>
+        <span class="text-slate-500 font-medium">{{ atencion.sub_atencion.nombre }}</span>
+      </div>
+      <div>
+        <span class="font-bold text-slate-400 block uppercase tracking-wider text-[10px]">Delegación Asignada</span>
+        <span class="font-bold text-[#C41230] text-sm mt-0.5 block">{{ atencion.delegacion.nombre }}</span>
+        <span class="text-slate-500 font-mono">{{ atencion.created_at|date:"d/m/Y H:i" }}</span>
+      </div>
+    </div>
+
+    <div class="space-y-2">
+      <span class="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Descripción de la Solicitud</span>
+      <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-800 text-xs leading-relaxed desc-roll max-h-48">
+        {{ atencion.descripcion }}
+      </div>
+    </div>
+
+    {% if atencion.avance_observaciones %}
+      <div class="space-y-2">
+        <span class="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Respuesta y Avance Municipal</span>
+        <div class="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-emerald-950 text-xs leading-relaxed desc-roll max-h-48">
+          {{ atencion.avance_observaciones }}
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Evidencias Territoriales -->
+    <div class="space-y-3 pt-3 border-t border-slate-100">
+      <div class="flex items-center justify-between">
+        <h3 class="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+          <i data-lucide="camera" class="w-4 h-4 text-[#C41230]"></i>
+          <span>Evidencias y Registros del Terreno</span>
+        </h3>
+        {% if atencion.estado_evidencia == 'Aprobado' %}
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            Evidencia Validada
+          </span>
+        {% endif %}
+      </div>
+
+      {% if atencion.actividad and atencion.actividad.evidencias.all %}
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {% for ev in atencion.actividad.evidencias.all %}
+            <div class="rounded-xl border border-slate-200 overflow-hidden bg-slate-50 p-2 flex flex-col items-center text-center">
+              {% if ev.imagen %}
+                <a href="{{ ev.imagen.url }}" target="_blank" rel="noopener" class="block w-full">
+                  <img src="{{ ev.imagen.url }}" alt="{{ ev.get_momento_display }}" class="w-full h-28 object-cover rounded-lg" />
+                </a>
+              {% endif %}
+              <span class="text-[10px] font-bold text-slate-600 mt-1.5">{{ ev.get_momento_display }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-xs text-slate-400 italic">No hay fotografías o archivos de terreno adjuntos a esta solicitud todavía.</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

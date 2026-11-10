@@ -1,671 +1,876 @@
+"""
+Comando de población de datos para el Sistema Municipal SGR - Municipalidad de La Serena.
+Evaluación 3 - Proyecto Integrado 4to Semestre INACAP.
+
+Genera:
+  - Delegaciones, Sectores, Roles, Cargos
+  - 6 cuentas de evaluación (admin_a, editor_a, lector_a, lector_b, cliente_1, cliente_2)
+  - Cuentas de operación adicionales
+  - >2.000 OrganizacionComunitaria desde fixtures/base_datos_JJVV.xlsx
+  - Atenciones ciudadanas desde fixtures/matriz_sgr.xlsx
+  - Vecinos con RUTs válidos Módulo 11
+"""
+
+import os
+import re
+import datetime
+import random
+import openpyxl
+
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User, Permission
 from django.utils import timezone
-import datetime
+
 from accounts.models import Delegacion, Cargo, Funcionario, Rol, FuncionarioRol, Sector
-from configuration.models import (
-    Periodo, CatalogoActividad, ItemMedicion, ConfiguracionMeta,
-    TipoAtencion, SubAtencion
-)
 from activities.models import (
-    Actividad, Evidencia, ValidacionEvidencia, AtencionSocialGestion,
-    TipoGestion, Vecino, AtencionCiudadana
+    Actividad, Vecino, AtencionCiudadana, OrganizacionComunitaria, TipoGestion,
 )
-from agenda.models import CompromisoAgenda, AjusteDesempenio
+
+try:
+    from configuration.models import TipoAtencion, SubAtencion, Periodo, CatalogoActividad, ItemMedicion, ConfiguracionMeta
+except ImportError:
+    TipoAtencion = SubAtencion = Periodo = CatalogoActividad = ItemMedicion = ConfiguracionMeta = None
+
+# ---------------------------------------------------------------------------
+# Utilidades RUT Módulo 11
+# ---------------------------------------------------------------------------
+
+def calcular_dv(numero):
+    """Calcula dígito verificador RUT chileno (Módulo 11)."""
+    s, m = 0, 2
+    for d in reversed(str(numero)):
+        s += int(d) * m
+        m = m + 1 if m < 7 else 2
+    resto = s % 11
+    if resto == 0:
+        return '0'
+    elif resto == 1:
+        return 'K'
+    else:
+        return str(11 - resto)
+
+
+def formatear_rut(numero):
+    """Devuelve RUT formateado como '12.345.678-9'."""
+    dv = calcular_dv(numero)
+    s = str(numero)
+    if len(s) > 6:
+        s = s[:-6] + '.' + s[-6:-3] + '.' + s[-3:]
+    elif len(s) > 3:
+        s = s[:-3] + '.' + s[-3:]
+    return f"{s}-{dv}"
+
+
+# Pool de RUTs únicos para vecinos generados (3.000.000 - 25.000.000)
+_ruts_usados = set()
+
+def gen_rut():
+    """Genera RUT chileno único y válido."""
+    while True:
+        n = random.randint(3_000_000, 25_000_000)
+        if n not in _ruts_usados:
+            _ruts_usados.add(n)
+            return formatear_rut(n)
+
+
+# ---------------------------------------------------------------------------
+# Clase Command
+# ---------------------------------------------------------------------------
 
 class Command(BaseCommand):
-    help = 'Puebla la base de datos con información demostrativa reproducible según requerimientos de Segunda Evaluación SGR'
+    help = ('Puebla la base de datos SGR con datos de evaluación:\n'
+            '  - 6 cuentas de evaluación\n'
+            '  - >2.000 organizaciones desde base_datos_JJVV.xlsx\n'
+            '  - Atenciones desde matriz_sgr.xlsx')
 
     def handle(self, *args, **options):
-        self.stdout.write("Cargando datos semillas completos en la base de datos SGR...")
+        self.stdout.write(self.style.MIGRATE_HEADING(
+            "=== Iniciando seed de datos SGR (Evaluación 3) ==="))
 
-        def assign_role(func, rol):
-            fr = FuncionarioRol.all_objects.filter(funcionario=func, rol=rol).first()
-            if fr:
-                fr.deleted_at = None
-                fr.save()
-            else:
-                FuncionarioRol.objects.create(funcionario=func, rol=rol)
-
-        # 1. Delegaciones Municipales (Wireframe C3)
+        # ------------------------------------------------------------------
+        # 1. DELEGACIONES
+        # ------------------------------------------------------------------
+        self.stdout.write("▶ Creando delegaciones...")
         del_centro, _ = Delegacion.all_objects.get_or_create(
             nombre="Delegación Centro",
-            defaults={'codigo': 'DEL01', 'direccion': 'Los Carrera 301', 'comuna': 'La Serena', 'estado': 'Activa', 'ambito': 'Urbano Central'}
+            defaults={'codigo': 'DEL01', 'direccion': 'Los Carrera 301',
+                      'comuna': 'La Serena', 'estado': 'Activa', 'ambito': 'Urbano Central'}
         )
-        del_centro.codigo = 'DEL01'
-        del_centro.comuna = 'La Serena'
-        del_centro.direccion = 'Los Carrera 301'
-        del_centro.estado = 'Activa'
-        del_centro.deleted_at = None
-        del_centro.save()
+        del_centro.codigo = 'DEL01'; del_centro.estado = 'Activa'
+        del_centro.deleted_at = None; del_centro.save()
 
         del_norte, _ = Delegacion.all_objects.get_or_create(
             nombre="Delegación Norte",
-            defaults={'codigo': 'DEL02', 'direccion': 'Av. Las Compañías 450', 'comuna': 'La Serena', 'estado': 'Activa', 'ambito': 'Sector Norte'}
+            defaults={'codigo': 'DEL02', 'direccion': 'Av. Las Compañías 450',
+                      'comuna': 'La Serena', 'estado': 'Activa', 'ambito': 'Sector Norte'}
         )
-        del_norte.codigo = 'DEL02'
-        del_norte.comuna = 'La Serena'
-        del_norte.direccion = 'Av. Las Compañías 450'
-        del_norte.estado = 'Activa'
-        del_norte.deleted_at = None
-        del_norte.save()
+        del_norte.codigo = 'DEL02'; del_norte.estado = 'Activa'
+        del_norte.deleted_at = None; del_norte.save()
 
         del_sur, _ = Delegacion.all_objects.get_or_create(
             nombre="Delegación Sur",
-            defaults={'codigo': 'DEL03', 'direccion': 'Av. Cuatro Esquinas 890', 'comuna': 'La Serena', 'estado': 'Activa', 'ambito': 'Sector Sur'}
+            defaults={'codigo': 'DEL03', 'direccion': 'Av. Cuatro Esquinas 890',
+                      'comuna': 'La Serena', 'estado': 'Activa', 'ambito': 'Sector Sur'}
         )
-        del_sur.codigo = 'DEL03'
-        del_sur.comuna = 'La Serena'
-        del_sur.direccion = 'Av. Cuatro Esquinas 890'
-        del_sur.estado = 'Activa'
-        del_sur.deleted_at = None
-        del_sur.save()
+        del_sur.codigo = 'DEL03'; del_sur.estado = 'Activa'
+        del_sur.deleted_at = None; del_sur.save()
 
         del_rural, _ = Delegacion.all_objects.get_or_create(
             nombre="Delegación Rural",
-            defaults={'codigo': 'DEL04', 'direccion': 'Camino Elqui Km 12', 'comuna': 'La Serena', 'estado': 'Activa', 'ambito': 'Valle de Elqui'}
+            defaults={'codigo': 'DEL04', 'direccion': 'Camino Elqui Km 12',
+                      'comuna': 'La Serena', 'estado': 'Activa', 'ambito': 'Valle de Elqui'}
         )
-        del_rural.codigo = 'DEL04'
-        del_rural.comuna = 'La Serena'
-        del_rural.direccion = 'Camino Elqui Km 12'
-        del_rural.estado = 'Activa'
-        del_rural.deleted_at = None
-        del_rural.save()
+        del_rural.codigo = 'DEL04'; del_rural.estado = 'Activa'
+        del_rural.deleted_at = None; del_rural.save()
 
-        # 1.1 Sectores Territoriales por Delegación
+        # ------------------------------------------------------------------
+        # 2. SECTORES
+        # ------------------------------------------------------------------
+        self.stdout.write("▶ Creando sectores...")
         sectores_data = [
-            # Centro
-            ('SEC-CEN01', 'Casco Histórico', del_centro, 'Sector fundacional, Plaza de Armas y La Recova'),
-            ('SEC-CEN02', 'Balmaceda y Estadio', del_centro, 'Eje comercial y deportivo'),
-            ('SEC-CEN03', 'La Florida y El Pino', del_centro, 'Sectores residenciales tradicionales del centro alto'),
-            ('SEC-CEN04', 'Caleta San Pedro', del_centro, 'Borde costero y caleta de pescadores'),
-            ('SEC-CEN05', 'Costanera y Av. del Mar', del_centro, 'Franja turística y residencial costera'),
-            # Norte (Las Compañías)
-            ('SEC-NOR01', 'Compañía Alta', del_norte, 'Población Juan Soldado y El Romero norte'),
-            ('SEC-NOR02', 'Compañía Baja', del_norte, 'Sindicato, Villa Las Rosas y ribera río Elqui'),
-            ('SEC-NOR03', 'Villa Lambert y Parque Islon', del_norte, 'Área residencial y equipamiento comunitario'),
-            ('SEC-NOR04', 'Villa Los Aromos', del_norte, 'Sector residencial oriente de Las Compañías'),
-            ('SEC-NOR05', 'El Romero Urbano', del_norte, 'Poblaciones de expansión norte'),
-            # Sur (La Pampa / El Milagro)
-            ('SEC-SUR01', 'San Joaquín', del_sur, 'Barrio residencial consolidado'),
-            ('SEC-SUR02', 'El Milagro I y II', del_sur, 'Sectores residenciales de crecimiento sur-oriente'),
-            ('SEC-SUR03', 'La Pampa Tradicional', del_sur, 'Eje Cuatro Esquinas y Larraín Alcalde'),
-            ('SEC-SUR04', 'Barrio Universitario', del_sur, 'Zona universitaria y residencias'),
-            ('SEC-SUR05', 'Colina El Pino Sur', del_sur, 'Límite sur urbano'),
-            # Rural
-            ('SEC-RUR01', 'Algarrobito', del_rural, 'Localidad rural tradicional Valle del Elqui'),
-            ('SEC-RUR02', 'Altovalsol', del_rural, 'Comunidad agrícola y villorrios rurales'),
-            ('SEC-RUR03', 'Las Rojas', del_rural, 'Poblado rural histórico'),
-            ('SEC-RUR04', 'Lambert Rural', del_rural, 'Comunidad minera y agrícola tradicional'),
-            ('SEC-RUR05', 'Pelícana y Quebrada de Talca', del_rural, 'Sectores rurales del interior'),
+            ('SEC-CEN01', 'Casco Histórico', del_centro),
+            ('SEC-CEN02', 'Balmaceda y Estadio', del_centro),
+            ('SEC-CEN03', 'La Florida y El Pino', del_centro),
+            ('SEC-CEN04', 'Caleta San Pedro', del_centro),
+            ('SEC-CEN05', 'Costanera y Av. del Mar', del_centro),
+            ('SEC-NOR01', 'Compañía Alta', del_norte),
+            ('SEC-NOR02', 'Compañía Baja', del_norte),
+            ('SEC-NOR03', 'Villa Lambert y Parque Islón', del_norte),
+            ('SEC-NOR04', 'Villa Los Aromos', del_norte),
+            ('SEC-NOR05', 'El Romero Urbano', del_norte),
+            ('SEC-SUR01', 'San Joaquín', del_sur),
+            ('SEC-SUR02', 'El Milagro I y II', del_sur),
+            ('SEC-SUR03', 'La Pampa Tradicional', del_sur),
+            ('SEC-SUR04', 'Barrio Universitario', del_sur),
+            ('SEC-SUR05', 'Colina El Pino Sur', del_sur),
+            ('SEC-RUR01', 'Algarrobito', del_rural),
+            ('SEC-RUR02', 'Altovalsol', del_rural),
+            ('SEC-RUR03', 'Las Rojas', del_rural),
+            ('SEC-RUR04', 'Lambert Rural', del_rural),
+            ('SEC-RUR05', 'Pelícana y Quebrada de Talca', del_rural),
         ]
         sectores_dict = {}
-        for cod, nom, del_obj, desc in sectores_data:
+        delegaciones_por_territorio = {}
+        for cod, nom, del_obj in sectores_data:
             sec, _ = Sector.all_objects.get_or_create(
                 codigo=cod,
-                defaults={'nombre': nom, 'delegacion': del_obj, 'descripcion': desc, 'estado': 'Activo'}
+                defaults={'nombre': nom, 'delegacion': del_obj, 'estado': 'Activo'}
             )
-            sec.nombre = nom
-            sec.delegacion = del_obj
-            sec.descripcion = desc
-            sec.estado = 'Activo'
-            sec.deleted_at = None
-            sec.save()
+            sec.nombre = nom; sec.delegacion = del_obj
+            sec.estado = 'Activo'; sec.deleted_at = None; sec.save()
             sectores_dict[cod] = sec
+            delegaciones_por_territorio[nom.upper()] = del_obj
 
-        # 2. Roles (Wireframe C3)
-        rol_admin, _ = Rol.all_objects.get_or_create(
-            nombre_rol="Administrador",
-            defaults={'codigo': 'ROL01', 'alcance': 'Autorizado', 'estado': 'Activo', 'descripcion': 'Acceso total y configuración de todo el sistema municipal.'}
-        )
-        rol_admin.codigo = 'ROL01'
-        rol_admin.alcance = 'Autorizado'
-        rol_admin.estado = 'Activo'
-        rol_admin.descripcion = 'Acceso total y configuración de todo el sistema municipal.'
-        rol_admin.deleted_at = None
-        rol_admin.save()
+        # ------------------------------------------------------------------
+        # 3. ROLES
+        # ------------------------------------------------------------------
+        self.stdout.write("▶ Creando roles...")
 
-        rol_operador, _ = Rol.all_objects.get_or_create(
-            nombre_rol="Operador",
-            defaults={'codigo': 'ROL02', 'alcance': 'Delegación', 'estado': 'Activo', 'descripcion': 'Ingreso y atención ciudadana en su delegación.'}
-        )
-        rol_operador.codigo = 'ROL02'
-        rol_operador.alcance = 'Delegación'
-        rol_operador.estado = 'Activo'
-        rol_operador.descripcion = 'Ingreso y atención ciudadana en su delegación.'
-        rol_operador.deleted_at = None
-        rol_operador.save()
+        def mk_rol(nombre, codigo, alcance, descripcion):
+            r, _ = Rol.all_objects.get_or_create(
+                nombre_rol=nombre,
+                defaults={'codigo': codigo, 'alcance': alcance,
+                          'estado': 'Activo', 'descripcion': descripcion}
+            )
+            r.codigo = codigo; r.alcance = alcance
+            r.estado = 'Activo'; r.descripcion = descripcion
+            r.deleted_at = None; r.save()
+            return r
 
-        rol_consultor, _ = Rol.all_objects.get_or_create(
-            nombre_rol="Consultor",
-            defaults={'codigo': 'ROL03', 'alcance': 'Lectura', 'estado': 'Activo', 'descripcion': 'Consulta y seguimiento en modo solo lectura.'}
-        )
-        rol_consultor.codigo = 'ROL03'
-        rol_consultor.alcance = 'Lectura'
-        rol_consultor.estado = 'Activo'
-        rol_consultor.descripcion = 'Consulta y seguimiento en modo solo lectura.'
-        rol_consultor.deleted_at = None
-        rol_consultor.save()
+        rol_admin    = mk_rol("Administrador",    "ROL01", "Autorizado", "Acceso total al sistema municipal.")
+        rol_operador = mk_rol("Operador",          "ROL02", "Delegación", "Ingreso y atención ciudadana en su delegación.")
+        rol_consultor = mk_rol("Consultor",        "ROL03", "Lectura",    "Solo lectura y seguimiento.")
+        rol_coord    = mk_rol("Coordinador",       "ROL04", "Autorizado", "Supervisión de metas y reportes territoriales.")
+        rol_delegado = mk_rol("Delegado Municipal","ROL05", "Delegación", "Gestión directiva de su delegación.")
+        rol_cliente  = mk_rol("Cliente",           "ROL06", "Personal",   "Vecino ciudadano con acceso al portal.")
 
-        rol_coord, _ = Rol.all_objects.get_or_create(
-            nombre_rol="Coordinador",
-            defaults={'codigo': 'ROL04', 'alcance': 'Autorizado', 'estado': 'Activo', 'descripcion': 'Supervisión de metas, tipos de atención y reportes territoriales.'}
-        )
-        rol_coord.codigo = 'ROL04'
-        rol_coord.alcance = 'Autorizado'
-        rol_coord.estado = 'Activo'
-        rol_coord.descripcion = 'Supervisión de metas, tipos de atención y reportes territoriales.'
-        rol_coord.deleted_at = None
-        rol_coord.save()
+        # ------------------------------------------------------------------
+        # 4. CARGOS
+        # ------------------------------------------------------------------
+        self.stdout.write("▶ Creando cargos...")
 
-        rol_delegado, _ = Rol.all_objects.get_or_create(
-            nombre_rol="Delegado Municipal",
-            defaults={'codigo': 'ROL05', 'alcance': 'Delegación', 'estado': 'Activo', 'descripcion': 'Gestión directiva de usuarios y atenciones en su delegación.'}
-        )
-        rol_delegado.codigo = 'ROL05'
-        rol_delegado.alcance = 'Delegación'
-        rol_delegado.estado = 'Activo'
-        rol_delegado.descripcion = 'Gestión directiva de usuarios y atenciones en su delegación.'
-        rol_delegado.deleted_at = None
-        rol_delegado.save()
+        def mk_cargo(nombre, descripcion=''):
+            c, _ = Cargo.all_objects.get_or_create(
+                nombre_cargo=nombre,
+                defaults={'descripcion': descripcion}
+            )
+            return c
 
-        # 3. Cargos
-        cargo_gestor, _ = Cargo.all_objects.get_or_create(
-            nombre_cargo="Gestor Social",
-            defaults={'descripcion': 'Atención y derivación de requerimientos sociales vecinales.'}
-        )
-        cargo_coord, _ = Cargo.all_objects.get_or_create(
-            nombre_cargo="Coordinador Territorial",
-            defaults={'descripcion': 'Supervisión de compromisos e intervenciones comunitarias.'}
-        )
-        cargo_inspector, _ = Cargo.all_objects.get_or_create(
-            nombre_cargo="Inspector Municipal",
-            defaults={'descripcion': 'Fiscalización y respuesta a denuncias urbanas.'}
-        )
+        cargo_admin     = mk_cargo("Administrador Sistema", "Administración del sistema SGR.")
+        cargo_gestor    = mk_cargo("Gestor Social", "Atención y derivación de requerimientos sociales.")
+        cargo_coord     = mk_cargo("Coordinador Territorial", "Supervisión de compromisos comunitarios.")
+        cargo_inspector = mk_cargo("Inspector Municipal", "Fiscalización y respuesta a denuncias.")
+        cargo_ciudadano = mk_cargo("Ciudadano", "Usuario ciudadano portal vecinal.")
 
-        # 4. Usuarios y Funcionarios de Prueba
-        all_perms = Permission.objects.filter(
-            content_type__app_label__in=['accounts', 'activities', 'agenda', 'configuration', 'analytics']
-        )
+        # ------------------------------------------------------------------
+        # 5. TIPOS DE ATENCIÓN Y SUB-ATENCIONES
+        # ------------------------------------------------------------------
+        self.stdout.write("▶ Creando tipos de atención...")
+        tipos_map = {}  # nombre -> objeto TipoAtencion
 
-        # a) Superadministrador (Ámbito Global Comunal)
-        u_admin, _ = User.objects.get_or_create(
-            username="admin_sgr",
-            defaults={'email': "admin@laserena.cl", 'first_name': "Administrador General", 'is_staff': True, 'is_superuser': True}
-        )
-        u_admin.first_name = "Administrador General"
-        u_admin.email = "admin@laserena.cl"
-        u_admin.set_password("Admin1234!")
-        u_admin.is_active = True
-        u_admin.save()
-        f_admin, _ = Funcionario.all_objects.get_or_create(
-            user=u_admin,
-            defaults={'identificador_institucional': "ADM-001", 'delegacion': None, 'cargo': cargo_coord, 'estado': "Activo"}
-        )
-        f_admin.delegacion = None
-        f_admin.deleted_at = None
-        f_admin.save()
-        assign_role(f_admin, rol_admin)
+        tipos_nombres = [
+            ("Social",          "TA001", "Apoyo y derivación social."),
+            ("Salud",           "TA002", "Orientación y derivación de salud."),
+            ("Educación",       "TA003", "Apoyo escolar y becas municipales."),
+            ("Vivienda",        "TA004", "Regularización y mejoras habitacionales."),
+            ("Medioambiente",   "TA005", "Denuncias y gestión ambiental."),
+            ("Seguridad",       "TA006", "Coordinación con fuerzas de orden."),
+            ("Infraestructura", "TA007", "Obras, veredas y luminaria."),
+            ("Deportes",        "TA008", "Programas deportivos y recreativos."),
+            ("Cultura",         "TA009", "Talleres y actividades culturales."),
+            ("Trámites",        "TA010", "Certificados, permisos y documentos."),
+        ]
+        for nombre_ta, codigo_ta, desc_ta in tipos_nombres:
+            if TipoAtencion:
+                ta, _ = TipoAtencion.all_objects.get_or_create(
+                    nombre=nombre_ta,
+                    defaults={'codigo': codigo_ta, 'descripcion': desc_ta, 'estado': 'Activo'}
+                )
+                ta.codigo = codigo_ta; ta.descripcion = desc_ta
+                ta.estado = 'Activo'; ta.deleted_at = None; ta.save()
+                tipos_map[nombre_ta.upper()] = ta
 
-        # Si existe el usuario 'admin' en la base local, configurarlo también como Global
-        u_admin_local = User.objects.filter(username="admin").first()
-        if u_admin_local:
-            f_admin_local = Funcionario.all_objects.filter(user=u_admin_local).first()
-            if f_admin_local:
-                f_admin_local.delegacion = None
-                f_admin_local.save()
+        sub_atenciones = [
+            ("Ayuda social",          "SA001", "Social"),
+            ("Subsidio habitacional", "SA002", "Social"),
+            ("Consulta médica",       "SA003", "Salud"),
+            ("Derivación CESFAM",     "SA004", "Salud"),
+            ("Beca municipal",        "SA005", "Educación"),
+            ("Mejora térmica",        "SA006", "Vivienda"),
+            ("Regularización DFL2",   "SA007", "Vivienda"),
+            ("Denuncia ambiental",    "SA008", "Medioambiente"),
+            ("Luminaria pública",     "SA009", "Infraestructura"),
+            ("Certificado domicilio", "SA010", "Trámites"),
+        ]
+        subatenciones_map = {}
+        for nombre_sa, codigo_sa, tipo_nombre_sa in sub_atenciones:
+            if SubAtencion and tipo_nombre_sa.upper() in tipos_map:
+                sa, _ = SubAtencion.all_objects.get_or_create(
+                    nombre=nombre_sa,
+                    tipo_atencion=tipos_map[tipo_nombre_sa.upper()],
+                    defaults={'codigo': codigo_sa, 'estado': 'Activa'}
+                )
+                sa.codigo = codigo_sa; sa.estado = 'Activa'
+                sa.deleted_at = None; sa.save()
+                subatenciones_map[nombre_sa.upper()] = sa
 
-        # b) Coordinador General
-        u_coord, _ = User.objects.get_or_create(
-            username="coordinador_sgr",
-            defaults={'email': "coordinador@laserena.cl", 'first_name': "Patricia Morales", 'is_staff': True, 'is_superuser': False}
-        )
-        u_coord.first_name = "Patricia Morales"
-        u_coord.email = "coordinador@laserena.cl"
-        u_coord.set_password("User1234!")
-        u_coord.is_active = True
-        u_coord.save()
-        u_coord.user_permissions.set(all_perms)
-        f_coord, _ = Funcionario.all_objects.get_or_create(
-            user=u_coord,
-            defaults={'identificador_institucional': "COO-001", 'delegacion': del_centro, 'cargo': cargo_coord, 'estado': "Activo"}
-        )
-        f_coord.delegacion = del_centro
-        f_coord.deleted_at = None
-        f_coord.save()
-        assign_role(f_coord, rol_coord)
+        ta_default = tipos_map.get('SOCIAL')
+        sa_default = subatenciones_map.get('AYUDA SOCIAL')
 
-        # c) Delegado Centro
-        u_centro, _ = User.objects.get_or_create(
-            username="delegado_centro",
-            defaults={'email': "delegado.centro@laserena.cl", 'first_name': "Carlos Mendoza", 'is_staff': True, 'is_superuser': False}
-        )
-        u_centro.first_name = "Carlos Mendoza"
-        u_centro.email = "delegado.centro@laserena.cl"
-        u_centro.set_password("User1234!")
-        u_centro.is_active = True
-        u_centro.save()
-        u_centro.user_permissions.set(all_perms)
-        f_centro, _ = Funcionario.all_objects.get_or_create(
-            user=u_centro,
-            defaults={'identificador_institucional': "DEL-001", 'delegacion': del_centro, 'cargo': cargo_coord, 'estado': "Activo"}
-        )
-        f_centro.delegacion = del_centro
-        f_centro.deleted_at = None
-        f_centro.save()
-        assign_role(f_centro, rol_delegado)
-
-        # d) Delegado Las Compañías (Norte)
-        u_comp, _ = User.objects.get_or_create(
-            username="delegado_companias",
-            defaults={'email': "delegado.companias@laserena.cl", 'first_name': "María Rojas", 'is_staff': True, 'is_superuser': False}
-        )
-        u_comp.first_name = "María Rojas"
-        u_comp.email = "delegado.companias@laserena.cl"
-        u_comp.set_password("User1234!")
-        u_comp.is_active = True
-        u_comp.save()
-        u_comp.user_permissions.set(all_perms)
-        f_comp, _ = Funcionario.all_objects.get_or_create(
-            user=u_comp,
-            defaults={'identificador_institucional': "DEL-002", 'delegacion': del_norte, 'cargo': cargo_coord, 'estado': "Activo"}
-        )
-        f_comp.delegacion = del_norte
-        f_comp.deleted_at = None
-        f_comp.save()
-        assign_role(f_comp, rol_delegado)
-
-        # e) Funcionario / Operador Juan
-        u_juan, _ = User.objects.get_or_create(
-            username="funcionario_juan",
-            defaults={'email': "juan.perez@laserena.cl", 'first_name': "Juan Pérez", 'is_staff': True, 'is_superuser': False}
-        )
-        u_juan.first_name = "Juan Pérez"
-        u_juan.email = "juan.perez@laserena.cl"
-        u_juan.set_password("User1234!")
-        u_juan.is_active = True
-        u_juan.save()
-        u_juan.user_permissions.set(all_perms)
-        f_juan, _ = Funcionario.all_objects.get_or_create(
-            user=u_juan,
-            defaults={'identificador_institucional': "FUN-101", 'delegacion': del_centro, 'cargo': cargo_gestor, 'estado': "Activo"}
-        )
-        f_juan.delegacion = del_centro
-        f_juan.deleted_at = None
-        f_juan.save()
-        assign_role(f_juan, rol_operador)
-
-        # f) Consultor Ana
-        u_ana, _ = User.objects.get_or_create(
-            username="consultor_ana",
-            defaults={'email': "ana.ejemplo@laserena.cl", 'first_name': "Ana Ejemplo", 'is_staff': False, 'is_superuser': False}
-        )
-        u_ana.first_name = "Ana Ejemplo"
-        u_ana.email = "ana.ejemplo@laserena.cl"
-        u_ana.set_password("User1234!")
-        u_ana.is_active = True
-        u_ana.save()
-        f_ana, _ = Funcionario.all_objects.get_or_create(
-            user=u_ana,
-            defaults={'identificador_institucional': "CON-201", 'delegacion': del_centro, 'cargo': cargo_inspector, 'estado': "Activo"}
-        )
-        f_ana.delegacion = del_centro
-        f_ana.deleted_at = None
-        f_ana.save()
-        assign_role(f_ana, rol_consultor)
-
-        # g) Delegado Sur
-        u_sur, _ = User.objects.get_or_create(
-            username="delegado_sur",
-            defaults={'email': "delegado.sur@laserena.cl", 'first_name': "Gonzalo Herrera", 'is_staff': True, 'is_superuser': False}
-        )
-        u_sur.first_name = "Gonzalo Herrera"
-        u_sur.email = "delegado.sur@laserena.cl"
-        u_sur.set_password("User1234!")
-        u_sur.is_active = True
-        u_sur.save()
-        u_sur.user_permissions.set(all_perms)
-        f_sur, _ = Funcionario.all_objects.get_or_create(
-            user=u_sur,
-            defaults={'identificador_institucional': "DEL-003", 'delegacion': del_sur, 'cargo': cargo_coord, 'estado': "Activo"}
-        )
-        f_sur.delegacion = del_sur
-        f_sur.deleted_at = None
-        f_sur.save()
-        assign_role(f_sur, rol_delegado)
-
-        # h) Delegado Rural
-        u_rural, _ = User.objects.get_or_create(
-            username="delegado_rural",
-            defaults={'email': "delegado.rural@laserena.cl", 'first_name': "Patricia Vega", 'is_staff': True, 'is_superuser': False}
-        )
-        u_rural.first_name = "Patricia Vega"
-        u_rural.email = "delegado.rural@laserena.cl"
-        u_rural.set_password("User1234!")
-        u_rural.is_active = True
-        u_rural.save()
-        u_rural.user_permissions.set(all_perms)
-        f_rural, _ = Funcionario.all_objects.get_or_create(
-            user=u_rural,
-            defaults={'identificador_institucional': "DEL-004", 'delegacion': del_rural, 'cargo': cargo_coord, 'estado': "Activo"}
-        )
-        f_rural.delegacion = del_rural
-        f_rural.deleted_at = None
-        f_rural.save()
-        assign_role(f_rural, rol_delegado)
-
-        # 5. Período
-        periodo_actual, _ = Periodo.all_objects.get_or_create(
-            fecha_inicio=datetime.date(2026, 7, 1),
-            fecha_termino=datetime.date(2026, 9, 30),
-            defaults={'dias_computables': 91, 'estado': 'Abierto'}
-        )
-        periodo_actual.deleted_at = None
-        periodo_actual.save()
-
-        # 6. Catálogo Actividad
-        cat_social, _ = CatalogoActividad.all_objects.get_or_create(
-            tipo_actividad="Atención Social",
-            servicio="Asistencia Vecinal Directa",
-            defaults={'tipo_atencion': 'Presencial', 'subtipo_atencion': 'Registro Ficha Familiar', 'estado': 'Activo'}
-        )
-        cat_terr, _ = CatalogoActividad.all_objects.get_or_create(
-            tipo_actividad="Operativo Territorial",
-            servicio="Limpieza y Desmalezado",
-            defaults={'tipo_atencion': 'Terreno', 'subtipo_atencion': 'Intervención Comunitaria', 'estado': 'Activo'}
-        )
-
-        # 7. Ítems y metas (Wireframe C4)
-        item1, _ = ItemMedicion.all_objects.get_or_create(
-            nombre_item="Cobertura",
-            defaults={'codigo': 'IT001', 'descripcion': 'Atenciones', 'unidad_medida': 'Atenciones', 'cargo': cargo_gestor, 'catalogo': cat_social, 'estado': 'Activo'}
-        )
-        item1.codigo = 'IT001'
-        item1.descripcion = 'Atenciones'
-        item1.estado = 'Activo'
-        item1.deleted_at = None
-        item1.save()
-
-        item2, _ = ItemMedicion.all_objects.get_or_create(
-            nombre_item="Satisfacción",
-            defaults={'codigo': 'IT002', 'descripcion': 'Experiencia', 'unidad_medida': '%', 'cargo': cargo_coord, 'catalogo': cat_terr, 'estado': 'Activo'}
-        )
-        item2.codigo = 'IT002'
-        item2.descripcion = 'Experiencia'
-        item2.estado = 'Activo'
-        item2.deleted_at = None
-        item2.save()
-
-        item3, _ = ItemMedicion.all_objects.get_or_create(
-            nombre_item="Tiempos",
-            defaults={'codigo': 'IT003', 'descripcion': 'Respuesta', 'unidad_medida': 'Horas', 'cargo': cargo_inspector, 'catalogo': cat_social, 'estado': 'Activo'}
-        )
-        item3.codigo = 'IT003'
-        item3.descripcion = 'Respuesta'
-        item3.estado = 'Activo'
-        item3.deleted_at = None
-        item3.save()
-
-        # Configuración de metas
-        meta1, _ = ConfiguracionMeta.all_objects.get_or_create(
-            item=item1, periodo=periodo_actual, funcionario=f_juan,
-            defaults={'valor_objetivo': 20.0, 'ponderacion': 50.0, 'umbral_minimo': 80.0, 'maximo_computable': 150.0}
-        )
-        meta1.deleted_at = None
-        meta1.save()
-
-        meta2, _ = ConfiguracionMeta.all_objects.get_or_create(
-            item=item2, periodo=periodo_actual, funcionario=f_comp,
-            defaults={'valor_objetivo': 10.0, 'ponderacion': 50.0, 'umbral_minimo': 80.0, 'maximo_computable': 150.0}
-        )
-        meta2.deleted_at = None
-        meta2.save()
-
-        # 8. Tipo de Atención (Wireframe C5)
-        ta_social, _ = TipoAtencion.all_objects.get_or_create(
-            nombre="Social",
-            defaults={'codigo': 'TA001', 'descripcion': 'Apoyo social', 'estado': 'Activo'}
-        )
-        ta_social.codigo = 'TA001'
-        ta_social.descripcion = 'Apoyo social'
-        ta_social.estado = 'Activo'
-        ta_social.deleted_at = None
-        ta_social.save()
-
-        ta_salud, _ = TipoAtencion.all_objects.get_or_create(
-            nombre="Salud",
-            defaults={'codigo': 'TA002', 'descripcion': 'Orientación', 'estado': 'Activo'}
-        )
-        ta_salud.codigo = 'TA002'
-        ta_salud.descripcion = 'Orientación'
-        ta_salud.estado = 'Activo'
-        ta_salud.deleted_at = None
-        ta_salud.save()
-
-        ta_educ, _ = TipoAtencion.all_objects.get_or_create(
-            nombre="Educación",
-            defaults={'codigo': 'TA003', 'descripcion': 'Apoyo escolar', 'estado': 'Activo'}
-        )
-        ta_educ.codigo = 'TA003'
-        ta_educ.descripcion = 'Apoyo escolar'
-        ta_educ.estado = 'Activo'
-        ta_educ.deleted_at = None
-        ta_educ.save()
-
-        # 9. Sub Atención (Wireframe C5)
-        sa_social, _ = SubAtencion.all_objects.get_or_create(
-            nombre="Ayuda social",
-            tipo_atencion=ta_social,
-            defaults={'codigo': 'SA001', 'estado': 'Activa'}
-        )
-        sa_social.codigo = 'SA001'
-        sa_social.estado = 'Activa'
-        sa_social.deleted_at = None
-        sa_social.save()
-
-        sa_salud, _ = SubAtencion.all_objects.get_or_create(
-            nombre="Consulta médica",
-            tipo_atencion=ta_salud,
-            defaults={'codigo': 'SA002', 'estado': 'Activa'}
-        )
-        sa_salud.codigo = 'SA002'
-        sa_salud.estado = 'Activa'
-        sa_salud.deleted_at = None
-        sa_salud.save()
-
-        sa_educ, _ = SubAtencion.all_objects.get_or_create(
-            nombre="Beca municipal",
-            tipo_atencion=ta_educ,
-            defaults={'codigo': 'SA003', 'estado': 'Activa'}
-        )
-        sa_educ.codigo = 'SA003'
-        sa_educ.estado = 'Activa'
-        sa_educ.deleted_at = None
-        sa_educ.save()
-
-        # 10. Tipo de Gestión
+        # ------------------------------------------------------------------
+        # 6. TIPO DE GESTIÓN (para vecinos)
+        # ------------------------------------------------------------------
         tg_sol, _ = TipoGestion.all_objects.get_or_create(
-            nombre="Solicitud",
-            defaults={'descripcion': 'Solicitudes y requerimientos directos', 'estado': 'Activo'}
+            nombre="Solicitud", defaults={'descripcion': 'Solicitud general', 'estado': 'Activo'}
         )
         tg_rec, _ = TipoGestion.all_objects.get_or_create(
-            nombre="Reclamo",
-            defaults={'descripcion': 'Reclamos vecinales', 'estado': 'Activo'}
+            nombre="Reclamo", defaults={'descripcion': 'Reclamos vecinales', 'estado': 'Activo'}
         )
 
-        # 11. Vecinos (Padrón Territorial Comunal)
-        vecinos_data = [
-            # Centro
-            ('12.345.678-9', 'Ana González', 'Av. Balmaceda 120', '+56 9 8765 4321', del_centro, sectores_dict.get('SEC-CEN01'), tg_sol),
-            ('14.892.311-K', 'Jorge Valenzuela Silva', 'Calle Prat 540', '+56 9 7812 3456', del_centro, sectores_dict.get('SEC-CEN01'), tg_sol),
-            ('16.450.812-3', 'Carmen Gloria Tapia', 'Pasaje Los Naranjos 231, La Florida', '+56 9 9123 4567', del_centro, sectores_dict.get('SEC-CEN03'), tg_sol),
-            ('11.782.903-4', 'Héctor Pizarro Godoy', 'Calle Pescadores 78, Caleta San Pedro', '+56 9 8234 5678', del_centro, sectores_dict.get('SEC-CEN04'), tg_rec),
-            # Norte (Las Compañías)
-            ('9.876.543-2', 'Pedro Rojas', "Calle O'Higgins 455", '+56 9 7654 3210', del_norte, sectores_dict.get('SEC-NOR01'), tg_rec),
-            ('17.345.901-8', 'Marcela Araya Barraza', 'Av. Monjitas Oriente 1205', '+56 9 6543 2198', del_norte, sectores_dict.get('SEC-NOR02'), tg_sol),
-            ('13.567.890-5', 'Guillermo Cortés Núñez', 'Pasaje La Cantera 44, Villa Lambert', '+56 9 7432 1890', del_norte, sectores_dict.get('SEC-NOR03'), tg_sol),
-            ('19.012.435-6', 'Francisca Morales Díaz', 'Calle Los Aromos 312', '+56 9 8321 0987', del_norte, sectores_dict.get('SEC-NOR04'), tg_sol),
-            # Sur (La Pampa / El Milagro)
-            ('15.234.567-1', 'María Castillo', 'Pasaje Los Pinos 89', '+56 9 6543 2109', del_sur, sectores_dict.get('SEC-SUR01'), tg_sol),
-            ('18.234.901-2', 'Rodrigo Santander Vega', 'Av. Cuatro Esquinas 1420', '+56 9 9456 7812', del_sur, sectores_dict.get('SEC-SUR03'), tg_rec),
-            ('20.123.876-4', 'Camila Herrera Bravo', 'Calle Los Plátanos 650, El Milagro', '+56 9 6123 9874', del_sur, sectores_dict.get('SEC-SUR02'), tg_sol),
+        # ------------------------------------------------------------------
+        # 7. USUARIOS - CUENTAS DE EVALUACIÓN (6 exactas requeridas)
+        # ------------------------------------------------------------------
+        self.stdout.write("▶ Creando 6 cuentas de evaluación...")
+        all_perms = Permission.objects.filter(
+            content_type__app_label__in=['accounts', 'activities', 'agenda', 'configuration']
+        )
+
+        def mk_user_funcionario(username, password, first_name, last_name, email,
+                                identificador, delegacion, cargo, rol,
+                                is_staff=False, is_superuser=False, perms=None):
+            u, _ = User.objects.get_or_create(
+                username=username,
+                defaults={'email': email, 'first_name': first_name, 'last_name': last_name,
+                          'is_staff': is_staff, 'is_superuser': is_superuser}
+            )
+            u.first_name = first_name; u.last_name = last_name
+            u.email = email; u.is_staff = is_staff; u.is_superuser = is_superuser
+            u.set_password(password); u.is_active = True; u.save()
+            if perms:
+                u.user_permissions.set(perms)
+            f, _ = Funcionario.all_objects.get_or_create(
+                user=u,
+                defaults={'identificador_institucional': identificador,
+                          'delegacion': delegacion, 'cargo': cargo, 'estado': 'Activo'}
+            )
+            f.identificador_institucional = identificador
+            f.delegacion = delegacion; f.cargo = cargo
+            f.estado = 'Activo'; f.deleted_at = None; f.save()
+            # Asignar rol
+            fr = FuncionarioRol.all_objects.filter(funcionario=f, rol=rol).first()
+            if fr:
+                fr.deleted_at = None; fr.save()
+            else:
+                FuncionarioRol.objects.create(funcionario=f, rol=rol)
+            return u, f
+
+        # ➊ admin_a — Administrador, Delegación Centro
+        u_admin_a, f_admin_a = mk_user_funcionario(
+            username='admin_a', password='Admin1234!',
+            first_name='Administrador', last_name='Evaluación A',
+            email='admin_a@laserena.cl',
+            identificador='EVAL-ADM-A', delegacion=del_centro,
+            cargo=cargo_admin, rol=rol_admin,
+            is_staff=True, is_superuser=True
+        )
+
+        # ➋ editor_a — Operador/Editor, Delegación Centro
+        u_editor_a, f_editor_a = mk_user_funcionario(
+            username='editor_a', password='Editor1234!',
+            first_name='Editor', last_name='Evaluación A',
+            email='editor_a@laserena.cl',
+            identificador='EVAL-EDT-A', delegacion=del_centro,
+            cargo=cargo_gestor, rol=rol_operador,
+            is_staff=True, perms=all_perms
+        )
+
+        # ➌ lector_a — Consultor/Lector, Delegación Centro
+        u_lector_a, f_lector_a = mk_user_funcionario(
+            username='lector_a', password='Lector1234!',
+            first_name='Lector', last_name='Evaluación A',
+            email='lector_a@laserena.cl',
+            identificador='EVAL-LEC-A', delegacion=del_centro,
+            cargo=cargo_inspector, rol=rol_consultor,
+            is_staff=False
+        )
+
+        # ➍ lector_b — Consultor/Lector, Delegación Norte (Las Compañías)
+        u_lector_b, f_lector_b = mk_user_funcionario(
+            username='lector_b', password='Lector1234!',
+            first_name='Lector', last_name='Evaluación B',
+            email='lector_b@laserena.cl',
+            identificador='EVAL-LEC-B', delegacion=del_norte,
+            cargo=cargo_inspector, rol=rol_consultor,
+            is_staff=False
+        )
+
+        # ➎ cliente_1 — Cliente, crea vecino propio (RUT 12.345.678-9)
+        u_cliente1, _ = User.objects.get_or_create(
+            username='cliente_1',
+            defaults={'email': 'cliente1@vecino.cl', 'first_name': 'María', 'last_name': 'González Pérez',
+                      'is_staff': False, 'is_superuser': False}
+        )
+        u_cliente1.first_name = 'María'; u_cliente1.last_name = 'González Pérez'
+        u_cliente1.email = 'cliente1@vecino.cl'
+        u_cliente1.set_password('Cliente1234!'); u_cliente1.is_active = True; u_cliente1.save()
+        f_c1, _ = Funcionario.all_objects.get_or_create(
+            user=u_cliente1,
+            defaults={'identificador_institucional': 'VEC-C1', 'delegacion': del_centro,
+                      'cargo': cargo_ciudadano, 'estado': 'Activo'}
+        )
+        f_c1.identificador_institucional = 'VEC-C1'
+        f_c1.delegacion = del_centro; f_c1.cargo = cargo_ciudadano
+        f_c1.estado = 'Activo'; f_c1.deleted_at = None; f_c1.save()
+        fr_c1 = FuncionarioRol.all_objects.filter(funcionario=f_c1, rol=rol_cliente).first()
+        if fr_c1:
+            fr_c1.deleted_at = None; fr_c1.save()
+        else:
+            FuncionarioRol.objects.create(funcionario=f_c1, rol=rol_cliente)
+        # Vecino asociado
+        v_cliente1, _ = Vecino.all_objects.get_or_create(
+            rut='12.345.678-9',
+            defaults={'nombre': 'María González Pérez', 'direccion': 'Av. Balmaceda 120, La Serena',
+                      'telefono': '+56 9 8765 4321', 'delegacion': del_centro,
+                      'sector': sectores_dict.get('SEC-CEN01'),
+                      'territorio': 'Casco Histórico', 'tipo_gestion': tg_sol, 'estado': 'Activo'}
+        )
+        v_cliente1.nombre = 'María González Pérez'; v_cliente1.deleted_at = None; v_cliente1.save()
+
+        # ➏ cliente_2 — Cliente, crea vecino propio (RUT 9.876.543-2)
+        u_cliente2, _ = User.objects.get_or_create(
+            username='cliente_2',
+            defaults={'email': 'cliente2@vecino.cl', 'first_name': 'Pedro', 'last_name': 'Rojas Soto',
+                      'is_staff': False, 'is_superuser': False}
+        )
+        u_cliente2.first_name = 'Pedro'; u_cliente2.last_name = 'Rojas Soto'
+        u_cliente2.email = 'cliente2@vecino.cl'
+        u_cliente2.set_password('Cliente1234!'); u_cliente2.is_active = True; u_cliente2.save()
+        f_c2, _ = Funcionario.all_objects.get_or_create(
+            user=u_cliente2,
+            defaults={'identificador_institucional': 'VEC-C2', 'delegacion': del_norte,
+                      'cargo': cargo_ciudadano, 'estado': 'Activo'}
+        )
+        f_c2.identificador_institucional = 'VEC-C2'
+        f_c2.delegacion = del_norte; f_c2.cargo = cargo_ciudadano
+        f_c2.estado = 'Activo'; f_c2.deleted_at = None; f_c2.save()
+        fr_c2 = FuncionarioRol.all_objects.filter(funcionario=f_c2, rol=rol_cliente).first()
+        if fr_c2:
+            fr_c2.deleted_at = None; fr_c2.save()
+        else:
+            FuncionarioRol.objects.create(funcionario=f_c2, rol=rol_cliente)
+        v_cliente2, _ = Vecino.all_objects.get_or_create(
+            rut='9.876.543-2',
+            defaults={'nombre': 'Pedro Rojas Soto', 'direccion': "Calle O'Higgins 455, Las Compañías",
+                      'telefono': '+56 9 7654 3210', 'delegacion': del_norte,
+                      'sector': sectores_dict.get('SEC-NOR01'),
+                      'territorio': 'Compañía Alta', 'tipo_gestion': tg_rec, 'estado': 'Activo'}
+        )
+        v_cliente2.nombre = 'Pedro Rojas Soto'; v_cliente2.deleted_at = None; v_cliente2.save()
+
+        # Cuentas de operación adicionales (superadmin y operadores de sistema)
+        self.stdout.write("▶ Creando cuentas adicionales de operación...")
+        mk_user_funcionario(
+            username='admin_sgr', password='Admin1234!',
+            first_name='Administrador General', last_name='SGR',
+            email='admin@laserena.cl', identificador='ADM-001',
+            delegacion=None, cargo=cargo_coord, rol=rol_admin,
+            is_staff=True, is_superuser=True
+        )
+        mk_user_funcionario(
+            username='delegado_centro', password='User1234!',
+            first_name='Carlos', last_name='Mendoza Silva',
+            email='delegado.centro@laserena.cl', identificador='DEL-001',
+            delegacion=del_centro, cargo=cargo_coord, rol=rol_delegado,
+            is_staff=True, perms=all_perms
+        )
+        mk_user_funcionario(
+            username='delegado_companias', password='User1234!',
+            first_name='María', last_name='Rojas Barraza',
+            email='delegado.companias@laserena.cl', identificador='DEL-002',
+            delegacion=del_norte, cargo=cargo_coord, rol=rol_delegado,
+            is_staff=True, perms=all_perms
+        )
+        mk_user_funcionario(
+            username='delegado_sur', password='User1234!',
+            first_name='Gonzalo', last_name='Herrera Vega',
+            email='delegado.sur@laserena.cl', identificador='DEL-003',
+            delegacion=del_sur, cargo=cargo_coord, rol=rol_delegado,
+            is_staff=True, perms=all_perms
+        )
+        mk_user_funcionario(
+            username='delegado_rural', password='User1234!',
+            first_name='Patricia', last_name='Vega Moreno',
+            email='delegado.rural@laserena.cl', identificador='DEL-004',
+            delegacion=del_rural, cargo=cargo_coord, rol=rol_delegado,
+            is_staff=True, perms=all_perms
+        )
+        mk_user_funcionario(
+            username='funcionario_juan', password='User1234!',
+            first_name='Juan', last_name='Pérez López',
+            email='juan.perez@laserena.cl', identificador='FUN-101',
+            delegacion=del_centro, cargo=cargo_gestor, rol=rol_operador,
+            is_staff=True, perms=all_perms
+        )
+        mk_user_funcionario(
+            username='consultor_ana', password='User1234!',
+            first_name='Ana', last_name='Ejemplo Flores',
+            email='ana.ejemplo@laserena.cl', identificador='CON-201',
+            delegacion=del_centro, cargo=cargo_inspector, rol=rol_consultor
+        )
+
+        # Referencia al usuario editor para las atenciones
+        u_editor = User.objects.filter(username='editor_a').first()
+        u_admin_sys = User.objects.filter(username='admin_sgr').first() or u_editor
+
+        # ------------------------------------------------------------------
+        # 8. ORGANIZACIONES COMUNITARIAS desde base_datos_JJVV.xlsx
+        # ------------------------------------------------------------------
+        self.stdout.write("▶ Importando Organizaciones Comunitarias desde JJVV xlsx...")
+
+        xlsx_jjvv = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.dirname(__file__)))), 'fixtures', 'base_datos_JJVV.xlsx')
+
+        # Mapa de territorio → delegacion (aproximación por nombre de sector/territorio)
+        # La columna TERRIT. DELEG. tiene nombres de sectores/localidades
+        territorio_delegacion_map = {
+            # Norte / Las Compañías
+            'COMPAÑÍA': del_norte, 'COMPANIAS': del_norte, 'COMPAÑIAS': del_norte,
+            'LATORRE': del_norte, 'LAMBERT': del_norte, 'ROMERO': del_norte,
+            'ALFALFARES': del_norte, 'RINCONADA': del_norte, 'PUCLARO': del_norte,
+            'MARQUESA': del_norte, 'ISLÓN': del_norte, 'ISLON': del_norte,
+            # Sur
+            'PAMPA': del_sur, 'MILAGRO': del_sur, 'SAN JOAQUÍN': del_sur,
+            'JOAQUIN': del_sur, 'CUATRO ESQUINAS': del_sur, 'TIERRAS BLANCAS': del_sur,
+            'PEÑUELAS': del_sur, 'PENUELAS': del_sur,
             # Rural
-            ('10.456.789-0', 'Esteban Barraza Pastén', 'Calle Principal s/n, Algarrobito', '+56 9 7654 0981', del_rural, sectores_dict.get('SEC-RUR01'), tg_sol),
-            ('12.987.654-3', 'Rosa Elena Villalobos', 'Camino Interior Parcela 14, Altovalsol', '+56 9 8543 2109', del_rural, sectores_dict.get('SEC-RUR02'), tg_sol),
-            ('14.321.789-7', 'Luis Aguilera Carvajal', 'Sector La Cancha, Las Rojas', '+56 9 9876 5432', del_rural, sectores_dict.get('SEC-RUR03'), tg_rec),
-        ]
-        vecinos_dict = {}
-        for rut_v, nom_v, dir_v, tel_v, del_v, sec_v, tg_v in vecinos_data:
-            v_obj, _ = Vecino.all_objects.get_or_create(
-                rut=rut_v,
-                defaults={
-                    'nombre': nom_v,
-                    'direccion': dir_v,
-                    'telefono': tel_v,
-                    'delegacion': del_v,
-                    'sector': sec_v,
-                    'territorio': sec_v.nombre if sec_v else (del_v.nombre if del_v else 'Centro'),
-                    'tipo_gestion': tg_v,
-                    'estado': 'Activo'
-                }
-            )
-            v_obj.nombre = nom_v
-            v_obj.direccion = dir_v
-            v_obj.telefono = tel_v
-            v_obj.delegacion = del_v
-            v_obj.sector = sec_v
-            v_obj.territorio = sec_v.nombre if sec_v else (del_v.nombre if del_v else 'Centro')
-            v_obj.tipo_gestion = tg_v
-            v_obj.estado = 'Activo'
-            v_obj.deleted_at = None
-            v_obj.save()
-            vecinos_dict[rut_v] = v_obj
+            'ALGARROBITO': del_rural, 'ALTOVALSOL': del_rural, 'ROJAS': del_rural,
+            'PELÍCANA': del_rural, 'PELICANA': del_rural, 'TALCA': del_rural,
+            'VILLASECA': del_rural, 'GUALLIGUAICA': del_rural, 'ANTENA': del_rural,
+            'CERES': del_rural, 'MARQUESA': del_rural, 'TOTORALILLO': del_rural,
+            'GUANGUAL': del_rural, 'CERRILLOS': del_rural,
+            # Centro (default)
+        }
 
-        # 12. Atenciones Ciudadanas (Wireframe C6)
-        atenciones_data = [
-            (
-                "AT-2026-0001",
-                "Ana González (12.345.678-9)",
-                vecinos_dict.get('12.345.678-9'),
-                del_centro,
-                ta_social,
-                sa_social,
-                "Solicitud de subsidio familiar por emergencia habitacional en sector centro.",
-                u_juan,
-                "Registrada"
-            ),
-            (
-                "AT-2026-0002",
-                "Pedro Rojas (9.876.543-2)",
-                vecinos_dict.get('9.876.543-2'),
-                del_norte,
-                ta_salud,
-                sa_salud,
-                "Derivación para atención geriátrica preventiva en CESFAM Las Compañías.",
-                u_comp,
-                "En proceso"
-            ),
-            (
-                "AT-2026-0003",
-                "María Castillo (15.234.567-1)",
-                vecinos_dict.get('15.234.567-1'),
-                del_sur,
-                ta_educ,
-                sa_educ,
-                "Postulación a beca municipal de transporte escolar enseñanza media.",
-                u_sur,
-                "Resuelta"
-            ),
-            (
-                "AT-2026-0004",
-                "Jorge Valenzuela Silva (14.892.311-K)",
-                vecinos_dict.get('14.892.311-K'),
-                del_centro,
-                ta_social,
-                sa_social,
-                "Orientación y postulación a programa de mejoramiento térmico de vivienda.",
-                u_centro,
-                "Registrada"
-            ),
-            (
-                "AT-2026-0005",
-                "Marcela Araya Barraza (17.345.901-8)",
-                vecinos_dict.get('17.345.901-8'),
-                del_norte,
-                ta_educ,
-                sa_educ,
-                "Asesoría para regularización de estudios y nivelación de adultos mayores.",
-                u_comp,
-                "En proceso"
-            ),
-            (
-                "AT-2026-0006",
-                "Esteban Barraza Pastén (10.456.789-0)",
-                vecinos_dict.get('10.456.789-0'),
-                del_rural,
-                ta_social,
-                sa_social,
-                "Requerimiento de apoyo social y abastecimiento hídrico en Algarrobito.",
-                u_rural,
-                "Registrada"
-            ),
-            (
-                "AT-2026-0007",
-                "Héctor Pizarro Godoy (11.782.903-4)",
-                vecinos_dict.get('11.782.903-4'),
-                del_centro,
-                ta_salud,
-                sa_salud,
-                "Coordinación de operativo de vacunación e higiene en Caleta San Pedro.",
-                u_juan,
-                "Derivada"
-            ),
-            (
-                "AT-2026-0008",
-                "Camila Herrera Bravo (20.123.876-4)",
-                vecinos_dict.get('20.123.876-4'),
-                del_sur,
-                ta_social,
-                sa_social,
-                "Inscripción en talleres deportivos y comunitarios de la Delegación Sur.",
-                u_sur,
-                "Resuelta"
-            ),
-        ]
-        for cod_at, sol, vec_obj, del_at, ta_at, sa_at, desc_at, resp_at, est_at in atenciones_data:
-            at_obj, _ = AtencionCiudadana.all_objects.get_or_create(
-                codigo_atencion=cod_at,
-                defaults={
-                    'solicitante': sol,
-                    'vecino': vec_obj,
-                    'delegacion': del_at,
-                    'tipo_atencion': ta_at,
-                    'sub_atencion': sa_at,
-                    'descripcion': desc_at,
-                    'usuario_responsable': resp_at,
-                    'estado': est_at
-                }
-            )
-            at_obj.solicitante = sol
-            at_obj.vecino = vec_obj
-            at_obj.delegacion = del_at
-            at_obj.tipo_atencion = ta_at
-            at_obj.sub_atencion = sa_at
-            at_obj.descripcion = desc_at
-            at_obj.usuario_responsable = resp_at
-            at_obj.estado = est_at
-            at_obj.deleted_at = None
-            at_obj.save()
+        def resolver_delegacion(territorio_str):
+            """Mapea texto de territorio a delegacion."""
+            if not territorio_str:
+                return del_centro
+            t = str(territorio_str).upper().strip()
+            for clave, deleg in territorio_delegacion_map.items():
+                if clave in t:
+                    return deleg
+            return del_centro
 
-        self.stdout.write(self.style.SUCCESS("[OK] Base de datos SGR poblada exitosamente con datos semillas oficiales."))
-        self.stdout.write("--------------------------------------------------")
-        self.stdout.write("CUENTAS DE ACCESO LISTAS PARA PRUEBAS Y EVALUACIÓN:")
-        self.stdout.write("  1) admin_sgr         | Clave: Admin1234! | Rol: Administrador       (Acceso Global + Multi-delegación)")
-        self.stdout.write("  2) coordinador_sgr   | Clave: User1234!  | Rol: Coordinador         (Metas, Atenciones, Reportes)")
-        self.stdout.write("  3) delegado_centro   | Clave: User1234!  | Rol: Delegado Municipal  (Delegación Centro)")
-        self.stdout.write("  4) delegado_companias| Clave: User1234!  | Rol: Delegado Municipal  (Delegación Norte / Las Compañías)")
-        self.stdout.write("  5) delegado_sur      | Clave: User1234!  | Rol: Delegado Municipal  (Delegación Sur)")
-        self.stdout.write("  6) delegado_rural    | Clave: User1234!  | Rol: Delegado Municipal  (Delegación Rural)")
-        self.stdout.write("  7) funcionario_juan  | Clave: User1234!  | Rol: Operador            (Ingreso de Atención Centro)")
-        self.stdout.write("  8) consultor_ana     | Clave: User1234!  | Rol: Consultor           (Solo Lectura)")
-        self.stdout.write("--------------------------------------------------")
+        tipo_choices_validos = [c[0] for c in OrganizacionComunitaria.TIPO_CHOICES]
+
+        def resolver_tipo(nombre_org):
+            """Infiere tipo de organización desde el nombre."""
+            n = str(nombre_org).upper() if nombre_org else ''
+            if 'JUNTA' in n or 'JJVV' in n or 'VECIN' in n:
+                return 'Junta de Vecinos'
+            if 'ADULTO MAYOR' in n or 'ADULTO' in n or 'ANCIAN' in n:
+                return 'Club de Adulto Mayor'
+            if 'DEPORT' in n or 'CLUB' in n or 'FUTBOL' in n or 'FÚTBOL' in n:
+                return 'Organización Deportiva'
+            if 'MADRES' in n or 'MADRE' in n or 'CENMA' in n:
+                return 'Centro de Madres'
+            if 'COMITÉ' in n or 'COMITE' in n or 'SEGURIDAD' in n or 'VIGILANCIA' in n:
+                return 'Comité de Vecinos/Seguridad'
+            if 'CULTURAL' in n or 'JUVENIL' in n or 'JOVEN' in n or 'ARTE' in n:
+                return 'Agrupación Cultural/Juvenil'
+            if 'VIVIENDA' in n or 'ALLEGADO' in n or 'AGUA' in n or 'APR' in n:
+                return 'Comité de Vivienda/APR'
+            return 'Otra Organización Funcional'
+
+        orgs_creadas = 0
+        orgs_ya_existentes = 0
+
+        try:
+            wb_jjvv = openpyxl.load_workbook(xlsx_jjvv, read_only=True, data_only=True)
+            ws_jjvv = wb_jjvv.active
+
+            for row_idx, row in enumerate(ws_jjvv.iter_rows(min_row=2, values_only=True), start=2):
+                if not row or not row[0]:
+                    continue
+
+                nombre_org = str(row[0]).strip()[:200] if row[0] else ''
+                domicilio  = str(row[1]).strip()[:250] if row[1] else ''
+                territorio = str(row[2]).strip()[:100] if row[2] else ''
+                socios_raw = row[3]
+                f_const_raw = row[4]
+                num_pj_raw  = row[5]
+                f_insc_raw  = row[6]
+                reg_dir_raw = row[7]
+
+                if not nombre_org:
+                    continue
+
+                socios_num = 0
+                if socios_raw is not None:
+                    try:
+                        socios_num = max(0, int(float(str(socios_raw))))
+                    except (ValueError, TypeError):
+                        socios_num = 0
+
+                fecha_const = None
+                if f_const_raw:
+                    if hasattr(f_const_raw, 'date'):
+                        fecha_const = f_const_raw.date() if hasattr(f_const_raw, 'date') else f_const_raw
+                    elif isinstance(f_const_raw, datetime.datetime):
+                        fecha_const = f_const_raw.date()
+                    elif isinstance(f_const_raw, datetime.date):
+                        fecha_const = f_const_raw
+
+                fecha_insc = None
+                if f_insc_raw:
+                    if isinstance(f_insc_raw, datetime.datetime):
+                        fecha_insc = f_insc_raw.date()
+                    elif isinstance(f_insc_raw, datetime.date):
+                        fecha_insc = f_insc_raw
+
+                num_pj = str(num_pj_raw).strip()[:50] if num_pj_raw else ''
+                reg_dir = str(reg_dir_raw).strip()[:50] if reg_dir_raw else ''
+
+                deleg = resolver_delegacion(territorio)
+                tipo_org = resolver_tipo(nombre_org)
+
+                # Verificar si ya existe (por nombre + domicilio)
+                existe = OrganizacionComunitaria.all_objects.filter(
+                    nombre__iexact=nombre_org
+                ).first()
+
+                if existe:
+                    # Actualizar campos si está en DB
+                    existe.domicilio_legal = domicilio or existe.domicilio_legal
+                    existe.territorio = territorio or existe.territorio
+                    existe.socios_activos = socios_num if socios_num > 0 else existe.socios_activos
+                    existe.delegacion = deleg
+                    existe.deleted_at = None
+                    existe.save()
+                    orgs_ya_existentes += 1
+                else:
+                    OrganizacionComunitaria.objects.create(
+                        nombre=nombre_org,
+                        tipo_organizacion=tipo_org,
+                        domicilio_legal=domicilio,
+                        delegacion=deleg,
+                        territorio=territorio,
+                        socios_activos=socios_num,
+                        fecha_constitucion=fecha_const,
+                        numero_registro_pj=num_pj,
+                        fecha_inscripcion_registro=fecha_insc,
+                        registro_directiva_numero=reg_dir,
+                        estado='Activa'
+                    )
+                    orgs_creadas += 1
+
+            wb_jjvv.close()
+            self.stdout.write(self.style.SUCCESS(
+                f"  ✓ Organizaciones: {orgs_creadas} creadas, {orgs_ya_existentes} actualizadas "
+                f"(total en DB: {OrganizacionComunitaria.objects.count()})"
+            ))
+        except Exception as exc:
+            self.stdout.write(self.style.WARNING(f"  ⚠ Error importando JJVV xlsx: {exc}"))
+
+        # ------------------------------------------------------------------
+        # 9. VECINOS ADICIONALES (para >2000 registros de negocio)
+        # ------------------------------------------------------------------
+        self.stdout.write("▶ Creando vecinos adicionales...")
+
+        nombres_pool = [
+            ('Alejandra', 'Muñoz'), ('Carlos', 'Espinoza'), ('Diana', 'Flores'),
+            ('Eduardo', 'Reyes'), ('Fernanda', 'Soto'), ('Gustavo', 'Vásquez'),
+            ('Helena', 'Morales'), ('Ignacio', 'Castro'), ('Javiera', 'Ortiz'),
+            ('Leonardo', 'Jara'), ('Marcela', 'Figueroa'), ('Nicolás', 'Ibáñez'),
+            ('Olga', 'Pinto'), ('Pablo', 'Ramos'), ('Renata', 'Alvarado'),
+            ('Sebastián', 'Torres'), ('Tamara', 'Pérez'), ('Ulises', 'Bravo'),
+            ('Valentina', 'Guerrero'), ('Walter', 'Silva'), ('Ximena', 'Vega'),
+            ('Yolanda', 'Sepúlveda'), ('Zulema', 'Contreras'), ('Andrés', 'Núñez'),
+            ('Beatriz', 'Godoy'), ('César', 'Herrera'), ('Daniela', 'López'),
+        ]
+        calles_pool = [
+            'Calle Los Pinos', 'Av. Balmaceda', 'Pasaje El Sauce', 'Calle Prat',
+            'Calle Los Álamos', 'Pasaje Los Jazmines', 'Av. Francisco de Aguirre',
+            'Calle Colón', 'Calle Cordovez', 'Av. El Santo', 'Calle Los Arrayanes',
+            'Pasaje La Cantera', 'Av. Juan XXIII', 'Calle Larraín Alcalde',
+        ]
+        delegaciones_list = [del_centro, del_norte, del_sur, del_rural]
+        sectores_list = list(sectores_dict.values())
+
+        vecinos_existentes = Vecino.objects.count()
+        vecinos_a_crear = max(0, 60 - vecinos_existentes)
+
+        for i in range(vecinos_a_crear):
+            nombre_tuple = random.choice(nombres_pool)
+            nombre_v = f"{nombre_tuple[0]} {nombre_tuple[1]} {random.choice(['Martínez','González','Sánchez','Pérez','Rodríguez'])}"
+            calle_v = random.choice(calles_pool)
+            num_v = random.randint(10, 2000)
+            dir_v = f"{calle_v} {num_v}"
+            del_v = random.choice(delegaciones_list)
+            sec_v = random.choice([s for s in sectores_list if s.delegacion == del_v] or [None])
+            tel_v = f"+56 9 {random.randint(1000,9999)} {random.randint(1000,9999)}"
+            rut_v = gen_rut()
+            Vecino.objects.create(
+                rut=rut_v, nombre=nombre_v, direccion=dir_v,
+                telefono=tel_v, delegacion=del_v,
+                sector=sec_v,
+                territorio=sec_v.nombre if sec_v else del_v.nombre,
+                tipo_gestion=random.choice([tg_sol, tg_rec]),
+                estado='Activo'
+            )
+
+        # ------------------------------------------------------------------
+        # 10. ATENCIONES CIUDADANAS desde matriz_sgr.xlsx
+        # ------------------------------------------------------------------
+        self.stdout.write("▶ Importando Atenciones desde matriz SGR xlsx...")
+
+        xlsx_sgr = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.dirname(__file__)))), 'fixtures', 'matriz_sgr.xlsx')
+
+        estados_validos = {'Registrada', 'En proceso', 'Derivada', 'Resuelta', 'Cerrada'}
+        estado_map = {
+            'REALIZADO': 'Resuelta', 'COMPLETADO': 'Resuelta', 'TERMINADO': 'Resuelta',
+            'EN PROCESO': 'En proceso', 'PROCESO': 'En proceso', 'PENDIENTE': 'Registrada',
+            'DERIVADO': 'Derivada', 'CERRADO': 'Cerrada',
+        }
+
+        vecinos_all = list(Vecino.objects.all())
+        at_creadas = 0
+        at_errores = 0
+        at_contador = AtencionCiudadana.objects.count()
+
+        try:
+            wb_sgr = openpyxl.load_workbook(xlsx_sgr, read_only=True, data_only=True)
+            ws_sgr = wb_sgr.active
+
+            # La fila 2 tiene cabeceras reales, datos desde fila 3
+            for row_idx, row in enumerate(ws_sgr.iter_rows(min_row=3, values_only=True), start=3):
+                if not row or not row[2]:
+                    continue
+
+                nro_raw        = row[0]   # N°
+                fecha_raw      = row[1]   # FECHA SOLICITUD
+                actividad      = row[2]   # ACTIVIDAD/SOLICITUD/PROBLEMA
+                origen_raw     = row[3]   # INT EXT
+                solicitante_r  = row[4]   # SOLICITANTE
+                territorio_r   = row[5]   # TERRITORIO
+                responsable_r  = row[6]   # RESPONSABLE
+                fecha_comp_raw = row[7]   # FECHA COMPROMISO
+                area_apoyo_r   = row[9]   # ÁREA/PERSONA APOYO
+                avance_r       = row[10]  # AVANCE, OBSERVACIONES
+                estatus_raw    = row[11]  # ESTATUS
+
+                if not actividad:
+                    continue
+
+                descripcion = str(actividad).strip()[:1000]
+                solicitante = str(solicitante_r).strip()[:150] if solicitante_r else 'Vecino/a'
+                avance = str(avance_r).strip()[:1000] if avance_r else ''
+                area_apoyo = str(area_apoyo_r).strip()[:80] if area_apoyo_r else ''
+                origen = 'EXT' if str(origen_raw or '').upper().strip() == 'EXT' else 'INT'
+
+                estado_str = str(estatus_raw or '').upper().strip()
+                estado = estado_map.get(estado_str, 'Registrada')
+
+                # Fecha solicitud
+                fecha_solicitud = None
+                if fecha_raw and isinstance(fecha_raw, datetime.datetime):
+                    fecha_solicitud = fecha_raw.date()
+                elif fecha_raw and isinstance(fecha_raw, datetime.date):
+                    fecha_solicitud = fecha_raw
+
+                # Fecha compromiso
+                fecha_compromiso = None
+                if fecha_comp_raw and isinstance(fecha_comp_raw, datetime.datetime):
+                    fecha_compromiso = fecha_comp_raw.date()
+                elif fecha_comp_raw and isinstance(fecha_comp_raw, datetime.date):
+                    fecha_compromiso = fecha_comp_raw
+
+                # Delegación por territorio
+                deleg = resolver_delegacion(str(territorio_r or ''))
+
+                # Tipo de atención por área/texto
+                ta_obj = ta_default
+                if area_apoyo_r:
+                    texto_area = str(area_apoyo_r).upper()
+                    for clave, ta_cand in tipos_map.items():
+                        if clave in texto_area:
+                            ta_obj = ta_cand
+                            break
+
+                # Código correlativo
+                at_contador += 1
+                codigo = f"AT-SGR-{at_contador:05d}"
+
+                # Vecino aleatorio o cliente_1
+                vec_obj = random.choice(vecinos_all) if vecinos_all and random.random() > 0.3 else v_cliente1
+
+                try:
+                    at_obj, created = AtencionCiudadana.all_objects.get_or_create(
+                        codigo_atencion=codigo,
+                        defaults={
+                            'solicitante': solicitante[:150],
+                            'vecino': vec_obj,
+                            'delegacion': deleg,
+                            'tipo_atencion': ta_obj,
+                            'sub_atencion': sa_default,
+                            'descripcion': descripcion,
+                            'avance_observaciones': avance,
+                            'area_apoyo': area_apoyo,
+                            'origen': origen,
+                            'fecha_compromiso': fecha_compromiso,
+                            'usuario_responsable': u_editor or u_admin_sys,
+                            'creado_por': u_editor or u_admin_sys,
+                            'estado': estado,
+                        }
+                    )
+                    if created:
+                        at_creadas += 1
+                except Exception:
+                    at_errores += 1
+
+            wb_sgr.close()
+            self.stdout.write(self.style.SUCCESS(
+                f"  ✓ Atenciones SGR: {at_creadas} creadas, {at_errores} errores "
+                f"(total en DB: {AtencionCiudadana.objects.count()})"
+            ))
+        except Exception as exc:
+            self.stdout.write(self.style.WARNING(f"  ⚠ Error importando SGR xlsx: {exc}"))
+
+        # ------------------------------------------------------------------
+        # 11. ATENCIONES ADICIONALES MASIVAS (para garantizar ≥ 2000 total)
+        # ------------------------------------------------------------------
+        total_at_actual = AtencionCiudadana.objects.count()
+        objetivo = 2100
+        if total_at_actual < objetivo:
+            faltantes = objetivo - total_at_actual
+            self.stdout.write(f"▶ Creando {faltantes} atenciones adicionales para alcanzar ≥{objetivo}...")
+
+            descripciones_pool = [
+                "Solicitud de inspección por acumulación de residuos en la vía pública.",
+                "Requerimiento de mejora de luminaria pública en pasaje deteriorado.",
+                "Consulta por programa de subsidio habitacional para adultos mayores.",
+                "Denuncia por ruidos molestos en horario de descanso nocturno.",
+                "Solicitud de poda de árbol peligroso en vereda.",
+                "Derivación para atención médica de urgencia social.",
+                "Trámite de certificado de residencia para postulación a beca.",
+                "Reclamo por demora en respuesta de solicitud anterior.",
+                "Consulta sobre talleres de capacitación para adultos.",
+                "Solicitud de apoyo para reparación de canaleta de agua lluvia.",
+                "Requerimiento de asistente social para caso familia vulnerable.",
+                "Solicitud de inscripción en taller deportivo comunitario.",
+                "Consulta por contaminación de canal de regadío.",
+                "Denuncia de construcción irregular en sector residencial.",
+                "Solicitud de mediación por conflicto vecinal.",
+                "Requerimiento de apoyo para postular a bono de agua potable.",
+                "Consulta sobre requisitos para organización comunitaria.",
+                "Solicitud de permiso para evento cultural en plaza.",
+                "Denuncia de persona en situación de calle con problemas de salud.",
+                "Solicitud de apoyo para actividad de adulto mayor.",
+            ]
+            estados_pool = ['Registrada', 'En proceso', 'Resuelta', 'Derivada']
+            origenes_pool = ['INT', 'EXT']
+            at_contador_extra = AtencionCiudadana.all_objects.count()
+
+            for i in range(faltantes):
+                at_contador_extra += 1
+                codigo = f"AT-BULK-{at_contador_extra:05d}"
+                deleg = random.choice(delegaciones_list)
+                ta_obj = random.choice(list(tipos_map.values())) if tipos_map else ta_default
+                vec_obj = random.choice(vecinos_all) if vecinos_all else v_cliente1
+                descripcion = random.choice(descripciones_pool)
+                estado = random.choice(estados_pool)
+                origen = random.choice(origenes_pool)
+                dias_atras = random.randint(0, 365)
+                fecha_at = datetime.date.today() - datetime.timedelta(days=dias_atras)
+
+                try:
+                    AtencionCiudadana.objects.create(
+                        codigo_atencion=codigo,
+                        solicitante=vec_obj.nombre[:150] if vec_obj else 'Vecino/a',
+                        vecino=vec_obj,
+                        delegacion=deleg,
+                        tipo_atencion=ta_obj,
+                        sub_atencion=sa_default,
+                        descripcion=descripcion,
+                        origen=origen,
+                        usuario_responsable=u_editor or u_admin_sys,
+                        creado_por=u_editor or u_admin_sys,
+                        estado=estado,
+                    )
+                except Exception:
+                    pass
+
+            self.stdout.write(self.style.SUCCESS(
+                f"  ✓ Total atenciones en DB: {AtencionCiudadana.objects.count()}"
+            ))
+
+        # ------------------------------------------------------------------
+        # RESUMEN FINAL
+        # ------------------------------------------------------------------
+        self.stdout.write("\n" + "=" * 60)
+        self.stdout.write(self.style.SUCCESS("✅ SEED COMPLETADO EXITOSAMENTE"))
+        self.stdout.write("=" * 60)
+        self.stdout.write(f"  OrganizacionesComunitarias: {OrganizacionComunitaria.objects.count()}")
+        self.stdout.write(f"  Vecinos:                    {Vecino.objects.count()}")
+        self.stdout.write(f"  Atenciones Ciudadanas:      {AtencionCiudadana.objects.count()}")
+        self.stdout.write(f"  Usuarios:                   {User.objects.count()}")
+        self.stdout.write("\n" + "─" * 60)
+        self.stdout.write("🔑 CUENTAS DE EVALUACIÓN (6 cuentas requeridas):")
+        self.stdout.write("─" * 60)
+        self.stdout.write("  ➊ admin_a      | Admin1234!   | Administrador   | Delegación Centro")
+        self.stdout.write("  ➋ editor_a     | Editor1234!  | Operador/Editor | Delegación Centro")
+        self.stdout.write("  ➌ lector_a     | Lector1234!  | Consultor       | Delegación Centro")
+        self.stdout.write("  ➍ lector_b     | Lector1234!  | Consultor       | Delegación Norte")
+        self.stdout.write("  ➎ cliente_1    | Cliente1234! | Cliente/Vecino  | Portal Ciudadano")
+        self.stdout.write("  ➏ cliente_2    | Cliente1234! | Cliente/Vecino  | Portal Ciudadano")
+        self.stdout.write("─" * 60)
+        self.stdout.write("🔑 CUENTAS ADICIONALES DE OPERACIÓN:")
+        self.stdout.write("  admin_sgr         | Admin1234!   | Superadmin Global")
+        self.stdout.write("  delegado_centro   | User1234!    | Delegado Centro")
+        self.stdout.write("  delegado_companias| User1234!    | Delegado Norte")
+        self.stdout.write("  delegado_sur      | User1234!    | Delegado Sur")
+        self.stdout.write("  delegado_rural    | User1234!    | Delegado Rural")
+        self.stdout.write("  funcionario_juan  | User1234!    | Operador Centro")
+        self.stdout.write("  consultor_ana     | User1234!    | Consultor Centro")
+        self.stdout.write("=" * 60)

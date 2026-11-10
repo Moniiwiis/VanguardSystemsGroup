@@ -1,0 +1,497 @@
+{% extends "base.html" %}
+
+{% block title %}Organizaciones Comunitarias y JJVV — Sistema Municipal La Serena{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Page Bar -->
+  <div class="bg-white rounded-3xl p-6 sm:p-7 border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
+    <div class="space-y-1">
+      <div class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+        <span>Gestión Territorial</span>
+        <span class="text-slate-300">/</span>
+        <span class="text-[#C41230]">Organizaciones Comunitarias</span>
+      </div>
+      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
+        Juntas de Vecinos y Organizaciones Comunitarias
+      </h1>
+      <p class="text-xs text-slate-500 max-w-2xl">
+        Padrón oficial de organizaciones comunitarias funcionales y territoriales de La Serena según registro municipal (Ley 19.418), con seguimiento de personalidad jurídica y directiva.
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 shrink-0">
+      <!-- Indicador en tiempo real WebSockets (Channels) -->
+      <div id="ws-status-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold shadow-sm">
+        <span id="ws-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span id="ws-text">En vivo</span>
+      </div>
+
+      <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl {% if delegacion_activa %}bg-red-50 text-[#C41230] border border-red-200/90{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %} text-xs font-bold">
+        <i data-lucide="{% if delegacion_activa %}map-pin{% else %}globe{% endif %}" class="w-4 h-4"></i>
+        <span>Delegación: <strong>{% if delegacion_activa %}{{ delegacion_activa.nombre }}{% else %}Global (Todas){% endif %}</strong></span>
+      </div>
+
+      <a href="?export=excel{% if q %}&q={{ q }}{% endif %}{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}" 
+         class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+        <span>Exportar Excel</span>
+      </a>
+
+      {% if not permisos.es_consultor %}
+        <button type="button" onclick="abrirModalCrearOrg()"
+                class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          <span>Nueva Organización</span>
+        </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Search & Filter Card -->
+  <div class="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+    <form method="GET" action="{% url 'gestion_organizaciones' %}" class="flex-1 flex flex-wrap items-center gap-3">
+      <div class="relative flex-1 min-w-[240px]">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+          <i data-lucide="search" class="w-4 h-4"></i>
+        </div>
+        <input type="text" name="q" value="{{ q }}" maxlength="100" placeholder="Buscar por nombre, RUT, directiva o PJ..." 
+               class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230] font-medium" />
+      </div>
+
+      <select name="tipo" onchange="this.form.submit()"
+              class="px-3 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+        <option value="">Tipo: Todos</option>
+        {% for tipo_val in tipos_organizaciones %}
+          <option value="{{ tipo_val }}" {% if filtro_tipo == tipo_val %}selected{% endif %}>{{ tipo_val }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="estado" onchange="this.form.submit()"
+              class="px-3 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+        <option value="">Estado: Todos</option>
+        <option value="Activa" {% if filtro_estado == 'Activa' %}selected{% endif %}>Activa</option>
+        <option value="Inactiva" {% if filtro_estado == 'Inactiva' %}selected{% endif %}>Inactiva</option>
+        <option value="En tramite" {% if filtro_estado == 'En tramite' %}selected{% endif %}>En trámite</option>
+      </select>
+      {% include "gestion/includes/ordering_control.html" %}
+
+      {% if q or filtro_tipo or filtro_estado %}
+        <a href="{% url 'gestion_organizaciones' %}" class="text-xs text-[#C41230] font-bold hover:underline py-2">Limpiar</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Table Card -->
+  <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs text-slate-700">
+        <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+          <tr>
+            <th class="py-3 px-3.5 w-10 text-center">#</th>
+            <th class="py-3 px-3.5">Organización / Tipo</th>
+            <th class="py-3 px-3.5 whitespace-nowrap">RUT / Personalidad J.</th>
+            <th class="py-3 px-3.5 min-w-[180px]">Directiva / Representante</th>
+            <th class="py-3 px-3.5 min-w-[180px]">Sede / Contacto</th>
+            <th class="py-3 px-3.5 min-w-[200px]">Observaciones / Registro</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap">Estado</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap w-24 sticky right-0 bg-slate-50 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 font-medium">
+          {% for o in organizaciones %}
+          <tr class="hover:bg-red-50/20 transition-colors">
+            <td class="py-3 px-3.5 font-semibold text-slate-400 text-center">{{ forloop.counter }}</td>
+            <td class="py-3 px-3.5">
+              <span class="font-bold text-slate-900 block leading-tight">{{ o.nombre }}</span>
+              <span class="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                {{ o.get_tipo_organizacion_display }}
+              </span>
+            </td>
+            <td class="py-3 px-3.5 whitespace-nowrap">
+              <span class="font-mono text-slate-800 font-bold text-[11px] block">{{ o.rut|default:"—" }}</span>
+              {% if o.personalidad_juridica %}
+                <span class="text-[10px] text-slate-500 font-semibold block">PJ: {{ o.personalidad_juridica }}</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-3.5 min-w-[180px] max-w-[240px]">
+              <div class="desc-roll text-slate-800">
+                {% if o.directiva_actual %}
+                  {{ o.directiva_actual }}
+                {% elif o.representante_legal %}
+                  <strong class="text-slate-600">Rep:</strong> {{ o.representante_legal }}
+                {% else %}
+                  <span class="text-slate-400 italic">Sin directiva informada</span>
+                {% endif %}
+              </div>
+            </td>
+            <td class="py-3 px-3.5 min-w-[180px] max-w-[240px]">
+              <div class="desc-roll text-slate-700 leading-tight">
+                {{ o.direccion_sede|default:"—" }}
+              </div>
+              {% if o.telefono_contacto %}
+                <span class="font-mono text-slate-500 text-[10px] block mt-0.5">{{ o.telefono_contacto }}</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-3.5 min-w-[200px] max-w-[280px]">
+              <div class="desc-roll text-slate-600">
+                {{ o.observaciones|default:"Sin observaciones registradas." }}
+              </div>
+              {% if o.delegacion %}
+                <span class="text-[10px] text-[#C41230] font-bold block mt-1">{{ o.delegacion.nombre }}</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-3.5 text-center whitespace-nowrap">
+              {% if o.estado == 'Activa' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Activa
+                </span>
+              {% elif o.estado == 'En tramite' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
+                  En trámite
+                </span>
+              {% else %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-50 text-red-600 border border-red-200">
+                  Inactiva
+                </span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-3.5 text-center whitespace-nowrap sticky right-0 bg-white shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
+              <div class="flex items-center justify-center gap-1">
+                <button type="button" 
+                        onclick="verDetalleOrg('{{ o.id }}', '{{ o.nombre|escapejs }}', '{{ o.tipo_organizacion|escapejs }}', '{{ o.rut|default:''|escapejs }}', '{{ o.personalidad_juridica|default:''|escapejs }}', '{{ o.directiva_actual|default:''|escapejs }}', '{{ o.representante_legal|default:''|escapejs }}', '{{ o.direccion_sede|default:''|escapejs }}', '{{ o.telefono_contacto|default:''|escapejs }}', '{{ o.email_contacto|default:''|escapejs }}', '{{ o.estado|escapejs }}', '{{ o.observaciones|default:''|escapejs }}', '{{ o.delegacion_id|default:'' }}')"
+                        title="Ver detalle"
+                        class="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all">
+                  <i data-lucide="eye" class="w-4 h-4"></i>
+                </button>
+                {% if not permisos.es_consultor %}
+                  <button type="button" 
+                          onclick="abrirModalEditarOrg('{{ o.id }}', '{{ o.nombre|escapejs }}', '{{ o.tipo_organizacion|escapejs }}', '{{ o.rut|default:''|escapejs }}', '{{ o.personalidad_juridica|default:''|escapejs }}', '{{ o.directiva_actual|default:''|escapejs }}', '{{ o.representante_legal|default:''|escapejs }}', '{{ o.direccion_sede|default:''|escapejs }}', '{{ o.telefono_contacto|default:''|escapejs }}', '{{ o.email_contacto|default:''|escapejs }}', '{{ o.estado|escapejs }}', '{{ o.observaciones|default:''|escapejs }}', '{{ o.delegacion_id|default:'' }}')"
+                          title="Editar"
+                          class="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all">
+                    <i data-lucide="edit-3" class="w-4 h-4"></i>
+                  </button>
+                  <form method="POST" action="{% url 'gestion_organizaciones_eliminar' o.id %}"
+                        onsubmit="return confirmDelete(this, '{{ o.nombre|escapejs }}');" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" title="Eliminar"
+                            class="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all">
+                      <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="py-8 text-center text-slate-400 font-medium">
+              No se encontraron organizaciones comunitarias registradas para los filtros aplicados.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% include "gestion/includes/paginator.html" %}
+  </div>
+
+</div>
+
+<!-- Modal Crear Organización -->
+<div id="modal-crear-org" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[92vh] overflow-y-auto space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div>
+        <h3 class="text-base font-extrabold text-slate-900">Registrar Organización Comunitaria</h3>
+        <p class="text-[11px] text-slate-400">Padrón de Juntas de Vecinos y Organizaciones Funcionales (Ley 19.418)</p>
+      </div>
+      <button onclick="document.getElementById('modal-crear-org').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+    </div>
+
+    <form method="POST" action="{% url 'gestion_organizaciones' %}" class="space-y-4">
+      {% csrf_token %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="sm:col-span-2 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Nombre de la Organización <span class="text-[#C41230]">*</span></label>
+          <input type="text" name="nombre" required maxlength="200" placeholder="Ej: Junta de Vecinos N° 12 El Milagro"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Tipo de Organización</label>
+          <select name="tipo_organizacion" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            {% for tipo_val in tipos_organizaciones %}
+              <option value="{{ tipo_val }}">{{ tipo_val }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">RUT de la Organización</label>
+          <input type="text" name="rut" data-rut="true" maxlength="12" placeholder="Ej: 65.123.456-7"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <div class="rut-feedback"></div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">N° Personalidad Jurídica</label>
+          <input type="text" name="personalidad_juridica" maxlength="50" placeholder="Ej: PJ-1244/2018"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Representante Legal / Presidente</label>
+          <input type="text" name="representante_legal" maxlength="150" placeholder="Nombre completo del representante"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Teléfono Contacto</label>
+          <input type="text" name="telefono_contacto" maxlength="15" placeholder="+56 9 8765 4321"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
+          <div class="tel-feedback"></div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Email Contacto</label>
+          <input type="email" name="email_contacto" maxlength="100" placeholder="contacto@jjvv.cl"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="sm:col-span-2 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Dirección Sede / Dirección Referencial</label>
+          <input type="text" name="direccion_sede" maxlength="200" placeholder="Calle, número, sector"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="sm:col-span-2 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Nómina de Directiva Actual</label>
+          <textarea name="directiva_actual" rows="2" maxlength="500" placeholder="Presidente, Secretario, Tesorero, Directores..."
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+        </div>
+        <div class="sm:col-span-2 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Observaciones / Antecedentes</label>
+          <textarea name="observaciones" rows="2" maxlength="1000" placeholder="Observaciones adicionales, estado de vigencia, etc."
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Delegación Asignada</label>
+          <select name="delegacion_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            {% for d in delegaciones %}
+              <option value="{{ d.id }}" {% if delegacion_activa and delegacion_activa.id == d.id %}selected{% endif %}>{{ d.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Estado de Vigencia</label>
+          <select name="estado" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="Activa">Activa</option>
+            <option value="Inactiva">Inactiva</option>
+            <option value="En tramite">En trámite</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+        <button type="button" onclick="document.getElementById('modal-crear-org').classList.add('hidden')" 
+                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cancelar</button>
+        <button type="submit" class="px-5 py-2 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-md transition-all">Guardar Organización</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Editar Organización -->
+<div id="modal-editar-org" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[92vh] overflow-y-auto space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div>
+        <h3 class="text-base font-extrabold text-slate-900">Editar Organización Comunitaria</h3>
+        <p class="text-[11px] text-slate-400">Actualizar registro y directiva</p>
+      </div>
+      <button onclick="document.getElementById('modal-editar-org').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+    </div>
+
+    <form id="form-editar-org" method="POST" action="" class="space-y-4">
+      {% csrf_token %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="sm:col-span-2 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Nombre de la Organización <span class="text-[#C41230]">*</span></label>
+          <input type="text" id="edit-org-nombre" name="nombre" required maxlength="200"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Tipo de Organización</label>
+          <select id="edit-org-tipo" name="tipo_organizacion" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            {% for tipo_val in tipos_organizaciones %}
+              <option value="{{ tipo_val }}">{{ tipo_val }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">RUT de la Organización</label>
+          <input type="text" id="edit-org-rut" name="rut" data-rut="true" maxlength="12"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <div class="rut-feedback"></div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">N° Personalidad Jurídica</label>
+          <input type="text" id="edit-org-pj" name="personalidad_juridica" maxlength="50"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Representante Legal</label>
+          <input type="text" id="edit-org-rep" name="representante_legal" maxlength="150"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Teléfono Contacto</label>
+          <input type="text" id="edit-org-tel" name="telefono_contacto" maxlength="15" placeholder="+56 9 8765 4321"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
+          <div class="tel-feedback"></div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Email Contacto</label>
+          <input type="email" id="edit-org-email" name="email_contacto" maxlength="100"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="sm:col-span-2 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Dirección Sede</label>
+          <input type="text" id="edit-org-dir" name="direccion_sede" maxlength="200"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="sm:col-span-2 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Nómina de Directiva Actual</label>
+          <textarea id="edit-org-directiva" name="directiva_actual" rows="2" maxlength="500"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+        </div>
+        <div class="sm:col-span-2 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Observaciones</label>
+          <textarea id="edit-org-obs" name="observaciones" rows="2" maxlength="1000"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Delegación Asignada</label>
+          <select id="edit-org-del" name="delegacion_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            {% for d in delegaciones %}
+              <option value="{{ d.id }}">{{ d.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Estado</label>
+          <select id="edit-org-estado" name="estado" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="Activa">Activa</option>
+            <option value="Inactiva">Inactiva</option>
+            <option value="En tramite">En trámite</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+        <button type="button" onclick="document.getElementById('modal-editar-org').classList.add('hidden')" 
+                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cancelar</button>
+        <button type="submit" class="px-5 py-2 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-md transition-all">Guardar Cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function abrirModalCrearOrg() {
+    document.getElementById('modal-crear-org').classList.remove('hidden');
+  }
+
+  function abrirModalEditarOrg(id, nombre, tipo, rut, pj, directiva, rep, dir, tel, email, estado, obs, delId) {
+    document.getElementById('form-editar-org').action = `/gestion/organizaciones/${id}/editar/`;
+    document.getElementById('edit-org-nombre').value = nombre;
+    document.getElementById('edit-org-tipo').value = tipo;
+    document.getElementById('edit-org-rut').value = rut;
+    document.getElementById('edit-org-pj').value = pj;
+    document.getElementById('edit-org-directiva').value = directiva;
+    document.getElementById('edit-org-rep').value = rep;
+    document.getElementById('edit-org-dir').value = dir;
+    document.getElementById('edit-org-tel').value = tel;
+    document.getElementById('edit-org-email').value = email;
+    document.getElementById('edit-org-estado').value = estado;
+    document.getElementById('edit-org-obs').value = obs;
+    if (delId) document.getElementById('edit-org-del').value = delId;
+    document.getElementById('modal-editar-org').classList.remove('hidden');
+  }
+
+  function verDetalleOrg(id, nombre, tipo, rut, pj, directiva, rep, dir, tel, email, estado, obs, delId) {
+    Swal.fire({
+      title: nombre,
+      html: `
+        <div class="text-left text-xs space-y-2 p-2">
+          <p><strong>Tipo:</strong> ${tipo}</p>
+          <p><strong>RUT:</strong> ${rut || '—'}</p>
+          <p><strong>PJ:</strong> ${pj || '—'}</p>
+          <p><strong>Representante:</strong> ${rep || '—'}</p>
+          <p><strong>Directiva:</strong><br><span class="text-slate-600">${directiva || '—'}</span></p>
+          <p><strong>Sede / Dirección:</strong> ${dir || '—'}</p>
+          <p><strong>Contacto:</strong> ${tel || '—'} ${email ? '· ' + email : ''}</p>
+          <p><strong>Observaciones:</strong><br><span class="text-slate-600">${obs || '—'}</span></p>
+          <p><strong>Estado:</strong> ${estado}</p>
+        </div>
+      `,
+      confirmButtonColor: '#C41230',
+      confirmButtonText: 'Cerrar'
+    });
+  }
+
+  // WebSocket Live Sync para Organizaciones
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const wsUrl = wsProtocol + window.location.host + '/ws/crud/organizaciones/';
+  let orgSocket = null;
+
+  function connectOrgWS() {
+    try {
+      orgSocket = new WebSocket(wsUrl);
+      const dot = document.getElementById('ws-dot');
+      const text = document.getElementById('ws-text');
+
+      orgSocket.onopen = function() {
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+        if (text) text.textContent = 'En vivo (WebSocket)';
+      };
+
+      orgSocket.onmessage = function(e) {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === 'module_changed' && data.module === 'organizaciones') {
+            const toast = Swal.mixin({
+              toast: true,
+              position: 'top-end',
+              showConfirmButton: false,
+              timer: 3000,
+              timerProgressBar: true
+            });
+            toast.fire({
+              icon: 'info',
+              title: `Organización ${data.action}`
+            });
+            fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+              .then(res => res.text())
+              .then(html => {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const newTbody = doc.querySelector('tbody');
+                const curTbody = document.querySelector('tbody');
+                if (newTbody && curTbody) curTbody.innerHTML = newTbody.innerHTML;
+                if (window.lucide) lucide.createIcons();
+              });
+          }
+        } catch(err) {}
+      };
+
+      orgSocket.onclose = function() {
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-amber-500';
+        if (text) text.textContent = 'Reconectando...';
+        setTimeout(connectOrgWS, 4000);
+      };
+    } catch(e) {}
+  }
+
+  document.addEventListener("DOMContentLoaded", function() {
+    connectOrgWS();
+  });
+</script>
+{% endblock %}

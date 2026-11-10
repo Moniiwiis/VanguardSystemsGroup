@@ -44,6 +44,29 @@
       background-color: #FDF6F6;
       color: #241016;
     }
+    /* Roll en descripciones para visualización limpia sin romper tablas */
+    .desc-roll {
+      max-height: 4.8rem;
+      overflow-y: auto;
+      padding-right: 0.25rem;
+      word-break: break-word;
+      font-size: 0.8125rem;
+      line-height: 1.35;
+    }
+    .desc-roll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .desc-roll::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.04);
+      border-radius: 4px;
+    }
+    .desc-roll::-webkit-scrollbar-thumb {
+      background: rgba(196,18,48,0.3);
+      border-radius: 4px;
+    }
+    .desc-roll::-webkit-scrollbar-thumb:hover {
+      background: rgba(196,18,48,0.6);
+    }
   </style>
   {% block extra_head %}{% endblock %}
 </head>
@@ -132,15 +155,33 @@
 
       <!-- Derecha: Identificación de Usuario, Rol y Salir (Wireframe C3-C6) -->
       <div class="flex items-center gap-3 shrink-0 text-xs">
-        <div class="text-right hidden sm:block">
-          <div class="font-bold text-white text-xs leading-tight">
-            {{ request.user.first_name|default:request.user.username }}
+        <a href="{% url 'perfil_usuario' %}" class="flex items-center gap-2 group hover:opacity-90 transition-opacity">
+          {% if funcionario_actual and funcionario_actual.foto %}
+            <img src="{{ funcionario_actual.foto.url }}" alt="{{ request.user.username }}" class="w-8 h-8 rounded-full object-cover ring-2 ring-white/40 shadow-sm" />
+          {% elif request.user.funcionario.foto %}
+            <img src="{{ request.user.funcionario.foto.url }}" alt="{{ request.user.username }}" class="w-8 h-8 rounded-full object-cover ring-2 ring-white/40 shadow-sm" />
+          {% else %}
+            <div class="w-8 h-8 rounded-full bg-white/20 ring-2 ring-white/30 flex items-center justify-center font-bold text-white text-xs">
+              {{ request.user.first_name|default:request.user.username|make_list|first|upper }}
+            </div>
+          {% endif %}
+          <div class="text-right hidden sm:block">
+            <div class="font-bold text-white text-xs leading-tight group-hover:underline">
+              {{ request.user.first_name|default:request.user.username }}
+            </div>
+            <div class="text-[11px] text-white/80 leading-tight">
+              <span>{{ user_rol_name }}</span>
+            </div>
           </div>
-          <div class="text-[11px] text-white/80 leading-tight">
-            <span>{{ user_rol_name }}</span>
-            <span class="mx-1 text-white/50">|</span>
-            <a href="{% url 'logout' %}" class="hover:underline font-semibold text-white hover:text-red-200 transition-colors">Salir</a>
-          </div>
+        </a>
+
+        <div class="hidden sm:flex items-center gap-2 border-l border-white/20 pl-3">
+          <a href="{% url 'perfil_usuario' %}" title="Mi Perfil y Foto" class="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors">
+            <i data-lucide="user" class="w-3.5 h-3.5"></i>
+          </a>
+          <a href="{% url 'logout' %}" title="Cerrar sesión" class="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white hover:text-red-200 transition-colors">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+          </a>
         </div>
         
         <!-- Botón Salir Mobile -->
@@ -231,12 +272,30 @@
           </a>
         {% endif %}
 
+        <!-- 7b. Tubo SGR de Trabajo (Matriz Excel) -->
+        {% if permisos.ver_atenciones or permisos.ver_reportes or permisos.es_admin %}
+          <a href="{% url 'gestion_tubo' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_tubo' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="git-pull-request" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
+            <span>Tubo de Trabajo SGR</span>
+          </a>
+        {% endif %}
+
         <!-- 8. Vecinos -->
         {% if permisos.ver_vecinos %}
           <a href="{% url 'gestion_vecinos' %}" 
              class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_vecinos' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
             <i data-lucide="user-check" class="w-4 h-4 shrink-0"></i>
             <span>Vecinos</span>
+          </a>
+        {% endif %}
+
+        <!-- 8a. Organizaciones Comunitarias / JJVV (Coherencia Excel JJVV) -->
+        {% if permisos.ver_organizaciones %}
+          <a href="{% url 'gestion_organizaciones' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_organizaciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="landmark" class="w-4 h-4 shrink-0"></i>
+            <span>JJVV y Organizaciones</span>
           </a>
         {% endif %}
 
@@ -257,6 +316,31 @@
             <span>Reportes</span>
           </a>
         {% endif %}
+
+        <div class="pt-2 border-t border-slate-100 my-1"></div>
+
+        <!-- Tiempo Real / Chat (Channels WebSockets) -->
+        <a href="{% url 'websocket:chat_index' %}" 
+           class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'chat' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+          <i data-lucide="messages-square" class="w-4 h-4 shrink-0 text-red-600"></i>
+          <span>Chat en Vivo</span>
+        </a>
+
+        <!-- Portal Ciudadano (Acceso para rol Cliente o consulta) -->
+        {% if ver_portal_cliente or es_cliente %}
+          <a href="{% url 'portal_cliente' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'portal_cliente' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="user-square-2" class="w-4 h-4 shrink-0 text-blue-600"></i>
+            <span>Portal Ciudadano</span>
+          </a>
+        {% endif %}
+
+        <!-- Mi Perfil (Croppr.js y Credenciales) -->
+        <a href="{% url 'perfil_usuario' %}" 
+           class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'perfil_usuario' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+          <i data-lucide="user-cog" class="w-4 h-4 shrink-0"></i>
+          <span>Mi Perfil</span>
+        </a>
 
       </nav>
 
@@ -510,6 +594,311 @@
         });
       });
     });
+
+    // =========================================================================
+    // FORMATEADOR Y VALIDADOR UNIVERSAL EN TIEMPO REAL: RUT Y TELÉFONO CHILENO
+    // =========================================================================
+
+    // --- RUT Chileno (Algoritmo Módulo 11) ---
+    function calcularDvRut(cuerpo) {
+      if (!cuerpo) return '';
+      let suma = 0;
+      let multiplo = 2;
+      for (let i = cuerpo.length - 1; i >= 0; i--) {
+        suma += parseInt(cuerpo.charAt(i), 10) * multiplo;
+        multiplo = (multiplo < 7) ? multiplo + 1 : 2;
+      }
+      let resto = 11 - (suma % 11);
+      if (resto === 11) return '0';
+      if (resto === 10) return 'K';
+      return resto.toString();
+    }
+
+    function formatearRutChileno(rut) {
+      if (!rut) return '';
+      let clean = rut.replace(/[^0-9kK]/g, '').toUpperCase().slice(0, 9);
+      if (clean.length === 0) return '';
+      if (clean.length === 1) return clean;
+      let dv = clean.slice(-1);
+      let cuerpo = clean.slice(0, -1);
+      let formatted = cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      return formatted + '-' + dv;
+    }
+
+    function validarRutChileno(rut) {
+      if (!rut) return false;
+      let clean = rut.replace(/[^0-9kK]/g, '').toUpperCase();
+      if (clean.length < 8 || clean.length > 9) return false;
+      let dv = clean.slice(-1);
+      let cuerpo = clean.slice(0, -1);
+      if (!/^\d+$/.test(cuerpo)) return false;
+      return dv === calcularDvRut(cuerpo);
+    }
+
+    // --- Teléfono Móvil Chileno (+56 9 1234 5678) ---
+    function formatearTelefonoChileno(val, isDelete) {
+      if (!val) return '';
+      let digits = val.replace(/\D/g, '');
+      if (!digits) return '';
+
+      // Si empieza con 56, remover prefijo de país
+      if (digits.startsWith('56')) {
+        digits = digits.slice(2);
+      }
+
+      // Si el usuario escribe con o sin el 9 inicial de móvil
+      let remaining = digits.startsWith('9') ? digits.slice(1) : digits;
+      if (remaining.length === 0) {
+        return isDelete ? '' : '+56 9 ';
+      }
+
+      remaining = remaining.slice(0, 8);
+      if (remaining.length <= 4) {
+        return '+56 9 ' + remaining;
+      }
+      return '+56 9 ' + remaining.slice(0, 4) + ' ' + remaining.slice(4);
+    }
+
+    function validarTelefonoChileno(val) {
+      if (!val) return false;
+      let digits = val.replace(/\D/g, '');
+      if (digits.startsWith('56')) digits = digits.slice(2);
+      let remaining = digits.startsWith('9') ? digits.slice(1) : digits;
+      return remaining.length === 8;
+    }
+
+    // --- Detectores de Inputs ---
+    function esInputRut(input) {
+      if (!input || input.type === 'hidden' || input.type === 'search') return false;
+      if (input.name === 'q' || input.name === 'q_colab' || input.id === 'solicitante' || input.name === 'solicitante') return false;
+      if (input.dataset.noFormat === 'true') return false;
+      if (input.dataset.rut === 'true') return true;
+      const name = (input.name || '').toLowerCase();
+      const id = (input.id || '').toLowerCase();
+      return name === 'rut' || name.endsWith('_rut') || name.startsWith('rut_') ||
+             id === 'rut' || id.endsWith('-rut') || id.endsWith('_rut') || id.includes('vecino_rut') || id.includes('vecino-rut') ||
+             name.includes('identificador_institucional');
+    }
+
+    function esInputTelefono(input) {
+      if (!input || input.type === 'hidden' || input.type === 'search') return false;
+      if (input.name === 'q' || input.name === 'q_colab') return false;
+      if (input.dataset.noFormat === 'true') return false;
+      if (input.dataset.telefono === 'true' || input.type === 'tel') return true;
+      const name = (input.name || '').toLowerCase();
+      const id = (input.id || '').toLowerCase();
+      return name.includes('telefono') || name.includes('celular') ||
+             id.includes('telefono') || id.includes('celular');
+    }
+
+    // --- Obtener o inyectar contenedor de feedback ---
+    function getFeedbackElement(input, type) {
+      let feedback = document.getElementById(input.id + '_feedback');
+      if (!feedback) {
+        feedback = input.parentElement.querySelector('.' + type + '-feedback');
+      }
+      if (!feedback && input.parentElement) {
+        feedback = document.createElement('div');
+        feedback.className = type + '-feedback text-[11px] font-bold mt-1';
+        input.parentElement.appendChild(feedback);
+      }
+      return feedback;
+    }
+
+    // --- Validadores Visuales en Vivo ---
+    function actualizarValidacionRut(input) {
+      const feedback = getFeedbackElement(input, 'rut');
+      const val = (input.value || '').trim();
+      if (!val) {
+        if (feedback) feedback.innerHTML = '';
+        input.classList.remove('border-emerald-500', 'border-red-500', 'border-amber-400');
+        return;
+      }
+      const clean = val.replace(/[^0-9kK]/g, '');
+      if (clean.length >= 8) {
+        const esValido = validarRutChileno(val);
+        const cuerpo = clean.slice(0, -1);
+        if (esValido) {
+          if (feedback) feedback.innerHTML = '<span class="text-emerald-600 flex items-center gap-1 font-bold">✓ RUT válido (Módulo 11 verificado)</span>';
+          input.classList.remove('border-red-500', 'border-amber-400');
+          input.classList.add('border-emerald-500');
+        } else {
+          const dvEsperado = calcularDvRut(cuerpo);
+          if (feedback) feedback.innerHTML = '<span class="text-red-600 flex items-center gap-1 font-bold">✗ RUT inválido (DV esperado: ' + dvEsperado + ')</span>';
+          input.classList.remove('border-emerald-500', 'border-amber-400');
+          input.classList.add('border-red-500');
+        }
+      } else {
+        if (feedback) feedback.innerHTML = '<span class="text-slate-400 font-semibold">Ingrese al menos 7 u 8 dígitos más DV</span>';
+        input.classList.remove('border-emerald-500', 'border-red-500');
+        input.classList.add('border-amber-400');
+      }
+    }
+
+    function actualizarValidacionTelefono(input) {
+      const feedback = getFeedbackElement(input, 'tel');
+      const val = (input.value || '').trim();
+      if (!val) {
+        if (feedback) feedback.innerHTML = '';
+        input.classList.remove('border-emerald-500', 'border-red-500', 'border-amber-400');
+        return;
+      }
+      let digits = val.replace(/\D/g, '');
+      if (digits.startsWith('56')) digits = digits.slice(2);
+      let remaining = digits.startsWith('9') ? digits.slice(1) : digits;
+
+      if (remaining.length === 8) {
+        if (feedback) feedback.innerHTML = '<span class="text-emerald-600 flex items-center gap-1 font-bold">✓ Teléfono válido (+56 9 XXXX XXXX)</span>';
+        input.classList.remove('border-red-500', 'border-amber-400');
+        input.classList.add('border-emerald-500');
+      } else {
+        let faltan = 8 - remaining.length;
+        if (faltan > 0) {
+          if (feedback) feedback.innerHTML = '<span class="text-amber-600 font-semibold">Faltan ' + faltan + ' dígitos (ej: +56 9 1234 5678)</span>';
+          input.classList.remove('border-emerald-500', 'border-red-500');
+          input.classList.add('border-amber-400');
+        } else {
+          if (feedback) feedback.innerHTML = '<span class="text-red-600 font-bold">✗ Formato incorrecto</span>';
+          input.classList.remove('border-emerald-500', 'border-amber-400');
+          input.classList.add('border-red-500');
+        }
+      }
+    }
+
+    // --- Delegación Global de Eventos para que funcione en cualquier campo nuevo o modal ---
+    document.addEventListener('input', function(e) {
+      const input = e.target;
+      if (!input || input.tagName !== 'INPUT') return;
+
+      if (esInputRut(input)) {
+        input.value = formatearRutChileno(input.value);
+        actualizarValidacionRut(input);
+      } else if (esInputTelefono(input)) {
+        const isDelete = (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward');
+        if (isDelete && (input.value.trim() === '+56 9' || input.value.trim() === '+56' || input.value.trim() === '+')) {
+          input.value = '';
+        } else {
+          input.value = formatearTelefonoChileno(input.value, isDelete);
+        }
+        actualizarValidacionTelefono(input);
+      }
+    });
+
+    // Permitir borrar el prefijo '+56 9 ' con Backspace cuando quede solo eso
+    document.addEventListener('keydown', function(e) {
+      const input = e.target;
+      if (!input || input.tagName !== 'INPUT' || !esInputTelefono(input)) return;
+      if (e.key === 'Backspace') {
+        const v = input.value.trim();
+        if (v === '+56 9' || v === '+56 9 ' || v === '+56' || v === '+') {
+          e.preventDefault();
+          input.value = '';
+          actualizarValidacionTelefono(input);
+        }
+      }
+    });
+
+    // Inicializar atributos en campos preexistentes al cargar la página
+    document.addEventListener("DOMContentLoaded", function() {
+      document.querySelectorAll('input').forEach(input => {
+        if (esInputRut(input)) {
+          input.setAttribute('maxlength', '12');
+          input.setAttribute('autocomplete', 'off');
+          if (!input.placeholder || input.placeholder.toLowerCase().includes('ej:')) {
+            input.setAttribute('placeholder', 'Ej: 12.345.678-5');
+          }
+          if (input.value) {
+            input.value = formatearRutChileno(input.value);
+            actualizarValidacionRut(input);
+          }
+        } else if (esInputTelefono(input)) {
+          input.setAttribute('maxlength', '15');
+          if (!input.placeholder || input.placeholder.includes('+56')) {
+            input.setAttribute('placeholder', '+56 9 1234 5678');
+          }
+          if (input.value) {
+            input.value = formatearTelefonoChileno(input.value, false);
+            actualizarValidacionTelefono(input);
+          }
+        }
+      });
+    });
+
+    // Interceptar el envío (submit) de TODOS los formularios con validaciones bloqueantes y alertas claras
+    document.addEventListener('submit', function(e) {
+      const form = e.target;
+      if (!form || form.tagName !== 'FORM') return;
+
+      const inputs = form.querySelectorAll('input');
+      for (const input of inputs) {
+        // Validación RUT al enviar
+        if (esInputRut(input)) {
+          const val = (input.value || '').trim();
+          const esRequerido = input.hasAttribute('required') || input.required;
+          if (!val && esRequerido) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            input.focus();
+            Swal.fire({
+              icon: 'warning',
+              title: 'RUT Obligatorio',
+              text: 'Por favor complete el campo de RUT antes de continuar.',
+              confirmButtonColor: '#C41230',
+              customClass: { popup: 'rounded-2xl shadow-xl font-sans' }
+            });
+            return false;
+          }
+          if (val && !validarRutChileno(val)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            input.focus();
+            const clean = val.replace(/[^0-9kK]/g, '');
+            const cuerpo = clean.length >= 2 ? clean.slice(0, -1) : '';
+            const dvEsp = cuerpo ? calcularDvRut(cuerpo) : '';
+            Swal.fire({
+              icon: 'error',
+              title: 'RUT Inválido (Módulo 11)',
+              text: 'El RUT ingresado (' + val + ') no es válido. ' + (dvEsp ? 'El dígito verificador correcto para este número es ' + dvEsp + '.' : 'Verifique los dígitos ingresados.'),
+              confirmButtonColor: '#C41230',
+              customClass: { popup: 'rounded-2xl shadow-xl font-sans' }
+            });
+            return false;
+          }
+        }
+
+        // Validación Teléfono al enviar
+        if (esInputTelefono(input)) {
+          const val = (input.value || '').trim();
+          const esRequerido = input.hasAttribute('required') || input.required;
+          if (!val && esRequerido) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            input.focus();
+            Swal.fire({
+              icon: 'warning',
+              title: 'Teléfono Obligatorio',
+              text: 'Por favor ingrese el número telefónico (+56 9 1234 5678).',
+              confirmButtonColor: '#C41230',
+              customClass: { popup: 'rounded-2xl shadow-xl font-sans' }
+            });
+            return false;
+          }
+          if (val && !validarTelefonoChileno(val)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            input.focus();
+            Swal.fire({
+              icon: 'error',
+              title: 'Teléfono Incompleto',
+              text: 'El teléfono ingresado (' + val + ') debe tener 9 dígitos en el formato oficial: +56 9 1234 5678.',
+              confirmButtonColor: '#C41230',
+              customClass: { popup: 'rounded-2xl shadow-xl font-sans' }
+            });
+            return false;
+          }
+        }
+      }
+    }, true);
 
     // SweetAlert2 Flash Messages
     document.addEventListener("DOMContentLoaded", function() {

@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}Mi Perfil de Usuario — Sistema Municipal La Serena{% endblock %}
+
+{% block extra_head %}
+<!-- Croppr.js CSS para recorte interactivo de foto de perfil (Evaluación Sumativa 3) -->
+<link href="https://cdn.jsdelivr.net/npm/croppr@2.3.1/dist/croppr.min.css" rel="stylesheet" />
+<style>
+  .croppr-container {
+    max-height: 380px;
+    background: #1e293b;
+    border-radius: 1rem;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-5xl mx-auto">
+
+  <!-- Header Card -->
+  <div class="bg-white rounded-3xl p-6 sm:p-7 border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="space-y-1">
+      <div class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+        <span>Cuenta Personal</span>
+        <span class="text-slate-300">/</span>
+        <span class="text-[#C41230]">Mi Perfil</span>
+      </div>
+      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
+        Configuración de Perfil y Credenciales
+      </h1>
+      <p class="text-xs text-slate-500 max-w-xl">
+        Edita tus datos personales, actualiza tu fotografía de perfil con recorte profesional (Croppr.js) y gestiona tu contraseña de acceso.
+      </p>
+    </div>
+
+    <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-red-50 text-[#C41230] border border-red-200/90 text-xs font-bold shrink-0">
+      <i data-lucide="shield-check" class="w-4 h-4"></i>
+      <span>Rol: <strong>{{ user_rol_name }}</strong></span>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Tarjeta Izquierda: Fotografía de Perfil con Croppr.js -->
+    <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-5 flex flex-col items-center text-center">
+      <div class="space-y-2">
+        <h2 class="text-base font-extrabold text-slate-900">Foto de Perfil</h2>
+        <p class="text-[11px] text-slate-400">Recorte interactivo 1:1 con Croppr.js (JPEG/PNG máx 2 MiB)</p>
+      </div>
+
+      <!-- Avatar Preview Actual -->
+      <div class="relative group">
+        {% if funcionario and funcionario.foto %}
+          <img id="avatar-preview-actual" src="{{ funcionario.foto.url }}" alt="{{ request.user.username }}"
+               class="w-36 h-36 rounded-full object-cover ring-4 ring-[#C41230]/20 shadow-lg" />
+        {% else %}
+          <div id="avatar-placeholder" class="w-36 h-36 rounded-full bg-gradient-to-tr from-[#8B1D19] to-[#C41230] flex items-center justify-center text-white text-4xl font-extrabold ring-4 ring-[#C41230]/20 shadow-lg">
+            {{ request.user.first_name|default:request.user.username|make_list|first|upper }}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="text-xs space-y-1">
+        <p class="font-extrabold text-slate-900 text-sm">{{ request.user.get_full_name|default:request.user.username }}</p>
+        <p class="text-slate-500 font-mono">{{ request.user.email|default:"Sin correo electrónico" }}</p>
+        <span class="inline-block mt-1 px-3 py-1 rounded-full text-[10px] font-extrabold bg-red-50 text-[#C41230] border border-red-200">
+          {{ user_rol_name }}
+        </span>
+      </div>
+
+      <!-- Botón para seleccionar nueva imagen -->
+      <div class="w-full pt-3 border-t border-slate-100">
+        <label for="input-foto-perfil" class="cursor-pointer w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-2xl shadow-sm transition-all flex items-center justify-center gap-2">
+          <i data-lucide="camera" class="w-4 h-4"></i>
+          <span>Subir y recortar nueva foto</span>
+        </label>
+        <input type="file" id="input-foto-perfil" accept="image/png, image/jpeg" class="hidden" />
+      </div>
+    </div>
+
+    <!-- Tarjeta Derecha: Formularios de Datos y Contraseña -->
+    <div class="lg:col-span-2 space-y-6">
+
+      <!-- Formulario 1: Datos Personales -->
+      <div class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-4">
+        <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
+          <i data-lucide="user" class="w-4 h-4 text-[#C41230]"></i>
+          <h2 class="text-base font-extrabold text-slate-900">Información Personal</h2>
+        </div>
+
+        <form method="POST" action="{% url 'perfil_usuario' %}" class="space-y-4">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="actualizar_datos">
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-700">Nombre <span class="text-[#C41230]">*</span></label>
+              <input type="text" name="first_name" required maxlength="150" value="{{ request.user.first_name }}"
+                     placeholder="Tu nombre (máx 150 caracteres)"
+                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-700">Apellidos</label>
+              <input type="text" name="last_name" maxlength="150" value="{{ request.user.last_name }}"
+                     placeholder="Tus apellidos (máx 150 caracteres)"
+                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-700">Correo Electrónico <span class="text-[#C41230]">*</span></label>
+              <input type="email" name="email" required maxlength="100" value="{{ request.user.email }}"
+                     placeholder="nombre@laserena.cl (máx 100 caracteres)"
+                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-700">Teléfono Móvil (Chile)</label>
+              <input type="text" name="telefono" maxlength="15" value="{{ funcionario.telefono|default:'' }}"
+                     placeholder="+56 9 8765 4321"
+                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
+              <div class="tel-feedback"></div>
+            </div>
+          </div>
+
+          <div class="flex justify-end pt-2">
+            <button type="submit" class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
+              <i data-lucide="save" class="w-4 h-4"></i>
+              <span>Guardar Datos</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Formulario 2: Cambio de Contraseña -->
+      <div class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-4">
+        <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
+          <i data-lucide="key" class="w-4 h-4 text-[#C41230]"></i>
+          <h2 class="text-base font-extrabold text-slate-900">Seguridad y Cambio de Contraseña</h2>
+        </div>
+
+        <form method="POST" action="{% url 'perfil_usuario' %}" class="space-y-4">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="cambiar_clave">
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-700">Contraseña Actual <span class="text-[#C41230]">*</span></label>
+              <input type="password" name="password_actual" required maxlength="128" placeholder="••••••••"
+                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-700">Nueva Contraseña <span class="text-[#C41230]">*</span></label>
+              <input type="password" name="password_nueva" required maxlength="128" placeholder="Mínimo 8 caracteres"
+                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-700">Confirmar Nueva <span class="text-[#C41230]">*</span></label>
+              <input type="password" name="password_confirmacion" required maxlength="128" placeholder="Repite contraseña"
+                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+          </div>
+
+          <div class="flex justify-end pt-2">
+            <button type="submit" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
+              <i data-lucide="lock" class="w-4 h-4"></i>
+              <span>Actualizar Contraseña</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Modal Interactivo Croppr.js para Recorte de Foto de Perfil -->
+<div id="modal-croppr" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-xl space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div>
+        <h3 class="text-base font-extrabold text-slate-900">Recortar Fotografía de Perfil</h3>
+        <p class="text-[11px] text-slate-400">Ajusta el encuadre cuadrado (1:1) antes de guardar</p>
+      </div>
+      <button type="button" onclick="cerrarModalCroppr()" class="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
+    </div>
+
+    <!-- Área de Recorte -->
+    <div class="croppr-container">
+      <img id="croppr-image" src="" alt="Para recortar" class="max-w-full max-h-[350px] object-contain" />
+    </div>
+
+    <form id="form-guardar-foto" method="POST" action="{% url 'perfil_usuario' %}">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="actualizar_foto">
+      <input type="hidden" name="action" value="actualizar_foto">
+      <input type="hidden" name="foto_recortada" id="foto_recortada_base64" value="">
+      <input type="hidden" name="foto_base64" id="foto_base64_alt" value="">
+
+      <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+        <span class="text-[11px] text-slate-400 font-semibold">Resolución óptima: 300x300 px</span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="cerrarModalCroppr()" 
+                  class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cancelar</button>
+          <button type="button" onclick="procesarYEnviarRecorte()" 
+                  class="px-5 py-2 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center gap-2">
+            <i data-lucide="crop" class="w-4 h-4"></i>
+            <span>Recortar y Guardar</span>
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Croppr.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/croppr@2.3.1/dist/croppr.min.js"></script>
+<script>
+  let cropprInstance = null;
+  let rawImageSrc = null;
+
+  const fileInput = document.getElementById('input-foto-perfil');
+  const modalCroppr = document.getElementById('modal-croppr');
+  const cropprImage = document.getElementById('croppr-image');
+
+  fileInput.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.match(/^image\/(jpeg|png)$/)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Formato no permitido',
+        text: 'Solo se permiten imágenes JPEG o PNG.'
+      });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Archivo demasiado grande',
+        text: 'La fotografía no debe superar los 2 MiB.'
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      rawImageSrc = evt.target.result;
+      cropprImage.src = rawImageSrc;
+      modalCroppr.classList.remove('hidden');
+
+      if (cropprInstance) {
+        cropprInstance.destroy();
+        cropprInstance = null;
+      }
+
+      // Inicializar Croppr con aspect ratio 1:1 (cuadrado)
+      setTimeout(() => {
+        cropprInstance = new Croppr(cropprImage, {
+          aspectRatio: 1,
+          startSize: [80, 80, '%'],
+          minSize: [60, 60, 'px']
+        });
+      }, 100);
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function cerrarModalCroppr() {
+    modalCroppr.classList.add('hidden');
+    if (cropprInstance) {
+      cropprInstance.destroy();
+      cropprInstance = null;
+    }
+    fileInput.value = '';
+  }
+
+  function procesarYEnviarRecorte() {
+    if (!cropprInstance) return;
+    const cropValue = cropprInstance.getValue();
+
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const targetSize = 300;
+      canvas.width = targetSize;
+      canvas.height = targetSize;
+      const ctx = canvas.getContext('2d');
+
+      ctx.drawImage(
+        img,
+        cropValue.x,
+        cropValue.y,
+        cropValue.width,
+        cropValue.height,
+        0,
+        0,
+        targetSize,
+        targetSize
+      );
+
+      const base64Data = canvas.toDataURL('image/jpeg', 0.9);
+      document.getElementById('foto_recortada_base64').value = base64Data;
+      if (document.getElementById('foto_base64_alt')) {
+        document.getElementById('foto_base64_alt').value = base64Data;
+      }
+      document.getElementById('form-guardar-foto').submit();
+    };
+    img.src = rawImageSrc;
+  }
+</script>
+{% endblock %}
