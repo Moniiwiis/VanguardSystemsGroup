@@ -128,7 +128,7 @@ def validar_rut(rut_completo):
 
     dv_calculado = calcular_dv(cuerpo)
     if dv != dv_calculado:
-        return False, f"El dígito verificador '{dv}' es incorrecto (debería ser '{dv_calculado}')."
+        return False, f"El dígito verificador '{dv}' es incorrecto."
 
     # Formatear canónicamente como XX.XXX.XXX-Y
     rut_formateado = formatear_rut(cuerpo + dv)
@@ -170,6 +170,25 @@ def validar_largo(texto, max_len, nombre_campo):
         return False, f"El campo '{nombre_campo}' excede el límite máximo permitido de {max_len} caracteres (actual: {len(str(texto).strip())})."
     return True, None
 
+
+def validar_direccion(direccion, nombre_campo="Dirección", max_len=250):
+    """
+    Valida que una dirección o domicilio legal contenga obligatoriamente letras
+    (nombre de calle, avenida o pasaje) y números (numeración), además de respetar el largo máximo.
+    Si está vacía, retorna (True, None) para permitir campos opcionales vacíos.
+    """
+    if not direccion or not str(direccion).strip():
+        return True, None
+    texto = str(direccion).strip()
+    ok_len, err_len = validar_largo(texto, max_len, nombre_campo)
+    if not ok_len:
+        return False, err_len
+    tiene_letras = bool(re.search(r'[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]', texto))
+    tiene_numeros = bool(re.search(r'\d', texto))
+    if not (tiene_letras and tiene_numeros):
+        return False, f"El campo '{nombre_campo}' debe contener tanto letras (calle o pasaje) como números (numeración)."
+    return True, None
+
 def validar_telefono_chileno(telefono):
     """
     Valida un número telefónico en formato chileno (+56 9 XXXX XXXX o 9 dígitos).
@@ -177,6 +196,8 @@ def validar_telefono_chileno(telefono):
     if not telefono or not str(telefono).strip():
         return True, None # Es opcional si no viene
     tel_limpio = re.sub(r'[\s\-\+\(\)]', '', str(telefono).strip())
+    if tel_limpio in ('', '569', '56', '9'):
+        return True, None # Solo el prefijo fijo sin dígitos adicionales
     if not tel_limpio.isdigit():
         return False, "El teléfono debe contener únicamente números y código internacional."
     if len(tel_limpio) < 8 or len(tel_limpio) > 12:
@@ -190,11 +211,13 @@ def formatear_telefono_chileno(telefono):
     if not telefono or not str(telefono).strip():
         return ""
     digits = re.sub(r'\D', '', str(telefono).strip())
-    if not digits:
+    if digits in ('', '569', '56', '9'):
         return ""
     if digits.startswith('56'):
         digits = digits[2:]
     remaining = digits[1:] if digits.startswith('9') else digits
+    if not remaining:
+        return ""
     if len(remaining) == 8:
         return f"+56 9 {remaining[:4]} {remaining[4:]}"
     elif len(digits) == 9 and digits.startswith('9'):

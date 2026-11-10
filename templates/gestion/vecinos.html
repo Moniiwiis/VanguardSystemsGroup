@@ -516,49 +516,5 @@
     document.getElementById('edit-vecino-estado').value = estado;
     document.getElementById('modal-editar-vecino').classList.remove('hidden');
   }
-
-  // WebSocket Live Sync para módulo Vecinos
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-  const wsUrl = wsProtocol + window.location.host + '/ws/crud/vecinos/';
-  let vecinosSocket = null;
-
-  function connectVecinosWS() {
-    try {
-      vecinosSocket = new WebSocket(wsUrl);
-      vecinosSocket.onmessage = function(e) {
-        try {
-          const data = JSON.parse(e.data);
-          if (data.type === 'module_changed' && data.module === 'vecinos') {
-            const toast = Swal.mixin({
-              toast: true,
-              position: 'top-end',
-              showConfirmButton: false,
-              timer: 3000,
-              timerProgressBar: true
-            });
-            toast.fire({
-              icon: 'info',
-              title: `Vecino actualizado: ${data.action}`
-            });
-            // Recargar tabla silenciosamente sin F5
-            fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-              .then(res => res.text())
-              .then(html => {
-                const doc = new DOMParser().parseFromString(html, 'text/html');
-                const newTbody = doc.querySelector('tbody');
-                const curTbody = document.querySelector('tbody');
-                if (newTbody && curTbody) curTbody.innerHTML = newTbody.innerHTML;
-                if (window.lucide) lucide.createIcons();
-              });
-          }
-        } catch(err) {}
-      };
-      vecinosSocket.onclose = () => setTimeout(connectVecinosWS, 4000);
-    } catch(e) {}
-  }
-
-  document.addEventListener("DOMContentLoaded", function() {
-    connectVecinosWS();
-  });
 </script>
 {% endblock %}

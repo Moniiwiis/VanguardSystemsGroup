@@ -67,6 +67,11 @@
     .desc-roll::-webkit-scrollbar-thumb:hover {
       background: rgba(196,18,48,0.6);
     }
+    /* Evitar que contenedores con space-y-* desplacen modales fixed inset-0 */
+    .fixed.inset-0 {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
   </style>
   {% block extra_head %}{% endblock %}
 </head>
@@ -635,24 +640,23 @@
       return dv === calcularDvRut(cuerpo);
     }
 
-    // --- Teléfono Móvil Chileno (+56 9 1234 5678) ---
-    function formatearTelefonoChileno(val, isDelete) {
-      if (!val) return '';
-      let digits = val.replace(/\D/g, '');
-      if (!digits) return '';
-
-      // Si empieza con 56, remover prefijo de país
+    // --- Teléfono Móvil Chileno (+56 9 1234 5678 con prefijo +56 9 fijo) ---
+    function extraerDigitosTelefono(val) {
+      let digits = (val || '').replace(/\D/g, '');
+      if (digits.startsWith('569')) return digits.slice(3, 11);
       if (digits.startsWith('56')) {
-        digits = digits.slice(2);
+        let rest = digits.slice(2);
+        return (rest.startsWith('9') ? rest.slice(1) : rest).slice(0, 8);
       }
+      if (digits.startsWith('9')) return digits.slice(1, 9);
+      return digits.slice(0, 8);
+    }
 
-      // Si el usuario escribe con o sin el 9 inicial de móvil
-      let remaining = digits.startsWith('9') ? digits.slice(1) : digits;
+    function formatearTelefonoChileno(val) {
+      let remaining = extraerDigitosTelefono(val);
       if (remaining.length === 0) {
-        return isDelete ? '' : '+56 9 ';
+        return '+56 9 ';
       }
-
-      remaining = remaining.slice(0, 8);
       if (remaining.length <= 4) {
         return '+56 9 ' + remaining;
       }
@@ -660,17 +664,13 @@
     }
 
     function validarTelefonoChileno(val) {
-      if (!val) return false;
-      let digits = val.replace(/\D/g, '');
-      if (digits.startsWith('56')) digits = digits.slice(2);
-      let remaining = digits.startsWith('9') ? digits.slice(1) : digits;
-      return remaining.length === 8;
+      return extraerDigitosTelefono(val).length === 8;
     }
 
     // --- Detectores de Inputs ---
     function esInputRut(input) {
       if (!input || input.type === 'hidden' || input.type === 'search') return false;
-      if (input.name === 'q' || input.name === 'q_colab' || input.id === 'solicitante' || input.name === 'solicitante') return false;
+      if (input.name === 'q' || input.name === 'q_colab' || input.id === 'solicitante' || input.name === 'solicitante' || input.id === 'funcionario_busqueda') return false;
       if (input.dataset.noFormat === 'true') return false;
       if (input.dataset.rut === 'true') return true;
       const name = (input.name || '').toLowerCase();
@@ -691,16 +691,30 @@
              id.includes('telefono') || id.includes('celular');
     }
 
-    // --- Obtener o inyectar contenedor de feedback ---
+    function esInputDireccion(input) {
+      if (!input || input.type === 'hidden' || input.type === 'search') return false;
+      if (input.name === 'q' || input.name === 'q_colab') return false;
+      if (input.dataset.noFormat === 'true') return false;
+      if (input.dataset.direccion === 'true') return true;
+      const name = (input.name || '').toLowerCase();
+      const id = (input.id || '').toLowerCase();
+      return name.includes('direccion') || name.includes('domicilio') ||
+             id.includes('direccion') || id.includes('domicilio') || id === 'edit-dir' || id === 'edit-org-dir';
+    }
+
+    function validarDireccionChilena(val) {
+      const texto = (val || '').trim();
+      if (!texto) return false;
+      const tieneLetras = /[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/.test(texto);
+      const tieneNumeros = /\d/.test(texto);
+      return tieneLetras && tieneNumeros;
+    }
+
+    // --- Obtener contenedor de feedback si existe ---
     function getFeedbackElement(input, type) {
       let feedback = document.getElementById(input.id + '_feedback');
-      if (!feedback) {
-        feedback = input.parentElement.querySelector('.' + type + '-feedback');
-      }
       if (!feedback && input.parentElement) {
-        feedback = document.createElement('div');
-        feedback.className = type + '-feedback text-[11px] font-bold mt-1';
-        input.parentElement.appendChild(feedback);
+        feedback = input.parentElement.querySelector('.' + type + '-feedback');
       }
       return feedback;
     }
@@ -717,52 +731,61 @@
       const clean = val.replace(/[^0-9kK]/g, '');
       if (clean.length >= 8) {
         const esValido = validarRutChileno(val);
-        const cuerpo = clean.slice(0, -1);
         if (esValido) {
-          if (feedback) feedback.innerHTML = '<span class="text-emerald-600 flex items-center gap-1 font-bold">✓ RUT válido (Módulo 11 verificado)</span>';
+          if (feedback) feedback.innerHTML = '';
           input.classList.remove('border-red-500', 'border-amber-400');
           input.classList.add('border-emerald-500');
         } else {
-          const dvEsperado = calcularDvRut(cuerpo);
-          if (feedback) feedback.innerHTML = '<span class="text-red-600 flex items-center gap-1 font-bold">✗ RUT inválido (DV esperado: ' + dvEsperado + ')</span>';
+          if (feedback) feedback.innerHTML = '';
           input.classList.remove('border-emerald-500', 'border-amber-400');
           input.classList.add('border-red-500');
         }
       } else {
-        if (feedback) feedback.innerHTML = '<span class="text-slate-400 font-semibold">Ingrese al menos 7 u 8 dígitos más DV</span>';
-        input.classList.remove('border-emerald-500', 'border-red-500');
-        input.classList.add('border-amber-400');
+        if (feedback) feedback.innerHTML = '';
+        input.classList.remove('border-emerald-500', 'border-red-500', 'border-amber-400');
       }
     }
 
     function actualizarValidacionTelefono(input) {
       const feedback = getFeedbackElement(input, 'tel');
-      const val = (input.value || '').trim();
-      if (!val) {
-        if (feedback) feedback.innerHTML = '';
+      if (feedback) feedback.innerHTML = '';
+      const remaining = extraerDigitosTelefono(input.value);
+      if (remaining.length === 0) {
         input.classList.remove('border-emerald-500', 'border-red-500', 'border-amber-400');
-        return;
-      }
-      let digits = val.replace(/\D/g, '');
-      if (digits.startsWith('56')) digits = digits.slice(2);
-      let remaining = digits.startsWith('9') ? digits.slice(1) : digits;
-
-      if (remaining.length === 8) {
-        if (feedback) feedback.innerHTML = '<span class="text-emerald-600 flex items-center gap-1 font-bold">✓ Teléfono válido (+56 9 XXXX XXXX)</span>';
+      } else if (remaining.length === 8) {
         input.classList.remove('border-red-500', 'border-amber-400');
         input.classList.add('border-emerald-500');
       } else {
-        let faltan = 8 - remaining.length;
-        if (faltan > 0) {
-          if (feedback) feedback.innerHTML = '<span class="text-amber-600 font-semibold">Faltan ' + faltan + ' dígitos (ej: +56 9 1234 5678)</span>';
-          input.classList.remove('border-emerald-500', 'border-red-500');
-          input.classList.add('border-amber-400');
-        } else {
-          if (feedback) feedback.innerHTML = '<span class="text-red-600 font-bold">✗ Formato incorrecto</span>';
-          input.classList.remove('border-emerald-500', 'border-amber-400');
-          input.classList.add('border-red-500');
-        }
+        input.classList.remove('border-emerald-500', 'border-red-500', 'border-amber-400');
       }
+    }
+
+    function actualizarValidacionDireccion(input) {
+      const val = (input.value || '').trim();
+      if (!val) {
+        input.classList.remove('border-emerald-500', 'border-red-500', 'border-amber-400');
+        return;
+      }
+      if (validarDireccionChilena(val)) {
+        input.classList.remove('border-red-500', 'border-amber-400');
+        input.classList.add('border-emerald-500');
+      } else {
+        input.classList.remove('border-emerald-500', 'border-amber-400');
+        input.classList.add('border-red-500');
+      }
+    }
+
+    function fijarCursorTelefono(input) {
+      if (!input.value || !input.value.startsWith('+56 9 ')) {
+        input.value = formatearTelefonoChileno(input.value);
+      }
+      setTimeout(() => {
+        try {
+          if (input.selectionStart < 6) {
+            input.setSelectionRange(6, Math.max(6, input.selectionEnd));
+          }
+        } catch (err) {}
+      }, 0);
     }
 
     // --- Delegación Global de Eventos para que funcione en cualquier campo nuevo o modal ---
@@ -774,26 +797,62 @@
         input.value = formatearRutChileno(input.value);
         actualizarValidacionRut(input);
       } else if (esInputTelefono(input)) {
-        const isDelete = (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward');
-        if (isDelete && (input.value.trim() === '+56 9' || input.value.trim() === '+56' || input.value.trim() === '+')) {
-          input.value = '';
-        } else {
-          input.value = formatearTelefonoChileno(input.value, isDelete);
-        }
+        input.value = formatearTelefonoChileno(input.value);
         actualizarValidacionTelefono(input);
+      } else if (esInputDireccion(input)) {
+        actualizarValidacionDireccion(input);
       }
     });
 
-    // Permitir borrar el prefijo '+56 9 ' con Backspace cuando quede solo eso
+    document.addEventListener('focusin', function(e) {
+      const input = e.target;
+      if (!input || input.tagName !== 'INPUT') return;
+      if (esInputTelefono(input)) {
+        fijarCursorTelefono(input);
+      }
+    });
+
+    document.addEventListener('click', function(e) {
+      const input = e.target;
+      if (!input || input.tagName !== 'INPUT') return;
+      if (esInputTelefono(input)) {
+        fijarCursorTelefono(input);
+      }
+    });
+
+    // Mantener '+56 9 ' fijo sin permitir borrarlo con Backspace o Delete
     document.addEventListener('keydown', function(e) {
       const input = e.target;
       if (!input || input.tagName !== 'INPUT' || !esInputTelefono(input)) return;
+      const start = input.selectionStart || 0;
+      const end = input.selectionEnd || 0;
+
       if (e.key === 'Backspace') {
-        const v = input.value.trim();
-        if (v === '+56 9' || v === '+56 9 ' || v === '+56' || v === '+') {
+        if (start <= 6 && end <= 6) {
           e.preventDefault();
-          input.value = '';
+          input.setSelectionRange(6, 6);
+        } else if (start < 6 && end > 6) {
+          e.preventDefault();
+          const afterSelection = input.value.slice(end);
+          input.value = formatearTelefonoChileno('+56 9 ' + afterSelection);
+          input.setSelectionRange(6, 6);
           actualizarValidacionTelefono(input);
+        }
+      } else if (e.key === 'Delete') {
+        if (start < 6 && end <= 6) {
+          e.preventDefault();
+          input.setSelectionRange(6, 6);
+        } else if (start < 6 && end > 6) {
+          e.preventDefault();
+          const afterSelection = input.value.slice(end);
+          input.value = formatearTelefonoChileno('+56 9 ' + afterSelection);
+          input.setSelectionRange(6, 6);
+          actualizarValidacionTelefono(input);
+        }
+      } else if (e.key === 'ArrowLeft' || e.key === 'Home') {
+        if (e.key === 'Home' || start <= 6) {
+          e.preventDefault();
+          input.setSelectionRange(6, 6);
         }
       }
     });
@@ -813,13 +872,9 @@
           }
         } else if (esInputTelefono(input)) {
           input.setAttribute('maxlength', '15');
-          if (!input.placeholder || input.placeholder.includes('+56')) {
-            input.setAttribute('placeholder', '+56 9 1234 5678');
-          }
-          if (input.value) {
-            input.value = formatearTelefonoChileno(input.value, false);
-            actualizarValidacionTelefono(input);
-          }
+          input.setAttribute('placeholder', '+56 9 1234 5678');
+          input.value = formatearTelefonoChileno(input.value);
+          actualizarValidacionTelefono(input);
         }
       });
     });
@@ -852,13 +907,10 @@
             e.preventDefault();
             e.stopImmediatePropagation();
             input.focus();
-            const clean = val.replace(/[^0-9kK]/g, '');
-            const cuerpo = clean.length >= 2 ? clean.slice(0, -1) : '';
-            const dvEsp = cuerpo ? calcularDvRut(cuerpo) : '';
             Swal.fire({
               icon: 'error',
-              title: 'RUT Inválido (Módulo 11)',
-              text: 'El RUT ingresado (' + val + ') no es válido. ' + (dvEsp ? 'El dígito verificador correcto para este número es ' + dvEsp + '.' : 'Verifique los dígitos ingresados.'),
+              title: 'RUT Inválido',
+              text: 'El RUT ingresado (' + val + ') no es válido. Por favor verifique el número y el dígito verificador.',
               confirmButtonColor: '#C41230',
               customClass: { popup: 'rounded-2xl shadow-xl font-sans' }
             });
@@ -868,6 +920,38 @@
 
         // Validación Teléfono al enviar
         if (esInputTelefono(input)) {
+          const remaining = extraerDigitosTelefono(input.value);
+          const esRequerido = input.hasAttribute('required') || input.required;
+          if (remaining.length === 0 && esRequerido) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            input.focus();
+            Swal.fire({
+              icon: 'warning',
+              title: 'Teléfono Obligatorio',
+              text: 'Por favor ingrese los 8 dígitos del número telefónico (+56 9 1234 5678).',
+              confirmButtonColor: '#C41230',
+              customClass: { popup: 'rounded-2xl shadow-xl font-sans' }
+            });
+            return false;
+          }
+          if (remaining.length > 0 && remaining.length < 8) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            input.focus();
+            Swal.fire({
+              icon: 'error',
+              title: 'Teléfono Incompleto',
+              text: 'El teléfono ingresado (' + input.value.trim() + ') debe completar los 8 dígitos tras +56 9 (ej: +56 9 1234 5678).',
+              confirmButtonColor: '#C41230',
+              customClass: { popup: 'rounded-2xl shadow-xl font-sans' }
+            });
+            return false;
+          }
+        }
+
+        // Validación Dirección / Domicilio Legal (debe tener letras y números)
+        if (esInputDireccion(input)) {
           const val = (input.value || '').trim();
           const esRequerido = input.hasAttribute('required') || input.required;
           if (!val && esRequerido) {
@@ -876,21 +960,21 @@
             input.focus();
             Swal.fire({
               icon: 'warning',
-              title: 'Teléfono Obligatorio',
-              text: 'Por favor ingrese el número telefónico (+56 9 1234 5678).',
+              title: 'Dirección Obligatoria',
+              text: 'Por favor ingrese la dirección (calle/pasaje y número) antes de continuar.',
               confirmButtonColor: '#C41230',
               customClass: { popup: 'rounded-2xl shadow-xl font-sans' }
             });
             return false;
           }
-          if (val && !validarTelefonoChileno(val)) {
+          if (val && !validarDireccionChilena(val)) {
             e.preventDefault();
             e.stopImmediatePropagation();
             input.focus();
             Swal.fire({
               icon: 'error',
-              title: 'Teléfono Incompleto',
-              text: 'El teléfono ingresado (' + val + ') debe tener 9 dígitos en el formato oficial: +56 9 1234 5678.',
+              title: 'Dirección Inválida',
+              text: 'La dirección ingresada ("' + val + '") debe contener tanto letras (nombre de calle o pasaje) como números (numeración).',
               confirmButtonColor: '#C41230',
               customClass: { popup: 'rounded-2xl shadow-xl font-sans' }
             });
@@ -899,6 +983,47 @@
         }
       }
     }, true);
+
+    // Sincronización silenciosa en segundo plano para todos los módulos de gestión
+    document.addEventListener("DOMContentLoaded", function() {
+      const path = window.location.pathname || '';
+      if (!path.startsWith('/gestion/')) return;
+      const parts = path.split('/').filter(Boolean);
+      const rawMod = (parts[1] || 'inicio').replace(/-/g, '_');
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+      const wsUrl = wsProtocol + window.location.host + '/ws/crud/' + rawMod + '/';
+      let globalCrudSocket = null;
+
+      function connectGlobalCrudWS() {
+        try {
+          globalCrudSocket = new WebSocket(wsUrl);
+          globalCrudSocket.onmessage = function(e) {
+            try {
+              const data = JSON.parse(e.data);
+              if (data.type === 'crud_update' || data.type === 'module_changed') {
+                fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                  .then(res => res.text())
+                  .then(html => {
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    const newTbodies = doc.querySelectorAll('table tbody');
+                    const curTbodies = document.querySelectorAll('table tbody');
+                    newTbodies.forEach((tb, idx) => {
+                      if (curTbodies[idx]) curTbodies[idx].innerHTML = tb.innerHTML;
+                    });
+                    if (window.lucide) lucide.createIcons();
+                  })
+                  .catch(() => {});
+              }
+            } catch (err) {}
+          };
+          globalCrudSocket.onclose = function() {
+            setTimeout(connectGlobalCrudWS, 5000);
+          };
+        } catch (err) {}
+      }
+
+      connectGlobalCrudWS();
+    });
 
     // SweetAlert2 Flash Messages
     document.addEventListener("DOMContentLoaded", function() {

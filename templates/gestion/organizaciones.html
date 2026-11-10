@@ -17,157 +17,316 @@
         Juntas de Vecinos y Organizaciones Comunitarias
       </h1>
       <p class="text-xs text-slate-500 max-w-2xl">
-        Padrón oficial de organizaciones comunitarias funcionales y territoriales de La Serena según registro municipal (Ley 19.418), con seguimiento de personalidad jurídica y directiva.
+        Padrón oficial de organizaciones comunitarias funcionales y territoriales de La Serena según registro municipal (Ley 19.418), con seguimiento de domicilio legal, socios activos, constitución, personalidad jurídica y registro de directiva.
       </p>
     </div>
 
     <div class="flex flex-wrap items-center gap-3 shrink-0">
-      <!-- Indicador en tiempo real WebSockets (Channels) -->
-      <div id="ws-status-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold shadow-sm">
-        <span id="ws-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span id="ws-text">En vivo</span>
+      <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl {% if delegacion_activa or delegacion_seleccionada %}bg-red-50 text-[#C41230] border border-red-200/90{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %} text-xs font-bold">
+        <i data-lucide="{% if delegacion_activa or delegacion_seleccionada %}map-pin{% else %}globe{% endif %}" class="w-4 h-4"></i>
+        <span>Delegación: <strong>{% if delegacion_seleccionada %}{{ delegacion_seleccionada.nombre }}{% elif delegacion_activa %}{{ delegacion_activa.nombre }}{% else %}Global (Todas){% endif %}</strong></span>
       </div>
 
-      <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl {% if delegacion_activa %}bg-red-50 text-[#C41230] border border-red-200/90{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %} text-xs font-bold">
-        <i data-lucide="{% if delegacion_activa %}map-pin{% else %}globe{% endif %}" class="w-4 h-4"></i>
-        <span>Delegación: <strong>{% if delegacion_activa %}{{ delegacion_activa.nombre }}{% else %}Global (Todas){% endif %}</strong></span>
-      </div>
-
-      <a href="?export=excel{% if q %}&q={{ q }}{% endif %}{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}" 
+      <a href="?export=excel{% if q %}&q={{ q }}{% endif %}{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
          class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
         <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
         <span>Exportar Excel</span>
       </a>
 
       {% if not permisos.es_consultor %}
-        <button type="button" onclick="abrirModalCrearOrg()"
-                class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
-          <i data-lucide="plus-circle" class="w-4 h-4"></i>
-          <span>Nueva Organización</span>
-        </button>
+        {% if not es_admin or delegacion_activa or delegacion_seleccionada %}
+          <button type="button" onclick="abrirModalCrearOrg()"
+                  class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span>Nueva Organización</span>
+          </button>
+        {% else %}
+          <button type="button" onclick="abrirModalCrearOrg()"
+                  class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span>Nueva Organización</span>
+          </button>
+        {% endif %}
       {% endif %}
     </div>
   </div>
 
-  <!-- Search & Filter Card -->
-  <div class="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-    <form method="GET" action="{% url 'gestion_organizaciones' %}" class="flex-1 flex flex-wrap items-center gap-3">
-      <div class="relative flex-1 min-w-[240px]">
-        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-          <i data-lucide="search" class="w-4 h-4"></i>
+  <!-- Tarjetas de Resumen Clicables (Idénticas a Atenciones y Tubo SGR) -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+    <a href="?{% if q %}q={{ q }}&{% endif %}{% if filtro_tipo %}tipo={{ filtro_tipo }}&{% endif %}{% if delegacion_seleccionada and es_admin %}delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if not filtro_estado %}border-[#C41230] ring-2 ring-red-100{% else %}border-slate-200/80 hover:border-red-300{% endif %} shadow-sm transition-all hover:shadow group block">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Padrón</span>
+        <div class="w-7 h-7 rounded-xl bg-red-50 text-[#C41230] flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
         </div>
-        <input type="text" name="q" value="{{ q }}" maxlength="100" placeholder="Buscar por nombre, RUT, directiva o PJ..." 
-               class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230] font-medium" />
       </div>
+      <div class="mt-1.5 flex items-baseline gap-1.5">
+        <span class="text-2xl font-extrabold text-slate-900">{{ total_general_org|default:total_organizaciones }}</span>
+        <span class="text-[10px] text-slate-400 font-semibold">organizaciones</span>
+      </div>
+      <div class="mt-1 flex items-center gap-1 text-[10px] font-bold text-[#C41230]">
+        <span class="w-1.5 h-1.5 rounded-full bg-[#C41230]"></span>
+        <span>Ver todas</span>
+      </div>
+    </a>
 
-      <select name="tipo" onchange="this.form.submit()"
-              class="px-3 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
-        <option value="">Tipo: Todos</option>
-        {% for tipo_val in tipos_organizaciones %}
-          <option value="{{ tipo_val }}" {% if filtro_tipo == tipo_val %}selected{% endif %}>{{ tipo_val }}</option>
-        {% endfor %}
-      </select>
+    <a href="?estado=Activa{% if q %}&q={{ q }}{% endif %}{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'Activa' %}border-emerald-500 ring-2 ring-emerald-100{% else %}border-slate-200/80 hover:border-emerald-300{% endif %} shadow-sm transition-all hover:shadow group block">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Activas</span>
+        <div class="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+        </div>
+      </div>
+      <div class="mt-1.5 flex items-baseline gap-1.5">
+        <span class="text-2xl font-extrabold text-slate-900">{{ total_activas_org|default:0 }}</span>
+        <span class="text-[10px] text-slate-400 font-semibold">vigentes</span>
+      </div>
+      <div class="mt-1 flex items-center gap-1 text-[10px] font-bold text-emerald-600">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+        <span>Directiva vigente</span>
+      </div>
+    </a>
 
-      <select name="estado" onchange="this.form.submit()"
-              class="px-3 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
-        <option value="">Estado: Todos</option>
-        <option value="Activa" {% if filtro_estado == 'Activa' %}selected{% endif %}>Activa</option>
-        <option value="Inactiva" {% if filtro_estado == 'Inactiva' %}selected{% endif %}>Inactiva</option>
-        <option value="En tramite" {% if filtro_estado == 'En tramite' %}selected{% endif %}>En trámite</option>
-      </select>
-      {% include "gestion/includes/ordering_control.html" %}
+    <a href="?estado=En+tramite{% if q %}&q={{ q }}{% endif %}{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'En tramite' %}border-amber-500 ring-2 ring-amber-100{% else %}border-slate-200/80 hover:border-amber-300{% endif %} shadow-sm transition-all hover:shadow group block">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">En Trámite</span>
+        <div class="w-7 h-7 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+        </div>
+      </div>
+      <div class="mt-1.5 flex items-baseline gap-1.5">
+        <span class="text-2xl font-extrabold text-slate-900">{{ total_tramite_org|default:0 }}</span>
+        <span class="text-[10px] text-slate-400 font-semibold">en proceso</span>
+      </div>
+      <div class="mt-1 flex items-center gap-1 text-[10px] font-bold text-amber-600">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+        <span>Renovación / Inscripción</span>
+      </div>
+    </a>
 
-      {% if q or filtro_tipo or filtro_estado %}
-        <a href="{% url 'gestion_organizaciones' %}" class="text-xs text-[#C41230] font-bold hover:underline py-2">Limpiar</a>
-      {% endif %}
-    </form>
+    <a href="?estado=Inactiva{% if q %}&q={{ q }}{% endif %}{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'Inactiva' %}border-red-500 ring-2 ring-red-100{% else %}border-slate-200/80 hover:border-red-300{% endif %} shadow-sm transition-all hover:shadow group block">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Inactivas</span>
+        <div class="w-7 h-7 rounded-xl bg-red-50 text-red-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
+        </div>
+      </div>
+      <div class="mt-1.5 flex items-baseline gap-1.5">
+        <span class="text-2xl font-extrabold text-slate-900">{{ total_inactivas_org|default:0 }}</span>
+        <span class="text-[10px] text-slate-400 font-semibold">sin vigencia</span>
+      </div>
+      <div class="mt-1 flex items-center gap-1 text-[10px] font-bold text-red-600">
+        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+        <span>Requieren actualización</span>
+      </div>
+    </a>
   </div>
 
-  <!-- Table Card -->
-  <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+  <!-- Search, Filter & Table Card -->
+  <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden space-y-0">
+    <div class="p-4 sm:p-5 bg-slate-50/70 border-b border-slate-200/80 space-y-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="font-extrabold text-sm uppercase tracking-wider text-slate-800 flex items-center gap-2">
+            <i data-lucide="list-Checks" class="w-4 h-4 text-[#C41230]"></i>
+            <span>Registro Oficial de Organizaciones Comunitarias y JJVV</span>
+          </h2>
+          <p class="text-[11px] text-slate-400">Mostrando {{ organizaciones|length }} de {{ total_organizaciones }} registros filtrados</p>
+        </div>
+
+        {% if q or filtro_tipo or filtro_estado or delegacion_seleccionada and es_admin %}
+          <a href="{% url 'gestion_organizaciones' %}{% if es_admin %}?delegacion={% endif %}"
+             class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1 self-start sm:self-auto">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            <span>Limpiar todos los filtros</span>
+          </a>
+        {% endif %}
+      </div>
+
+      <form method="GET" action="{% url 'gestion_organizaciones' %}" class="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5 pt-1 flex-wrap">
+        <div class="relative flex-1 min-w-[240px]">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <i data-lucide="search" class="w-4 h-4"></i>
+          </div>
+          <input type="text" name="q" value="{{ q }}" maxlength="100" placeholder="Buscar por organización, domicilio legal, territorio, N° Reg. P.J. o Reg. Dir..." 
+                 class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230] font-medium bg-white" />
+        </div>
+
+        {% if es_admin %}
+        <div>
+          <select name="delegacion" onchange="this.form.submit()"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-[#C41230] focus:outline-none bg-white">
+            <option value="" {% if not delegacion_seleccionada %}selected{% endif %}>Territ. Deleg.: Todas</option>
+            {% for d in todas_delegaciones %}
+              <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
+                {{ d.nombre }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+
+        <div>
+          <select name="tipo" onchange="this.form.submit()"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
+            <option value="">Tipo: Todos</option>
+            {% for tipo_val in tipos_organizaciones %}
+              <option value="{{ tipo_val }}" {% if filtro_tipo == tipo_val %}selected{% endif %}>{{ tipo_val }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <select name="estado" onchange="this.form.submit()"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
+            <option value="">Estado: Todos</option>
+            <option value="Activa" {% if filtro_estado == 'Activa' %}selected{% endif %}>Activa</option>
+            <option value="En tramite" {% if filtro_estado == 'En tramite' %}selected{% endif %}>En trámite</option>
+            <option value="Inactiva" {% if filtro_estado == 'Inactiva' %}selected{% endif %}>Inactiva</option>
+          </select>
+        </div>
+
+        {% include "gestion/includes/ordering_control.html" %}
+      </form>
+    </div>
+
+    <!-- Tabla Oficial de Organizaciones Comunitarias / JJVV -->
     <div class="overflow-x-auto">
       <table class="w-full text-left text-xs text-slate-700">
-        <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+        <thead class="bg-slate-50 text-slate-800 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200">
           <tr>
-            <th class="py-3 px-3.5 w-10 text-center">#</th>
-            <th class="py-3 px-3.5">Organización / Tipo</th>
-            <th class="py-3 px-3.5 whitespace-nowrap">RUT / Personalidad J.</th>
-            <th class="py-3 px-3.5 min-w-[180px]">Directiva / Representante</th>
-            <th class="py-3 px-3.5 min-w-[180px]">Sede / Contacto</th>
-            <th class="py-3 px-3.5 min-w-[200px]">Observaciones / Registro</th>
+            <th class="py-3 px-3.5 min-w-[200px]">Organizaciones</th>
+            <th class="py-3 px-3.5 min-w-[170px]">Domicilio Legal</th>
+            <th class="py-3 px-3.5 whitespace-nowrap">Territ. Deleg.</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap">Socios Activos</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap">Fecha Constit.</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap">Nº Reg. P.J.</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap">Fecha Inscripc en Reg.</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap">Reg. Dir. Nº</th>
             <th class="py-3 px-3.5 text-center whitespace-nowrap">Estado</th>
             <th class="py-3 px-3.5 text-center whitespace-nowrap w-24 sticky right-0 bg-slate-50 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acciones</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100 font-medium">
           {% for o in organizaciones %}
-          <tr class="hover:bg-red-50/20 transition-colors">
-            <td class="py-3 px-3.5 font-semibold text-slate-400 text-center">{{ forloop.counter }}</td>
+          <tr class="hover:bg-red-50/20 transition-colors group">
+            <!-- ORGANIZACIONES -->
             <td class="py-3 px-3.5">
               <span class="font-bold text-slate-900 block leading-tight">{{ o.nombre }}</span>
-              <span class="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                {{ o.get_tipo_organizacion_display }}
-              </span>
-            </td>
-            <td class="py-3 px-3.5 whitespace-nowrap">
-              <span class="font-mono text-slate-800 font-bold text-[11px] block">{{ o.rut|default:"—" }}</span>
-              {% if o.personalidad_juridica %}
-                <span class="text-[10px] text-slate-500 font-semibold block">PJ: {{ o.personalidad_juridica }}</span>
-              {% endif %}
-            </td>
-            <td class="py-3 px-3.5 min-w-[180px] max-w-[240px]">
-              <div class="desc-roll text-slate-800">
-                {% if o.directiva_actual %}
-                  {{ o.directiva_actual }}
-                {% elif o.representante_legal %}
-                  <strong class="text-slate-600">Rep:</strong> {{ o.representante_legal }}
-                {% else %}
-                  <span class="text-slate-400 italic">Sin directiva informada</span>
+              <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                  {{ o.get_tipo_organizacion_display }}
+                </span>
+                {% if o.rut %}
+                  <span class="font-mono text-[10px] text-slate-500 font-semibold">RUT: {{ o.rut }}</span>
                 {% endif %}
               </div>
             </td>
-            <td class="py-3 px-3.5 min-w-[180px] max-w-[240px]">
-              <div class="desc-roll text-slate-700 leading-tight">
-                {{ o.direccion_sede|default:"—" }}
+
+            <!-- DOMICILIO LEGAL -->
+            <td class="py-3 px-3.5 min-w-[170px] max-w-[240px]">
+              <div class="desc-roll text-slate-800 font-medium leading-tight">
+                {{ o.domicilio_legal|default:o.direccion_sede|default:"—" }}
               </div>
-              {% if o.telefono_contacto %}
-                <span class="font-mono text-slate-500 text-[10px] block mt-0.5">{{ o.telefono_contacto }}</span>
+              {% if o.representante_legal %}
+                <span class="text-[10px] text-slate-400 block mt-0.5">Rep.: {{ o.representante_legal }}</span>
               {% endif %}
             </td>
-            <td class="py-3 px-3.5 min-w-[200px] max-w-[280px]">
-              <div class="desc-roll text-slate-600">
-                {{ o.observaciones|default:"Sin observaciones registradas." }}
-              </div>
+
+            <!-- TERRIT. DELEG. -->
+            <td class="py-3 px-3.5 whitespace-nowrap">
               {% if o.delegacion %}
-                <span class="text-[10px] text-[#C41230] font-bold block mt-1">{{ o.delegacion.nombre }}</span>
+                <span class="font-bold text-[#C41230] text-[11px] block">{{ o.delegacion.nombre }}</span>
+              {% endif %}
+              {% if o.territorio %}
+                <span class="text-[10px] text-slate-500 font-semibold block">{{ o.territorio }}</span>
+              {% elif o.sector %}
+                <span class="text-[10px] text-slate-500 font-semibold block">{{ o.sector.nombre }}</span>
+              {% elif not o.delegacion %}
+                <span class="text-slate-400">—</span>
               {% endif %}
             </td>
+
+            <!-- SOCIOS ACTIVOS -->
+            <td class="py-3 px-3.5 text-center whitespace-nowrap">
+              <span class="inline-flex items-center justify-center min-w-[2.25rem] px-2 py-0.5 rounded-lg font-mono font-extrabold text-xs bg-slate-100 text-slate-800 border border-slate-200">
+                {{ o.socios_activos|default:0 }}
+              </span>
+            </td>
+
+            <!-- FECHA CONSTIT. -->
+            <td class="py-3 px-3.5 text-center whitespace-nowrap font-mono text-[11px] text-slate-700">
+              {% if o.fecha_constitucion %}
+                {{ o.fecha_constitucion|date:"d/m/Y" }}
+              {% else %}
+                <span class="text-slate-400">—</span>
+              {% endif %}
+            </td>
+
+            <!-- Nº REG. P.J. -->
+            <td class="py-3 px-3.5 text-center whitespace-nowrap">
+              {% if o.numero_registro_pj or o.personalidad_juridica %}
+                <span class="font-mono font-bold text-slate-800 text-[11px] px-2 py-0.5 rounded bg-slate-50 border border-slate-200">
+                  {{ o.numero_registro_pj|default:o.personalidad_juridica }}
+                </span>
+              {% else %}
+                <span class="text-slate-400">—</span>
+              {% endif %}
+            </td>
+
+            <!-- FECHA INSCRIPC EN REG. -->
+            <td class="py-3 px-3.5 text-center whitespace-nowrap font-mono text-[11px] text-slate-700">
+              {% if o.fecha_inscripcion_registro %}
+                {{ o.fecha_inscripcion_registro|date:"d/m/Y" }}
+              {% else %}
+                <span class="text-slate-400">—</span>
+              {% endif %}
+            </td>
+
+            <!-- REG. DIR. Nº -->
+            <td class="py-3 px-3.5 text-center whitespace-nowrap">
+              {% if o.registro_directiva_numero %}
+                <span class="font-mono font-bold text-[#8B1D19] text-[11px] px-2 py-0.5 rounded bg-red-50/60 border border-red-100">
+                  {{ o.registro_directiva_numero }}
+                </span>
+              {% else %}
+                <span class="text-slate-400">—</span>
+              {% endif %}
+            </td>
+
+            <!-- ESTADO -->
             <td class="py-3 px-3.5 text-center whitespace-nowrap">
               {% if o.estado == 'Activa' %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Activa
                 </span>
               {% elif o.estado == 'En tramite' %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
                   En trámite
                 </span>
               {% else %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-50 text-red-600 border border-red-200">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-50 text-red-600 border border-red-200">
                   Inactiva
                 </span>
               {% endif %}
             </td>
-            <td class="py-3 px-3.5 text-center whitespace-nowrap sticky right-0 bg-white shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
+
+            <!-- ACCIONES -->
+            <td class="py-3 px-3.5 text-center whitespace-nowrap sticky right-0 bg-white group-hover:bg-slate-50 transition-colors shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
               <div class="flex items-center justify-center gap-1">
                 <button type="button" 
-                        onclick="verDetalleOrg('{{ o.id }}', '{{ o.nombre|escapejs }}', '{{ o.tipo_organizacion|escapejs }}', '{{ o.rut|default:''|escapejs }}', '{{ o.personalidad_juridica|default:''|escapejs }}', '{{ o.directiva_actual|default:''|escapejs }}', '{{ o.representante_legal|default:''|escapejs }}', '{{ o.direccion_sede|default:''|escapejs }}', '{{ o.telefono_contacto|default:''|escapejs }}', '{{ o.email_contacto|default:''|escapejs }}', '{{ o.estado|escapejs }}', '{{ o.observaciones|default:''|escapejs }}', '{{ o.delegacion_id|default:'' }}')"
+                        onclick="verDetalleOrg('{{ o.id }}', '{{ o.nombre|escapejs }}', '{{ o.tipo_organizacion|escapejs }}', '{{ o.domicilio_legal|default:o.direccion_sede|default:''|escapejs }}', '{{ o.delegacion.nombre|default:''|escapejs }}', '{{ o.territorio|default:''|escapejs }}', '{{ o.socios_activos|default:0 }}', '{{ o.fecha_constitucion|date:'d/m/Y'|default:'' }}', '{{ o.numero_registro_pj|default:o.personalidad_juridica|default:''|escapejs }}', '{{ o.fecha_inscripcion_registro|date:'d/m/Y'|default:'' }}', '{{ o.registro_directiva_numero|default:''|escapejs }}', '{{ o.rut|default:''|escapejs }}', '{{ o.directiva_actual|default:''|escapejs }}', '{{ o.representante_legal|default:''|escapejs }}', '{{ o.telefono_contacto|default:''|escapejs }}', '{{ o.email_contacto|default:''|escapejs }}', '{{ o.estado|escapejs }}', '{{ o.observaciones|default:''|escapejs }}')"
                         title="Ver detalle"
-                        class="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all">
+                        class="p-1.5 rounded-lg text-slate-500 hover:text-[#C41230] hover:bg-red-50 transition-all">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
                 {% if not permisos.es_consultor %}
                   <button type="button" 
-                          onclick="abrirModalEditarOrg('{{ o.id }}', '{{ o.nombre|escapejs }}', '{{ o.tipo_organizacion|escapejs }}', '{{ o.rut|default:''|escapejs }}', '{{ o.personalidad_juridica|default:''|escapejs }}', '{{ o.directiva_actual|default:''|escapejs }}', '{{ o.representante_legal|default:''|escapejs }}', '{{ o.direccion_sede|default:''|escapejs }}', '{{ o.telefono_contacto|default:''|escapejs }}', '{{ o.email_contacto|default:''|escapejs }}', '{{ o.estado|escapejs }}', '{{ o.observaciones|default:''|escapejs }}', '{{ o.delegacion_id|default:'' }}')"
+                          onclick="abrirModalEditarOrg('{{ o.id }}', '{{ o.nombre|escapejs }}', '{{ o.tipo_organizacion|escapejs }}', '{{ o.domicilio_legal|default:o.direccion_sede|default:''|escapejs }}', '{{ o.delegacion_id|default:'' }}', '{{ o.sector_id|default:'' }}', '{{ o.socios_activos|default:0 }}', '{{ o.fecha_constitucion|date:'Y-m-d'|default:'' }}', '{{ o.numero_registro_pj|default:o.personalidad_juridica|default:''|escapejs }}', '{{ o.fecha_inscripcion_registro|date:'Y-m-d'|default:'' }}', '{{ o.registro_directiva_numero|default:''|escapejs }}', '{{ o.rut|default:''|escapejs }}', '{{ o.directiva_actual|default:''|escapejs }}', '{{ o.representante_legal|default:''|escapejs }}', '{{ o.telefono_contacto|default:''|escapejs }}', '{{ o.email_contacto|default:''|escapejs }}', '{{ o.estado|escapejs }}', '{{ o.observaciones|default:''|escapejs }}')"
                           title="Editar"
                           class="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all">
                     <i data-lucide="edit-3" class="w-4 h-4"></i>
@@ -186,8 +345,10 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="8" class="py-8 text-center text-slate-400 font-medium">
-              No se encontraron organizaciones comunitarias registradas para los filtros aplicados.
+            <td colspan="10" class="py-10 text-center text-slate-400 font-medium">
+              <i data-lucide="building-2" class="w-10 h-10 mx-auto mb-2 text-slate-300"></i>
+              <p class="font-extrabold text-slate-700 text-sm">No se encontraron organizaciones comunitarias registradas</p>
+              <p class="text-xs text-slate-400 mt-1">Ajusta los filtros de búsqueda o registra una nueva organización en el padrón.</p>
             </td>
           </tr>
           {% endfor %}
@@ -195,95 +356,173 @@
       </table>
     </div>
 
-    {% include "gestion/includes/paginator.html" %}
+    <!-- Paginador de Organizaciones / JJVV -->
+    <div class="px-6 py-4 bg-slate-50/50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 font-medium">
+      <div class="whitespace-nowrap">
+        Mostrando {{ page_obj.start_index|default:0 }} a {{ page_obj.end_index|default:0 }} de {{ total_organizaciones|default:page_obj.paginator.count }} organizaciones
+      </div>
+      <div class="flex items-center gap-1.5 flex-nowrap whitespace-nowrap overflow-x-auto max-w-full">
+        {% if page_obj.has_previous %}
+          <a href="?{% if q %}q={{ q }}&{% endif %}{% if filtro_tipo %}tipo={{ filtro_tipo }}&{% endif %}{% if filtro_estado %}estado={{ filtro_estado }}&{% endif %}{% if orden %}orden={{ orden }}&{% endif %}{% if page_size %}page_size={{ page_size }}&{% endif %}{% if delegacion_seleccionada and es_admin %}delegacion={{ delegacion_seleccionada.id }}&{% endif %}page={{ page_obj.previous_page_number }}"
+             class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold transition-all shadow-sm">
+            Anterior
+          </a>
+        {% else %}
+          <span class="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 font-bold cursor-not-allowed">
+            Anterior
+          </span>
+        {% endif %}
+
+        {% for p in page_obj.paginator.page_range %}
+          {% if p == 1 or p == page_obj.paginator.num_pages or p >= page_obj.number|add:"-2" and p <= page_obj.number|add:"2" %}
+            {% if p == page_obj.number %}
+              <span class="px-3 py-1.5 rounded-lg bg-[#C41230] text-white font-bold shadow-sm">{{ p }}</span>
+            {% else %}
+              <a href="?{% if q %}q={{ q }}&{% endif %}{% if filtro_tipo %}tipo={{ filtro_tipo }}&{% endif %}{% if filtro_estado %}estado={{ filtro_estado }}&{% endif %}{% if orden %}orden={{ orden }}&{% endif %}{% if page_size %}page_size={{ page_size }}&{% endif %}{% if delegacion_seleccionada and es_admin %}delegacion={{ delegacion_seleccionada.id }}&{% endif %}page={{ p }}"
+                 class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all">{{ p }}</a>
+            {% endif %}
+          {% elif p == 2 and page_obj.number > 4 %}
+            <span class="px-2 py-1.5 text-slate-400 font-bold select-none">...</span>
+          {% elif p == page_obj.paginator.num_pages|add:"-1" and page_obj.number < page_obj.paginator.num_pages|add:"-3" %}
+            <span class="px-2 py-1.5 text-slate-400 font-bold select-none">...</span>
+          {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+          <a href="?{% if q %}q={{ q }}&{% endif %}{% if filtro_tipo %}tipo={{ filtro_tipo }}&{% endif %}{% if filtro_estado %}estado={{ filtro_estado }}&{% endif %}{% if orden %}orden={{ orden }}&{% endif %}{% if page_size %}page_size={{ page_size }}&{% endif %}{% if delegacion_seleccionada and es_admin %}delegacion={{ delegacion_seleccionada.id }}&{% endif %}page={{ page_obj.next_page_number }}"
+             class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold transition-all shadow-sm">
+            Siguiente
+          </a>
+        {% else %}
+          <span class="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 font-bold cursor-not-allowed">
+            Siguiente
+          </span>
+        {% endif %}
+      </div>
+    </div>
   </div>
 
 </div>
 
 <!-- Modal Crear Organización -->
 <div id="modal-crear-org" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[92vh] overflow-y-auto space-y-4">
+  <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[92vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
       <div>
-        <h3 class="text-base font-extrabold text-slate-900">Registrar Organización Comunitaria</h3>
-        <p class="text-[11px] text-slate-400">Padrón de Juntas de Vecinos y Organizaciones Funcionales (Ley 19.418)</p>
+        <h3 class="text-base font-extrabold text-slate-900">Registrar Organización Comunitaria / JJVV</h3>
+        <p class="text-[11px] text-slate-400">Padrón oficial de Juntas de Vecinos y Organizaciones Funcionales (Ley 19.418)</p>
       </div>
       <button onclick="document.getElementById('modal-crear-org').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
     </div>
 
     <form method="POST" action="{% url 'gestion_organizaciones' %}" class="space-y-4">
       {% csrf_token %}
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         <div class="sm:col-span-2 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Nombre de la Organización <span class="text-[#C41230]">*</span></label>
+          <label class="block text-xs font-bold text-slate-700">Organización <span class="text-[#C41230]">*</span></label>
           <input type="text" name="nombre" required maxlength="200" placeholder="Ej: Junta de Vecinos N° 12 El Milagro"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Tipo de Organización</label>
-          <select name="tipo_organizacion" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+          <select name="tipo_organizacion" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
             {% for tipo_val in tipos_organizaciones %}
               <option value="{{ tipo_val }}">{{ tipo_val }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">RUT de la Organización</label>
-          <input type="text" name="rut" data-rut="true" maxlength="12" placeholder="Ej: 65.123.456-7"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-          <div class="rut-feedback"></div>
-        </div>
-        <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">N° Personalidad Jurídica</label>
-          <input type="text" name="personalidad_juridica" maxlength="50" placeholder="Ej: PJ-1244/2018"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-        </div>
-        <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Representante Legal / Presidente</label>
-          <input type="text" name="representante_legal" maxlength="150" placeholder="Nombre completo del representante"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-        </div>
-        <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Teléfono Contacto</label>
-          <input type="text" name="telefono_contacto" maxlength="15" placeholder="+56 9 8765 4321"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
-          <div class="tel-feedback"></div>
-        </div>
-        <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Email Contacto</label>
-          <input type="email" name="email_contacto" maxlength="100" placeholder="contacto@jjvv.cl"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-        </div>
+
         <div class="sm:col-span-2 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Dirección Sede / Dirección Referencial</label>
-          <input type="text" name="direccion_sede" maxlength="200" placeholder="Calle, número, sector"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-        </div>
-        <div class="sm:col-span-2 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Nómina de Directiva Actual</label>
-          <textarea name="directiva_actual" rows="2" maxlength="500" placeholder="Presidente, Secretario, Tesorero, Directores..."
-                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
-        </div>
-        <div class="sm:col-span-2 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Observaciones / Antecedentes</label>
-          <textarea name="observaciones" rows="2" maxlength="1000" placeholder="Observaciones adicionales, estado de vigencia, etc."
-                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+          <label class="block text-xs font-bold text-slate-700">Domicilio Legal</label>
+          <input type="text" name="domicilio_legal" maxlength="250" placeholder="Dirección / sede legal de la organización"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Delegación Asignada</label>
-          <select name="delegacion_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+          <label class="block text-xs font-bold text-slate-700">Socios Activos</label>
+          <input type="number" name="socios_activos" min="0" value="0"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Territ. Deleg. (Delegación)</label>
+          <select name="delegacion_id" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
             {% for d in delegaciones %}
-              <option value="{{ d.id }}" {% if delegacion_activa and delegacion_activa.id == d.id %}selected{% endif %}>{{ d.nombre }}</option>
+              <option value="{{ d.id }}" {% if delegacion_activa and delegacion_activa.id == d.id %}selected{% elif delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>{{ d.nombre }}</option>
             {% endfor %}
           </select>
         </div>
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Estado de Vigencia</label>
-          <select name="estado" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-            <option value="Activa">Activa</option>
-            <option value="Inactiva">Inactiva</option>
-            <option value="En tramite">En trámite</option>
+          <label class="block text-xs font-bold text-slate-700">Sector / Territorio</label>
+          <select name="sector_id" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="">General de la delegación</option>
+            {% for s in sectores %}
+              <option value="{{ s.id }}">{{ s.nombre }}{% if es_admin and not delegacion_activa %} ({{ s.delegacion.nombre }}){% endif %}</option>
+            {% endfor %}
           </select>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Fecha Constit.</label>
+          <input type="date" name="fecha_constitucion"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Nº Reg. P.J.</label>
+          <input type="text" name="numero_registro_pj" maxlength="50" placeholder="Ej: 1244 / PJ-1244"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Fecha Inscripc en Reg.</label>
+          <input type="date" name="fecha_inscripcion_registro"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Reg. Dir. Nº</label>
+          <input type="text" name="registro_directiva_numero" maxlength="50" placeholder="Ej: DIR-089"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">RUT de la Organización</label>
+          <input type="text" name="rut" data-rut="true" maxlength="12" placeholder="Ej: 65.123.456-7"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <div class="rut-feedback"></div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Representante Legal / Presidente</label>
+          <input type="text" name="representante_legal" maxlength="150" placeholder="Nombre completo"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Teléfono Contacto</label>
+          <input type="text" name="telefono_contacto" maxlength="15" placeholder="+56 9 8765 4321"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
+          <div class="tel-feedback"></div>
+        </div>
+
+        <div class="sm:col-span-2 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Email Contacto</label>
+          <input type="email" name="email_contacto" maxlength="100" placeholder="contacto@jjvv.cl"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Estado de Vigencia</label>
+          <select name="estado" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="Activa">Activa</option>
+            <option value="En tramite">En trámite</option>
+            <option value="Inactiva">Inactiva</option>
+          </select>
+        </div>
+
+        <div class="sm:col-span-3 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Nómina de Directiva Actual</label>
+          <textarea name="directiva_actual" rows="2" maxlength="500" placeholder="Presidente, Secretario, Tesorero, Directores..."
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+        </div>
+        <div class="sm:col-span-3 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Observaciones / Antecedentes</label>
+          <textarea name="observaciones" rows="2" maxlength="1000" placeholder="Observaciones adicionales..."
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
         </div>
       </div>
 
@@ -298,88 +537,123 @@
 
 <!-- Modal Editar Organización -->
 <div id="modal-editar-org" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[92vh] overflow-y-auto space-y-4">
+  <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[92vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
       <div>
-        <h3 class="text-base font-extrabold text-slate-900">Editar Organización Comunitaria</h3>
-        <p class="text-[11px] text-slate-400">Actualizar registro y directiva</p>
+        <h3 class="text-base font-extrabold text-slate-900">Editar Organización Comunitaria / JJVV</h3>
+        <p class="text-[11px] text-slate-400">Actualizar datos legales, registro P.J., inscripción y directiva</p>
       </div>
       <button onclick="document.getElementById('modal-editar-org').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
     </div>
 
     <form id="form-editar-org" method="POST" action="" class="space-y-4">
       {% csrf_token %}
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         <div class="sm:col-span-2 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Nombre de la Organización <span class="text-[#C41230]">*</span></label>
+          <label class="block text-xs font-bold text-slate-700">Organización <span class="text-[#C41230]">*</span></label>
           <input type="text" id="edit-org-nombre" name="nombre" required maxlength="200"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Tipo de Organización</label>
-          <select id="edit-org-tipo" name="tipo_organizacion" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+          <select id="edit-org-tipo" name="tipo_organizacion" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
             {% for tipo_val in tipos_organizaciones %}
               <option value="{{ tipo_val }}">{{ tipo_val }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">RUT de la Organización</label>
-          <input type="text" id="edit-org-rut" name="rut" data-rut="true" maxlength="12"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-          <div class="rut-feedback"></div>
-        </div>
-        <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">N° Personalidad Jurídica</label>
-          <input type="text" id="edit-org-pj" name="personalidad_juridica" maxlength="50"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-        </div>
-        <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Representante Legal</label>
-          <input type="text" id="edit-org-rep" name="representante_legal" maxlength="150"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-        </div>
-        <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Teléfono Contacto</label>
-          <input type="text" id="edit-org-tel" name="telefono_contacto" maxlength="15" placeholder="+56 9 8765 4321"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
-          <div class="tel-feedback"></div>
-        </div>
-        <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Email Contacto</label>
-          <input type="email" id="edit-org-email" name="email_contacto" maxlength="100"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-        </div>
+
         <div class="sm:col-span-2 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Dirección Sede</label>
-          <input type="text" id="edit-org-dir" name="direccion_sede" maxlength="200"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-        </div>
-        <div class="sm:col-span-2 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Nómina de Directiva Actual</label>
-          <textarea id="edit-org-directiva" name="directiva_actual" rows="2" maxlength="500"
-                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
-        </div>
-        <div class="sm:col-span-2 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Observaciones</label>
-          <textarea id="edit-org-obs" name="observaciones" rows="2" maxlength="1000"
-                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+          <label class="block text-xs font-bold text-slate-700">Domicilio Legal</label>
+          <input type="text" id="edit-org-domicilio" name="domicilio_legal" maxlength="250"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Delegación Asignada</label>
-          <select id="edit-org-del" name="delegacion_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+          <label class="block text-xs font-bold text-slate-700">Socios Activos</label>
+          <input type="number" id="edit-org-socios" name="socios_activos" min="0"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Territ. Deleg. (Delegación)</label>
+          <select id="edit-org-del" name="delegacion_id" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
             {% for d in delegaciones %}
               <option value="{{ d.id }}">{{ d.nombre }}</option>
             {% endfor %}
           </select>
         </div>
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Estado</label>
-          <select id="edit-org-estado" name="estado" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-            <option value="Activa">Activa</option>
-            <option value="Inactiva">Inactiva</option>
-            <option value="En tramite">En trámite</option>
+          <label class="block text-xs font-bold text-slate-700">Sector / Territorio</label>
+          <select id="edit-org-sector" name="sector_id" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="">General de la delegación</option>
+            {% for s in sectores %}
+              <option value="{{ s.id }}">{{ s.nombre }}{% if es_admin and not delegacion_activa %} ({{ s.delegacion.nombre }}){% endif %}</option>
+            {% endfor %}
           </select>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Fecha Constit.</label>
+          <input type="date" id="edit-org-fconst" name="fecha_constitucion"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Nº Reg. P.J.</label>
+          <input type="text" id="edit-org-numpj" name="numero_registro_pj" maxlength="50"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Fecha Inscripc en Reg.</label>
+          <input type="date" id="edit-org-finsc" name="fecha_inscripcion_registro"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Reg. Dir. Nº</label>
+          <input type="text" id="edit-org-regdir" name="registro_directiva_numero" maxlength="50"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">RUT de la Organización</label>
+          <input type="text" id="edit-org-rut" name="rut" data-rut="true" maxlength="12"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <div class="rut-feedback"></div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Representante Legal</label>
+          <input type="text" id="edit-org-rep" name="representante_legal" maxlength="150"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Teléfono Contacto</label>
+          <input type="text" id="edit-org-tel" name="telefono_contacto" maxlength="15" placeholder="+56 9 8765 4321"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
+          <div class="tel-feedback"></div>
+        </div>
+
+        <div class="sm:col-span-2 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Email Contacto</label>
+          <input type="email" id="edit-org-email" name="email_contacto" maxlength="100"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Estado</label>
+          <select id="edit-org-estado" name="estado" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="Activa">Activa</option>
+            <option value="En tramite">En trámite</option>
+            <option value="Inactiva">Inactiva</option>
+          </select>
+        </div>
+
+        <div class="sm:col-span-3 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Nómina de Directiva Actual</label>
+          <textarea id="edit-org-directiva" name="directiva_actual" rows="2" maxlength="500"
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+        </div>
+        <div class="sm:col-span-3 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Observaciones</label>
+          <textarea id="edit-org-obs" name="observaciones" rows="2" maxlength="1000"
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
         </div>
       </div>
 
@@ -400,98 +674,55 @@
     document.getElementById('modal-crear-org').classList.remove('hidden');
   }
 
-  function abrirModalEditarOrg(id, nombre, tipo, rut, pj, directiva, rep, dir, tel, email, estado, obs, delId) {
+  function abrirModalEditarOrg(id, nombre, tipo, domicilio, delId, sectorId, socios, fConst, numPj, fInsc, regDir, rut, directiva, rep, tel, email, estado, obs) {
     document.getElementById('form-editar-org').action = `/gestion/organizaciones/${id}/editar/`;
-    document.getElementById('edit-org-nombre').value = nombre;
-    document.getElementById('edit-org-tipo').value = tipo;
-    document.getElementById('edit-org-rut').value = rut;
-    document.getElementById('edit-org-pj').value = pj;
-    document.getElementById('edit-org-directiva').value = directiva;
-    document.getElementById('edit-org-rep').value = rep;
-    document.getElementById('edit-org-dir').value = dir;
-    document.getElementById('edit-org-tel').value = tel;
-    document.getElementById('edit-org-email').value = email;
-    document.getElementById('edit-org-estado').value = estado;
-    document.getElementById('edit-org-obs').value = obs;
+    document.getElementById('edit-org-nombre').value = nombre || '';
+    document.getElementById('edit-org-tipo').value = tipo || 'Junta de Vecinos';
+    document.getElementById('edit-org-domicilio').value = domicilio || '';
+    document.getElementById('edit-org-socios').value = socios || 0;
+    document.getElementById('edit-org-fconst').value = fConst || '';
+    document.getElementById('edit-org-numpj').value = numPj || '';
+    document.getElementById('edit-org-finsc').value = fInsc || '';
+    document.getElementById('edit-org-regdir').value = regDir || '';
+    document.getElementById('edit-org-rut').value = rut || '';
+    document.getElementById('edit-org-directiva').value = directiva || '';
+    document.getElementById('edit-org-rep').value = rep || '';
+    document.getElementById('edit-org-tel').value = (tel && tel.trim() !== '') ? tel : '+56 9 ';
+    document.getElementById('edit-org-email').value = email || '';
+    document.getElementById('edit-org-estado').value = estado || 'Activa';
+    document.getElementById('edit-org-obs').value = obs || '';
     if (delId) document.getElementById('edit-org-del').value = delId;
+    document.getElementById('edit-org-sector').value = sectorId || '';
     document.getElementById('modal-editar-org').classList.remove('hidden');
   }
 
-  function verDetalleOrg(id, nombre, tipo, rut, pj, directiva, rep, dir, tel, email, estado, obs, delId) {
+  function verDetalleOrg(id, nombre, tipo, domicilio, delegacion, territorio, socios, fConst, numPj, fInsc, regDir, rut, directiva, rep, tel, email, estado, obs) {
     Swal.fire({
       title: nombre,
+      width: 600,
       html: `
-        <div class="text-left text-xs space-y-2 p-2">
-          <p><strong>Tipo:</strong> ${tipo}</p>
-          <p><strong>RUT:</strong> ${rut || '—'}</p>
-          <p><strong>PJ:</strong> ${pj || '—'}</p>
-          <p><strong>Representante:</strong> ${rep || '—'}</p>
-          <p><strong>Directiva:</strong><br><span class="text-slate-600">${directiva || '—'}</span></p>
-          <p><strong>Sede / Dirección:</strong> ${dir || '—'}</p>
+        <div class="text-left text-xs space-y-2.5 p-2">
+          <div class="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <p><strong>Tipo:</strong> ${tipo || '—'}</p>
+            <p><strong>Estado:</strong> ${estado || '—'}</p>
+            <p><strong>Domicilio Legal:</strong> ${domicilio || '—'}</p>
+            <p><strong>Territ. Deleg.:</strong> ${delegacion || '—'}${territorio ? ' (' + territorio + ')' : ''}</p>
+            <p><strong>Socios Activos:</strong> ${socios || '0'}</p>
+            <p><strong>Fecha Constit.:</strong> ${fConst || '—'}</p>
+            <p><strong>Nº Reg. P.J.:</strong> ${numPj || '—'}</p>
+            <p><strong>Fecha Inscripc en Reg.:</strong> ${fInsc || '—'}</p>
+            <p><strong>Reg. Dir. Nº:</strong> ${regDir || '—'}</p>
+            <p><strong>RUT:</strong> ${rut || '—'}</p>
+          </div>
+          <p><strong>Representante Legal:</strong> ${rep || '—'}</p>
           <p><strong>Contacto:</strong> ${tel || '—'} ${email ? '· ' + email : ''}</p>
+          <p><strong>Directiva Actual:</strong><br><span class="text-slate-600">${directiva || '—'}</span></p>
           <p><strong>Observaciones:</strong><br><span class="text-slate-600">${obs || '—'}</span></p>
-          <p><strong>Estado:</strong> ${estado}</p>
         </div>
       `,
       confirmButtonColor: '#C41230',
       confirmButtonText: 'Cerrar'
     });
   }
-
-  // WebSocket Live Sync para Organizaciones
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-  const wsUrl = wsProtocol + window.location.host + '/ws/crud/organizaciones/';
-  let orgSocket = null;
-
-  function connectOrgWS() {
-    try {
-      orgSocket = new WebSocket(wsUrl);
-      const dot = document.getElementById('ws-dot');
-      const text = document.getElementById('ws-text');
-
-      orgSocket.onopen = function() {
-        if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
-        if (text) text.textContent = 'En vivo (WebSocket)';
-      };
-
-      orgSocket.onmessage = function(e) {
-        try {
-          const data = JSON.parse(e.data);
-          if (data.type === 'module_changed' && data.module === 'organizaciones') {
-            const toast = Swal.mixin({
-              toast: true,
-              position: 'top-end',
-              showConfirmButton: false,
-              timer: 3000,
-              timerProgressBar: true
-            });
-            toast.fire({
-              icon: 'info',
-              title: `Organización ${data.action}`
-            });
-            fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-              .then(res => res.text())
-              .then(html => {
-                const doc = new DOMParser().parseFromString(html, 'text/html');
-                const newTbody = doc.querySelector('tbody');
-                const curTbody = document.querySelector('tbody');
-                if (newTbody && curTbody) curTbody.innerHTML = newTbody.innerHTML;
-                if (window.lucide) lucide.createIcons();
-              });
-          }
-        } catch(err) {}
-      };
-
-      orgSocket.onclose = function() {
-        if (dot) dot.className = 'w-2 h-2 rounded-full bg-amber-500';
-        if (text) text.textContent = 'Reconectando...';
-        setTimeout(connectOrgWS, 4000);
-      };
-    } catch(e) {}
-  }
-
-  document.addEventListener("DOMContentLoaded", function() {
-    connectOrgWS();
-  });
 </script>
 {% endblock %}

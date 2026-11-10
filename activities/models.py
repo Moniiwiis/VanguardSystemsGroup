@@ -227,10 +227,19 @@ class OrganizacionComunitaria(BaseModel):
 
     def clean(self):
         super().clean()
+        from core.utils import validar_direccion
         if self.nombre and len(self.nombre.strip()) > 200:
             raise ValidationError({'nombre': 'El nombre de la organización no puede exceder los 200 caracteres.'})
         if self.socios_activos is not None and self.socios_activos < 0:
             raise ValidationError({'socios_activos': 'El número de socios activos no puede ser negativo.'})
+        if self.domicilio_legal:
+            ok_dom, err_dom = validar_direccion(self.domicilio_legal, 'Domicilio Legal', 250)
+            if not ok_dom:
+                raise ValidationError({'domicilio_legal': err_dom})
+        if self.direccion_sede:
+            ok_sede, err_sede = validar_direccion(self.direccion_sede, 'Dirección Sede', 250)
+            if not ok_sede:
+                raise ValidationError({'direccion_sede': err_sede})
 
     def save(self, *args, **kwargs):
         if self.sector:
@@ -261,7 +270,7 @@ class Vecino(BaseModel):
 
     def clean(self):
         super().clean()
-        from core.utils import validar_rut
+        from core.utils import validar_rut, validar_direccion
         if self.rut:
             valido, res = validar_rut(self.rut)
             if not valido:
@@ -269,6 +278,10 @@ class Vecino(BaseModel):
             self.rut = res
         if self.nombre and len(self.nombre.strip()) > 150:
             raise ValidationError({'nombre': 'El nombre no puede exceder 150 caracteres.'})
+        if self.direccion:
+            ok_dir, err_dir = validar_direccion(self.direccion, 'Dirección', 200)
+            if not ok_dir:
+                raise ValidationError({'direccion': err_dir})
 
     def save(self, *args, **kwargs):
         from core.utils import validar_rut

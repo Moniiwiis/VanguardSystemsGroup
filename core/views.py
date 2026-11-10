@@ -22,8 +22,8 @@ from django.http import JsonResponse, HttpResponseForbidden
 from core.context_processors import global_context
 from core.utils import (
     export_to_excel_csv, export_to_excel_xlsx, build_accent_query,
-    validar_rut, formatear_rut, validar_largo, validar_telefono_chileno,
-    formatear_telefono_chileno, validar_imagen_subida
+    validar_rut, formatear_rut, validar_largo, validar_direccion,
+    validar_telefono_chileno, formatear_telefono_chileno, validar_imagen_subida
 )
 from activities.models import (
     Actividad, Evidencia, ValidacionEvidencia, TipoGestion, Vecino,
@@ -53,6 +53,34 @@ def _send_recovery_code(email, code):
         ),
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[email],
+        fail_silently=False,
+    )
+    if sent_count != 1:
+        raise SMTPException("El backend de correo no confirmó el envío del mensaje.")
+
+
+def _send_welcome_provisional_password(user, provisional_password, rol_nombre='', delegacion_nombre=''):
+    nombre_display = user.first_name or user.username
+    contexto_linea = f"• Rol asignado: {rol_nombre}\n" if rol_nombre else ""
+    if delegacion_nombre:
+        contexto_linea += f"• Delegación: {delegacion_nombre}\n"
+    sent_count = send_mail(
+        subject='Credenciales de Acceso y Contraseña Provisoria — Sistema Municipal La Serena',
+        message=(
+            f"Estimado/a {nombre_display}:\n\n"
+            "Se ha creado tu cuenta de acceso en el Sistema de Gestión Territorial (SGR) "
+            "de la Ilustre Municipalidad de La Serena.\n\n"
+            "Tus credenciales de acceso son:\n"
+            f"• Usuario: {user.username}\n"
+            f"• Correo: {user.email}\n"
+            f"• Contraseña provisoria: {provisional_password}\n"
+            f"{contexto_linea}\n"
+            "IMPORTANTE: Por seguridad, en tu primer ingreso al sistema deberás cambiar "
+            "obligatoriamente esta contraseña provisoria por una contraseña personal definitiva.\n\n"
+            "Ilustre Municipalidad de La Serena"
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
         fail_silently=False,
     )
     if sent_count != 1:
@@ -95,6 +123,31 @@ def _validate_password(password):
     if not any(character in "!@#$%^&*()_+-=[]{}|;:,.<>?" for character in password):
         return "La contraseña debe contener al menos un carácter especial."
     return None
+
+
+def _generate_provisional_password(length=12):
+    """
+    Genera una contraseña provisoria aleatoria y criptográficamente segura
+    que cumple estrictamente todas las reglas de _validate_password.
+    """
+    import string
+    upper = string.ascii_uppercase
+    lower = string.ascii_lowercase
+    digits = string.digits
+    specials = "!@#$%^&*+-=?"
+    all_chars = upper + lower + digits + specials
+
+    while True:
+        chars = [
+            secrets.choice(upper),
+            secrets.choice(lower),
+            secrets.choice(digits),
+            secrets.choice(specials),
+        ] + [secrets.choice(all_chars) for _ in range(max(8, length) - 4)]
+        secrets.SystemRandom().shuffle(chars)
+        candidate = "".join(chars)
+        if _validate_password(candidate) is None:
+            return candidate
 
 
 ALLOWED_PAGE_SIZES = {5, 15, 30}
@@ -242,6 +295,8 @@ def cambiar_contrasena_inicial_view(request):
             messages.error(request, error)
         elif password != confirmation:
             messages.error(request, "Las contraseñas no coinciden.")
+        elif request.user.check_password(password):
+            messages.error(request, "La nueva contraseña debe ser diferente a la contraseña provisoria.")
         else:
             request.user.set_password(password)
             request.user.save()
@@ -625,6 +680,10 @@ def gestion_delegaciones(request):
         if not nombre:
             messages.error(request, "El nombre de la delegación es obligatorio.")
         else:
+            ok_dir, err_dir = validar_direccion(direccion, "Dirección", 200)
+            if not ok_dir:
+                messages.error(request, err_dir)
+                return redirect('gestion_delegaciones')
             if not codigo:
                 count = Delegacion.all_objects.count() + 1
                 codigo = f"DEL{count:02d}"
@@ -682,9 +741,14 @@ def gestion_delegaciones_editar(request, del_id):
 
     delegacion = get_object_or_404(Delegacion, id=del_id)
     if request.method == 'POST':
+        nueva_dir_del = request.POST.get('direccion', delegacion.direccion or '').strip()
+        ok_dir, err_dir = validar_direccion(nueva_dir_del, "Dirección", 200)
+        if not ok_dir:
+            messages.error(request, err_dir)
+            return redirect('gestion_delegaciones')
         delegacion.codigo = request.POST.get('codigo', delegacion.codigo).strip().upper()
         delegacion.nombre = request.POST.get('nombre', delegacion.nombre).strip()
-        delegacion.direccion = request.POST.get('direccion', delegacion.direccion).strip()
+        delegacion.direccion = nueva_dir_del
         delegacion.comuna = request.POST.get('comuna', delegacion.comuna).strip()
         delegacion.estado = request.POST.get('estado', delegacion.estado)
         delegacion.save()
@@ -875,11 +939,13 @@ def gestion_usuarios(request):
                     messages.error(request, "Selecciona una delegación activa válida.")
                     return redirect('gestion_usuarios')
 
+            provisional_password = _generate_provisional_password()
+
             user = User.objects.create_user(
                 username=username,
                 email=correo,
                 first_name=nombre,
-                password=DEFAULT_NEW_USER_PASSWORD,
+                password=provisional_password,
                 is_staff=True,
             )
             user.is_active = (estado == 'Activo')
@@ -909,11 +975,30 @@ def gestion_usuarios(request):
             else:
                 FuncionarioRol.objects.create(funcionario=func, rol=rol_obj)
 
-            messages.success(
-                request,
-                f"Usuario '{username}' creado. Contraseña temporal: "
-                f"{DEFAULT_NEW_USER_PASSWORD}. Deberá cambiarla al iniciar sesión.",
-            )
+            correo_enviado = False
+            try:
+                _send_welcome_provisional_password(
+                    user=user,
+                    provisional_password=provisional_password,
+                    rol_nombre=rol_obj.nombre_rol if rol_obj else '',
+                    delegacion_nombre=del_obj.nombre if del_obj else 'Global',
+                )
+                correo_enviado = True
+            except (OSError, SMTPException, BadHeaderError):
+                logger.exception("No se pudo enviar el correo con la contraseña provisoria al nuevo usuario.")
+
+            if correo_enviado:
+                messages.success(
+                    request,
+                    f"Usuario '{username}' creado exitosamente. Se envió un correo a {correo} "
+                    "con su contraseña provisoria, la cual deberá cambiar en su primer ingreso.",
+                )
+            else:
+                messages.warning(
+                    request,
+                    f"Usuario '{username}' creado con contraseña provisoria {provisional_password} "
+                    "(deberá cambiarla en su primer ingreso), pero no fue posible enviar el correo de notificación en este momento.",
+                )
             return redirect('gestion_usuarios')
 
     q = request.GET.get('q', '').strip()
@@ -1522,7 +1607,7 @@ def gestion_atenciones(request):
 
             ok, err = validar_largo(nuevo_nombre, 150, "Nombre completo")
             if not ok: messages.error(request, err); return redirect('gestion_atenciones')
-            ok, err = validar_largo(nuevo_dir, 200, "Dirección")
+            ok, err = validar_direccion(nuevo_dir, "Dirección", 200)
             if not ok: messages.error(request, err); return redirect('gestion_atenciones')
             ok, err = validar_telefono_chileno(nuevo_tel)
             if not ok: messages.error(request, err); return redirect('gestion_atenciones')
@@ -1656,6 +1741,20 @@ def gestion_atenciones(request):
                 tipo_registro=tipo_registro_val,
                 va_a_tubo=va_a_tubo_val,
             )
+
+            # Adjuntar evidencia inicial opcional al crear la atención (siempre corresponde a 'antes')
+            momento_ini = 'antes'
+            imagenes_ini = request.FILES.getlist('imagenes_evidencia')
+            archivos_ini = request.FILES.getlist('archivos_evidencia')
+            if atencion.actividad and (imagenes_ini or archivos_ini):
+                for img in imagenes_ini:
+                    try:
+                        img_clean = forms.ImageField().clean(img)
+                        Evidencia.objects.create(actividad=atencion.actividad, imagen=img_clean, momento=momento_ini)
+                    except ValidationError:
+                        pass
+                for arch in archivos_ini:
+                    Evidencia.objects.create(actividad=atencion.actividad, archivo=arch, momento=momento_ini)
 
             # Notificación en tiempo real por WebSocket (Channels) tras commit en BD
             del_id_ws = del_activa.id if del_activa else "global"
@@ -2130,17 +2229,21 @@ def gestion_atenciones_validar_evidencia(request, atencion_id):
             atencion.estado = 'Resuelta'
             atencion.save(update_fields=['estado'])
 
+        del_id_ws = atencion.delegacion.id if atencion.delegacion else "global"
+        publish_module_changed("atenciones", del_id_ws, "update", atencion.id)
+
         messages.success(request, f"¡Evidencia {actividad.codigo_evidencia_unico} de atención {atencion.codigo_atencion} validada como '{resultado}'! El Semáforo SGR se ha actualizado.")
 
-    return redirect('gestion_atenciones')
+    return redirect(request.META.get('HTTP_REFERER') or 'gestion_atenciones')
 
 
 @login_required
 def gestion_atenciones_subir_evidencia(request, atencion_id):
     ctx = global_context(request)
+    redirect_target = request.META.get('HTTP_REFERER') or 'gestion_atenciones'
     if request.method != 'POST' or not ctx['permisos'].get('puede_ingresar_atencion', True):
         messages.error(request, "No tienes autorización para adjuntar evidencias.")
-        return redirect('gestion_atenciones')
+        return redirect(redirect_target)
 
     atencion = get_object_or_404(
         AtencionCiudadana.objects.select_related('actividad', 'delegacion'),
@@ -2151,31 +2254,33 @@ def gestion_atenciones_subir_evidencia(request, atencion_id):
         delegacion_activa = ctx['delegacion_activa']
         if not delegacion_activa or atencion.delegacion != delegacion_activa:
             messages.error(request, "No puedes adjuntar evidencias a atenciones de otra delegación.")
-            return redirect('gestion_atenciones')
+            return redirect(redirect_target)
 
+    if not atencion.actividad:
+        atencion.save()
     actividad = atencion.actividad
     if not actividad:
         messages.error(request, "Esta atención aún no tiene una actividad asociada.")
-        return redirect('gestion_atenciones')
+        return redirect(redirect_target)
     if actividad.estado_validacion() == 'Aprobado':
         messages.error(request, "La evidencia ya fue aprobada y no se puede modificar.")
-        return redirect('gestion_atenciones')
+        return redirect(redirect_target)
 
     momento = request.POST.get('momento', '').strip()
     imagenes = request.FILES.getlist('imagenes')
     archivos = request.FILES.getlist('archivos')
     if momento not in {'antes', 'despues'}:
         messages.error(request, "Selecciona si la evidencia corresponde al antes o después del trabajo.")
-        return redirect('gestion_atenciones')
+        return redirect(redirect_target)
     if not imagenes and not archivos:
         messages.error(request, "Selecciona al menos una imagen o archivo para adjuntar.")
-        return redirect('gestion_atenciones')
+        return redirect(redirect_target)
 
     try:
         imagenes = [forms.ImageField().clean(imagen) for imagen in imagenes]
     except ValidationError:
         messages.error(request, "Una de las imágenes no es válida. Selecciona archivos de imagen compatibles.")
-        return redirect('gestion_atenciones')
+        return redirect(redirect_target)
 
     for imagen in imagenes:
         Evidencia.objects.create(
@@ -2196,8 +2301,11 @@ def gestion_atenciones_subir_evidencia(request, atencion_id):
         validacion.observaciones = "Se adjuntó nueva evidencia; requiere revisión."
         validacion.save(update_fields=['resultado', 'observaciones', 'updated_at'])
 
+    del_id_ws = atencion.delegacion.id if atencion.delegacion else "global"
+    publish_module_changed("atenciones", del_id_ws, "update", atencion.id)
+
     messages.success(request, "La evidencia se adjuntó correctamente y quedó pendiente de revisión.")
-    return redirect('gestion_atenciones')
+    return redirect(redirect_target)
 
 
 # --- 8. TIPO DE GESTIÓN ---
@@ -2310,7 +2418,7 @@ def gestion_vecinos(request):
         # Validaciones de límites de caracteres (Poner límite de caracteres en todo)
         ok, err = validar_largo(nombre, 150, "Nombre Completo")
         if not ok: messages.error(request, err); return redirect('gestion_vecinos')
-        ok, err = validar_largo(direccion, 200, "Dirección")
+        ok, err = validar_direccion(direccion, "Dirección", 200)
         if not ok: messages.error(request, err); return redirect('gestion_vecinos')
         ok, err = validar_telefono_chileno(telefono)
         if not ok: messages.error(request, err); return redirect('gestion_vecinos')
@@ -2511,7 +2619,7 @@ def gestion_vecinos_editar(request, vecino_id):
 
         ok, err = validar_largo(nuevo_nombre, 150, "Nombre Completo")
         if not ok: messages.error(request, err); return redirect('gestion_vecinos')
-        ok, err = validar_largo(nueva_dir, 200, "Dirección")
+        ok, err = validar_direccion(nueva_dir, "Dirección", 200)
         if not ok: messages.error(request, err); return redirect('gestion_vecinos')
         ok, err = validar_telefono_chileno(nuevo_tel)
         if not ok: messages.error(request, err); return redirect('gestion_vecinos')
@@ -3219,10 +3327,11 @@ def gestion_reportes(request):
     elif delegacion_seleccionada:
         ajustes_qs = ajustes_qs.filter(funcionario__delegacion=delegacion_seleccionada)
 
-    # Funcionarios y períodos para el modal del Delegado
-    funcionarios_ajuste = Funcionario.objects.select_related('user', 'delegacion').filter(estado='Activo')
-    if not es_admin and del_activa:
-        funcionarios_ajuste = funcionarios_ajuste.filter(delegacion=del_activa)
+    # Funcionarios y períodos para el modal del Delegado (filtrados por delegación activa)
+    funcionarios_ajuste = Funcionario.objects.select_related('user', 'delegacion', 'cargo').filter(estado='Activo')
+    del_objetivo_ajuste = delegacion_seleccionada or del_activa
+    if del_objetivo_ajuste:
+        funcionarios_ajuste = funcionarios_ajuste.filter(delegacion=del_objetivo_ajuste)
     periodos_ajuste = Periodo.objects.filter(estado='Abierto') or Periodo.objects.all()
 
     context = {
@@ -3273,17 +3382,35 @@ def gestion_ajuste_desempenio(request):
         return redirect('gestion_reportes')
 
     if request.method == 'POST':
-        funcionario_id = request.POST.get('funcionario_id')
+        funcionario_id = (request.POST.get('funcionario_id') or '').strip()
+        funcionario_busqueda = (request.POST.get('funcionario_busqueda') or '').strip()
         periodo_id = request.POST.get('periodo_id')
         concepto = request.POST.get('concepto', '').strip()
         valor_porcentaje_raw = request.POST.get('valor_porcentaje', '0').strip()
         motivo = request.POST.get('motivo', '').strip()
 
-        if not all((funcionario_id, periodo_id, concepto, motivo)):
-            messages.error(request, "Todos los campos marcados con (*) son obligatorios.")
+        del_activa = ctx['delegacion_activa']
+        func_qs = Funcionario.objects.select_related('user', 'delegacion', 'cargo').filter(estado='Activo')
+        if del_activa:
+            func_qs = func_qs.filter(delegacion=del_activa)
+
+        func_obj = None
+        if funcionario_id and funcionario_id.isdigit():
+            func_obj = func_qs.filter(id=int(funcionario_id)).first()
+        elif funcionario_busqueda:
+            busq_low = funcionario_busqueda.lower()
+            for f in func_qs:
+                nombre_full = (f.user.get_full_name() or f.user.username).strip()
+                cargo_nom = f.cargo.nombre_cargo if f.cargo else ''
+                etiqueta = f"{nombre_full} ({cargo_nom})".strip()
+                if etiqueta.lower() == busq_low or busq_low in etiqueta.lower():
+                    func_obj = f
+                    break
+
+        if not all((func_obj, periodo_id, concepto, motivo)):
+            messages.error(request, "Debe seleccionar un funcionario activo de la delegación activa y completar los campos obligatorios (*).")
             return redirect('gestion_reportes')
 
-        func_obj = Funcionario.objects.filter(id=funcionario_id).first()
         periodo_obj = Periodo.objects.filter(id=periodo_id).first()
         autorizador_obj = ctx['funcionario_actual'] or Funcionario.objects.first()
 
@@ -3369,12 +3496,18 @@ def gestion_organizaciones(request):
         # Validaciones de longitud en servidor (Poner límite de caracteres en todo)
         ok, err = validar_largo(nombre, 200, "Nombre de la Organización")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        ok, err = validar_largo(domicilio, 250, "Domicilio Legal")
+        ok, err = validar_direccion(domicilio, "Domicilio Legal", 250)
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        ok, err = validar_largo(direccion_sede, 250, "Dirección Sede")
+        ok, err = validar_direccion(direccion_sede, "Dirección Sede", 250)
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
         ok, err = validar_largo(rut_org, 20, "RUT Organización")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        if rut_org:
+            ok_rut, res_rut = validar_rut(rut_org)
+            if not ok_rut:
+                messages.error(request, f"RUT de la organización inválido: {res_rut}")
+                return redirect('gestion_organizaciones')
+            rut_org = res_rut
         ok, err = validar_largo(representante, 150, "Representante Legal")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
         ok, err = validar_largo(tel_contacto, 20, "Teléfono Contacto")
@@ -3419,6 +3552,11 @@ def gestion_organizaciones(request):
             except ValueError:
                 pass
 
+        if not domicilio and direccion_sede:
+            domicilio = direccion_sede
+        if not num_pj and personalidad_jur:
+            num_pj = personalidad_jur
+
         nueva_org = OrganizacionComunitaria.objects.create(
             nombre=nombre,
             tipo_organizacion=tipo_org,
@@ -3433,22 +3571,22 @@ def gestion_organizaciones(request):
             registro_directiva_numero=reg_dir,
             estado=estado,
             rut=rut_org or None,
-            personalidad_juridica=personalidad_jur or None,
+            personalidad_juridica=personalidad_jur or num_pj or None,
             representante_legal=representante or None,
             telefono_contacto=tel_contacto or None,
             email_contacto=email_contacto or None,
-            direccion_sede=direccion_sede or None,
+            direccion_sede=direccion_sede or domicilio or None,
             directiva_actual=directiva or None,
             observaciones=observaciones or None,
         )
 
         # Notificación en tiempo real por WebSocket
-        del_id_ws = del_activa.id if del_activa else "global"
+        del_id_ws = del_a_usar.id if del_a_usar else "global"
         def notificar_ws_org():
             publish_module_changed("organizaciones", del_id_ws, "create", nueva_org.id)
         transaction.on_commit(notificar_ws_org)
 
-        messages.success(request, f"Organización '{nombre}' registrada exitosamente en {del_activa.nombre}.")
+        messages.success(request, f"Organización '{nombre}' registrada exitosamente en {del_a_usar.nombre}.")
         return redirect('gestion_organizaciones')
 
     q = request.GET.get('q', '').strip()
@@ -3478,61 +3616,68 @@ def gestion_organizaciones(request):
             delegacion_seleccionada = del_activa
             qs = qs.filter(delegacion=del_activa)
 
+    qs_metricas = qs
     if q:
-        qs = qs.filter(build_accent_query([
+        qs_metricas = qs_metricas.filter(build_accent_query([
             'nombre', 'tipo_organizacion', 'domicilio_legal', 'territorio',
             'numero_registro_pj', 'registro_directiva_numero', 'sector__nombre', 'delegacion__nombre',
             'rut', 'representante_legal', 'directiva_actual', 'observaciones', 'direccion_sede',
         ], q))
     if filtro_tipo:
-        qs = qs.filter(tipo_organizacion__iexact=filtro_tipo)
+        qs_metricas = qs_metricas.filter(tipo_organizacion__iexact=filtro_tipo)
+
+    total_general_org = qs_metricas.count()
+    total_activas_org = qs_metricas.filter(estado__iexact='Activa').count()
+    total_tramite_org = qs_metricas.filter(estado__iexact='En tramite').count()
+    total_inactivas_org = qs_metricas.filter(estado__iexact='Inactiva').count()
+
+    qs = qs_metricas
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
 
     orden_opciones = [
-        ('id', 'Más antiguas'),
         ('-id', 'Más recientes'),
-        ('nombre', 'Nombre A-Z'),
-        ('-nombre', 'Nombre Z-A'),
-        ('socios_activos', 'Menor socios'),
-        ('-socios_activos', 'Mayor socios'),
-        ('delegacion__nombre', 'Delegación'),
+        ('id', 'Más antiguas'),
+        ('nombre', 'Organización A-Z'),
+        ('-nombre', 'Organización Z-A'),
+        ('-socios_activos', 'Mayor socios activos'),
+        ('socios_activos', 'Menor socios activos'),
+        ('-fecha_constitucion', 'Constitución: recientes'),
+        ('fecha_constitucion', 'Constitución: antiguas'),
+        ('delegacion__nombre', 'Territorio / Delegación'),
     ]
     qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-id')
 
-    # Exportación nativa a .xlsx (coherente con columnas del archivo JJVV)
+    # Exportación nativa a .xlsx (coherente con columnas de la tabla oficial JJVV)
     if request.GET.get('export') == 'excel':
         headers = [
-            '#', 'Nombre Organización / JJVV', 'Tipo Organización', 'RUT',
-            'Personalidad Jurídica', 'Representante Legal', 'Teléfono Contacto', 'Email Contacto',
-            'Dirección Sede', 'Domicilio Legal', 'Directiva Actual',
-            'Delegación Territorial', 'Sector / Territorio', 'Socios Activos',
-            'Fecha Constitución', 'N° Reg. P.J.', 'Fecha Inscripción Registro',
-            'Reg. Directiva N°', 'Observaciones', 'Estado'
+            'ORGANIZACIONES', 'DOMICILIO LEGAL', 'TERRIT. DELEG.',
+            'SOCIOS ACTIVOS', 'FECHA CONSTIT.', 'Nº REG. P.J.',
+            'FECHA INSCRIPC EN REG.', 'REG. DIR. Nº',
+            'TIPO ORGANIZACIÓN', 'RUT', 'REPRESENTANTE LEGAL',
+            'TELÉFONO CONTACTO', 'EMAIL CONTACTO', 'DIRECTIVA ACTUAL',
+            'OBSERVACIONES', 'ESTADO'
         ]
         rows = []
-        for i, org in enumerate(qs, start=1):
+        for org in qs:
             f_c = org.fecha_constitucion.strftime('%d/%m/%Y') if org.fecha_constitucion else '—'
             f_i = org.fecha_inscripcion_registro.strftime('%d/%m/%Y') if org.fecha_inscripcion_registro else '—'
+            terr_del = org.territorio or (org.sector.nombre if org.sector else '') or (org.delegacion.nombre if org.delegacion else '—')
             rows.append([
-                i,
                 org.nombre,
+                org.domicilio_legal or org.direccion_sede or '—',
+                terr_del,
+                org.socios_activos,
+                f_c,
+                org.numero_registro_pj or org.personalidad_juridica or '—',
+                f_i,
+                org.registro_directiva_numero or '—',
                 org.tipo_organizacion,
                 org.rut or '—',
-                org.personalidad_juridica or '—',
                 org.representante_legal or '—',
                 org.telefono_contacto or '—',
                 org.email_contacto or '—',
-                org.direccion_sede or '—',
-                org.domicilio_legal or '—',
                 org.directiva_actual or '—',
-                org.delegacion.nombre if org.delegacion else 'Sin delegación',
-                org.territorio or '—',
-                org.socios_activos,
-                f_c,
-                org.numero_registro_pj or '—',
-                f_i,
-                org.registro_directiva_numero or '—',
                 org.observaciones or '—',
                 org.estado
             ])
@@ -3565,7 +3710,11 @@ def gestion_organizaciones(request):
         'orden': orden,
         'orden_opciones': orden_opciones,
         'page_size': page_size,
-        'total_organizaciones': total_organizaciones
+        'total_organizaciones': total_organizaciones,
+        'total_general_org': total_general_org,
+        'total_activas_org': total_activas_org,
+        'total_tramite_org': total_tramite_org,
+        'total_inactivas_org': total_inactivas_org,
     })
 
 
@@ -3612,12 +3761,18 @@ def gestion_organizaciones_editar(request, org_id):
 
         ok, err = validar_largo(nuevo_nombre, 200, "Nombre")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        ok, err = validar_largo(nuevo_domicilio, 250, "Domicilio")
+        ok, err = validar_direccion(nuevo_domicilio, "Domicilio Legal", 250)
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        ok, err = validar_largo(direccion_sede_e, 250, "Dirección Sede")
+        ok, err = validar_direccion(direccion_sede_e, "Dirección Sede", 250)
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
         ok, err = validar_largo(rut_org, 20, "RUT")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+        if rut_org:
+            ok_rut, res_rut = validar_rut(rut_org)
+            if not ok_rut:
+                messages.error(request, f"RUT de la organización inválido: {res_rut}")
+                return redirect('gestion_organizaciones')
+            rut_org = res_rut
         ok, err = validar_largo(representante, 150, "Representante Legal")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
         ok, err = validar_largo(tel_contacto, 20, "Teléfono Contacto")
@@ -3634,6 +3789,11 @@ def gestion_organizaciones_editar(request, org_id):
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
         ok, err = validar_largo(observaciones_e, 1000, "Observaciones")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
+
+        if not nuevo_domicilio and direccion_sede_e:
+            nuevo_domicilio = direccion_sede_e
+        if not num_pj and personalidad_jur:
+            num_pj = personalidad_jur
 
         org.nombre = nuevo_nombre
         org.tipo_organizacion = request.POST.get('tipo_organizacion', org.tipo_organizacion)
@@ -3653,22 +3813,26 @@ def gestion_organizaciones_editar(request, org_id):
         if f_const:
             try: org.fecha_constitucion = datetime.date.fromisoformat(f_const)
             except ValueError: pass
+        elif 'fecha_constitucion' in request.POST:
+            org.fecha_constitucion = None
 
         f_insc = request.POST.get('fecha_inscripcion_registro', '').strip()
         if f_insc:
             try: org.fecha_inscripcion_registro = datetime.date.fromisoformat(f_insc)
             except ValueError: pass
+        elif 'fecha_inscripcion_registro' in request.POST:
+            org.fecha_inscripcion_registro = None
 
         org.numero_registro_pj = num_pj
         org.registro_directiva_numero = reg_dir
         org.estado = request.POST.get('estado', org.estado)
         # Nuevos campos
         org.rut = rut_org or None
-        org.personalidad_juridica = personalidad_jur or None
+        org.personalidad_juridica = personalidad_jur or num_pj or None
         org.representante_legal = representante or None
         org.telefono_contacto = tel_contacto or None
         org.email_contacto = email_contacto_e or None
-        org.direccion_sede = direccion_sede_e or None
+        org.direccion_sede = direccion_sede_e or nuevo_domicilio or None
         org.directiva_actual = directiva_e or None
         org.observaciones = observaciones_e or None
         org.save()
