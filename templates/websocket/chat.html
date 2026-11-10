@@ -8,15 +8,15 @@
   <div class="bg-white rounded-3xl p-6 border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
     <div>
       <div class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
-        <span>Comunicación en Tiempo Real</span>
+        <span>Comunicación Interna</span>
         <span class="text-slate-300">/</span>
-        <span class="text-[#C41230]">Channels & WebSocket</span>
+        <span class="text-[#C41230]">Chat Territorial</span>
       </div>
       <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
         Chat Colaborativo de la Organización
       </h1>
       <p class="text-xs text-slate-500 mt-1">
-        Canal síncrono ASGI/Daphne aislado por delegación territorial.
+        Canal de comunicación directa para el equipo territorial.
       </p>
     </div>
 
@@ -31,9 +31,6 @@
     <!-- Lista de mensajes -->
     <div id="messages-container" class="flex-1 p-5 overflow-y-auto space-y-3 bg-slate-50/50">
       <ul id="messages" class="space-y-3" aria-live="polite">
-        <li class="text-center py-4 text-xs text-slate-400 italic">
-          Inicio de la sala. Los mensajes se distribuyen instantáneamente a través de WebSocket sin recargar la página.
-        </li>
       </ul>
     </div>
 

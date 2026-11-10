@@ -406,13 +406,31 @@
       </div>
 
       <div class="space-y-1">
-        <label class="block text-slate-700 font-bold">Funcionario a Ajustar <span class="text-[#C41230]">*</span></label>
-        <select name="funcionario_id" required class="w-full px-3 py-2 rounded-xl border border-slate-300 font-normal text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-          <option value="">-- Seleccionar Funcionario --</option>
-          {% for f in funcionarios_ajuste %}
-            <option value="{{ f.id }}">{{ f.user.get_full_name|default:f.user.username }} ({{ f.cargo.nombre_cargo }})</option>
-          {% endfor %}
-        </select>
+        <div class="flex items-center justify-between">
+          <label for="funcionario_busqueda" class="block text-slate-700 font-bold">
+            Funcionario a Ajustar <span class="text-[#C41230]">*</span>
+          </label>
+          <span class="text-[10px] font-bold text-[#C41230] bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+            Delegación Activa: {% if delegacion_seleccionada %}{{ delegacion_seleccionada.nombre }}{% elif delegacion_activa %}{{ delegacion_activa.nombre }}{% else %}Todas{% endif %}
+          </span>
+        </div>
+        <div class="relative">
+          <input type="text" id="funcionario_busqueda" name="funcionario_busqueda" required list="funcionarios-ajuste-list"
+                 oninput="sincronizarFuncionarioAjuste(this.value)"
+                 placeholder="Buscar por nombre o cargo en la delegación activa..."
+                 autocomplete="off"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-medium text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none" />
+          <input type="hidden" id="funcionario_id" name="funcionario_id" value="">
+          <datalist id="funcionarios-ajuste-list">
+            {% for f in funcionarios_ajuste %}
+              <option value="{{ f.user.get_full_name|default:f.user.username }} ({{ f.cargo.nombre_cargo }})" data-id="{{ f.id }}">{% if f.delegacion %}{{ f.delegacion.nombre }}{% else %}Delegación Activa{% endif %}</option>
+            {% endfor %}
+          </datalist>
+        </div>
+        {% if not funcionarios_ajuste %}
+          <p class="text-[10px] text-amber-700 font-medium">No hay funcionarios activos registrados para la delegación activa.</p>
+        {% endif %}
+        <p class="text-[10px] text-slate-400 font-normal">Selecciona del listado o escribe el nombre o cargo del funcionario</p>
       </div>
 
       <div class="space-y-1">
@@ -465,6 +483,20 @@
 </div>
 
 <script>
+  function sincronizarFuncionarioAjuste(val) {
+    const list = document.getElementById('funcionarios-ajuste-list');
+    const hiddenId = document.getElementById('funcionario_id');
+    if (!list || !hiddenId) return;
+    hiddenId.value = '';
+    const options = list.querySelectorAll('option');
+    for (let opt of options) {
+      if (opt.value === val) {
+        hiddenId.value = opt.getAttribute('data-id') || '';
+        break;
+      }
+    }
+  }
+
   function abrirModalAjuste() {
     const m = document.getElementById('modal-ajuste-desempenio');
     if (m) {

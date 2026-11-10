@@ -13,7 +13,7 @@ from accounts.models import Cargo, Delegacion, Funcionario, FuncionarioRol, Rol,
 from activities.models import Actividad, AtencionCiudadana, Evidencia, ValidacionEvidencia, Vecino
 from configuration.models import ItemMedicion, Periodo, SubAtencion, TipoAtencion
 from core.utils import build_accent_query
-from core.views import _apply_list_ordering, _get_page_size
+from core.views import _apply_list_ordering, _get_page_size, _validate_password
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
@@ -182,6 +182,7 @@ class SearchAndOrderingTests(TestCase):
         self.assertEqual(size2, 30)  # La sesión recuerda 30
 
 
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class UserManagementTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_superuser(
@@ -216,8 +217,15 @@ class UserManagementTests(TestCase):
         )
         created_user = User.objects.get(username='usuario_prueba')
         funcionario = Funcionario.objects.get(user=created_user)
-        self.assertTrue(created_user.check_password('User1234!'))
         self.assertTrue(funcionario.debe_cambiar_contrasena)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['usuario@example.test'])
+        self.assertIn('usuario_prueba', mail.outbox[0].body)
+        pw_match = re.search(r'Contraseña provisoria:\s*(\S+)', mail.outbox[0].body)
+        self.assertIsNotNone(pw_match)
+        provisional_pw = pw_match.group(1)
+        self.assertIsNone(_validate_password(provisional_pw))
+        self.assertTrue(created_user.check_password(provisional_pw))
         self.assertEqual(funcionario.cargo, self.cargo)
         self.assertIsNone(funcionario.delegacion)
         list_response = self.client.get(
@@ -1045,3 +1053,36 @@ class SectorYTerritorioTests(TestCase):
         # Comprobar que gestion_sectores carga con status 200
         resp_sectores = self.client.get(reverse('gestion_sectores'))
         self.assertEqual(resp_sectores.status_code, 200)
+
+    def test_direccion_requiere_letras_y_numeros(self):
+        self.client.force_login(self.user_delegado)
+
+        # Dirección solo con letras: debe ser rechazada
+        self.client.post(reverse('gestion_vecinos'), {
+            'nombre': 'Vecino Sin Número',
+            'rut': '18.999.888-0',
+            'direccion': 'Avenida Francisco de Aguirre',
+            'sector_id': self.sector1.id,
+            'estado': 'Activo',
+        })
+        self.assertFalse(Vecino.objects.filter(rut='18.999.888-0').exists())
+
+        # Dirección solo con números: debe ser rechazada
+        self.client.post(reverse('gestion_vecinos'), {
+            'nombre': 'Vecino Solo Números',
+            'rut': '18.999.888-0',
+            'direccion': '12345',
+            'sector_id': self.sector1.id,
+            'estado': 'Activo',
+        })
+        self.assertFalse(Vecino.objects.filter(rut='18.999.888-0').exists())
+
+        # Dirección con letras y números: debe aceptarse
+        self.client.post(reverse('gestion_vecinos'), {
+            'nombre': 'Vecino Dirección Completa',
+            'rut': '18.999.888-0',
+            'direccion': 'Avenida Francisco de Aguirre 123',
+            'sector_id': self.sector1.id,
+            'estado': 'Activo',
+        })
+        self.assertTrue(Vecino.objects.filter(rut='18.999.888-0').exists())

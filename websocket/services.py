@@ -26,31 +26,30 @@ def publish_module_changed(modulo, org_id, action, record_id, extra_data=None):
         payload = {
             "type": "crud_update",
             "modulo": modulo,
+            "module": modulo,
             "action": action,
             "record_id": record_id,
             "timestamp": timezone.now().strftime('%H:%M:%S'),
             "data": extra_data or {}
         }
 
-        # 1. Enviar al grupo específico de la organización / delegación
-        group_org = f"crud_{modulo}_{org_id}"
-        async_to_sync(layer.group_send)(
-            group_org,
-            {
-                "type": "crud_event",
-                "payload": payload
-            }
-        )
+        modulos_destino = {modulo, "general"}
+        if modulo in ("atenciones", "tubo", "actividades"):
+            modulos_destino.update({"atenciones", "tubo", "inicio", "reportes"})
 
-        # 2. Enviar también al canal global de administradores
-        group_all = f"crud_{modulo}_all"
-        async_to_sync(layer.group_send)(
-            group_all,
-            {
-                "type": "crud_event",
-                "payload": payload
-            }
-        )
+        grupos = set()
+        for mod in modulos_destino:
+            grupos.add(f"crud_{mod}_{org_id}")
+            grupos.add(f"crud_{mod}_all")
+
+        for grp in grupos:
+            async_to_sync(layer.group_send)(
+                grp,
+                {
+                    "type": "crud_event",
+                    "payload": payload
+                }
+            )
     except Exception as e:
         logger.error(f"Error al emitir evento WebSocket en publish_module_changed: {e}")
 
