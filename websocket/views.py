@@ -1,8 +1,9 @@
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.views.decorators.http import require_POST
+from core.context_processors import global_context
 from .services import publish_chat_message, get_recent_chat_messages
 
 def _resolve_user_org_id(user):
@@ -14,6 +15,9 @@ def _resolve_user_org_id(user):
 
 @login_required
 def chat_room(request):
+    ctx = global_context(request)
+    if ctx.get('permisos', {}).get('es_cliente'):
+        return redirect('portal_cliente')
     org_id = _resolve_user_org_id(request.user)
     return render(request, "websocket/chat.html", {
         "initial_messages": get_recent_chat_messages(org_id),
@@ -22,6 +26,9 @@ def chat_room(request):
 @login_required
 @require_POST
 def send_message(request):
+    ctx = global_context(request)
+    if ctx.get('permisos', {}).get('es_cliente'):
+        return JsonResponse({"error": "Acceso denegado."}, status=403)
     org_id = _resolve_user_org_id(request.user)
 
     message = request.POST.get("message", "").strip()
@@ -34,6 +41,9 @@ def send_message(request):
 
 @login_required
 def messages_feed(request):
+    ctx = global_context(request)
+    if ctx.get('permisos', {}).get('es_cliente'):
+        return JsonResponse({"error": "Acceso denegado."}, status=403)
     org_id = _resolve_user_org_id(request.user)
     return JsonResponse({"ok": True, "messages": get_recent_chat_messages(org_id)})
 

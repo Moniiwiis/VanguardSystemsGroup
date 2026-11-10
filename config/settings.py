@@ -12,10 +12,15 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+_venv_site = BASE_DIR / '.venv' / 'Lib' / 'site-packages'
+if _venv_site.is_dir() and str(_venv_site) not in sys.path:
+    sys.path.insert(0, str(_venv_site))
 
 # Carga las variables definidas en tu archivo .env
 load_dotenv(BASE_DIR / ".env")
@@ -34,10 +39,11 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver', 'http://34.227.36.243/'
 
 
 # Application definition
+import importlib.util as _importlib_util
 
 INSTALLED_APPS = [
-    'daphne',
-    'channels',
+    *(['daphne'] if _importlib_util.find_spec('daphne') else []),
+    *(['channels'] if _importlib_util.find_spec('channels') else []),
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

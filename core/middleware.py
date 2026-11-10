@@ -1,7 +1,8 @@
 from django.conf import settings
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 
 from accounts.models import Funcionario
+from core.context_processors import global_context
 
 
 class PasswordChangeRequiredMiddleware:
@@ -25,5 +26,21 @@ class PasswordChangeRequiredMiddleware:
             is_asset = request.path.startswith((static_path, media_path))
             if must_change_password and not is_asset and request.path not in allowed_paths:
                 return redirect('cambiar_contrasena_inicial')
+
+            # Aislamiento estricto en servidor para rol Cliente:
+            # Solo puede consultar sus propios datos/registros (/portal-cliente/) y editar su perfil/foto (/perfil/)
+            ctx = global_context(request)
+            if ctx.get('permisos', {}).get('es_cliente') and not is_asset:
+                path = request.path
+                if path in ('/', '/gestion/', '/login/', '/accounts/login/'):
+                    return redirect('portal_cliente')
+                allowed_client_prefixes = (
+                    '/portal-cliente/',
+                    '/perfil/',
+                    '/cambiar-contrasena-inicial/',
+                    '/logout/',
+                )
+                if not path.startswith(allowed_client_prefixes):
+                    return render(request, 'errors/403.html', status=403)
 
         return self.get_response(request)

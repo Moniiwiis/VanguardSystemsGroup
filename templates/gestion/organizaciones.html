@@ -331,6 +331,7 @@
                           class="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all">
                     <i data-lucide="edit-3" class="w-4 h-4"></i>
                   </button>
+                  {% if permisos.puede_eliminar %}
                   <form method="POST" action="{% url 'gestion_organizaciones_eliminar' o.id %}"
                         onsubmit="return confirmDelete(this, '{{ o.nombre|escapejs }}');" class="inline">
                     {% csrf_token %}
@@ -339,6 +340,7 @@
                       <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
                   </form>
+                  {% endif %}
                 {% endif %}
               </div>
             </td>

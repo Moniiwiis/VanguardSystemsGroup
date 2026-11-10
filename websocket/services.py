@@ -4,7 +4,11 @@ import os
 import tempfile
 import uuid
 from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
+try:
+    from channels.layers import get_channel_layer
+except ImportError:
+    def get_channel_layer():
+        return None
 from django.conf import settings
 from django.db import connection
 from django.utils import timezone
@@ -112,19 +116,24 @@ def _save_shared_chat_message(msg_payload):
     except Exception:
         pass
 
-def publish_module_changed(modulo, org_id, action, record_id, extra_data=None):
+_RECENT_EMISSIONS = {}
+
+
+def publish_module_changed(modulo, org_id, action, record_id, extra_data=None, extra_groups=None):
     """
     Publica una notificación de cambio de módulo en tiempo real a través de Channels.
     Se despacha típicamente dentro de transaction.on_commit() tras guardar en BD.
-    
-    Parámetros:
-    - modulo: string identificador ('atenciones', 'vecinos', etc.)
-    - org_id: identificador de la delegación u organización (ej. '1', '2', 'global')
-    - action: 'create', 'update', 'delete', 'status_change'
-    - record_id: ID del registro modificado
-    - extra_data: dict opcional con metadatos autorizados
     """
     try:
+        import time
+        now_mono = time.monotonic()
+        dedup_key = f"{modulo}:{org_id}:{action}:{record_id}"
+        if now_mono - _RECENT_EMISSIONS.get(dedup_key, 0.0) < 0.2:
+            return
+        _RECENT_EMISSIONS[dedup_key] = now_mono
+        if len(_RECENT_EMISSIONS) > 500:
+            _RECENT_EMISSIONS.clear()
+
         layer = get_channel_layer()
         if layer is None:
             logger.warning("Channel layer no configurado, omitiendo notificación WebSocket.")
@@ -140,14 +149,23 @@ def publish_module_changed(modulo, org_id, action, record_id, extra_data=None):
             "data": extra_data or {}
         }
 
-        modulos_destino = {modulo, "general"}
+        modulos_destino = {modulo, "general", "inicio"}
         if modulo in ("atenciones", "tubo", "actividades"):
-            modulos_destino.update({"atenciones", "tubo", "inicio", "reportes"})
+            modulos_destino.update({"atenciones", "tubo", "inicio", "reportes", "actividades"})
+        elif modulo in ("metas", "configuracion", "periodos"):
+            modulos_destino.update({"metas", "configuracion", "reportes", "inicio"})
+        elif modulo in ("delegaciones", "roles", "usuarios"):
+            modulos_destino.update({modulo, "usuarios", "inicio"})
+        elif modulo in ("tipo_atencion", "sub_atencion"):
+            modulos_destino.update({"tipo_atencion", "sub_atencion", "atenciones"})
 
         grupos = set()
         for mod in modulos_destino:
             grupos.add(f"crud_{mod}_{org_id}")
             grupos.add(f"crud_{mod}_all")
+
+        if extra_groups:
+            grupos.update(extra_groups)
 
         for grp in grupos:
             async_to_sync(layer.group_send)(
@@ -159,6 +177,86 @@ def publish_module_changed(modulo, org_id, action, record_id, extra_data=None):
             )
     except Exception as e:
         logger.error(f"Error al emitir evento WebSocket en publish_module_changed: {e}")
+
+
+def register_realtime_crud_signals():
+    """
+    Conecta señales post_save y post_delete con transaction.on_commit()
+    para que absolutamente todos los módulos del sistema reflejen los cambios en tiempo real.
+    """
+    import sys
+    if "seed_data" in sys.argv or "migrate" in sys.argv or "flush" in sys.argv:
+        return
+
+    from django.db import transaction
+    from django.db.models.signals import post_save, post_delete
+
+    MODEL_MODULE_MAP = {
+        "Delegacion": ("delegaciones", lambda inst: "global"),
+        "Rol": ("roles", lambda inst: "global"),
+        "Funcionario": ("usuarios", lambda inst: str(inst.delegacion_id) if getattr(inst, "delegacion_id", None) else "global"),
+        "FuncionarioRol": ("usuarios", lambda inst: str(inst.funcionario.delegacion_id) if getattr(inst, "funcionario_id", None) and getattr(inst.funcionario, "delegacion_id", None) else "global"),
+        "Sector": ("sectores", lambda inst: str(inst.delegacion_id) if getattr(inst, "delegacion_id", None) else "global"),
+        "ItemMedicion": ("metas", lambda inst: "global"),
+        "Periodo": ("metas", lambda inst: "global"),
+        "ConfiguracionMeta": ("configuracion", lambda inst: str(inst.funcionario.delegacion_id) if getattr(inst, "funcionario_id", None) and getattr(inst.funcionario, "delegacion_id", None) else "global"),
+        "TipoAtencion": ("tipo_atencion", lambda inst: "global"),
+        "SubAtencion": ("sub_atencion", lambda inst: "global"),
+        "TipoGestion": ("tipo_gestion", lambda inst: "global"),
+        "Vecino": ("vecinos", lambda inst: str(inst.delegacion_id) if getattr(inst, "delegacion_id", None) else "global"),
+        "OrganizacionComunitaria": ("organizaciones", lambda inst: str(inst.delegacion_id) if getattr(inst, "delegacion_id", None) else "global"),
+        "AtencionCiudadana": ("atenciones", lambda inst: str(inst.delegacion_id) if getattr(inst, "delegacion_id", None) else "global"),
+        "Actividad": ("atenciones", lambda inst: str(inst.funcionario.delegacion_id) if getattr(inst, "funcionario_id", None) and getattr(inst.funcionario, "delegacion_id", None) else "global"),
+        "ValidacionEvidencia": ("atenciones", lambda inst: str(inst.actividad.funcionario.delegacion_id) if getattr(inst, "actividad_id", None) and getattr(inst.actividad, "funcionario_id", None) and getattr(inst.actividad.funcionario, "delegacion_id", None) else "global"),
+        "EvidenciaArchivo": ("atenciones", lambda inst: str(inst.actividad.funcionario.delegacion_id) if getattr(inst, "actividad_id", None) and getattr(inst.actividad, "funcionario_id", None) and getattr(inst.actividad.funcionario, "delegacion_id", None) else "global"),
+        "CompromisoAgenda": ("agenda", lambda inst: "global"),
+        "AjusteDesempenio": ("reportes", lambda inst: str(inst.funcionario.delegacion_id) if getattr(inst, "funcionario_id", None) and getattr(inst.funcionario, "delegacion_id", None) else "global"),
+    }
+
+    def _handle_model_change(sender, instance, created=False, is_delete=False, **kwargs):
+        model_name = sender.__name__
+        if model_name not in MODEL_MODULE_MAP:
+            return
+        modulo, org_resolver = MODEL_MODULE_MAP[model_name]
+        try:
+            org_id = org_resolver(instance)
+        except Exception:
+            org_id = "global"
+
+        if is_delete or getattr(instance, "deleted_at", None) is not None:
+            action = "delete"
+        elif created:
+            action = "create"
+        else:
+            action = "update"
+
+        rec_id = getattr(instance, "pk", 0) or 0
+        extra_groups = set()
+        if model_name in ("AtencionCiudadana", "Vecino"):
+            if getattr(instance, "creado_por_id", None):
+                extra_groups.add(f"crud_portal_cliente_user_{instance.creado_por_id}")
+            vec_id = getattr(instance, "vecino_id", None) if model_name == "AtencionCiudadana" else getattr(instance, "pk", None)
+            if vec_id in (1, 2):
+                from django.contrib.auth.models import User
+                target_uname = "cliente_1" if vec_id == 1 else "cliente_2"
+                u_obj = User.objects.filter(username=target_uname).only("id").first()
+                if u_obj:
+                    extra_groups.add(f"crud_portal_cliente_user_{u_obj.id}")
+
+        transaction.on_commit(
+            lambda: publish_module_changed(
+                modulo, org_id, action, rec_id, extra_groups=extra_groups
+            )
+        )
+
+    def _on_post_save(sender, instance, created, **kwargs):
+        _handle_model_change(sender, instance, created=created, is_delete=False, **kwargs)
+
+    def _on_post_delete(sender, instance, **kwargs):
+        _handle_model_change(sender, instance, created=False, is_delete=True, **kwargs)
+
+    post_save.connect(_on_post_save, dispatch_uid="sgr_realtime_post_save")
+    post_delete.connect(_on_post_delete, dispatch_uid="sgr_realtime_post_delete")
 
 def publish_chat_message(user, org_id, message, msg_id=None):
     """

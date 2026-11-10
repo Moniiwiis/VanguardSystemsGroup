@@ -33,11 +33,19 @@
       </div>
       {% endif %}
 
+      <a href="?export=excel{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+         class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-2xl shadow-sm transition-all flex items-center gap-2">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+        <span>Exportar Excel</span>
+      </a>
+
+      {% if not permisos.es_consultor %}
       <button type="button" onclick="document.getElementById('modal-crear-sector').classList.remove('hidden')" 
               class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
         <i data-lucide="plus-circle" class="w-4 h-4"></i>
         <span>Nuevo Sector</span>
       </button>
+      {% endif %}
     </div>
   </div>
 
@@ -129,17 +137,24 @@
             </td>
             <td class="py-3 px-4 text-center whitespace-nowrap">
               <div class="flex items-center justify-center gap-1.5">
+                {% if not permisos.es_consultor %}
                 <button type="button" 
                         onclick="abrirModalEditarSector('{{ s.id }}', '{{ s.codigo|default:''|escapejs }}', '{{ s.nombre|escapejs }}', '{{ s.delegacion.id }}', '{{ s.delegacion.nombre|escapejs }}', '{{ s.descripcion|default:''|escapejs }}', '{{ s.estado }}')"
                         class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Editar Sector">
                   <i data-lucide="edit-3" class="w-4 h-4"></i>
                 </button>
+                {% endif %}
+                {% if permisos.puede_eliminar %}
                 <form method="POST" action="{% url 'gestion_sectores_eliminar' s.id %}" onsubmit="return confirmDelete(this, '{{ s.nombre|escapejs }}');" class="inline">
                   {% csrf_token %}
                   <button type="submit" class="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all" title="Eliminar Sector">
                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                   </button>
                 </form>
+                {% endif %}
+                {% if permisos.es_consultor %}
+                <span class="text-[11px] font-bold text-slate-400">Solo lectura</span>
+                {% endif %}
               </div>
             </td>
           </tr>

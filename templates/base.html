@@ -82,7 +82,7 @@
     <div class="max-w-[1440px] mx-auto px-4 md:px-8 py-2.5 flex items-center justify-between gap-4">
       
       <!-- Izquierda: Logo y Marca Institucional -->
-      <a href="{% url 'gestion_inicio' %}" class="flex items-center gap-3 shrink-0 group">
+      <a href="{% if permisos.es_cliente %}{% url 'portal_cliente' %}{% else %}{% url 'gestion_inicio' %}{% endif %}" class="flex items-center gap-3 shrink-0 group">
         <img src="{% static 'horizontal-blanco.svg' %}" 
              alt="La Serena — Ilustre Municipalidad" 
              class="h-9 w-auto object-contain drop-shadow-sm"
@@ -149,6 +149,12 @@
               </div>
             </div>
           </div>
+        {% elif permisos.es_cliente %}
+          <!-- Contexto exclusivo para Cliente Final -->
+          <div class="flex items-center gap-2 bg-[#700F17]/90 text-white text-xs font-bold px-3.5 py-1.5 rounded-full border border-white/25 shadow-inner">
+            <i data-lucide="user-check" class="w-3.5 h-3.5 text-white/90"></i>
+            <span>Portal Ciudadano · Consulta Personal</span>
+          </div>
         {% elif delegacion_activa %}
           <!-- Contexto Territorial Fijo para Operadores / Delegados Monodelegación -->
           <div class="flex items-center gap-2 bg-[#700F17]/90 text-white text-xs font-bold px-3.5 py-1.5 rounded-full border border-white/25 shadow-inner">
@@ -207,12 +213,14 @@
       <!-- Menú Módulos Flat y Adaptable según wireframes C3-C6 -->
       <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-1 text-xs font-bold">
         
-        <!-- Inicio -->
+        <!-- Inicio (Oculto para rol Cliente) -->
+        {% if permisos.ver_inicio %}
         <a href="{% url 'gestion_inicio' %}" 
            class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_inicio' or request.resolver_match.url_name == 'gestion_inicio_alt' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
           <i data-lucide="home" class="w-4 h-4 shrink-0"></i>
           <span>Inicio</span>
         </a>
+        {% endif %}
 
         <!-- 1. Delegaciones (Solo Administrador) -->
         {% if permisos.ver_delegaciones %}
@@ -322,21 +330,23 @@
           </a>
         {% endif %}
 
+        {% if not permisos.es_cliente %}
         <div class="pt-2 border-t border-slate-100 my-1"></div>
 
-        <!-- Tiempo Real / Chat (Channels WebSockets) -->
+        <!-- Tiempo Real / Chat (Channels WebSockets - Solo Funcionarios) -->
         <a href="{% url 'websocket:chat_index' %}" 
            class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'chat' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
           <i data-lucide="messages-square" class="w-4 h-4 shrink-0 text-red-600"></i>
           <span>Chat en Vivo</span>
         </a>
+        {% endif %}
 
-        <!-- Portal Ciudadano (Acceso para rol Cliente o consulta) -->
-        {% if ver_portal_cliente or es_cliente %}
+        <!-- Portal Ciudadano (Acceso para rol Cliente) -->
+        {% if permisos.ver_portal_cliente or permisos.es_cliente %}
           <a href="{% url 'portal_cliente' %}" 
              class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'portal_cliente' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="user-square-2" class="w-4 h-4 shrink-0 text-blue-600"></i>
-            <span>Portal Ciudadano</span>
+            <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
+            <span>Mis Registros</span>
           </a>
         {% endif %}
 
@@ -344,7 +354,7 @@
         <a href="{% url 'perfil_usuario' %}" 
            class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'perfil_usuario' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
           <i data-lucide="user-cog" class="w-4 h-4 shrink-0"></i>
-          <span>Mi Perfil</span>
+          <span>Mi Perfil y Foto</span>
         </a>
 
       </nav>
@@ -984,40 +994,104 @@
       }
     }, true);
 
-    // Sincronización silenciosa en segundo plano para todos los módulos de gestión
+    // Sincronización en tiempo real por WebSocket para todos los módulos del sistema
     document.addEventListener("DOMContentLoaded", function() {
       const path = window.location.pathname || '';
-      if (!path.startsWith('/gestion/')) return;
-      const parts = path.split('/').filter(Boolean);
-      const rawMod = (parts[1] || 'inicio').replace(/-/g, '_');
+      if (path.startsWith('/login') || path.startsWith('/chat') || path.startsWith('/recuperar') || path.startsWith('/validar') || path.startsWith('/nueva-contrasena')) {
+        return;
+      }
+
+      let rawMod = 'inicio';
+      if (path.startsWith('/portal-cliente')) {
+        rawMod = 'portal_cliente';
+      } else if (path.startsWith('/gestion/')) {
+        const parts = path.split('/').filter(Boolean);
+        rawMod = (parts[1] || 'inicio').replace(/-/g, '_');
+      }
+
       const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
       const wsUrl = wsProtocol + window.location.host + '/ws/crud/' + rawMod + '/';
       let globalCrudSocket = null;
+      let hadConnectedOnce = false;
+
+      // Indicador discreto solo en caso de pérdida de conexión (requisito Pág. 7 de la pauta)
+      const disconnectBanner = document.createElement('div');
+      disconnectBanner.id = 'ws-disconnect-banner';
+      disconnectBanner.className = 'fixed bottom-4 right-4 z-40 hidden items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold shadow-lg';
+      disconnectBanner.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span><span>Conexión en tiempo real interrumpida. Reconectando...</span>';
+      document.body.appendChild(disconnectBanner);
+
+      function actualizarVistaSinRecargar() {
+        fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+          .then(res => res.text())
+          .then(html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const modalAbierto = document.querySelector('.fixed.inset-0:not(.hidden), dialog[open]');
+            const tagActivo = (document.activeElement && document.activeElement.tagName) || '';
+            const escribiendo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tagActivo);
+
+            const newTbodies = doc.querySelectorAll('table tbody');
+            const curTbodies = document.querySelectorAll('table tbody');
+
+            if (!modalAbierto && !escribiendo && newTbodies.length !== curTbodies.length) {
+              const newMain = doc.querySelector('main');
+              const curMain = document.querySelector('main');
+              if (newMain && curMain) {
+                curMain.innerHTML = newMain.innerHTML;
+                if (window.lucide) lucide.createIcons();
+                return;
+              }
+            }
+
+            newTbodies.forEach((tb, idx) => {
+              if (curTbodies[idx]) curTbodies[idx].innerHTML = tb.innerHTML;
+            });
+
+            // Actualizar barras de paginación y contadores de registros
+            const newPags = doc.querySelectorAll('.overflow-hidden > div:last-child, nav[aria-label*="Paginación"]');
+            const curPags = document.querySelectorAll('.overflow-hidden > div:last-child, nav[aria-label*="Paginación"]');
+            newPags.forEach((pg, idx) => {
+              if (curPags[idx]) curPags[idx].innerHTML = pg.innerHTML;
+            });
+
+            // Actualizar tarjetas KPI superiores si no hay modal abierto
+            if (!modalAbierto) {
+              const newGrids = doc.querySelectorAll('main .grid');
+              const curGrids = document.querySelectorAll('main .grid');
+              newGrids.forEach((gr, idx) => {
+                if (curGrids[idx] && !curGrids[idx].closest('.fixed, dialog, form')) {
+                  curGrids[idx].innerHTML = gr.innerHTML;
+                }
+              });
+            }
+
+            if (window.lucide) lucide.createIcons();
+          })
+          .catch(() => {});
+      }
 
       function connectGlobalCrudWS() {
         try {
           globalCrudSocket = new WebSocket(wsUrl);
+          globalCrudSocket.onopen = function() {
+            hadConnectedOnce = true;
+            disconnectBanner.classList.add('hidden');
+            disconnectBanner.classList.remove('flex');
+          };
           globalCrudSocket.onmessage = function(e) {
             try {
               const data = JSON.parse(e.data);
               if (data.type === 'crud_update' || data.type === 'module_changed') {
-                fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-                  .then(res => res.text())
-                  .then(html => {
-                    const doc = new DOMParser().parseFromString(html, 'text/html');
-                    const newTbodies = doc.querySelectorAll('table tbody');
-                    const curTbodies = document.querySelectorAll('table tbody');
-                    newTbodies.forEach((tb, idx) => {
-                      if (curTbodies[idx]) curTbodies[idx].innerHTML = tb.innerHTML;
-                    });
-                    if (window.lucide) lucide.createIcons();
-                  })
-                  .catch(() => {});
+                actualizarVistaSinRecargar();
               }
             } catch (err) {}
           };
           globalCrudSocket.onclose = function() {
-            setTimeout(connectGlobalCrudWS, 5000);
+            if (hadConnectedOnce) {
+              disconnectBanner.classList.remove('hidden');
+              disconnectBanner.classList.add('flex');
+            }
+            setTimeout(connectGlobalCrudWS, 3500);
           };
         } catch (err) {}
       }
