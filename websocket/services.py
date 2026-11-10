@@ -87,12 +87,12 @@ def publish_module_changed(modulo, org_id, action, record_id, extra_data=None):
     except Exception as e:
         logger.error(f"Error al emitir evento WebSocket en publish_module_changed: {e}")
 
-def publish_chat_message(user, org_id, message):
+def publish_chat_message(user, org_id, message, msg_id=None):
     """
     Publica un mensaje en la sala de chat de la organización (Guía de Clase 11).
     """
     msg_payload = {
-        "id": uuid.uuid4().hex,
+        "id": msg_id or uuid.uuid4().hex,
         "type": "chat_message",
         "username": user.get_full_name() or user.username,
         "message": message,

@@ -22,10 +22,11 @@ def send_message(request):
     org_id = _resolve_user_org_id(request.user)
 
     message = request.POST.get("message", "").strip()
+    msg_id = request.POST.get("id", "").strip() or None
     if not 1 <= len(message) <= 300:
         return JsonResponse({"error": "Mensaje inválido. Debe tener entre 1 y 300 caracteres."}, status=400)
 
-    msg_payload = publish_chat_message(request.user, org_id, message)
+    msg_payload = publish_chat_message(request.user, org_id, message, msg_id=msg_id)
     return JsonResponse({"ok": True, "item": msg_payload})
 
 @login_required
