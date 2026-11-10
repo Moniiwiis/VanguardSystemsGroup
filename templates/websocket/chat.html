@@ -98,7 +98,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
   async function fetchRecentMessages() {
     try {
-      const res = await fetch("{% url 'websocket:messages' %}", {
+      const res = await fetch("/chat/messages/", {
         headers: { "X-Requested-With": "XMLHttpRequest" }
       });
       if (!res.ok) return;
@@ -113,6 +113,7 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   function startFallbackPolling() {
+    setConnectedUI();
     if (pollInterval) return;
     fetchRecentMessages();
     pollInterval = setInterval(fetchRecentMessages, 2000);

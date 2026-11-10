@@ -1214,6 +1214,67 @@ def gestion_metas(request):
         return redirect('gestion_inicio')
 
     if request.method == 'POST':
+        accion_post = request.POST.get('accion', 'crear_item').strip()
+        if accion_post == 'crear_periodo':
+            f_inicio = _parse_iso_date(request.POST.get('fecha_inicio', ''))
+            f_termino = _parse_iso_date(request.POST.get('fecha_termino', ''))
+            dias_raw = request.POST.get('dias_computables', '').strip()
+            estado_per = request.POST.get('estado', 'Abierto').strip() or 'Abierto'
+            if not f_inicio or not f_termino:
+                messages.error(request, "Debes indicar la Fecha de Inicio y la Fecha de Término del período de medición.")
+            elif f_termino < f_inicio:
+                messages.error(request, "La fecha de término no puede ser anterior a la fecha de inicio.")
+            else:
+                try:
+                    dias_comp = int(dias_raw) if dias_raw else max(1, (f_termino - f_inicio).days + 1)
+                except ValueError:
+                    dias_comp = max(1, (f_termino - f_inicio).days + 1)
+                if dias_comp <= 0:
+                    messages.error(request, "Los días computables deben ser mayores a cero.")
+                else:
+                    Periodo.objects.create(
+                        fecha_inicio=f_inicio,
+                        fecha_termino=f_termino,
+                        dias_computables=dias_comp,
+                        estado=estado_per,
+                    )
+                    messages.success(request, f"Fecha / Período de medición ({f_inicio} a {f_termino}) creado exitosamente.")
+            return redirect('gestion_metas')
+
+        elif accion_post == 'editar_periodo':
+            per_id = request.POST.get('periodo_id', '').strip()
+            periodo_obj = get_object_or_404(Periodo, id=per_id)
+            f_inicio = _parse_iso_date(request.POST.get('fecha_inicio', ''))
+            f_termino = _parse_iso_date(request.POST.get('fecha_termino', ''))
+            dias_raw = request.POST.get('dias_computables', '').strip()
+            estado_per = request.POST.get('estado', periodo_obj.estado).strip()
+            if not f_inicio or not f_termino:
+                messages.error(request, "Las fechas de inicio y término son obligatorias.")
+            elif f_termino < f_inicio:
+                messages.error(request, "La fecha de término no puede ser anterior a la fecha de inicio.")
+            else:
+                try:
+                    dias_comp = int(dias_raw) if dias_raw else max(1, (f_termino - f_inicio).days + 1)
+                except ValueError:
+                    dias_comp = max(1, (f_termino - f_inicio).days + 1)
+                periodo_obj.fecha_inicio = f_inicio
+                periodo_obj.fecha_termino = f_termino
+                periodo_obj.dias_computables = max(1, dias_comp)
+                periodo_obj.estado = estado_per
+                periodo_obj.save()
+                messages.success(request, f"Período de medición ({f_inicio} a {f_termino}) actualizado.")
+            return redirect('gestion_metas')
+
+        elif accion_post == 'eliminar_periodo':
+            per_id = request.POST.get('periodo_id', '').strip()
+            periodo_obj = get_object_or_404(Periodo, id=per_id)
+            if ConfiguracionMeta.objects.filter(periodo=periodo_obj).exists():
+                messages.error(request, "No se puede eliminar este período porque tiene metas asociadas.")
+            else:
+                periodo_obj.delete()
+                messages.success(request, "Período de medición eliminado.")
+            return redirect('gestion_metas')
+
         codigo = request.POST.get('codigo', '').strip().upper()
         nombre = request.POST.get('nombre_item', '').strip()
         descripcion = request.POST.get('descripcion', '').strip()
@@ -1260,6 +1321,7 @@ def gestion_metas(request):
     return render(request, 'gestion/metas.html', {
         'page_obj': page_obj,
         'items': page_obj.object_list,
+        'periodos': Periodo.objects.all().order_by('-fecha_inicio'),
         'q': q,
         'filtro_estado': filtro_estado,
         'orden': orden,
