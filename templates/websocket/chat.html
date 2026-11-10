@@ -177,8 +177,17 @@ document.addEventListener("DOMContentLoaded", function() {
       const data = await response.json();
       if (data && data.item) {
         renderMessage(data.item);
+      } else {
+        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        renderMessage({
+          type: "chat_message",
+          username: "{{ request.user.get_full_name|default:request.user.username|escapejs }}",
+          message: msg,
+          time: nowStr
+        });
       }
       input.value = "";
+      input.focus();
     } catch (err) {
       console.error("Error al enviar", err);
     }

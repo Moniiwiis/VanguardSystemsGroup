@@ -3,7 +3,14 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_POST
-from .services import publish_chat_message
+from .services import publish_chat_message, get_recent_chat_messages
+
+def _resolve_user_org_id(user):
+    try:
+        func = getattr(user, 'funcionario', None)
+        return str(func.delegacion_id) if func and func.delegacion_id else 'global'
+    except (ObjectDoesNotExist, AttributeError):
+        return 'global'
 
 @login_required
 def chat_room(request):
@@ -12,16 +19,17 @@ def chat_room(request):
 @login_required
 @require_POST
 def send_message(request):
-    try:
-        func = getattr(request.user, 'funcionario', None)
-        org_id = func.delegacion_id if func and func.delegacion_id else 'global'
-    except (ObjectDoesNotExist, AttributeError):
-        org_id = 'global'
+    org_id = _resolve_user_org_id(request.user)
 
     message = request.POST.get("message", "").strip()
     if not 1 <= len(message) <= 300:
         return JsonResponse({"error": "Mensaje inválido. Debe tener entre 1 y 300 caracteres."}, status=400)
 
-    publish_chat_message(request.user, org_id, message)
-    return JsonResponse({"ok": True})
+    msg_payload = publish_chat_message(request.user, org_id, message)
+    return JsonResponse({"ok": True, "item": msg_payload})
+
+@login_required
+def messages_feed(request):
+    org_id = _resolve_user_org_id(request.user)
+    return JsonResponse({"ok": True, "messages": get_recent_chat_messages(org_id)})
 
