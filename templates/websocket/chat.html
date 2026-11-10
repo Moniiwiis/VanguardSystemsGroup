@@ -62,55 +62,102 @@ document.addEventListener("DOMContentLoaded", function() {
   const dot = document.querySelector("#chat-status-dot");
   const container = document.querySelector("#messages-container");
   const messagesList = document.querySelector("#messages");
+  const renderedIds = new Set();
 
-  const scheme = location.protocol === "https:" ? "wss:" : "ws:";
-  const chatSocket = new WebSocket(scheme + "//" + location.host + "/ws/chat/");
+  let chatSocket = null;
+  let pollInterval = null;
 
-  chatSocket.onopen = () => {
+  function setConnectedUI() {
     state.textContent = "Conectado en tiempo real";
     dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
     button.disabled = false;
-  };
+  }
 
-  chatSocket.onclose = () => {
-    state.textContent = "Desconectado. Vuelve a abrir el chat.";
-    dot.className = "w-2.5 h-2.5 rounded-full bg-red-500";
-    button.disabled = true;
-  };
+  function renderMessage(data) {
+    if (!data || data.type !== "chat_message") return;
+    const msgId = data.id || `${data.username}-${data.time}-${data.message}`;
+    if (renderedIds.has(msgId)) return;
+    renderedIds.add(msgId);
 
-  chatSocket.onerror = (err) => {
-    console.error("Error WebSocket", err);
-  };
+    const li = document.createElement("li");
+    li.className = "bg-white p-3 rounded-2xl border border-slate-200 shadow-sm max-w-lg";
 
-  chatSocket.onmessage = (event) => {
+    const header = document.createElement("div");
+    header.className = "flex items-center justify-between text-[11px] font-bold text-slate-600 mb-1";
+    header.innerHTML = `<span class="text-[#C41230] font-extrabold">${escapeHTML(data.username || data.usuario || "Usuario")}</span><span class="text-slate-400 font-mono text-[10px]">${data.time || ""}</span>`;
+
+    const body = document.createElement("div");
+    body.className = "text-xs text-slate-800 break-words font-medium";
+    body.textContent = data.message || data.mensaje || "";
+
+    li.appendChild(header);
+    li.appendChild(body);
+    messagesList.appendChild(li);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  async function fetchRecentMessages() {
     try {
-      const data = JSON.parse(event.data);
-      if (data.type !== "chat_message") return;
-
-      const li = document.createElement("li");
-      li.className = "bg-white p-3 rounded-2xl border border-slate-200 shadow-sm max-w-lg";
-      
-      const header = document.createElement("div");
-      header.className = "flex items-center justify-between text-[11px] font-bold text-slate-600 mb-1";
-      header.innerHTML = `<span class="text-[#C41230] font-extrabold">${escapeHTML(data.username)}</span><span class="text-slate-400 font-mono text-[10px]">${data.time || ''}</span>`;
-      
-      const body = document.createElement("div");
-      body.className = "text-xs text-slate-800 break-words font-medium";
-      body.textContent = data.message;
-
-      li.appendChild(header);
-      li.appendChild(body);
-      messagesList.appendChild(li);
-      container.scrollTop = container.scrollHeight;
-    } catch(e) {
-      console.error(e);
+      const res = await fetch("{% url 'websocket:messages' %}", {
+        headers: { "X-Requested-With": "XMLHttpRequest" }
+      });
+      if (!res.ok) return;
+      const payload = await res.json();
+      if (Array.isArray(payload.messages)) {
+        payload.messages.forEach(renderMessage);
+      }
+      setConnectedUI();
+    } catch (e) {
+      // Silencioso
     }
-  };
+  }
+
+  function startFallbackPolling() {
+    if (pollInterval) return;
+    fetchRecentMessages();
+    pollInterval = setInterval(fetchRecentMessages, 2000);
+  }
+
+  function connectWebSocket() {
+    const scheme = location.protocol === "https:" ? "wss:" : "ws:";
+    try {
+      chatSocket = new WebSocket(scheme + "//" + location.host + "/ws/chat/");
+    } catch (e) {
+      startFallbackPolling();
+      return;
+    }
+
+    chatSocket.onopen = () => {
+      setConnectedUI();
+      fetchRecentMessages();
+    };
+
+    chatSocket.onclose = () => {
+      // Activa sincronización inmediata de respaldo y reintenta WebSocket
+      startFallbackPolling();
+      setTimeout(connectWebSocket, 4000);
+    };
+
+    chatSocket.onerror = () => {
+      startFallbackPolling();
+    };
+
+    chatSocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        renderMessage(data);
+      } catch(e) {
+        console.error(e);
+      }
+    };
+  }
+
+  connectWebSocket();
 
   form.onsubmit = async (event) => {
     event.preventDefault();
     const msg = input.value.trim();
-    if (!msg || chatSocket.readyState !== WebSocket.OPEN) return;
+    if (!msg) return;
 
     try {
       const response = await fetch(form.action, {
@@ -125,6 +172,10 @@ document.addEventListener("DOMContentLoaded", function() {
       if (!response.ok) {
         state.textContent = "Error al enviar mensaje";
         return;
+      }
+      const data = await response.json();
+      if (data && data.item) {
+        renderMessage(data.item);
       }
       input.value = "";
     } catch (err) {
