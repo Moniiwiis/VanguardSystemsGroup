@@ -97,6 +97,10 @@ class ChatConsumer(JsonWebsocketConsumer):
             self.group_name,
             self.channel_name
         )
+        async_to_sync(self.channel_layer.group_add)(
+            "chat_org_all",
+            self.channel_name
+        )
         self.accept()
 
     def disconnect(self, close_code):
@@ -105,6 +109,10 @@ class ChatConsumer(JsonWebsocketConsumer):
                 self.group_name,
                 self.channel_name
             )
+        async_to_sync(self.channel_layer.group_discard)(
+            "chat_org_all",
+            self.channel_name
+        )
 
     def receive_json(self, content):
         mensaje = content.get("mensaje", "")

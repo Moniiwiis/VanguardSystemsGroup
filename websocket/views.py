@@ -14,7 +14,10 @@ def _resolve_user_org_id(user):
 
 @login_required
 def chat_room(request):
-    return render(request, "websocket/chat.html")
+    org_id = _resolve_user_org_id(request.user)
+    return render(request, "websocket/chat.html", {
+        "initial_messages": get_recent_chat_messages(org_id),
+    })
 
 @login_required
 @require_POST

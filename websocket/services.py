@@ -1,24 +1,65 @@
 import json
 import logging
 import os
+import tempfile
 import uuid
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings
+from django.db import connection
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 _CHAT_BUFFER = []
-_CHAT_FILE = os.path.join(settings.BASE_DIR, "media", "chat_history.json")
+_CHAT_FILE = os.path.join(tempfile.gettempdir(), "sgr_chat_history.json")
+
+
+def _ensure_chat_db_table():
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sgr_chat_messages (
+                msg_id VARCHAR(64) PRIMARY KEY,
+                username VARCHAR(150) NOT NULL,
+                message TEXT NOT NULL,
+                org_id VARCHAR(50) NOT NULL,
+                time_str VARCHAR(20) NOT NULL,
+                created_ts DOUBLE PRECISION NOT NULL
+            )
+            """
+        )
 
 
 def _load_shared_chat_history():
+    try:
+        _ensure_chat_db_table()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT msg_id, username, message, org_id, time_str FROM sgr_chat_messages ORDER BY created_ts DESC LIMIT 40"
+            )
+            rows = cursor.fetchall()
+        if rows is not None:
+            items = [
+                {
+                    "id": r[0],
+                    "type": "chat_message",
+                    "username": r[1],
+                    "message": r[2],
+                    "org_id": r[3],
+                    "time": r[4],
+                }
+                for r in reversed(rows)
+            ]
+            return items
+    except Exception:
+        pass
+
     try:
         if os.path.exists(_CHAT_FILE):
             with open(_CHAT_FILE, "r", encoding="utf-8") as fh:
                 data = json.load(fh)
                 if isinstance(data, list):
-                    return data[-50:]
+                    return data[-40:]
     except Exception:
         pass
     return list(_CHAT_BUFFER)
@@ -29,13 +70,45 @@ def _save_shared_chat_message(msg_payload):
         _CHAT_BUFFER.append(msg_payload)
         if len(_CHAT_BUFFER) > 50:
             del _CHAT_BUFFER[:-50]
-        os.makedirs(os.path.dirname(_CHAT_FILE), exist_ok=True)
-        history = _load_shared_chat_history()
+    except Exception:
+        pass
+
+    try:
+        _ensure_chat_db_table()
+        now_ts = timezone.now().timestamp()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(1) FROM sgr_chat_messages WHERE msg_id = %s",
+                [msg_payload["id"]],
+            )
+            exists = cursor.fetchone()[0]
+            if not exists:
+                cursor.execute(
+                    """
+                    INSERT INTO sgr_chat_messages (msg_id, username, message, org_id, time_str, created_ts)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    [
+                        msg_payload["id"],
+                        msg_payload["username"],
+                        msg_payload["message"],
+                        str(msg_payload.get("org_id", "global")),
+                        msg_payload["time"],
+                        now_ts,
+                    ],
+                )
+    except Exception as e:
+        logger.error(f"Error guardando chat en BD: {e}")
+
+    try:
+        history = []
+        if os.path.exists(_CHAT_FILE):
+            with open(_CHAT_FILE, "r", encoding="utf-8") as fh:
+                history = json.load(fh)
         if not any(m.get("id") == msg_payload.get("id") for m in history):
             history.append(msg_payload)
-        history = history[-50:]
         with open(_CHAT_FILE, "w", encoding="utf-8") as fh:
-            json.dump(history, fh, ensure_ascii=False)
+            json.dump(history[-50:], fh, ensure_ascii=False)
     except Exception:
         pass
 
@@ -119,10 +192,7 @@ def publish_chat_message(user, org_id, message, msg_id=None):
     return msg_payload
 
 
-def get_recent_chat_messages(org_id):
+def get_recent_chat_messages(org_id=None):
     history = _load_shared_chat_history()
-    org_str = str(org_id)
-    if org_str == "global":
-        return history[-30:]
-    return [m for m in history if m.get("org_id") in (org_str, "global", None)][-30:]
+    return history[-35:]
 

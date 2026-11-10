@@ -31,6 +31,15 @@
     <!-- Lista de mensajes -->
     <div id="messages-container" class="flex-1 p-5 overflow-y-auto space-y-3 bg-slate-50/50">
       <ul id="messages" class="space-y-3" aria-live="polite">
+        {% for m in initial_messages %}
+          <li data-msg-id="{{ m.id }}" class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm max-w-lg">
+            <div class="flex items-center justify-between text-[11px] font-bold text-slate-600 mb-1">
+              <span class="text-[#C41230] font-extrabold">{{ m.username }}</span>
+              <span class="text-slate-400 font-mono text-[10px]">{{ m.time }}</span>
+            </div>
+            <div class="text-xs text-slate-800 break-words font-medium">{{ m.message }}</div>
+          </li>
+        {% endfor %}
       </ul>
     </div>
 
@@ -63,6 +72,10 @@ document.addEventListener("DOMContentLoaded", function() {
   const container = document.querySelector("#messages-container");
   const messagesList = document.querySelector("#messages");
   const renderedIds = new Set();
+  document.querySelectorAll("#messages li[data-msg-id]").forEach(el => {
+    if (el.dataset.msgId) renderedIds.add(el.dataset.msgId);
+  });
+  if (container) container.scrollTop = container.scrollHeight;
   const currentUsername = "{{ request.user.get_full_name|default:request.user.username|escapejs }}";
 
   let chatSocket = null;
