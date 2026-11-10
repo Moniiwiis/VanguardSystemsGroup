@@ -831,7 +831,7 @@
       </div>
 
       {% if not permisos.es_consultor %}
-      <form id="form-subir-evidencia" method="POST" enctype="multipart/form-data" action="" class="space-y-2.5 border-t border-slate-200 pt-3">
+      <form id="form-subir-evidencia" method="POST" enctype="multipart/form-data" action="" class="space-y-2.5 border-t border-slate-200 pt-3" onsubmit="if (!this.imagenes.files.length && !this.archivos.files.length) { alert('Por favor selecciona al menos una fotografía o archivo antes de presionar Adjuntar Evidencia.'); return false; }">
         {% csrf_token %}
         <p class="text-[11px] font-extrabold text-slate-700 flex items-center gap-1.5">
           <i data-lucide="upload" class="w-3.5 h-3.5 text-[#C41230]"></i>

@@ -180,6 +180,12 @@ EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+try:
+    (MEDIA_ROOT / "evidencias" / "imagenes").mkdir(parents=True, exist_ok=True)
+    (MEDIA_ROOT / "evidencias" / "archivos").mkdir(parents=True, exist_ok=True)
+    (MEDIA_ROOT / "perfiles").mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
 
 # ASGI & Channels Configuration
 ASGI_APPLICATION = "config.asgi.application"

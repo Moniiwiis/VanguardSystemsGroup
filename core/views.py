@@ -1816,14 +1816,23 @@ def gestion_atenciones(request):
             imagenes_ini = request.FILES.getlist('imagenes_evidencia')
             archivos_ini = request.FILES.getlist('archivos_evidencia')
             if atencion.actividad and (imagenes_ini or archivos_ini):
-                for img in imagenes_ini:
-                    try:
-                        img_clean = forms.ImageField().clean(img)
-                        Evidencia.objects.create(actividad=atencion.actividad, imagen=img_clean, momento=momento_ini)
-                    except ValidationError:
-                        pass
-                for arch in archivos_ini:
-                    Evidencia.objects.create(actividad=atencion.actividad, archivo=arch, momento=momento_ini)
+                try:
+                    import os
+                    from pathlib import Path
+                    from django.conf import settings
+                    media_dir = Path(settings.MEDIA_ROOT)
+                    os.makedirs(media_dir / 'evidencias' / 'imagenes', exist_ok=True)
+                    os.makedirs(media_dir / 'evidencias' / 'archivos', exist_ok=True)
+                    for img in imagenes_ini:
+                        try:
+                            img_clean = forms.ImageField().clean(img)
+                            Evidencia.objects.create(actividad=atencion.actividad, imagen=img_clean, momento=momento_ini)
+                        except ValidationError:
+                            Evidencia.objects.create(actividad=atencion.actividad, archivo=img, momento=momento_ini)
+                    for arch in archivos_ini:
+                        Evidencia.objects.create(actividad=atencion.actividad, archivo=arch, momento=momento_ini)
+                except Exception as e:
+                    messages.warning(request, f"Atención registrada, pero ocurrió un detalle al guardar las evidencias iniciales: {e}")
 
             # Notificación en tiempo real por WebSocket (Channels) tras commit en BD
             del_id_ws = del_activa.id if del_activa else "global"
@@ -2241,12 +2250,12 @@ def gestion_atenciones_validar_evidencia(request, atencion_id):
         return redirect('gestion_atenciones')
 
     atencion = get_object_or_404(AtencionCiudadana, id=atencion_id)
-    es_admin = ctx['permisos']['es_admin']
+    es_admin = ctx['permisos']['es_admin'] or ctx['permisos'].get('es_coordinador', False)
     del_activa = ctx['delegacion_activa']
 
     # Scoping territorial
     if not es_admin:
-        if del_activa and atencion.delegacion != del_activa:
+        if del_activa and atencion.delegacion_id != del_activa.id:
             messages.error(request, "Acceso denegado: No puedes validar evidencias de otra delegación.")
             return redirect('gestion_atenciones')
 
@@ -2298,8 +2307,9 @@ def gestion_atenciones_validar_evidencia(request, atencion_id):
             atencion.estado = 'Resuelta'
             atencion.save(update_fields=['estado'])
 
-        del_id_ws = atencion.delegacion.id if atencion.delegacion else "global"
+        del_id_ws = atencion.delegacion_id if atencion.delegacion_id else "global"
         publish_module_changed("atenciones", del_id_ws, "update", atencion.id)
+        publish_module_changed("tubo", del_id_ws, "update", atencion.id)
 
         messages.success(request, f"¡Evidencia {actividad.codigo_evidencia_unico} de atención {atencion.codigo_atencion} validada como '{resultado}'! El Semáforo SGR se ha actualizado.")
 
@@ -2318,15 +2328,16 @@ def gestion_atenciones_subir_evidencia(request, atencion_id):
         AtencionCiudadana.objects.select_related('actividad', 'delegacion'),
         id=atencion_id,
     )
-    es_admin = ctx['permisos']['es_admin']
+    es_admin = ctx['permisos']['es_admin'] or ctx['permisos'].get('es_coordinador', False)
     if not es_admin:
         delegacion_activa = ctx['delegacion_activa']
-        if not delegacion_activa or atencion.delegacion != delegacion_activa:
+        if not delegacion_activa or atencion.delegacion_id != delegacion_activa.id:
             messages.error(request, "No puedes adjuntar evidencias a atenciones de otra delegación.")
             return redirect(redirect_target)
 
     if not atencion.actividad:
         atencion.save()
+        atencion.refresh_from_db()
     actividad = atencion.actividad
     if not actividad:
         messages.error(request, "Esta atención aún no tiene una actividad asociada.")
@@ -2345,24 +2356,42 @@ def gestion_atenciones_subir_evidencia(request, atencion_id):
         messages.error(request, "Selecciona al menos una imagen o archivo para adjuntar.")
         return redirect(redirect_target)
 
+    archivos_guardados = 0
     try:
-        imagenes = [forms.ImageField().clean(imagen) for imagen in imagenes]
-    except ValidationError:
-        messages.error(request, "Una de las imágenes no es válida. Selecciona archivos de imagen compatibles.")
-        return redirect(redirect_target)
+        import os
+        from pathlib import Path
+        from django.conf import settings
+        media_dir = Path(settings.MEDIA_ROOT)
+        os.makedirs(media_dir / 'evidencias' / 'imagenes', exist_ok=True)
+        os.makedirs(media_dir / 'evidencias' / 'archivos', exist_ok=True)
 
-    for imagen in imagenes:
-        Evidencia.objects.create(
-            actividad=actividad,
-            imagen=imagen,
-            momento=momento,
-        )
-    for archivo in archivos:
-        Evidencia.objects.create(
-            actividad=actividad,
-            archivo=archivo,
-            momento=momento,
-        )
+        for imagen in imagenes:
+            try:
+                img_clean = forms.ImageField().clean(imagen)
+                Evidencia.objects.create(
+                    actividad=actividad,
+                    imagen=img_clean,
+                    momento=momento,
+                )
+            except ValidationError:
+                Evidencia.objects.create(
+                    actividad=actividad,
+                    archivo=imagen,
+                    momento=momento,
+                )
+            archivos_guardados += 1
+
+        for archivo in archivos:
+            Evidencia.objects.create(
+                actividad=actividad,
+                archivo=archivo,
+                momento=momento,
+            )
+            archivos_guardados += 1
+
+    except Exception as e:
+        messages.error(request, f"Error al guardar los archivos en el servidor: {e}")
+        return redirect(redirect_target)
 
     validacion = ValidacionEvidencia.objects.filter(actividad=actividad).order_by('-created_at').first()
     if validacion:
@@ -2370,10 +2399,13 @@ def gestion_atenciones_subir_evidencia(request, atencion_id):
         validacion.observaciones = "Se adjuntó nueva evidencia; requiere revisión."
         validacion.save(update_fields=['resultado', 'observaciones', 'updated_at'])
 
-    del_id_ws = atencion.delegacion.id if atencion.delegacion else "global"
-    publish_module_changed("atenciones", del_id_ws, "update", atencion.id)
+    del_id_ws = atencion.delegacion_id if atencion.delegacion_id else "global"
+    def notificar_ws_evidencia():
+        publish_module_changed("atenciones", del_id_ws, "update", atencion.id)
+        publish_module_changed("tubo", del_id_ws, "update", atencion.id)
+    transaction.on_commit(notificar_ws_evidencia)
 
-    messages.success(request, "La evidencia se adjuntó correctamente y quedó pendiente de revisión.")
+    messages.success(request, f"¡Evidencia adjuntada exitosamente ({archivos_guardados} archivo(s), {momento})! Quedó pendiente de revisión.")
     return redirect(redirect_target)
 
 

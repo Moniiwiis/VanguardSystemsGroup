@@ -120,8 +120,12 @@ urlpatterns = [
     path('gestion/tubo/<int:atencion_id>/cambiar-estado/', views.gestion_tubo_cambiar_estado, name='gestion_tubo_cambiar_estado'),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+from django.views.static import serve
+from django.urls import re_path
+
+urlpatterns += [
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+]
 
 # Custom Error Handlers (Evaluación Sumativa 3)
 handler400 = 'core.views.error_400'
