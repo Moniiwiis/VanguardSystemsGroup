@@ -75,27 +75,14 @@
         <tbody class="divide-y divide-slate-100 font-medium">
           {% for f in funcionarios %}
           <tr class="hover:bg-slate-50/70 transition-colors">
-            <td class="py-3.5 px-6 font-bold text-slate-900">
-              <div class="inline-flex items-center gap-1.5">
+            <td class="py-3.5 px-6 font-bold text-slate-900 whitespace-nowrap">
+              <div class="flex items-center gap-2">
                 <span>{{ f.user.first_name|default:f.user.username }}</span>
                 {% if f.debe_cambiar_contrasena %}
-                  <div class="relative inline-flex items-center group">
-                    <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-50 text-amber-600 border border-amber-300 hover:bg-amber-100 hover:text-amber-700 transition-colors cursor-help"
-                          title="El usuario no ha cambiado la contraseña provisional. Se recomienda darle aviso para que lo efectúe a la brevedad.">
-                      <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
-                    </span>
-                    <!-- Tooltip flotante al pasar el mouse -->
-                    <div class="absolute left-0 bottom-full mb-1.5 hidden group-hover:flex flex-col items-start pointer-events-none z-50 w-72">
-                      <div class="bg-slate-900/95 backdrop-blur-sm text-white text-[11px] font-normal leading-snug rounded-xl py-2 px-3 shadow-2xl border border-slate-700/60">
-                        <div class="flex items-center gap-1.5 font-bold text-amber-400 mb-0.5">
-                          <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0"></i>
-                          <span>Contraseña provisional pendiente</span>
-                        </div>
-                        <p class="text-slate-200">El usuario no ha cambiado la contraseña provisional. Se recomienda darle aviso para que lo efectúe a la brevedad.</p>
-                      </div>
-                      <div class="w-2 h-2 bg-slate-900/95 rotate-45 -mt-1 ml-2 border-r border-b border-slate-700/60"></div>
-                    </div>
-                  </div>
+                  <span onmouseenter="mostrarTooltipClave(this)" onmouseleave="ocultarTooltipClave()"
+                        class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-50 text-amber-600 border border-amber-300 hover:bg-amber-100 hover:text-amber-700 transition-colors cursor-help shrink-0">
+                    <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+                  </span>
                 {% endif %}
               </div>
             </td>
@@ -366,10 +353,40 @@
   </div>
 </div>
 
+<!-- Tooltip Flotante Global para Contraseña Provisional (Fixed para evitar cortes y sin title duplicado) -->
+<div id="usuario-pw-tooltip" class="fixed hidden z-[9999] pointer-events-none transition-opacity duration-150">
+  <div class="bg-slate-900/95 backdrop-blur-sm text-white text-[11px] font-normal leading-snug rounded-xl py-2 px-3 shadow-2xl border border-slate-700/60 max-w-xs">
+    <div class="flex items-center gap-1.5 font-bold text-amber-400 mb-0.5">
+      <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0"></i>
+      <span>Contraseña provisional pendiente</span>
+    </div>
+    <p class="text-slate-200">El usuario no ha cambiado la contraseña provisional. Se recomienda darle aviso para que lo efectúe a la brevedad.</p>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
+  function mostrarTooltipClave(el) {
+    const tip = document.getElementById('usuario-pw-tooltip');
+    if (!tip || !el) return;
+    const rect = el.getBoundingClientRect();
+    let left = rect.left;
+    if (left + 290 > window.innerWidth) {
+      left = window.innerWidth - 300;
+    }
+    tip.style.left = Math.max(10, left) + 'px';
+    tip.style.top = (rect.bottom + 6) + 'px';
+    tip.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+  }
+
+  function ocultarTooltipClave() {
+    const tip = document.getElementById('usuario-pw-tooltip');
+    if (tip) tip.classList.add('hidden');
+  }
+
   function verDetalle(nombre, usuario, correo, cargo, rol, delegacion, estado, idInst, debeCambiarPw) {
     document.getElementById('ver-id').textContent = idInst || '—';
     document.getElementById('ver-nombre').textContent = nombre;
