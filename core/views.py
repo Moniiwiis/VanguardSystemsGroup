@@ -1793,6 +1793,19 @@ def gestion_atenciones(request):
             user_encontrado = User.objects.filter(id=int(responsable_id), is_active=True).first()
             if user_encontrado:
                 responsable_user = user_encontrado
+        elif request.POST.get('representante_input', '').strip():
+            rep_text = request.POST.get('representante_input', '').strip()
+            u_enc = None
+            if '(' in rep_text and ')' in rep_text:
+                candidate = rep_text.split('(')[-1].replace(')', '').strip().lstrip('@')
+                u_enc = User.objects.filter(username__iexact=candidate, is_active=True).first()
+            if not u_enc:
+                u_enc = User.objects.filter(
+                    Q(username__iexact=rep_text) |
+                    Q(first_name__icontains=rep_text)
+                ).filter(is_active=True).first()
+            if u_enc:
+                responsable_user = u_enc
 
         from accounts.models import FuncionarioRol as _FR
         func_resp = Funcionario.all_objects.filter(user=responsable_user).first()
@@ -2138,7 +2151,21 @@ def gestion_atenciones_editar(request, atencion_id):
 
     descripcion = request.POST.get('descripcion', '').strip()
     responsable_id = request.POST.get('responsable_id', '').strip()
-    responsable = User.objects.filter(id=responsable_id, is_active=True).first() if responsable_id.isdigit() else None
+    responsable = User.objects.filter(id=int(responsable_id), is_active=True).first() if (responsable_id and responsable_id.isdigit()) else None
+    if not responsable and request.POST.get('responsable_input', '').strip():
+        rep_text = request.POST.get('responsable_input', '').strip()
+        u_enc = None
+        if '(' in rep_text and ')' in rep_text:
+            candidate = rep_text.split('(')[-1].replace(')', '').strip().lstrip('@')
+            u_enc = User.objects.filter(username__iexact=candidate, is_active=True).first()
+        if not u_enc:
+            u_enc = User.objects.filter(
+                Q(username__iexact=rep_text) |
+                Q(first_name__icontains=rep_text)
+            ).filter(is_active=True).first()
+        if u_enc:
+            responsable = u_enc
+
     funcionario_nuevo = None
     if responsable:
         funcionario_nuevo = Funcionario.objects.filter(
@@ -2193,6 +2220,8 @@ def gestion_atenciones_editar(request, atencion_id):
     if 'va_a_tubo' in request.POST:
         va_tubo_val = request.POST.get('va_a_tubo', '').strip().lower() in ['1', 'true', 'on', 'si', 's']
         cambios_atencion['va_a_tubo'] = va_tubo_val
+        if not va_tubo_val:
+            cambios_atencion['fecha_compromiso'] = None
 
     with transaction.atomic():
         AtencionCiudadana.all_objects.filter(id=atencion.id).update(**cambios_atencion)

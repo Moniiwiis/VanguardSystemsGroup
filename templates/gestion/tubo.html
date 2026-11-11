@@ -257,9 +257,6 @@
             <!-- Solicitante -->
             <td class="py-3 px-3.5">
               <div class="font-bold text-slate-900">{{ at.solicitante }}</div>
-              {% if at.telefono_contacto %}
-                <span class="text-[10px] text-slate-400 font-mono">{{ at.telefono_contacto }}</span>
-              {% endif %}
             </td>
 
             <!-- Territorio -->
@@ -702,7 +699,7 @@
       </div>
 
       <!-- Conexión Tubo SGR (Modo Lectura) -->
-      <div class="p-3.5 rounded-2xl bg-red-50/40 border border-red-100 space-y-2">
+      <div id="at-seccion-lectura-tubo" class="p-3.5 rounded-2xl bg-red-50/40 border border-red-100 space-y-2">
         <div class="flex items-center justify-between border-b border-red-100 pb-1.5">
           <div class="flex items-center gap-1.5">
             <i data-lucide="git-pull-request" class="w-3.5 h-3.5 text-[#C41230]"></i>
@@ -747,16 +744,20 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div class="space-y-1">
-          <label for="at-edit-responsable" class="block text-slate-700">Encargado del trabajo <span class="text-[#C41230]">*</span></label>
-          <select id="at-edit-responsable" name="responsable_id" required
-                  class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-            <option value="">Selecciona encargado</option>
-            {% for encargado in encargados_edicion %}
-              <option value="{{ encargado.id }}" data-delegacion-id="{{ encargado.delegacion_id }}">
-                {{ encargado.label }} — {{ encargado.delegacion_nombre|default:'' }}
-              </option>
-            {% endfor %}
-          </select>
+          <label for="at-edit-responsable-input" class="block text-slate-700">Encargado del trabajo <span class="text-[#C41230]">*</span></label>
+          <div class="relative">
+            <input type="text" id="at-edit-responsable-input" name="responsable_input" list="encargados-edicion-list" oninput="sincronizarEncargadoEdicion(this.value)"
+                   placeholder="Buscar encargado por nombre o usuario..." required
+                   class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            <input type="hidden" id="at-edit-responsable" name="responsable_id" value="" required>
+            <datalist id="encargados-edicion-list">
+              {% for encargado in encargados_edicion %}
+                <option value="{{ encargado.label }}" data-id="{{ encargado.id }}">
+                  {{ encargado.delegacion_nombre|default:'Funcionario Municipal' }}
+                </option>
+              {% endfor %}
+            </datalist>
+          </div>
         </div>
         <div class="space-y-1">
           <label for="at-edit-estado" class="block text-slate-700">Estado de la Atención y Tubo <span class="text-[#C41230]">*</span></label>
@@ -777,31 +778,34 @@
           <i data-lucide="git-pull-request" class="w-4 h-4 text-[#C41230]"></i>
           <span class="font-extrabold text-xs">Parámetros del Tubo de Trabajo SGR</span>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div class="space-y-1">
-            <label for="at-edit-vatubo" class="block text-slate-700 text-[11px]">¿Gestionar en Tubo?</label>
-            <select id="at-edit-vatubo" name="va_a_tubo"
-                    class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-              <option value="true">Sí (En Tubo de Trabajo)</option>
-              <option value="false">No (Registro Regular)</option>
-            </select>
-          </div>
-          <div class="space-y-1">
-            <label for="at-edit-fechacomp" class="block text-slate-700 text-[11px]">Fecha de Compromiso</label>
-            <input type="date" id="at-edit-fechacomp" name="fecha_compromiso"
-                   class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-medium focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-          </div>
-          <div class="space-y-1">
-            <label for="at-edit-areaapoyo" class="block text-slate-700 text-[11px]">Área de Apoyo</label>
-            <input type="text" id="at-edit-areaapoyo" name="area_apoyo" maxlength="100" placeholder="Ej: DISERCO, Cuadrilla OOCC..."
-                   class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-          </div>
-        </div>
         <div class="space-y-1">
-          <label for="at-edit-avanceobs" class="block text-slate-700 text-[11px]">Avance u Observaciones Territoriales</label>
-          <textarea id="at-edit-avanceobs" name="avance_observaciones" rows="2" maxlength="1000"
-                    placeholder="Registra avances, acuerdos de cuadrilla o coordinaciones..."
-                    class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+          <label for="at-edit-vatubo" class="block text-slate-700 text-[11px]">¿Gestionar en Tubo de Trabajo?</label>
+          <select id="at-edit-vatubo" name="va_a_tubo" onchange="toggleCamposTuboEdicion(this.value)"
+                  class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="true">Sí (En Tubo de Trabajo)</option>
+            <option value="false">No (Registro Regular)</option>
+          </select>
+        </div>
+        <!-- Campos específicos del Tubo: Ocultos si va_a_tubo es false -->
+        <div id="seccion-campos-tubo-edicion" class="space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label for="at-edit-fechacomp" class="block text-slate-700 text-[11px]">Fecha de Compromiso</label>
+              <input type="date" id="at-edit-fechacomp" name="fecha_compromiso"
+                     class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-medium focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+            <div class="space-y-1">
+              <label for="at-edit-areaapoyo" class="block text-slate-700 text-[11px]">Área de Apoyo</label>
+              <input type="text" id="at-edit-areaapoyo" name="area_apoyo" maxlength="100" placeholder="Ej: DISERCO, Cuadrilla OOCC..."
+                     class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+          </div>
+          <div class="space-y-1">
+            <label for="at-edit-avanceobs" class="block text-slate-700 text-[11px]">Avance u Observaciones Territoriales</label>
+            <textarea id="at-edit-avanceobs" name="avance_observaciones" rows="2" maxlength="1000"
+                      placeholder="Registra avances, acuerdos de cuadrilla o coordinaciones..."
+                      class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+          </div>
         </div>
       </div>
 
@@ -911,6 +915,32 @@
 </div>
 
 <script>
+  function sincronizarEncargadoEdicion(val) {
+    const list = document.getElementById('encargados-edicion-list');
+    const hiddenId = document.getElementById('at-edit-responsable');
+    if (!list || !hiddenId) return;
+    hiddenId.value = '';
+    const cleanVal = (val || '').trim().toLowerCase();
+    const options = list.querySelectorAll('option');
+    for (let opt of options) {
+      if (opt.value.trim().toLowerCase() === cleanVal) {
+        hiddenId.value = opt.getAttribute('data-id') || '';
+        break;
+      }
+    }
+  }
+
+  function toggleCamposTuboEdicion(valor) {
+    const sec = document.getElementById('seccion-campos-tubo-edicion');
+    if (!sec) return;
+    const isTubo = (valor === 'true' || valor === '1' || valor === true);
+    if (isTubo) {
+      sec.classList.remove('hidden');
+    } else {
+      sec.classList.add('hidden');
+    }
+  }
+
   // Modal Ver Detalle y Gestión de Estado y Evidencia (con Tubo SGR)
   function verDetalleAtencion(id, cod, sol, del, tipo, sub, desc, resp, creador, fecha, estado, eviCod, eviEstado, responsableId, responsableRol, delegacionId, vaTubo, fechaComp, areaApoyo, avanceObs) {
     cancelarEdicionAtencion();
@@ -938,6 +968,14 @@
 
     // Datos Tubo SGR en Modo Lectura
     const isTubo = (vaTubo === '1' || vaTubo === 'true' || vaTubo === true);
+    const seccionLecturaTubo = document.getElementById('at-seccion-lectura-tubo');
+    if (seccionLecturaTubo) {
+      if (isTubo) {
+        seccionLecturaTubo.classList.remove('hidden');
+      } else {
+        seccionLecturaTubo.classList.add('hidden');
+      }
+    }
     const tuboBadge = document.getElementById('at-tubo-badge');
     if (tuboBadge) {
       if (isTubo) {
@@ -959,7 +997,8 @@
     const formEditar = document.getElementById('form-editar-atencion');
     const editButton = document.getElementById('at-btn-editar');
     const descInput = document.getElementById('at-edit-descripcion');
-    const responsableSelect = document.getElementById('at-edit-responsable');
+    const respInput = document.getElementById('at-edit-responsable-input');
+    const respHidden = document.getElementById('at-edit-responsable');
     const estadoSelect = document.getElementById('at-edit-estado');
     const vaTuboSelect = document.getElementById('at-edit-vatubo');
     const fechaCompInput = document.getElementById('at-edit-fechacomp');
@@ -974,25 +1013,23 @@
 
       if (descInput) descInput.value = desc || '';
       if (estadoSelect) estadoSelect.value = estado || 'Registrada';
-      if (vaTuboSelect) vaTuboSelect.value = isTubo ? 'true' : 'false';
+      if (vaTuboSelect) {
+        vaTuboSelect.value = isTubo ? 'true' : 'false';
+        toggleCamposTuboEdicion(vaTuboSelect.value);
+      }
       if (fechaCompInput) fechaCompInput.value = fechaComp || '';
       if (areaApoyoInput) areaApoyoInput.value = areaApoyo || '';
       if (avanceObsInput) avanceObsInput.value = avanceObs || '';
 
-      if (responsableSelect) {
-        const existing = Array.from(responsableSelect.options).some(option => option.value === responsableId);
-        if (responsableId && !existing) {
-          const currentOption = new Option(
-            `${resp} · ${responsableRol || 'Sin rol registrado'} (actual)`,
-            responsableId
-          );
-          currentOption.dataset.delegacionId = delegacionId || '';
-          responsableSelect.add(currentOption);
+      if (respHidden) respHidden.value = responsableId || '';
+      if (respInput) {
+        const list = document.getElementById('encargados-edicion-list');
+        let label = resp || '';
+        if (list && responsableId) {
+          const opt = Array.from(list.querySelectorAll('option')).find(o => o.getAttribute('data-id') == responsableId);
+          if (opt) label = opt.value;
         }
-        Array.from(responsableSelect.options).forEach((option) => {
-          if (option.value) option.hidden = option.dataset.delegacionId !== delegacionId;
-        });
-        responsableSelect.value = responsableId || '';
+        respInput.value = label;
       }
       if (editButton) editButton.classList.toggle('hidden', estado === 'Cancelada');
     }
