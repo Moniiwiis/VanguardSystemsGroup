@@ -2323,20 +2323,19 @@ def gestion_atenciones_validar_evidencia(request, atencion_id):
         observaciones = request.POST.get('observaciones', f'Validación de evidencia para atención {atencion.codigo_atencion}').strip()
         if resultado not in {'Aprobado', 'Rechazado'}:
             messages.error(request, "El resultado de validación no es válido.")
-            return redirect('gestion_atenciones')
-        if resultado == 'Aprobado':
-            evidence_files = actividad.evidencias.filter(
-                Q(imagen__gt='') | Q(archivo__gt='')
+            return redirect(request.META.get('HTTP_REFERER') or 'gestion_atenciones')
+
+        evidence_files = actividad.evidencias.filter(
+            Q(imagen__gt='') | Q(archivo__gt='')
+        )
+        has_before = evidence_files.filter(momento='antes').exists()
+        has_after = evidence_files.filter(momento='despues').exists()
+        if not has_before or not has_after:
+            messages.error(
+                request,
+                "Para recién ser aprobada o rechazada, se debe contar obligatoriamente con una evidencia de antes y otra de después del trabajo.",
             )
-            has_before = evidence_files.filter(momento='antes').exists()
-            has_after = evidence_files.filter(momento='despues').exists()
-            if not has_before or not has_after:
-                messages.error(
-                    request,
-                    "Para aprobar, adjunta al menos un archivo de evidencia de antes "
-                    "y otro de después del trabajo.",
-                )
-                return redirect('gestion_atenciones')
+            return redirect(request.META.get('HTTP_REFERER') or 'gestion_atenciones')
 
         val, _ = ValidacionEvidencia.objects.get_or_create(
             actividad=actividad,
@@ -3308,6 +3307,19 @@ def gestion_evidencias_validar(request, actividad_id):
     if request.method == 'POST':
         resultado = request.POST.get('resultado', 'Aprobado').strip()
         observaciones = request.POST.get('observaciones', 'Validado desde panel de auditoría SGR').strip()
+
+        evidence_files = actividad.evidencias.filter(
+            Q(imagen__gt='') | Q(archivo__gt='')
+        )
+        has_before = evidence_files.filter(momento='antes').exists()
+        has_after = evidence_files.filter(momento='despues').exists()
+        if not has_before or not has_after:
+            messages.error(
+                request,
+                "Para recién ser aprobada o rechazada, se debe contar obligatoriamente con una evidencia de antes y otra de después del trabajo.",
+            )
+            referer = request.META.get('HTTP_REFERER')
+            return redirect(referer if referer else 'gestion_reportes')
 
         val, _ = ValidacionEvidencia.objects.get_or_create(
             actividad=actividad,

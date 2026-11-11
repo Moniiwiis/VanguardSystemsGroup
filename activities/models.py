@@ -145,6 +145,12 @@ class Actividad(BaseModel):
             return 'Pendiente'
         return val.resultado
 
+    def tiene_evidencias_completas(self):
+        evis = self.evidencias.filter(
+            Q(imagen__gt='') | Q(archivo__gt='')
+        )
+        return evis.filter(momento='antes').exists() and evis.filter(momento='despues').exists()
+
     def __str__(self):
         return f"Actividad {self.codigo_evidencia_unico} {'✓' if self.da_puntaje else '✗'}"
 
@@ -343,6 +349,11 @@ class AtencionCiudadana(BaseModel):
         if self.actividad:
             return self.actividad.estado_validacion()
         return "Pendiente"
+
+    def tiene_evidencias_completas(self):
+        if not self.actividad_id:
+            return False
+        return self.actividad.tiene_evidencias_completas()
 
     def save(self, *args, **kwargs):
         is_new = self.id is None
