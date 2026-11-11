@@ -1006,14 +1006,12 @@ def gestion_usuarios(request):
             if correo_enviado:
                 messages.success(
                     request,
-                    f"Usuario '{username}' creado exitosamente. Se envió un correo a {correo} "
-                    "con su contraseña provisoria, la cual deberá cambiar en su primer ingreso.",
+                    f"Usuario '{username}' creado exitosamente. Se enviaron las credenciales de acceso al correo '{correo}'.",
                 )
             else:
                 messages.warning(
                     request,
-                    f"Usuario '{username}' creado con contraseña provisoria {provisional_password} "
-                    "(deberá cambiarla en su primer ingreso), pero no fue posible enviar el correo de notificación en este momento.",
+                    f"Usuario '{username}' creado exitosamente con contraseña provisional: {provisional_password} (no fue posible enviar el correo de notificación en este momento).",
                 )
             return redirect('gestion_usuarios')
 

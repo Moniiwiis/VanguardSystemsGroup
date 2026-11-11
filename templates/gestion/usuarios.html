@@ -76,12 +76,28 @@
           {% for f in funcionarios %}
           <tr class="hover:bg-slate-50/70 transition-colors">
             <td class="py-3.5 px-6 font-bold text-slate-900">
-              {{ f.user.first_name|default:f.user.username }}
-              {% if f.debe_cambiar_contrasena %}
-                <span class="block mt-0.5 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full w-fit">
-                  Clave provisoria (cambio pendiente)
-                </span>
-              {% endif %}
+              <div class="inline-flex items-center gap-1.5">
+                <span>{{ f.user.first_name|default:f.user.username }}</span>
+                {% if f.debe_cambiar_contrasena %}
+                  <div class="relative inline-flex items-center group">
+                    <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-50 text-amber-600 border border-amber-300 hover:bg-amber-100 hover:text-amber-700 transition-colors cursor-help"
+                          title="El usuario no ha cambiado la contraseña provisional. Se recomienda darle aviso para que lo efectúe a la brevedad.">
+                      <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+                    </span>
+                    <!-- Tooltip flotante al pasar el mouse -->
+                    <div class="absolute left-0 bottom-full mb-1.5 hidden group-hover:flex flex-col items-start pointer-events-none z-50 w-72">
+                      <div class="bg-slate-900/95 backdrop-blur-sm text-white text-[11px] font-normal leading-snug rounded-xl py-2 px-3 shadow-2xl border border-slate-700/60">
+                        <div class="flex items-center gap-1.5 font-bold text-amber-400 mb-0.5">
+                          <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0"></i>
+                          <span>Contraseña provisional pendiente</span>
+                        </div>
+                        <p class="text-slate-200">El usuario no ha cambiado la contraseña provisional. Se recomienda darle aviso para que lo efectúe a la brevedad.</p>
+                      </div>
+                      <div class="w-2 h-2 bg-slate-900/95 rotate-45 -mt-1 ml-2 border-r border-b border-slate-700/60"></div>
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
             </td>
             <td class="py-3.5 px-6 font-mono text-slate-700">{{ f.user.username }}</td>
             <td class="py-3.5 px-6 text-slate-600">{{ f.user.email|default:"—" }}</td>
@@ -102,7 +118,7 @@
               <div class="flex items-center justify-center gap-1.5">
                 <!-- Ver Detalle -->
                 <button type="button" 
-                        onclick="verDetalle('{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.cargo.nombre_cargo|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.nombre_rol|default:'Funcionario'|escapejs }}', '{{ f.delegacion.nombre|default:'Global'|escapejs }}', '{{ f.estado|escapejs }}', '{{ f.identificador_institucional|escapejs }}')"
+                        onclick="verDetalle('{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.cargo.nombre_cargo|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.nombre_rol|default:'Funcionario'|escapejs }}', '{{ f.delegacion.nombre|default:'Global'|escapejs }}', '{{ f.estado|escapejs }}', '{{ f.identificador_institucional|escapejs }}', '{{ f.debe_cambiar_contrasena|yesno:"1,0" }}')"
                         title="Ver detalle"
                         class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all">
                   <i data-lucide="eye" class="w-4 h-4"></i>
@@ -202,6 +218,13 @@
       <div><span class="font-bold text-slate-500">Rol:</span> <span id="ver-rol" class="font-bold text-slate-800"></span></div>
       <div><span class="font-bold text-slate-500">Delegación Asignada:</span> <span id="ver-del" class="text-slate-800"></span></div>
       <div><span class="font-bold text-slate-500">Estado:</span> <span id="ver-estado" class="font-bold"></span></div>
+      <div id="ver-alerta-provisoria" class="hidden p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2.5">
+        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+        <div class="text-[11px] leading-relaxed">
+          <span class="font-bold block text-amber-800">Contraseña provisional pendiente</span>
+          <span>El usuario no ha cambiado la contraseña provisional. Se recomienda darle aviso para que lo efectúe a la brevedad.</span>
+        </div>
+      </div>
     </div>
     <div class="flex justify-end pt-2">
       <button type="button" onclick="document.getElementById('modal-ver').classList.add('hidden')" 
@@ -347,7 +370,7 @@
 
 {% block extra_js %}
 <script>
-  function verDetalle(nombre, usuario, correo, cargo, rol, delegacion, estado, idInst) {
+  function verDetalle(nombre, usuario, correo, cargo, rol, delegacion, estado, idInst, debeCambiarPw) {
     document.getElementById('ver-id').textContent = idInst || '—';
     document.getElementById('ver-nombre').textContent = nombre;
     document.getElementById('ver-usuario').textContent = usuario;
@@ -356,6 +379,16 @@
     document.getElementById('ver-rol').textContent = rol;
     document.getElementById('ver-del').textContent = delegacion;
     document.getElementById('ver-estado').textContent = estado;
+
+    const alertaPw = document.getElementById('ver-alerta-provisoria');
+    if (alertaPw) {
+      if (debeCambiarPw === '1') {
+        alertaPw.classList.remove('hidden');
+      } else {
+        alertaPw.classList.add('hidden');
+      }
+    }
+    if (window.lucide) lucide.createIcons();
     document.getElementById('modal-ver').classList.remove('hidden');
   }
 
