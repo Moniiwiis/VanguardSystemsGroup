@@ -223,9 +223,9 @@
           <label class="block text-xs font-bold text-slate-800">
             Descripción de la atención <span class="text-[#C41230]">*</span>
           </label>
-          <textarea id="descripcion" name="descripcion" required rows="3" maxlength="1000"
+          <textarea id="descripcion" name="descripcion" required rows="5" maxlength="1000"
                     placeholder="Describa la solicitud y los antecedentes necesarios (máximo 1000 caracteres)."
-                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none font-medium"></textarea>
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none font-medium break-words [overflow-wrap:anywhere] max-h-40"></textarea>
         </div>
 
         <!-- Lógica de Decisión Tubo SGR (Matriz Excel: ¿Va a Tubo de Trabajo?) -->
@@ -709,13 +709,15 @@
       </div>
 
       <!-- Descripción -->
-      <div class="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-1">
+      <div class="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-1.5 overflow-hidden">
         <span class="font-bold text-slate-500 block text-[11px]">Descripción de la Atención:</span>
-        <p id="at-desc-lectura" class="text-slate-700 text-xs font-normal whitespace-pre-line"></p>
+        <div class="rounded-xl bg-slate-50/70 p-2.5 border border-slate-100">
+          <p id="at-desc-lectura" class="desc-box-5lines text-slate-700 text-xs font-normal"></p>
+        </div>
       </div>
 
       <!-- Conexión Tubo SGR (Modo Lectura) -->
-      <div id="at-seccion-lectura-tubo" class="p-3.5 rounded-2xl bg-red-50/40 border border-red-100 space-y-2">
+      <div id="at-seccion-lectura-tubo" class="p-3.5 rounded-2xl bg-red-50/40 border border-red-100 space-y-2 overflow-hidden">
         <div class="flex items-center justify-between border-b border-red-100 pb-1.5">
           <div class="flex items-center gap-1.5">
             <i data-lucide="git-pull-request" class="w-3.5 h-3.5 text-[#C41230]"></i>
@@ -735,7 +737,9 @@
         </div>
         <div class="text-[11px] pt-1">
           <span class="font-bold text-slate-500 block">Avance u Observaciones:</span>
-          <p id="at-tubo-avance" class="text-slate-700 font-normal mt-0.5 whitespace-pre-line"></p>
+          <div class="rounded-xl bg-white/90 p-2.5 border border-red-100 mt-1">
+            <p id="at-tubo-avance" class="desc-box-5lines text-slate-700 font-normal"></p>
+          </div>
         </div>
       </div>
     </div>
@@ -754,8 +758,8 @@
 
       <div class="space-y-1">
         <label for="at-edit-descripcion" class="block text-slate-700">Descripción de la atención <span class="text-[#C41230]">*</span></label>
-        <textarea id="at-edit-descripcion" name="descripcion" required rows="3" maxlength="1000"
-                  class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+        <textarea id="at-edit-descripcion" name="descripcion" required rows="5" maxlength="1000"
+                  class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal focus:ring-2 focus:ring-[#C41230] focus:outline-none break-words [overflow-wrap:anywhere] max-h-40"></textarea>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -818,9 +822,9 @@
           </div>
           <div class="space-y-1">
             <label for="at-edit-avanceobs" class="block text-slate-700 text-[11px]">Avance u Observaciones Territoriales</label>
-            <textarea id="at-edit-avanceobs" name="avance_observaciones" rows="2" maxlength="1000"
+            <textarea id="at-edit-avanceobs" name="avance_observaciones" rows="5" maxlength="1000"
                       placeholder="Registra avances, acuerdos de cuadrilla o coordinaciones..."
-                      class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+                      class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal focus:ring-2 focus:ring-[#C41230] focus:outline-none break-words [overflow-wrap:anywhere] max-h-40"></textarea>
           </div>
         </div>
       </div>
