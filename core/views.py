@@ -523,7 +523,7 @@ def nueva_contrasena_view(request):
 def cambiar_delegacion_view(request, del_id):
     ctx = global_context(request)
     if not ctx['can_switch_delegacion']:
-        messages.error(request, "Tu perfil de usuario tiene asignado un contexto territorial fijo.")
+        messages.error(request, "Tu perfil de usuario tiene asignada una delegación fija.")
         return redirect(request.META.get('HTTP_REFERER', 'gestion_inicio'))
 
     from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
@@ -536,7 +536,7 @@ def cambiar_delegacion_view(request, del_id):
     if del_id == 0:
         request.session['delegacion_activa_id'] = 'global'
         request.session.modified = True
-        messages.success(request, "Contexto territorial cambiado a 'Global (Todas las delegaciones)'.")
+        messages.success(request, "Vista cambiada a 'Global (Todas las delegaciones)'.")
         if referer:
             u = urlparse(referer)
             # Si el referer es la página de inicio, redirigir directamente sin parámetros
@@ -552,7 +552,7 @@ def cambiar_delegacion_view(request, del_id):
     nueva_del = get_object_or_404(Delegacion, id=del_id, estado='Activa')
     request.session['delegacion_activa_id'] = nueva_del.id
     request.session.modified = True
-    messages.success(request, f"Contexto territorial cambiado a '{nueva_del.nombre}'.")
+    messages.success(request, f"Vista cambiada a '{nueva_del.nombre}'.")
 
     if referer:
         u = urlparse(referer)
@@ -1516,7 +1516,7 @@ def gestion_tipo_atencion_eliminar(request, tipo_id):
     if request.method == 'POST':
         # Validación de integridad referencial requerida en la rúbrica (A3 / Pág 3 y 9)
         if SubAtencion.objects.filter(tipo_atencion=tipo).exists():
-            messages.error(request, f"Integridad referencial: No se puede eliminar '{tipo.nombre}' porque posee Sub Atenciones asociadas activas.")
+            messages.error(request, f"No se puede eliminar '{tipo.nombre}' porque tiene Sub-Atenciones asociadas activas.")
             return redirect('gestion_tipo_atencion')
 
         nombre = tipo.nombre
@@ -1822,7 +1822,7 @@ def gestion_atenciones(request):
         if not solicitante or not tipo_id or not sub_id or not descripcion:
             messages.error(request, "Todos los campos marcados con (*) son obligatorios.")
         elif not del_activa:
-            messages.error(request, "Error de contexto: No se identificó la delegación activa autorizada.")
+            messages.error(request, "Debes seleccionar una delegación activa para registrar la atención.")
         else:
             tipo_obj = get_object_or_404(TipoAtencion, id=tipo_id)
             sub_obj = get_object_or_404(SubAtencion, id=sub_id, tipo_atencion=tipo_obj)
@@ -1893,8 +1893,8 @@ def gestion_atenciones(request):
                             Evidencia.objects.create(actividad=actividad_ini, archivo=img, momento=momento_ini)
                     for arch in archivos_ini:
                         Evidencia.objects.create(actividad=actividad_ini, archivo=arch, momento=momento_ini)
-                except Exception as e:
-                    messages.warning(request, f"Atención registrada, pero ocurrió un detalle al guardar las evidencias iniciales: {e}")
+                except Exception:
+                    messages.warning(request, "Atención registrada, pero ocurrió un problema al adjuntar las evidencias iniciales.")
 
             # Notificación en tiempo real por WebSocket (Channels) tras commit en BD
             del_id_ws = del_activa.id if del_activa else "global"
@@ -2339,7 +2339,7 @@ def gestion_atenciones_validar_evidencia(request, atencion_id):
 
     actividad = get_or_create_actividad_para_atencion(atencion)
     if not actividad:
-        messages.error(request, "Esta atención aún no tiene una actividad asociada para validar evidencias.")
+        messages.error(request, "No fue posible acceder a la actividad asociada a esta atención. Por favor, intente nuevamente.")
         return redirect('gestion_atenciones')
 
     funcionario_actual = ctx['funcionario_actual']
@@ -2414,7 +2414,7 @@ def gestion_atenciones_subir_evidencia(request, atencion_id):
 
     actividad = get_or_create_actividad_para_atencion(atencion)
     if not actividad:
-        messages.error(request, "No se pudo vincular la actividad correspondiente a esta atención.")
+        messages.error(request, "No se pudo asociar la actividad a esta atención. Por favor, intente nuevamente.")
         return redirect(redirect_target)
     if actividad.estado_validacion() == 'Aprobado':
         messages.error(request, "La evidencia ya fue aprobada y no se puede modificar.")
@@ -2463,8 +2463,8 @@ def gestion_atenciones_subir_evidencia(request, atencion_id):
             )
             archivos_guardados += 1
 
-    except Exception as e:
-        messages.error(request, f"Error al guardar los archivos en el servidor: {e}")
+    except Exception:
+        messages.error(request, "Ocurrió un error al guardar los archivos adjuntos. Por favor, intenta nuevamente.")
         return redirect(redirect_target)
 
     validacion = ValidacionEvidencia.objects.filter(actividad=actividad).order_by('-created_at').first()
@@ -4217,9 +4217,9 @@ def perfil_usuario(request):
                         return redirect('perfil_usuario')
 
                     funcionario.foto.save(file_name, c_file, save=True)
-                    messages.success(request, "¡Foto de perfil actualizada exitosamente con recorte Croppr.js!")
-                except Exception as e:
-                    messages.error(request, f"Error al procesar el recorte de la imagen: {str(e)}")
+                    messages.success(request, "¡Foto de perfil actualizada exitosamente!")
+                except Exception:
+                    messages.error(request, "No se pudo procesar la imagen seleccionada. Por favor, intenta con otra imagen.")
             elif foto_file:
                 valido, err = validar_imagen_subida(foto_file, max_mb=2)
                 if not valido:
