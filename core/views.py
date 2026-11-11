@@ -802,6 +802,10 @@ def gestion_roles(request):
         if not nombre:
             messages.error(request, "El nombre del rol es obligatorio.")
         else:
+            ok, err = validar_largo(descripcion, 1000, "Descripción")
+            if not ok:
+                messages.error(request, err)
+                return redirect('gestion_roles')
             if not codigo:
                 count = Rol.all_objects.count() + 1
                 codigo = f"ROL{count:02d}"
@@ -858,11 +862,16 @@ def gestion_roles_editar(request, rol_id):
 
     rol = get_object_or_404(Rol, id=rol_id)
     if request.method == 'POST':
+        nueva_desc = request.POST.get('descripcion', rol.descripcion or '').strip()
+        ok, err = validar_largo(nueva_desc, 1000, "Descripción")
+        if not ok:
+            messages.error(request, err)
+            return redirect('gestion_roles')
         rol.codigo = request.POST.get('codigo', rol.codigo).strip().upper()
         rol.nombre_rol = request.POST.get('nombre_rol', rol.nombre_rol).strip()
         rol.alcance = request.POST.get('alcance', rol.alcance)
         rol.estado = request.POST.get('estado', rol.estado)
-        rol.descripcion = request.POST.get('descripcion', rol.descripcion).strip()
+        rol.descripcion = nueva_desc
         rol.save()
         messages.success(request, f"Rol '{rol.nombre_rol}' actualizado correctamente.")
     return redirect('gestion_roles')
@@ -1213,6 +1222,27 @@ def gestion_usuarios_eliminar(request, user_id):
 
 # --- 4. CRUD ÍTEMS Y METAS (Wireframe C4) ---
 
+def _parse_iso_date(raw_date):
+    if not raw_date:
+        return None
+    if isinstance(raw_date, datetime.datetime):
+        return raw_date.date()
+    if isinstance(raw_date, datetime.date):
+        return raw_date
+    raw_date = str(raw_date).strip()
+    if not raw_date:
+        return None
+    try:
+        return datetime.date.fromisoformat(raw_date)
+    except (ValueError, TypeError):
+        pass
+    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%Y/%m/%d'):
+        try:
+            return datetime.datetime.strptime(raw_date, fmt).date()
+        except (ValueError, TypeError):
+            continue
+    return None
+
 @login_required
 def gestion_metas(request):
     ctx = global_context(request)
@@ -1290,6 +1320,10 @@ def gestion_metas(request):
         if not nombre:
             messages.error(request, "El nombre del ítem es obligatorio.")
         else:
+            ok, err = validar_largo(descripcion, 1000, "Descripción")
+            if not ok:
+                messages.error(request, err)
+                return redirect('gestion_metas')
             if not codigo:
                 count = ItemMedicion.all_objects.count() + 1
                 codigo = f"IT{count:03d}"
@@ -1347,9 +1381,14 @@ def gestion_metas_editar(request, item_id):
 
     item = get_object_or_404(ItemMedicion, id=item_id)
     if request.method == 'POST':
+        nueva_desc = request.POST.get('descripcion', item.descripcion or '').strip()
+        ok, err = validar_largo(nueva_desc, 1000, "Descripción")
+        if not ok:
+            messages.error(request, err)
+            return redirect('gestion_metas')
         item.codigo = request.POST.get('codigo', item.codigo).strip().upper()
         item.nombre_item = request.POST.get('nombre_item', item.nombre_item).strip()
-        item.descripcion = request.POST.get('descripcion', item.descripcion).strip()
+        item.descripcion = nueva_desc
         item.estado = request.POST.get('estado', item.estado)
         item.save()
         messages.success(request, f"Ítem '{item.nombre_item}' actualizado correctamente.")
@@ -1392,6 +1431,10 @@ def gestion_tipo_atencion(request):
         if not nombre:
             messages.error(request, "El nombre del Tipo de Atención es obligatorio.")
         else:
+            ok, err = validar_largo(descripcion, 1000, "Descripción")
+            if not ok:
+                messages.error(request, err)
+                return redirect('gestion_tipo_atencion')
             if not codigo:
                 count = TipoAtencion.all_objects.count() + 1
                 codigo = f"TA{count:03d}"
@@ -1448,9 +1491,14 @@ def gestion_tipo_atencion_editar(request, tipo_id):
 
     tipo = get_object_or_404(TipoAtencion, id=tipo_id)
     if request.method == 'POST':
+        nueva_desc = request.POST.get('descripcion', tipo.descripcion or '').strip()
+        ok, err = validar_largo(nueva_desc, 1000, "Descripción")
+        if not ok:
+            messages.error(request, err)
+            return redirect('gestion_tipo_atencion')
         tipo.codigo = request.POST.get('codigo', tipo.codigo).strip().upper()
         tipo.nombre = request.POST.get('nombre', tipo.nombre).strip()
-        tipo.descripcion = request.POST.get('descripcion', tipo.descripcion).strip()
+        tipo.descripcion = nueva_desc
         tipo.estado = request.POST.get('estado', tipo.estado)
         tipo.save()
         messages.success(request, f"Tipo de Atención '{tipo.nombre}' actualizado.")
@@ -1641,11 +1689,11 @@ def gestion_atenciones(request):
         # Validaciones de límite de caracteres en servidor (Poner límite de caracteres en todo)
         ok, err = validar_largo(solicitante, 150, "Solicitante")
         if not ok: messages.error(request, err); return redirect('gestion_atenciones')
-        ok, err = validar_largo(descripcion, 500, "Descripción")
+        ok, err = validar_largo(descripcion, 1000, "Descripción")
         if not ok: messages.error(request, err); return redirect('gestion_atenciones')
         ok, err = validar_largo(area_apoyo, 100, "Área de apoyo")
         if not ok: messages.error(request, err); return redirect('gestion_atenciones')
-        ok, err = validar_largo(avance_observaciones, 500, "Avance u observaciones")
+        ok, err = validar_largo(avance_observaciones, 1000, "Avance u observaciones")
         if not ok: messages.error(request, err); return redirect('gestion_atenciones')
         ok, err = validar_largo(telefono_contacto, 30, "Teléfono de contacto")
         if not ok: messages.error(request, err); return redirect('gestion_atenciones')
@@ -2102,7 +2150,7 @@ def gestion_atenciones_editar(request, atencion_id):
     errores = []
     if not descripcion:
         errores.append("La descripción es obligatoria.")
-    ok, err = validar_largo(descripcion, 500, "Descripción")
+    ok, err = validar_largo(descripcion, 1000, "Descripción")
     if not ok:
         errores.append(err)
     if not responsable:
@@ -2417,9 +2465,13 @@ def gestion_tipo_gestion(request):
         return redirect('gestion_inicio')
 
     if request.method == 'POST':
-        nombre = request.POST.get('nombre')
-        descripcion = request.POST.get('descripcion')
+        nombre = request.POST.get('nombre', '').strip()
+        descripcion = request.POST.get('descripcion', '').strip()
         if nombre:
+            ok, err = validar_largo(descripcion, 1000, "Descripción")
+            if not ok:
+                messages.error(request, err)
+                return redirect('gestion_tipo_gestion')
             TipoGestion.objects.create(nombre=nombre, descripcion=descripcion, estado='Activo')
             messages.success(request, f"Tipo de Gestión '{nombre}' creado.")
             return redirect('gestion_tipo_gestion')
@@ -2460,8 +2512,13 @@ def gestion_tipo_gestion(request):
 def gestion_tipo_gestion_editar(request, tg_id):
     tg = get_object_or_404(TipoGestion, id=tg_id)
     if request.method == 'POST':
+        nueva_desc = request.POST.get('descripcion', tg.descripcion or '').strip()
+        ok, err = validar_largo(nueva_desc, 1000, "Descripción")
+        if not ok:
+            messages.error(request, err)
+            return redirect('gestion_tipo_gestion')
         tg.nombre = request.POST.get('nombre', tg.nombre)
-        tg.descripcion = request.POST.get('descripcion', tg.descripcion)
+        tg.descripcion = nueva_desc
         tg.save()
         messages.success(request, f"Tipo de Gestión '{tg.nombre}' actualizado.")
     return redirect('gestion_tipo_gestion')
@@ -2819,6 +2876,10 @@ def gestion_sectores(request):
         elif not del_obj:
             messages.error(request, "Debes seleccionar o contar con una delegación territorial activa.")
         else:
+            ok, err = validar_largo(descripcion, 1000, "Descripción")
+            if not ok:
+                messages.error(request, err)
+                return redirect('gestion_sectores')
             if not codigo:
                 count = Sector.all_objects.filter(delegacion=del_obj).count() + 1
                 codigo = f"SEC{count:02d}"
@@ -2911,9 +2972,14 @@ def gestion_sectores_editar(request, sector_id):
         return redirect('gestion_sectores')
 
     if request.method == 'POST':
+        nueva_desc = request.POST.get('descripcion', sector.descripcion or '').strip()
+        ok, err = validar_largo(nueva_desc, 1000, "Descripción")
+        if not ok:
+            messages.error(request, err)
+            return redirect('gestion_sectores')
         sector.nombre = request.POST.get('nombre', sector.nombre).strip()
         sector.codigo = request.POST.get('codigo', sector.codigo).strip().upper()
-        sector.descripcion = request.POST.get('descripcion', sector.descripcion).strip()
+        sector.descripcion = nueva_desc
         sector.estado = request.POST.get('estado', sector.estado)
         if es_admin and not del_activa:
             del_id = request.POST.get('delegacion_id')
@@ -3634,7 +3700,7 @@ def gestion_organizaciones(request):
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
         ok, err = validar_largo(reg_dir, 50, "Registro Directiva N°")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        ok, err = validar_largo(directiva, 500, "Directiva Actual")
+        ok, err = validar_largo(directiva, 1000, "Directiva Actual")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
         ok, err = validar_largo(observaciones, 1000, "Observaciones")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
@@ -3899,7 +3965,7 @@ def gestion_organizaciones_editar(request, org_id):
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
         ok, err = validar_largo(reg_dir, 50, "Registro Directiva N°")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        ok, err = validar_largo(directiva_e, 500, "Directiva Actual")
+        ok, err = validar_largo(directiva_e, 1000, "Directiva Actual")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
         ok, err = validar_largo(observaciones_e, 1000, "Observaciones")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')

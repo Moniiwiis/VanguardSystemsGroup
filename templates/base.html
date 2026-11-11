@@ -421,6 +421,15 @@
       return false;
     }
 
+    // Límite global de 1000 caracteres para todos los campos de texto extenso / descripciones
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('textarea').forEach(function(ta) {
+        if (!ta.getAttribute('maxlength') || parseInt(ta.getAttribute('maxlength')) > 1000) {
+          ta.setAttribute('maxlength', '1000');
+        }
+      });
+    });
+
     // Manejo interactivo y accesible del selector de delegación activa
     function toggleDelegacionDropdown(e) {
       if (e) {

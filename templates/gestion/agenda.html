@@ -55,7 +55,7 @@
       </div>
       <div>
         <label class="block text-slate-700 mb-1">Observaciones / Detalle</label>
-        <textarea name="observacion" rows="2" placeholder="Observaciones" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal"></textarea>
+        <textarea name="observacion" rows="2" maxlength="1000" placeholder="Observaciones" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal"></textarea>
       </div>
       <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
         <button type="button" onclick="document.getElementById('modal-compromiso').close()" class="px-4 py-2.5 rounded-2xl bg-slate-100 text-slate-600 hover:bg-slate-200">Cancelar</button>
@@ -142,7 +142,7 @@
                   </div>
                   <div>
                     <label class="block text-slate-700 mb-1">Observaciones</label>
-                    <textarea name="observacion" rows="2" class="w-full p-2.5 rounded-xl border border-slate-200">{{ comp.observacion|default:'' }}</textarea>
+                    <textarea name="observacion" rows="2" maxlength="1000" class="w-full p-2.5 rounded-xl border border-slate-200">{{ comp.observacion|default:'' }}</textarea>
                   </div>
                   <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
                     <button type="button" onclick="document.getElementById('modal-edit-comp-{{ comp.id }}').close()" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-600">Cancelar</button>

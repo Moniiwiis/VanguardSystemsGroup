@@ -240,8 +240,8 @@
           <label class="block text-xs font-bold text-slate-800">
             Descripción de la atención <span class="text-[#C41230]">*</span>
           </label>
-          <textarea id="descripcion" name="descripcion" required rows="3"
-                    placeholder="Describa la solicitud y los antecedentes necesarios."
+          <textarea id="descripcion" name="descripcion" required rows="3" maxlength="1000"
+                    placeholder="Describa la solicitud y los antecedentes necesarios (máximo 1000 caracteres)."
                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none font-medium"></textarea>
         </div>
 
@@ -761,7 +761,7 @@
 
       <div class="space-y-1">
         <label for="at-edit-descripcion" class="block text-slate-700">Descripción de la atención <span class="text-[#C41230]">*</span></label>
-        <textarea id="at-edit-descripcion" name="descripcion" required rows="3" maxlength="500"
+        <textarea id="at-edit-descripcion" name="descripcion" required rows="3" maxlength="1000"
                   class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
       </div>
 
