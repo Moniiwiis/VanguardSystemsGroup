@@ -27,7 +27,7 @@ from core.utils import (
 )
 from activities.models import (
     Actividad, Evidencia, ValidacionEvidencia, TipoGestion, Vecino,
-    AtencionCiudadana, OrganizacionComunitaria
+    AtencionCiudadana, OrganizacionComunitaria, get_or_create_actividad_para_atencion
 )
 from websocket.services import publish_module_changed
 from agenda.models import CompromisoAgenda
@@ -1815,7 +1815,8 @@ def gestion_atenciones(request):
             momento_ini = 'antes'
             imagenes_ini = request.FILES.getlist('imagenes_evidencia')
             archivos_ini = request.FILES.getlist('archivos_evidencia')
-            if atencion.actividad and (imagenes_ini or archivos_ini):
+            if atencion and (imagenes_ini or archivos_ini):
+                actividad_ini = get_or_create_actividad_para_atencion(atencion)
                 try:
                     import os
                     from pathlib import Path
@@ -1826,11 +1827,11 @@ def gestion_atenciones(request):
                     for img in imagenes_ini:
                         try:
                             img_clean = forms.ImageField().clean(img)
-                            Evidencia.objects.create(actividad=atencion.actividad, imagen=img_clean, momento=momento_ini)
+                            Evidencia.objects.create(actividad=actividad_ini, imagen=img_clean, momento=momento_ini)
                         except ValidationError:
-                            Evidencia.objects.create(actividad=atencion.actividad, archivo=img, momento=momento_ini)
+                            Evidencia.objects.create(actividad=actividad_ini, archivo=img, momento=momento_ini)
                     for arch in archivos_ini:
-                        Evidencia.objects.create(actividad=atencion.actividad, archivo=arch, momento=momento_ini)
+                        Evidencia.objects.create(actividad=actividad_ini, archivo=arch, momento=momento_ini)
                 except Exception as e:
                     messages.warning(request, f"Atención registrada, pero ocurrió un detalle al guardar las evidencias iniciales: {e}")
 
@@ -2259,7 +2260,7 @@ def gestion_atenciones_validar_evidencia(request, atencion_id):
             messages.error(request, "Acceso denegado: No puedes validar evidencias de otra delegación.")
             return redirect('gestion_atenciones')
 
-    actividad = atencion.actividad
+    actividad = get_or_create_actividad_para_atencion(atencion)
     if not actividad:
         messages.error(request, "Esta atención aún no tiene una actividad asociada para validar evidencias.")
         return redirect('gestion_atenciones')
@@ -2335,12 +2336,9 @@ def gestion_atenciones_subir_evidencia(request, atencion_id):
             messages.error(request, "No puedes adjuntar evidencias a atenciones de otra delegación.")
             return redirect(redirect_target)
 
-    if not atencion.actividad:
-        atencion.save()
-        atencion.refresh_from_db()
-    actividad = atencion.actividad
+    actividad = get_or_create_actividad_para_atencion(atencion)
     if not actividad:
-        messages.error(request, "Esta atención aún no tiene una actividad asociada.")
+        messages.error(request, "No se pudo vincular la actividad correspondiente a esta atención.")
         return redirect(redirect_target)
     if actividad.estado_validacion() == 'Aprobado':
         messages.error(request, "La evidencia ya fue aprobada y no se puede modificar.")
