@@ -39,6 +39,14 @@ python -m daphne -b 0.0.0.0 -p 8000 config.asgi:application
 
 ---
 
+## 🌐 Despliegue en AWS (Criterio 5)
+- **URL Pública:** `http://34.227.36.243`
+- **Servidor Web y ASGI:** Nginx 1.24 (Reverse Proxy) + Daphne 4.2.3 (ASGI)
+- **Base de Datos:** MySQL / SQLite persistente con soporte transaccional
+- **Soporte:** HTTP y WebSockets (`ws://`) completamente operativos en producción con DEBUG=False.
+
+---
+
 ## 🔑 Cuentas de Evaluación (6 requeridas)
 
 | # | Usuario | Contraseña | Rol | Delegación |
@@ -61,6 +69,19 @@ python -m daphne -b 0.0.0.0 -p 8000 config.asgi:application
 | `delegado_rural` | `User1234!` | Delegado Municipal | Rural |
 | `funcionario_juan` | `User1234!` | Operador | Centro |
 | `consultor_ana` | `User1234!` | Consultor | Centro |
+
+---
+
+## 👥 Matriz de Responsabilidades y Recorridos de Prueba (Página 4 y Criterio 5)
+
+| Alias | Rol | Ámbito / Delegación | Responsabilidad en el Sistema | Acciones Permitidas | Acciones Restringidas | Recorrido de Prueba y Resultado Esperado |
+|---|---|---|---|---|---|---|
+| **Administrador A** (`admin_a`) | Administrador | Delegación Centro (conmutación global) | Gestión integral del sistema y administración de usuarios. | Ver, crear, editar, archivar y eliminar registros; gestionar usuarios y delegaciones; exportar Excel. | Restricciones de seguridad general. | Iniciar sesión → ingresar a `/gestion/usuarios/` → crear/editar usuario → verificar persistencia → eliminar registro con confirmación SweetAlert2 → operación exitosa con retroalimentación. |
+| **Editor A** (`editor_a`) | Operador / Editor | Delegación Centro | Registro y gestión operativa territorial. | Ver, crear y editar dentro de Delegación Centro; adjuntar evidencias; exportar Excel. | **No puede eliminar ni archivar registros** (bloqueado por UI y backend). | Iniciar sesión → registrar atención en modal → verificar actualización en tiempo real en sesión de lector sin F5 → intentar eliminar registro por URL o petición directa → **recibe rechazo (403/Alerta de acceso denegado)**. |
+| **Lector A** (`lector_a`) | Consultor / Lector | Delegación Centro | Consulta, seguimiento y auditoría territorial. | Ver y exportar a Excel exclusivamente registros autorizados del ámbito Centro. | **No puede crear, editar, archivar ni eliminar registros**. | Iniciar sesión → observar tabla de atenciones sin recargar mientras Editor A guarda un registro (actualización WebSocket sin F5) → intentar crear o editar registro vía URL/POST → **rechazo (403)**. |
+| **Lector B** (`lector_b`) | Consultor / Lector | Delegación Norte (Las Compañías) | Consulta y auditoría territorial norte. | Ver y exportar a Excel exclusivamente registros del ámbito Norte. | **No puede acceder a registros de Delegación Centro ni otros ámbitos**. | Iniciar sesión → verificar que solo se muestran registros de Delegación Norte → intentar acceder por ID a una atención de Delegación Centro → **rechazo 404/403 sin revelar datos ajenos**. No recibe eventos WebSocket de Centro. |
+| **Cliente 1** (`cliente_1`) | Cliente / Vecino | Portal Ciudadano | Consulta de requerimientos personales y perfil propio. | Consultar únicamente sus propias atenciones ciudadanas y estado; editar su foto de perfil con Croppr.js. | **Acceso denegado a módulos administrativos (`/gestion/...`) y a datos de otros clientes**. | Iniciar sesión → redirige a `/portal/` → consulta sus solicitudes → abre detalle propio → edita foto con recorte Croppr.js → intenta acceder a `/portal/atencion/{id_cliente_2}/` → **rechazo sin revelar datos**. |
+| **Cliente 2** (`cliente_2`) | Cliente / Vecino | Portal Ciudadano | Consulta de requerimientos personales y perfil propio. | Consultar únicamente sus propias atenciones ciudadanas y estado; editar su foto de perfil con Croppr.js. | **Acceso denegado a módulos administrativos y a datos de otros clientes**. | Iniciar sesión en navegador/incógnito independiente → verificar que sus solicitudes son distintas a las de Cliente 1 → intentar URL administrativa (`/gestion/atenciones/`) → **bloqueo inmediato con redirección o 403**. |
 
 ---
 
