@@ -12,10 +12,15 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+_venv_site = BASE_DIR / '.venv' / 'Lib' / 'site-packages'
+if _venv_site.is_dir() and str(_venv_site) not in sys.path:
+    sys.path.insert(0, str(_venv_site))
 
 # Carga las variables definidas en tu archivo .env
 load_dotenv(BASE_DIR / ".env")
@@ -30,14 +35,15 @@ SECRET_KEY = 'django-insecure-4-334v+k-t#9y=z*@tq+*5_^d!1=3xouo58su-^2mvhzct0d)n
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver', '*']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver', 'http://34.227.36.243/','*']
 
 
 # Application definition
+import importlib.util as _importlib_util
 
 INSTALLED_APPS = [
-    'daphne',
-    'channels',
+    *(['daphne'] if _importlib_util.find_spec('daphne') else []),
+    *(['channels'] if _importlib_util.find_spec('channels') else []),
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -174,6 +180,12 @@ EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+try:
+    (MEDIA_ROOT / "evidencias" / "imagenes").mkdir(parents=True, exist_ok=True)
+    (MEDIA_ROOT / "evidencias" / "archivos").mkdir(parents=True, exist_ok=True)
+    (MEDIA_ROOT / "perfiles").mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
 
 # ASGI & Channels Configuration
 ASGI_APPLICATION = "config.asgi.application"

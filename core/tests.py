@@ -372,6 +372,18 @@ class ActivityEvidenceUploadTests(TestCase):
                 self.assertFalse(
                     ValidacionEvidencia.objects.filter(actividad=actividad).exists()
                 )
+                # Tampoco debe permitir rechazar si falta la evidencia del despues
+                self.assertRedirects(
+                    self.client.post(
+                        reverse('gestion_atenciones_validar_evidencia', args=[atencion.id]),
+                        {'resultado_evidencia': 'Rechazado'},
+                    ),
+                    reverse('gestion_atenciones'),
+                    fetch_redirect_response=False,
+                )
+                self.assertFalse(
+                    ValidacionEvidencia.objects.filter(actividad=actividad).exists()
+                )
 
                 after_response = self.client.post(
                     reverse('gestion_atenciones_subir_evidencia', args=[atencion.id]),

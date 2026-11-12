@@ -67,6 +67,31 @@
     .desc-roll::-webkit-scrollbar-thumb:hover {
       background: rgba(196,18,48,0.6);
     }
+    /* Cuadro de texto espacioso de 5 líneas con scrollbar para descripciones de hasta 1000 caracteres */
+    .desc-box-5lines {
+      max-height: 6.5rem;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 0.35rem;
+      word-break: break-all;
+      overflow-wrap: anywhere;
+      white-space: pre-line;
+      line-height: 1.35;
+    }
+    .desc-box-5lines::-webkit-scrollbar {
+      width: 5px;
+    }
+    .desc-box-5lines::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.05);
+      border-radius: 6px;
+    }
+    .desc-box-5lines::-webkit-scrollbar-thumb {
+      background: rgba(196,18,48,0.35);
+      border-radius: 6px;
+    }
+    .desc-box-5lines::-webkit-scrollbar-thumb:hover {
+      background: rgba(196,18,48,0.7);
+    }
     /* Evitar que contenedores con space-y-* desplacen modales fixed inset-0 */
     .fixed.inset-0 {
       margin-top: 0 !important;
@@ -82,7 +107,7 @@
     <div class="max-w-[1440px] mx-auto px-4 md:px-8 py-2.5 flex items-center justify-between gap-4">
       
       <!-- Izquierda: Logo y Marca Institucional -->
-      <a href="{% url 'gestion_inicio' %}" class="flex items-center gap-3 shrink-0 group">
+      <a href="{% if permisos.es_cliente %}{% url 'portal_cliente' %}{% else %}{% url 'gestion_inicio' %}{% endif %}" class="flex items-center gap-3 shrink-0 group">
         <img src="{% static 'horizontal-blanco.svg' %}" 
              alt="La Serena — Ilustre Municipalidad" 
              class="h-9 w-auto object-contain drop-shadow-sm"
@@ -149,6 +174,12 @@
               </div>
             </div>
           </div>
+        {% elif permisos.es_cliente %}
+          <!-- Contexto exclusivo para Cliente Final -->
+          <div class="flex items-center gap-2 bg-[#700F17]/90 text-white text-xs font-bold px-3.5 py-1.5 rounded-full border border-white/25 shadow-inner">
+            <i data-lucide="user-check" class="w-3.5 h-3.5 text-white/90"></i>
+            <span>Portal Ciudadano · Consulta Personal</span>
+          </div>
         {% elif delegacion_activa %}
           <!-- Contexto Territorial Fijo para Operadores / Delegados Monodelegación -->
           <div class="flex items-center gap-2 bg-[#700F17]/90 text-white text-xs font-bold px-3.5 py-1.5 rounded-full border border-white/25 shadow-inner">
@@ -207,12 +238,14 @@
       <!-- Menú Módulos Flat y Adaptable según wireframes C3-C6 -->
       <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-1 text-xs font-bold">
         
-        <!-- Inicio -->
+        <!-- Inicio (Oculto para rol Cliente) -->
+        {% if permisos.ver_inicio %}
         <a href="{% url 'gestion_inicio' %}" 
            class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_inicio' or request.resolver_match.url_name == 'gestion_inicio_alt' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
           <i data-lucide="home" class="w-4 h-4 shrink-0"></i>
           <span>Inicio</span>
         </a>
+        {% endif %}
 
         <!-- 1. Delegaciones (Solo Administrador) -->
         {% if permisos.ver_delegaciones %}
@@ -322,21 +355,23 @@
           </a>
         {% endif %}
 
+        {% if not permisos.es_cliente %}
         <div class="pt-2 border-t border-slate-100 my-1"></div>
 
-        <!-- Tiempo Real / Chat (Channels WebSockets) -->
+        <!-- Tiempo Real / Chat (Channels WebSockets - Solo Funcionarios) -->
         <a href="{% url 'websocket:chat_index' %}" 
            class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'chat' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
           <i data-lucide="messages-square" class="w-4 h-4 shrink-0 text-red-600"></i>
           <span>Chat en Vivo</span>
         </a>
+        {% endif %}
 
-        <!-- Portal Ciudadano (Acceso para rol Cliente o consulta) -->
-        {% if ver_portal_cliente or es_cliente %}
+        <!-- Portal Ciudadano (Acceso para rol Cliente) -->
+        {% if permisos.ver_portal_cliente or permisos.es_cliente %}
           <a href="{% url 'portal_cliente' %}" 
              class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'portal_cliente' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="user-square-2" class="w-4 h-4 shrink-0 text-blue-600"></i>
-            <span>Portal Ciudadano</span>
+            <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
+            <span>Mis Registros</span>
           </a>
         {% endif %}
 
@@ -344,7 +379,7 @@
         <a href="{% url 'perfil_usuario' %}" 
            class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'perfil_usuario' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
           <i data-lucide="user-cog" class="w-4 h-4 shrink-0"></i>
-          <span>Mi Perfil</span>
+          <span>Mi Perfil y Foto</span>
         </a>
 
       </nav>
@@ -410,6 +445,15 @@
       });
       return false;
     }
+
+    // Límite global de 1000 caracteres para todos los campos de texto extenso / descripciones
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('textarea').forEach(function(ta) {
+        if (!ta.getAttribute('maxlength') || parseInt(ta.getAttribute('maxlength')) > 1000) {
+          ta.setAttribute('maxlength', '1000');
+        }
+      });
+    });
 
     // Manejo interactivo y accesible del selector de delegación activa
     function toggleDelegacionDropdown(e) {
@@ -984,40 +1028,104 @@
       }
     }, true);
 
-    // Sincronización silenciosa en segundo plano para todos los módulos de gestión
+    // Sincronización en tiempo real por WebSocket para todos los módulos del sistema
     document.addEventListener("DOMContentLoaded", function() {
       const path = window.location.pathname || '';
-      if (!path.startsWith('/gestion/')) return;
-      const parts = path.split('/').filter(Boolean);
-      const rawMod = (parts[1] || 'inicio').replace(/-/g, '_');
+      if (path.startsWith('/login') || path.startsWith('/chat') || path.startsWith('/recuperar') || path.startsWith('/validar') || path.startsWith('/nueva-contrasena')) {
+        return;
+      }
+
+      let rawMod = 'inicio';
+      if (path.startsWith('/portal-cliente')) {
+        rawMod = 'portal_cliente';
+      } else if (path.startsWith('/gestion/')) {
+        const parts = path.split('/').filter(Boolean);
+        rawMod = (parts[1] || 'inicio').replace(/-/g, '_');
+      }
+
       const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
       const wsUrl = wsProtocol + window.location.host + '/ws/crud/' + rawMod + '/';
       let globalCrudSocket = null;
+      let hadConnectedOnce = false;
+
+      // Indicador discreto solo en caso de pérdida de conexión (requisito Pág. 7 de la pauta)
+      const disconnectBanner = document.createElement('div');
+      disconnectBanner.id = 'ws-disconnect-banner';
+      disconnectBanner.className = 'fixed bottom-4 right-4 z-40 hidden items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold shadow-lg';
+      disconnectBanner.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span><span>Conexión en tiempo real interrumpida. Reconectando...</span>';
+      document.body.appendChild(disconnectBanner);
+
+      function actualizarVistaSinRecargar() {
+        fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+          .then(res => res.text())
+          .then(html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const modalAbierto = document.querySelector('.fixed.inset-0:not(.hidden), dialog[open]');
+            const tagActivo = (document.activeElement && document.activeElement.tagName) || '';
+            const escribiendo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tagActivo);
+
+            const newTbodies = doc.querySelectorAll('table tbody');
+            const curTbodies = document.querySelectorAll('table tbody');
+
+            if (!modalAbierto && !escribiendo && newTbodies.length !== curTbodies.length) {
+              const newMain = doc.querySelector('main');
+              const curMain = document.querySelector('main');
+              if (newMain && curMain) {
+                curMain.innerHTML = newMain.innerHTML;
+                if (window.lucide) lucide.createIcons();
+                return;
+              }
+            }
+
+            newTbodies.forEach((tb, idx) => {
+              if (curTbodies[idx]) curTbodies[idx].innerHTML = tb.innerHTML;
+            });
+
+            // Actualizar barras de paginación y contadores de registros
+            const newPags = doc.querySelectorAll('.overflow-hidden > div:last-child, nav[aria-label*="Paginación"]');
+            const curPags = document.querySelectorAll('.overflow-hidden > div:last-child, nav[aria-label*="Paginación"]');
+            newPags.forEach((pg, idx) => {
+              if (curPags[idx]) curPags[idx].innerHTML = pg.innerHTML;
+            });
+
+            // Actualizar tarjetas KPI superiores si no hay modal abierto
+            if (!modalAbierto) {
+              const newGrids = doc.querySelectorAll('main .grid');
+              const curGrids = document.querySelectorAll('main .grid');
+              newGrids.forEach((gr, idx) => {
+                if (curGrids[idx] && !curGrids[idx].closest('.fixed, dialog, form')) {
+                  curGrids[idx].innerHTML = gr.innerHTML;
+                }
+              });
+            }
+
+            if (window.lucide) lucide.createIcons();
+          })
+          .catch(() => {});
+      }
 
       function connectGlobalCrudWS() {
         try {
           globalCrudSocket = new WebSocket(wsUrl);
+          globalCrudSocket.onopen = function() {
+            hadConnectedOnce = true;
+            disconnectBanner.classList.add('hidden');
+            disconnectBanner.classList.remove('flex');
+          };
           globalCrudSocket.onmessage = function(e) {
             try {
               const data = JSON.parse(e.data);
               if (data.type === 'crud_update' || data.type === 'module_changed') {
-                fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-                  .then(res => res.text())
-                  .then(html => {
-                    const doc = new DOMParser().parseFromString(html, 'text/html');
-                    const newTbodies = doc.querySelectorAll('table tbody');
-                    const curTbodies = document.querySelectorAll('table tbody');
-                    newTbodies.forEach((tb, idx) => {
-                      if (curTbodies[idx]) curTbodies[idx].innerHTML = tb.innerHTML;
-                    });
-                    if (window.lucide) lucide.createIcons();
-                  })
-                  .catch(() => {});
+                actualizarVistaSinRecargar();
               }
             } catch (err) {}
           };
           globalCrudSocket.onclose = function() {
-            setTimeout(connectGlobalCrudWS, 5000);
+            if (hadConnectedOnce) {
+              disconnectBanner.classList.remove('hidden');
+              disconnectBanner.classList.add('flex');
+            }
+            setTimeout(connectGlobalCrudWS, 3500);
           };
         } catch (err) {}
       }
@@ -1042,6 +1150,147 @@
         {% endfor %}
       {% endif %}
     });
+
+    // --- VISOR DE EVIDENCIAS EN PANTALLA (SIN ABRIR NUEVA PESTAÑA) ---
+    function abrirVisorEvidencia(url, titulo, momento) {
+      if (!url) return;
+      const modal = document.getElementById('modal-visor-evidencia');
+      const imgEl = document.getElementById('visor-img');
+      const frameEl = document.getElementById('visor-frame');
+      const fallbackEl = document.getElementById('visor-fallback');
+      const tituloEl = document.getElementById('visor-titulo');
+      const badgeEl = document.getElementById('visor-momento-badge');
+      const downloadBtn = document.getElementById('visor-descargar-btn');
+      const fallbackBtn = document.getElementById('visor-fallback-btn');
+      const fallbackNombre = document.getElementById('visor-fallback-nombre');
+
+      if (!modal) return;
+
+      if (tituloEl) tituloEl.textContent = titulo || 'Evidencia de Respaldo';
+      if (downloadBtn) {
+        downloadBtn.href = url;
+        const nombreArchivo = (titulo || 'evidencia').replace(/[^a-zA-Z0-9_\.-]/g, '_');
+        downloadBtn.setAttribute('download', nombreArchivo);
+      }
+      if (fallbackBtn) fallbackBtn.href = url;
+      if (fallbackNombre) fallbackNombre.textContent = titulo || 'Archivo de evidencia';
+
+      if (badgeEl) {
+        const momLower = (momento || '').toLowerCase();
+        if (momLower.includes('antes')) {
+          badgeEl.textContent = 'Antes del trabajo';
+          badgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200 shrink-0';
+        } else if (momLower.includes('despues') || momLower.includes('después')) {
+          badgeEl.textContent = 'Después del trabajo';
+          badgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0';
+        } else {
+          badgeEl.textContent = momento || 'Evidencia';
+          badgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-700 border border-slate-200 shrink-0';
+        }
+      }
+
+      if (imgEl) { imgEl.classList.add('hidden'); imgEl.src = ''; }
+      if (frameEl) { frameEl.classList.add('hidden'); frameEl.src = ''; }
+      if (fallbackEl) { fallbackEl.classList.add('hidden'); }
+
+      const cleanUrl = url.split('?')[0].toLowerCase();
+      const esImagen = cleanUrl.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)$/i) || url.startsWith('data:image/');
+      const esPdf = cleanUrl.endsWith('.pdf');
+
+      if (esImagen && imgEl) {
+        imgEl.src = url;
+        imgEl.classList.remove('hidden');
+      } else if (esPdf && frameEl) {
+        frameEl.src = url;
+        frameEl.classList.remove('hidden');
+      } else if (fallbackEl) {
+        fallbackEl.classList.remove('hidden');
+      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function cerrarVisorEvidencia() {
+      const modal = document.getElementById('modal-visor-evidencia');
+      const imgEl = document.getElementById('visor-img');
+      const frameEl = document.getElementById('visor-frame');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+      if (imgEl) imgEl.src = '';
+      if (frameEl) frameEl.src = '';
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') cerrarVisorEvidencia();
+    });
+
+    // Interceptar clics en enlaces a evidencias para visualizarlos directamente sin abrir pestañas
+    document.addEventListener('click', function(e) {
+      const link = e.target.closest('a');
+      if (!link) return;
+      const href = link.getAttribute('href') || '';
+      if (link.closest('#modal-visor-evidencia') || link.hasAttribute('download')) return;
+      if (link.classList.contains('visor-evidencia') ||
+          href.includes('/media/evidencias/') ||
+          href.includes('/media/archivos/') ||
+          (href.startsWith('/media/') && href.match(/\.(jpg|jpeg|png|gif|webp|svg|pdf)$/i))) {
+        e.preventDefault();
+        e.stopPropagation();
+        const titulo = link.getAttribute('data-titulo') || link.textContent.trim() || 'Evidencia de Respaldo';
+        const momento = link.getAttribute('data-momento') || (link.closest('[data-momento]') ? link.closest('[data-momento]').dataset.momento : '');
+        abrirVisorEvidencia(href, titulo, momento);
+      }
+    });
+  </script>
+
+  <!-- Modal Global Visor de Evidencias Sin Abrir Pestaña -->
+  <div id="modal-visor-evidencia" class="fixed inset-0 z-[100] hidden items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-sm transition-all" onclick="if (event.target === this) cerrarVisorEvidencia();">
+    <div class="relative w-full max-w-4xl max-h-[92vh] bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-slate-200" onclick="event.stopPropagation();">
+      <!-- Header del Visor -->
+      <div class="flex items-center justify-between px-5 py-3.5 bg-slate-50 border-b border-slate-200">
+        <div class="flex items-center gap-2.5 overflow-hidden">
+          <span id="visor-momento-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-50 text-[#C41230] border border-red-200 shrink-0">
+            Evidencia
+          </span>
+          <h4 id="visor-titulo" class="font-display font-extrabold text-sm text-slate-800 truncate">
+            Visualizador de Evidencia
+          </h4>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <a id="visor-descargar-btn" href="#" download class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5" title="Descargar archivo original">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">Descargar</span>
+          </a>
+          <button type="button" onclick="cerrarVisorEvidencia()" class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center justify-center font-bold transition-all">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Contenedor de Vista Previa -->
+      <div id="visor-contenedor" class="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-900/5 min-h-[320px] max-h-[calc(92vh-100px)]">
+        <!-- Imagen -->
+        <img id="visor-img" src="" alt="Evidencia" class="max-w-full max-h-[75vh] object-contain rounded-xl shadow-md hidden" />
+        
+        <!-- PDF / Documento interactivo -->
+        <iframe id="visor-frame" src="" class="w-full h-[75vh] rounded-xl border border-slate-200 hidden bg-white"></iframe>
+
+        <!-- Fallback si no es previsualizable en línea -->
+        <div id="visor-fallback" class="text-center p-8 hidden">
+          <i data-lucide="file-text" class="w-16 h-16 mx-auto text-slate-400 mb-3"></i>
+          <p id="visor-fallback-nombre" class="font-bold text-sm text-slate-700 mb-2"></p>
+          <p class="text-xs text-slate-500 mb-4">Este tipo de archivo no se puede renderizar directamente en el navegador.</p>
+          <a id="visor-fallback-btn" href="#" download class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#C41230] text-white text-xs font-bold hover:bg-[#8B1D19]">
+            <i data-lucide="download" class="w-4 h-4"></i> Descargar para visualizar
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
   </script>
   {% block extra_js %}{% endblock %}
 </body>

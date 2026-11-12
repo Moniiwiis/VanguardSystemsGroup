@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Portal Ciudadano — Ilustre Municipalidad de La Serena{% endblock %}
+{% block title %}Portal Ciudadano — Consulta de Datos y Registros Propios{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -9,57 +9,141 @@
   <div class="bg-gradient-to-r from-[#8B1D19] via-[#C41230] to-[#DB3334] rounded-3xl p-6 sm:p-8 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6">
     <div class="space-y-2">
       <span class="inline-block px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-white/20 text-white border border-white/30 backdrop-blur-sm">
-        Portal Ciudadano de La Serena
+        Portal Ciudadano · Consulta Personal
       </span>
       <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">
-        Bienvenido(a), {{ request.user.first_name|default:request.user.username }}
+        Bienvenido(a), {{ request.user.get_full_name|default:request.user.username }}
       </h1>
       <p class="text-xs sm:text-sm text-red-100 max-w-2xl leading-relaxed">
-        Consulta el estado de tus solicitudes y atenciones ciudadanas en tiempo real, revisa las evidencias territoriales de avance y comunícate con la delegación municipal correspondiente.
+        Consulta exclusivamente tu información personal y el historial de tus registros y solicitudes vinculadas a tu cuenta en tiempo real.
       </p>
     </div>
 
     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-      <div class="bg-black/20 rounded-2xl p-4 border border-white/20 text-center">
-        <span class="text-2xl font-black block">{{ total_solicitudes|default:atenciones|length }}</span>
-        <span class="text-[10px] text-white/80 font-bold uppercase tracking-wider">Mis Solicitudes</span>
+      <div data-realtime-card="portal-counter" class="bg-black/20 rounded-2xl px-5 py-3.5 border border-white/20 text-center">
+        <span class="text-2xl font-black block">{{ total_propias }}</span>
+        <span class="text-[10px] text-white/80 font-bold uppercase tracking-wider">Mis Registros</span>
       </div>
-      <button type="button" onclick="document.getElementById('modal-nueva-solicitud-ciudadana').classList.remove('hidden')"
-              class="px-5 py-3 bg-white hover:bg-red-50 text-[#C41230] text-xs font-black rounded-2xl shadow-md transition-all flex items-center justify-center gap-2">
-        <i data-lucide="plus-circle" class="w-4 h-4"></i>
-        <span>Ingresar Requerimiento</span>
-      </button>
+      <a href="{% url 'perfil_usuario' %}"
+         class="px-5 py-3 bg-white hover:bg-red-50 text-[#C41230] text-xs font-black rounded-2xl shadow-md transition-all flex items-center justify-center gap-2">
+        <i data-lucide="user-cog" class="w-4 h-4"></i>
+        <span>Editar Mi Perfil y Foto</span>
+      </a>
     </div>
   </div>
 
-  <!-- Ficha de Datos del Vecino -->
-  {% if vecino %}
-  <div class="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  <!-- Ficha Exclusiva de Datos Personales del Cliente -->
+  <div data-realtime-card="portal-datos-personales" class="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
     <div class="flex items-center gap-4">
-      <div class="w-12 h-12 rounded-2xl bg-red-50 text-[#C41230] flex items-center justify-center shrink-0 border border-red-100 shadow-inner">
-        <i data-lucide="user" class="w-6 h-6"></i>
-      </div>
-      <div class="text-xs">
-        <h3 class="font-extrabold text-slate-900 text-sm">{{ vecino.nombre }}</h3>
-        <p class="text-slate-500 font-mono">RUT: <strong class="text-slate-800">{{ vecino.rut }}</strong> · Tel: {{ vecino.telefono|default:"No informado" }}</p>
-        <p class="text-slate-500">Dirección: {{ vecino.direccion|default:"No informada" }} {% if vecino.sector %}· Sector {{ vecino.sector.nombre }}{% endif %}</p>
+      {% if funcionario and funcionario.foto %}
+        <img src="{{ funcionario.foto.url }}" alt="{{ request.user.username }}" class="w-14 h-14 rounded-full object-cover ring-2 ring-[#C41230]/30 shadow-sm shrink-0" />
+      {% else %}
+        <div class="w-14 h-14 rounded-2xl bg-red-50 text-[#C41230] flex items-center justify-center shrink-0 border border-red-100 shadow-inner font-extrabold text-lg">
+          {{ request.user.first_name|default:request.user.username|make_list|first|upper }}
+        </div>
+      {% endif %}
+      <div class="text-xs space-y-1">
+        <div class="flex flex-wrap items-center gap-2">
+          <h3 class="font-extrabold text-slate-900 text-sm">
+            {% if vecino %}{{ vecino.nombre }}{% else %}{{ request.user.get_full_name|default:request.user.username }}{% endif %}
+          </h3>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-50 text-[#C41230] border border-red-200">
+            Mis Datos Personales
+          </span>
+        </div>
+        <p class="text-slate-600 font-mono">
+          {% if vecino %}RUT: <strong class="text-slate-900">{{ vecino.rut }}</strong> · {% endif %}
+          Correo: <strong class="text-slate-900">{{ request.user.email|default:"No informado" }}</strong> ·
+          Tel: <strong class="text-slate-900">{{ funcionario.telefono|default:vecino.telefono|default:"No informado" }}</strong>
+        </p>
+        {% if vecino %}
+          <p class="text-slate-500">
+            Dirección: <strong class="text-slate-700">{{ vecino.direccion|default:"No informada" }}</strong>
+            {% if vecino.sector %} · Sector: <strong class="text-slate-700">{{ vecino.sector.nombre }}</strong>{% elif vecino.territorio %} · Sector: <strong class="text-slate-700">{{ vecino.territorio }}</strong>{% endif %}
+          </p>
+        {% endif %}
       </div>
     </div>
-    <div class="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 px-3.5 py-2 rounded-2xl border border-slate-200">
+    <div class="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 px-3.5 py-2.5 rounded-2xl border border-slate-200 shrink-0">
       <i data-lucide="map-pin" class="w-4 h-4 text-[#C41230]"></i>
-      <span>Delegación: <strong>{{ vecino.delegacion.nombre|default:"Comuna de La Serena" }}</strong></span>
+      <span>Delegación: <strong>{% if vecino and vecino.delegacion %}{{ vecino.delegacion.nombre }}{% elif funcionario and funcionario.delegacion %}{{ funcionario.delegacion.nombre }}{% else %}Comuna de La Serena{% endif %}</strong></span>
     </div>
   </div>
-  {% endif %}
 
-  <!-- Listado de Solicitudes y Requerimientos -->
-  <div class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-4">
+  <!-- Tarjetas de Resumen de Registros Propios -->
+  <div data-realtime-card="portal-kpis" class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Total Propios</span>
+        <span class="text-2xl font-black text-slate-900">{{ total_propias }}</span>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+        <i data-lucide="layers" class="w-5 h-5"></i>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl p-4 border border-blue-200/80 shadow-sm flex items-center justify-between">
+      <div>
+        <span class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 block">Registradas</span>
+        <span class="text-2xl font-black text-blue-700">{{ registradas }}</span>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+        <i data-lucide="clock" class="w-5 h-5"></i>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl p-4 border border-amber-200/80 shadow-sm flex items-center justify-between">
+      <div>
+        <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 block">En Proceso</span>
+        <span class="text-2xl font-black text-amber-700">{{ en_proceso }}</span>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+        <i data-lucide="loader" class="w-5 h-5"></i>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-sm flex items-center justify-between">
+      <div>
+        <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 block">Resueltas</span>
+        <span class="text-2xl font-black text-emerald-700">{{ resueltas }}</span>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+        <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Buscador y Filtro de Registros Propios -->
+  <div class="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+    <form method="GET" action="{% url 'portal_cliente' %}" class="flex-1 flex flex-wrap items-center gap-3">
+      <div class="relative flex-1 min-w-[240px]">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+          <i data-lucide="search" class="w-4 h-4"></i>
+        </div>
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar en mis registros por código, tipo o descripción..."
+               class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230] font-medium" />
+      </div>
+
+      <select name="estado" onchange="this.form.submit()"
+              class="px-3 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+        <option value="">Estado: Todos mis registros</option>
+        <option value="Registrada" {% if filtro_estado == 'Registrada' %}selected{% endif %}>Registrada</option>
+        <option value="En proceso" {% if filtro_estado == 'En proceso' %}selected{% endif %}>En proceso</option>
+        <option value="Resuelta" {% if filtro_estado == 'Resuelta' %}selected{% endif %}>Resuelta</option>
+        <option value="Cancelada" {% if filtro_estado == 'Cancelada' %}selected{% endif %}>Cancelada</option>
+      </select>
+
+      {% if q or filtro_estado %}
+        <a href="{% url 'portal_cliente' %}" class="text-xs text-[#C41230] font-bold hover:underline py-2">Limpiar filtros</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Listado Exclusivo de Solicitudes y Registros Propios -->
+  <div data-realtime-card="portal-solicitudes" class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-4">
       <div class="flex items-center gap-2.5">
         <i data-lucide="clipboard-list" class="w-5 h-5 text-[#C41230]"></i>
-        <h2 class="text-base font-extrabold text-slate-900">Historial de Mis Atenciones y Requerimientos</h2>
+        <h2 class="text-base font-extrabold text-slate-900">Mis Solicitudes y Registros Propios</h2>
       </div>
-      <span class="text-xs font-bold text-slate-400 font-mono">{{ atenciones|length }} registrado(s)</span>
+      <span class="text-xs font-bold text-slate-400 font-mono">{{ total_filtradas|default:total_propias }} registro(s) propio(s)</span>
     </div>
 
     {% if atenciones %}
@@ -92,10 +176,9 @@
 
               <div>
                 <h4 class="font-extrabold text-slate-900 text-sm leading-tight">{{ a.tipo_atencion.nombre }}</h4>
-                <p class="text-[11px] text-slate-400 mt-0.5 font-medium">{{ a.sub_atencion.nombre }}</p>
+                <p class="text-[11px] text-slate-400 mt-0.5 font-medium">{{ a.sub_atencion.nombre }} · {{ a.delegacion.nombre }}</p>
               </div>
 
-              <!-- Roll en descripción para visualización limpia -->
               <div class="desc-roll text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs">
                 {{ a.descripcion }}
               </div>
@@ -118,69 +201,15 @@
           </div>
         {% endfor %}
       </div>
+
+      {% include "gestion/includes/paginator.html" %}
     {% else %}
       <div class="text-center py-12 text-slate-400 space-y-2">
         <i data-lucide="inbox" class="w-10 h-10 mx-auto text-slate-300"></i>
-        <p class="text-xs font-semibold">No tienes solicitudes registradas actualmente.</p>
-        <button type="button" onclick="document.getElementById('modal-nueva-solicitud-ciudadana').classList.remove('hidden')"
-                class="px-4 py-2 bg-[#C41230] text-white text-xs font-bold rounded-xl mt-2 inline-flex items-center gap-1.5">
-          <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
-          <span>Crear mi primer requerimiento</span>
-        </button>
+        <p class="text-xs font-semibold">No se encontraron registros propios con los criterios seleccionados.</p>
       </div>
     {% endif %}
   </div>
 
 </div>
-
-<!-- Modal Ingreso de Requerimiento Ciudadano -->
-<div id="modal-nueva-solicitud-ciudadana" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-lg space-y-4">
-    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-      <div>
-        <h3 class="text-base font-extrabold text-slate-900">Ingresar Requerimiento Vecinal</h3>
-        <p class="text-[11px] text-slate-400">Canal directo con la Ilustre Municipalidad de La Serena</p>
-      </div>
-      <button type="button" onclick="document.getElementById('modal-nueva-solicitud-ciudadana').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
-    </div>
-
-    <form method="POST" action="{% url 'portal_cliente' %}" class="space-y-4">
-      {% csrf_token %}
-
-      <div class="space-y-1">
-        <label class="block text-xs font-bold text-slate-700">Tipo de Requerimiento <span class="text-[#C41230]">*</span></label>
-        <select name="tipo_atencion_id" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-          <option value="">Selecciona el tipo de servicio...</option>
-          {% for t in tipos_activos %}
-            <option value="{{ t.id }}">{{ t.nombre }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="space-y-1">
-        <label class="block text-xs font-bold text-slate-700">Teléfono de Contacto</label>
-        <input type="text" name="telefono_contacto" maxlength="20" placeholder="+56 9 8765 4321" value="{{ vecino.telefono|default:'' }}"
-               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium" />
-      </div>
-
-      <div class="space-y-1">
-        <div class="flex items-center justify-between">
-          <label class="block text-xs font-bold text-slate-700">Descripción de tu Solicitud <span class="text-[#C41230]">*</span></label>
-          <span id="char-portal-desc" class="text-[10px] text-slate-400 font-mono">0 / 1000</span>
-        </div>
-        <textarea name="descripcion" required rows="4" maxlength="1000"
-                  oninput="document.getElementById('char-portal-desc').textContent = this.value.length + ' / 1000'"
-                  placeholder="Explica detalladamente la situación, ubicación exacta y antecedentes de tu requerimiento (máx 1000 caracteres)."
-                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium"></textarea>
-      </div>
-
-      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-        <button type="button" onclick="document.getElementById('modal-nueva-solicitud-ciudadana').classList.add('hidden')"
-                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cancelar</button>
-        <button type="submit" class="px-5 py-2 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-black rounded-xl shadow-md transition-all">Enviar Requerimiento</button>
-      </div>
-    </form>
-  </div>
-</div>
-
 {% endblock %}

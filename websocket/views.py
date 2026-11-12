@@ -1,27 +1,49 @@
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.views.decorators.http import require_POST
-from .services import publish_chat_message
+from core.context_processors import global_context
+from .services import publish_chat_message, get_recent_chat_messages
+
+def _resolve_user_org_id(user):
+    try:
+        func = getattr(user, 'funcionario', None)
+        return str(func.delegacion_id) if func and func.delegacion_id else 'global'
+    except (ObjectDoesNotExist, AttributeError):
+        return 'global'
 
 @login_required
 def chat_room(request):
-    return render(request, "websocket/chat.html")
+    ctx = global_context(request)
+    if ctx.get('permisos', {}).get('es_cliente'):
+        return redirect('portal_cliente')
+    org_id = _resolve_user_org_id(request.user)
+    return render(request, "websocket/chat.html", {
+        "initial_messages": get_recent_chat_messages(org_id),
+    })
 
 @login_required
 @require_POST
 def send_message(request):
-    try:
-        func = getattr(request.user, 'funcionario', None)
-        org_id = func.delegacion_id if func and func.delegacion_id else 'global'
-    except (ObjectDoesNotExist, AttributeError):
-        org_id = 'global'
+    ctx = global_context(request)
+    if ctx.get('permisos', {}).get('es_cliente'):
+        return JsonResponse({"error": "Acceso denegado."}, status=403)
+    org_id = _resolve_user_org_id(request.user)
 
     message = request.POST.get("message", "").strip()
+    msg_id = request.POST.get("id", "").strip() or None
     if not 1 <= len(message) <= 300:
         return JsonResponse({"error": "Mensaje inválido. Debe tener entre 1 y 300 caracteres."}, status=400)
 
-    publish_chat_message(request.user, org_id, message)
-    return JsonResponse({"ok": True})
+    msg_payload = publish_chat_message(request.user, org_id, message, msg_id=msg_id)
+    return JsonResponse({"ok": True, "item": msg_payload})
+
+@login_required
+def messages_feed(request):
+    ctx = global_context(request)
+    if ctx.get('permisos', {}).get('es_cliente'):
+        return JsonResponse({"error": "Acceso denegado."}, status=403)
+    org_id = _resolve_user_org_id(request.user)
+    return JsonResponse({"ok": True, "messages": get_recent_chat_messages(org_id)})
 

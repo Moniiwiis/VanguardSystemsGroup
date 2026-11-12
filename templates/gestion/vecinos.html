@@ -31,16 +31,18 @@
         <span>Delegación Activa: <strong>{% if delegacion_activa %}{{ delegacion_activa.nombre }}{% elif delegacion_seleccionada %}{{ delegacion_seleccionada.nombre }}{% else %}Global (Todas){% endif %}</strong></span>
       </div>
 
-      {% if not es_admin or delegacion_activa %}
-        <button type="button" onclick="document.getElementById('modal-crear-vecino').classList.remove('hidden')"
-                class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
-          <i data-lucide="user-plus" class="w-4 h-4"></i>
-          <span>Nuevo Vecino</span>
-        </button>
-      {% else %}
-        <span class="max-w-xs text-right text-xs font-semibold text-slate-500">
-          Selecciona una delegación activa en la cabecera para registrar un vecino.
-        </span>
+      {% if not permisos.es_consultor %}
+        {% if not es_admin or delegacion_activa %}
+          <button type="button" onclick="document.getElementById('modal-crear-vecino').classList.remove('hidden')"
+                  class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
+            <i data-lucide="user-plus" class="w-4 h-4"></i>
+            <span>Nuevo Vecino</span>
+          </button>
+        {% else %}
+          <span class="max-w-xs text-right text-xs font-semibold text-slate-500">
+            Selecciona una delegación activa en la cabecera para registrar un vecino.
+          </span>
+        {% endif %}
       {% endif %}
     </div>
   </div>
@@ -84,6 +86,12 @@
         <a href="{% url 'gestion_vecinos' %}" class="text-xs text-[#C41230] font-bold hover:underline py-2">Limpiar filtros</a>
       {% endif %}
     </form>
+
+    <a href="?q={{ q }}&estado={{ filtro_estado }}&orden={{ orden }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}&export=excel"
+       class="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
+      <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+      <span>Exportar Excel</span>
+    </a>
   </div>
 
   <!-- Table Card (Diseño Optimizado 100% Pantalla sin Scroll Horizontal) -->
@@ -152,18 +160,22 @@
                         class="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
+                {% if not permisos.es_consultor %}
                 <button type="button" 
                         onclick="openEditVecino('{{ v.id }}', '{{ v.nombre|escapejs }}', '{{ v.rut|escapejs }}', '{{ v.direccion|default:''|escapejs }}', '{{ v.telefono|default:''|escapejs }}', '{{ v.sector.id|default:'' }}', '{{ v.delegacion.id|default:'' }}', '{% if v.delegacion %}{{ v.delegacion.nombre|escapejs }}{% elif delegacion_activa %}{{ delegacion_activa.nombre|escapejs }}{% else %}Sin delegación{% endif %}', '{{ v.tipo_gestion.id|default:'' }}', '{{ v.estado|escapejs }}')" 
                         title="Editar vecino"
                         class="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all">
                   <i data-lucide="edit-3" class="w-4 h-4"></i>
                 </button>
+                {% endif %}
+                {% if permisos.puede_eliminar %}
                 <form method="POST" action="{% url 'gestion_vecinos_eliminar' v.id %}" onsubmit="return confirmDelete(this, '{{ v.nombre|escapejs }}');" class="inline">
                   {% csrf_token %}
                   <button type="submit" title="Eliminar vecino" class="p-1.5 rounded-lg text-slate-600 hover:text-red-600 hover:bg-red-50 transition-all">
                     <i data-lucide="trash-2" class="w-4 h-4 text-red-500"></i>
                   </button>
                 </form>
+                {% endif %}
               </div>
             </td>
           </tr>

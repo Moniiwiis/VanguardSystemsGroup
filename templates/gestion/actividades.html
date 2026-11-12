@@ -71,11 +71,11 @@
       </div>
       <div>
         <label class="block text-slate-700 mb-1">Descripción de la Solicitud / Problema *</label>
-        <textarea name="descripcion_solicitud" required rows="2" placeholder="Describe la solicitud" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal"></textarea>
+        <textarea name="descripcion_solicitud" required rows="2" maxlength="1000" placeholder="Describe la solicitud (máximo 1000 caracteres)" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal"></textarea>
       </div>
       <div>
         <label class="block text-slate-700 mb-1">Acción Ejecutada en Terreno *</label>
-        <textarea name="accion_ejecutada" required rows="2" placeholder="Describe la acción realizada" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal"></textarea>
+        <textarea name="accion_ejecutada" required rows="2" maxlength="1000" placeholder="Describe la acción realizada (máximo 1000 caracteres)" class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal"></textarea>
       </div>
       <!-- Datos del usuario atendido -->
       <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
@@ -146,19 +146,29 @@
             <td class="p-4 font-bold text-slate-900">{{ act.funcionario }}</td>
             <td class="p-4">{{ act.item }}</td>
             <td class="p-4">
-              <div class="flex flex-col gap-1">
+              <div class="flex flex-col gap-1.5">
                 {% for evidencia in act.evidencias.all %}
-                  <div class="flex flex-col gap-1">
-                    <span class="text-[10px] font-bold text-slate-500">{{ evidencia.get_momento_display }}</span>
-                  {% if evidencia.imagen %}
-                    <a href="{{ evidencia.imagen.url }}" target="_blank" rel="noopener" class="text-[#C41230] hover:underline">Ver imagen</a>
-                  {% endif %}
-                  {% if evidencia.archivo %}
-                    <a href="{{ evidencia.archivo.url }}" target="_blank" rel="noopener" class="text-[#C41230] hover:underline">{{ evidencia.archivo.name|cut:"evidencias/archivos/" }}</a>
-                  {% endif %}
+                  <div class="flex items-center justify-between gap-2 p-1.5 rounded-lg border border-slate-100 bg-slate-50/70" data-momento="{{ evidencia.momento }}">
+                    <div class="flex items-center gap-1.5">
+                      {% if evidencia.momento == 'antes' %}
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">Antes</span>
+                      {% else %}
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">Después</span>
+                      {% endif %}
+                      {% if evidencia.imagen %}
+                        <a href="{{ evidencia.imagen.url }}" data-momento="{{ evidencia.momento }}" data-titulo="Evidencia {{ evidencia.get_momento_display }} ({{ act.codigo_evidencia_unico }})" class="visor-evidencia text-[#C41230] font-bold hover:underline flex items-center gap-1 text-[11px]">
+                          <i data-lucide="image" class="w-3.5 h-3.5"></i><span>Ver imagen</span>
+                        </a>
+                      {% endif %}
+                      {% if evidencia.archivo %}
+                        <a href="{{ evidencia.archivo.url }}" data-momento="{{ evidencia.momento }}" data-titulo="Evidencia {{ evidencia.get_momento_display }} ({{ act.codigo_evidencia_unico }})" class="visor-evidencia text-[#C41230] font-bold hover:underline flex items-center gap-1 text-[11px]">
+                          <i data-lucide="file-text" class="w-3.5 h-3.5"></i><span>Ver archivo</span>
+                        </a>
+                      {% endif %}
+                    </div>
                   </div>
                 {% empty %}
-                  <span class="text-slate-400">Sin archivos</span>
+                  <span class="text-slate-400 text-xs">Sin archivos</span>
                 {% endfor %}
               </div>
             </td>
@@ -197,11 +207,11 @@
                   </div>
                   <div>
                     <label class="block text-slate-700 mb-1">Descripción de Solicitud</label>
-                    <textarea name="descripcion_solicitud" required rows="2" class="w-full p-2.5 rounded-xl border border-slate-200">{{ act.descripcion_solicitud }}</textarea>
+                    <textarea name="descripcion_solicitud" required rows="2" maxlength="1000" class="w-full p-2.5 rounded-xl border border-slate-200">{{ act.descripcion_solicitud }}</textarea>
                   </div>
                   <div>
                     <label class="block text-slate-700 mb-1">Acción Ejecutada</label>
-                    <textarea name="accion_ejecutada" required rows="2" class="w-full p-2.5 rounded-xl border border-slate-200">{{ act.accion_ejecutada }}</textarea>
+                    <textarea name="accion_ejecutada" required rows="2" maxlength="1000" class="w-full p-2.5 rounded-xl border border-slate-200">{{ act.accion_ejecutada }}</textarea>
                   </div>
                   <div class="grid grid-cols-2 gap-2">
                     <div>

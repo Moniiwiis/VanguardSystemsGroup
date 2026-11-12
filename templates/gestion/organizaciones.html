@@ -331,6 +331,7 @@
                           class="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all">
                     <i data-lucide="edit-3" class="w-4 h-4"></i>
                   </button>
+                  {% if permisos.puede_eliminar %}
                   <form method="POST" action="{% url 'gestion_organizaciones_eliminar' o.id %}"
                         onsubmit="return confirmDelete(this, '{{ o.nombre|escapejs }}');" class="inline">
                     {% csrf_token %}
@@ -339,6 +340,7 @@
                       <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
                   </form>
+                  {% endif %}
                 {% endif %}
               </div>
             </td>
@@ -516,7 +518,7 @@
 
         <div class="sm:col-span-3 space-y-1">
           <label class="block text-xs font-bold text-slate-700">Nómina de Directiva Actual</label>
-          <textarea name="directiva_actual" rows="2" maxlength="500" placeholder="Presidente, Secretario, Tesorero, Directores..."
+          <textarea name="directiva_actual" rows="2" maxlength="1000" placeholder="Presidente, Secretario, Tesorero, Directores..."
                     class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
         </div>
         <div class="sm:col-span-3 space-y-1">
@@ -647,7 +649,7 @@
 
         <div class="sm:col-span-3 space-y-1">
           <label class="block text-xs font-bold text-slate-700">Nómina de Directiva Actual</label>
-          <textarea id="edit-org-directiva" name="directiva_actual" rows="2" maxlength="500"
+          <textarea id="edit-org-directiva" name="directiva_actual" rows="2" maxlength="1000"
                     class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
         </div>
         <div class="sm:col-span-3 space-y-1">

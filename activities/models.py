@@ -1,4 +1,5 @@
 import uuid
+import datetime
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
@@ -143,6 +144,12 @@ class Actividad(BaseModel):
         if not val:
             return 'Pendiente'
         return val.resultado
+
+    def tiene_evidencias_completas(self):
+        evis = self.evidencias.filter(
+            Q(imagen__gt='') | Q(archivo__gt='')
+        )
+        return evis.filter(momento='antes').exists() and evis.filter(momento='despues').exists()
 
     def __str__(self):
         return f"Actividad {self.codigo_evidencia_unico} {'✓' if self.da_puntaje else '✗'}"
@@ -343,6 +350,11 @@ class AtencionCiudadana(BaseModel):
             return self.actividad.estado_validacion()
         return "Pendiente"
 
+    def tiene_evidencias_completas(self):
+        if not self.actividad_id:
+            return False
+        return self.actividad.tiene_evidencias_completas()
+
     def save(self, *args, **kwargs):
         is_new = self.id is None
         if not self.codigo_atencion:
@@ -355,60 +367,123 @@ class AtencionCiudadana(BaseModel):
             self.creado_por = self.usuario_responsable
         super().save(*args, **kwargs)
 
-        if not self.actividad:
-            from configuration.models import ItemMedicion, Periodo
-            from accounts.models import Funcionario, FuncionarioRol
-
-            func = Funcionario.all_objects.filter(user=self.usuario_responsable).first()
-            if not func and self.delegacion:
-                func = Funcionario.all_objects.filter(delegacion=self.delegacion).first()
-            if not func:
-                func = Funcionario.all_objects.first()
-
-            periodo = Periodo.objects.filter(estado='Abierto').first() or Periodo.objects.first()
-            item = None
-            if self.tipo_atencion and 'social' in self.tipo_atencion.nombre.lower():
-                item = ItemMedicion.objects.filter(nombre_item__icontains='social').first()
-            if not item:
-                item = ItemMedicion.objects.filter(nombre_item__icontains='operativo').first() or ItemMedicion.objects.first()
-
-            if func and periodo and item:
-                hoy = timezone.now().date()
-                fecha_act = hoy
-                if periodo.fecha_inicio and periodo.fecha_termino:
-                    if hoy < periodo.fecha_inicio:
-                        fecha_act = periodo.fecha_inicio
-                    elif hoy > periodo.fecha_termino:
-                        fecha_act = periodo.fecha_termino
-
-                # Detectar si el responsable es Delegado
-                es_delegado = False
-                if func:
-                    fr = FuncionarioRol.objects.filter(funcionario=func).select_related('rol').first()
-                    if fr and fr.rol and 'delegado' in fr.rol.nombre_rol.lower():
-                        es_delegado = True
-
-                # Verificar contacto completo
-                contacto_nombre = self.solicitante[:100] if self.solicitante else None
-                contacto_tel = self.telefono_contacto or (
-                    self.vecino.telefono if self.vecino else None
-                )
-
-                act = Actividad.objects.create(
-                    fecha_actividad=fecha_act,
-                    descripcion_solicitud=self.descripcion or f"Solicitud ciudadana {self.codigo_atencion}",
-                    accion_ejecutada=f"Atención ciudadana {self.codigo_atencion} ({self.tipo_atencion.nombre if self.tipo_atencion else 'General'})",
-                    contacto_nombre=contacto_nombre,
-                    contacto_telefono=contacto_tel,
-                    funcionario=func,
-                    item=item,
-                    periodo=periodo,
-                    tipo_registro=self.tipo_registro,
-                    es_gestion_delegado=es_delegado,
-                    va_a_tubo=self.va_a_tubo,
-                )
-                self.actividad = act
-                super().save(update_fields=['actividad'])
+        if not self.actividad_id:
+            get_or_create_actividad_para_atencion(self)
 
     def __str__(self):
         return f"{self.codigo_atencion} - {self.solicitante}"
+
+
+def get_or_create_actividad_para_atencion(atencion):
+    """
+    Garantiza que una AtencionCiudadana tenga una Actividad vinculada con código EVI único,
+    generando dinámicamente cualquier dependencia faltante en la base de datos (Funcionario, Periodo, ItemMedicion).
+    """
+    if atencion.actividad_id:
+        try:
+            return atencion.actividad
+        except Exception:
+            pass
+
+    import datetime
+    from django.utils import timezone
+    from configuration.models import Periodo, ItemMedicion
+    from accounts.models import Funcionario, FuncionarioRol, Delegacion, Cargo
+    from django.contrib.auth.models import User
+
+    # 1. Funcionario responsable
+    func = None
+    if atencion.usuario_responsable_id:
+        func = Funcionario.all_objects.filter(user_id=atencion.usuario_responsable_id).first()
+    if not func and atencion.delegacion_id:
+        func = Funcionario.all_objects.filter(delegacion_id=atencion.delegacion_id).first()
+    if not func:
+        func = Funcionario.all_objects.first()
+    if not func:
+        del_obj = atencion.delegacion or Delegacion.objects.first()
+        if not del_obj:
+            del_obj = Delegacion.objects.create(nombre="Delegación Centro", codigo="DEL01", estado="Activa")
+        cargo_obj = Cargo.objects.first()
+        if not cargo_obj:
+            cargo_obj = Cargo.objects.create(nombre_cargo="Operador Territorial", estado="Activo")
+        user_obj = atencion.usuario_responsable or atencion.creado_por or User.objects.filter(is_superuser=True).first() or User.objects.first()
+        func = Funcionario.objects.create(
+            user=user_obj,
+            identificador_institucional=f"FUNC-{user_obj.id if user_obj else 1:04d}",
+            cargo=cargo_obj,
+            delegacion=del_obj,
+            estado="Activo",
+        )
+
+    # 2. Período
+    periodo = Periodo.objects.filter(estado='Abierto').first() or Periodo.objects.first()
+    if not periodo:
+        anio = timezone.now().year
+        periodo = Periodo.objects.create(
+            fecha_inicio=datetime.date(anio, 1, 1),
+            fecha_termino=datetime.date(anio, 12, 31),
+            dias_computables=365,
+            estado='Abierto',
+        )
+
+    # 3. Ítem de medición
+    item = None
+    if atencion.tipo_atencion and 'social' in atencion.tipo_atencion.nombre.lower():
+        item = ItemMedicion.objects.filter(nombre_item__icontains='social').first()
+    if not item:
+        item = ItemMedicion.objects.filter(nombre_item__icontains='operativo').first()
+    if not item:
+        item = ItemMedicion.objects.first()
+    if not item:
+        item = ItemMedicion.objects.create(
+            nombre_item="Atención Ciudadana y Requerimientos Territoriales",
+            descripcion="Ítem base para requerimientos territoriales y evidencias SGR",
+            estado="Activo",
+        )
+
+    # 4. Fecha válida
+    hoy = timezone.now().date()
+    fecha_act = hoy
+    if periodo.fecha_inicio and periodo.fecha_termino:
+        if hoy < periodo.fecha_inicio:
+            fecha_act = periodo.fecha_inicio
+        elif hoy > periodo.fecha_termino:
+            fecha_act = periodo.fecha_termino
+
+    # 5. Código único de evidencia EVI
+    fecha_str = timezone.now().strftime('%Y%m%d')
+    uid = uuid.uuid4().hex[:6].upper()
+    cod_evi = f"EVI-{fecha_str}-{uid}"
+
+    # 6. Datos de contacto seguros
+    contacto_nombre = (atencion.solicitante[:100] if atencion.solicitante else 'Vecino/a')
+    contacto_tel = atencion.telefono_contacto or (atencion.vecino.telefono if atencion.vecino else None)
+    if contacto_tel:
+        contacto_tel = str(contacto_tel)[:20]
+
+    # 7. Rol delegado
+    es_delegado = False
+    if func:
+        fr = FuncionarioRol.objects.filter(funcionario=func).select_related('rol').first()
+        if fr and fr.rol and 'delegado' in fr.rol.nombre_rol.lower():
+            es_delegado = True
+
+    # 8. Crear actividad
+    actividad = Actividad.objects.create(
+        codigo_evidencia_unico=cod_evi,
+        fecha_actividad=fecha_act,
+        descripcion_solicitud=atencion.descripcion or f"Solicitud ciudadana {atencion.codigo_atencion}",
+        accion_ejecutada=f"Atención ciudadana {atencion.codigo_atencion} ({atencion.tipo_atencion.nombre if atencion.tipo_atencion else 'General'})",
+        contacto_nombre=contacto_nombre,
+        contacto_telefono=contacto_tel,
+        funcionario=func,
+        item=item,
+        periodo=periodo,
+        tipo_registro=getattr(atencion, 'tipo_registro', 'accion') or 'accion',
+        es_gestion_delegado=es_delegado,
+        va_a_tubo=getattr(atencion, 'va_a_tubo', False),
+    )
+
+    AtencionCiudadana.all_objects.filter(id=atencion.id).update(actividad=actividad)
+    atencion.actividad = actividad
+    return actividad

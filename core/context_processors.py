@@ -35,6 +35,9 @@ def global_context(request):
         delegacion_sesion_id = request.session.get('delegacion_activa_id')
         if delegacion_sesion_id and delegacion_sesion_id != 'global' and str(delegacion_sesion_id) != '0':
             delegacion_activa = Delegacion.objects.filter(id=delegacion_sesion_id, estado='Activa').first()
+        elif delegacion_sesion_id is None and funcionario and funcionario.delegacion:
+            delegacion_activa = funcionario.delegacion
+            request.session['delegacion_activa_id'] = delegacion_activa.id
         else:
             delegacion_activa = None  # Ámbito Global comunal
     else:
@@ -55,7 +58,7 @@ def global_context(request):
     es_coordinador = es_admin or ('coordinador' in rol_name.lower())
     es_delegado = es_admin or ('delegado' in rol_name.lower())
     es_operador = ('operador' in rol_name.lower()) or ('funcionario' in rol_name.lower())
-    es_consultor = ('consultor' in rol_name.lower())
+    es_consultor = ('consultor' in rol_name.lower()) or ('lector' in rol_name.lower())
     es_cliente = ('cliente' in rol_name.lower())
 
     permisos = {
@@ -65,6 +68,9 @@ def global_context(request):
         'es_operador': es_operador,
         'es_consultor': es_consultor,
         'es_cliente': es_cliente,
+        'puede_crear': not (es_consultor or es_cliente),
+        'puede_editar': not (es_consultor or es_cliente),
+        'puede_eliminar': es_admin or es_coordinador or es_delegado,
         'puede_ingresar_atencion': not (es_consultor or es_cliente),
         'puede_cambiar_estado_atencion': not (es_consultor or es_cliente),
         # Módulos permitidos en el menú lateral:
@@ -76,10 +82,10 @@ def global_context(request):
         'ver_tipo_atencion': es_admin or es_coordinador,
         'ver_sub_atencion': es_admin or es_coordinador,
         'ver_atenciones': not es_cliente,
-        'ver_organizaciones': es_admin or es_coordinador or es_delegado or es_operador,
+        'ver_organizaciones': not es_cliente,
         'ver_tipo_gestion': es_admin or es_coordinador,
-        'ver_vecinos': es_admin or es_coordinador or es_delegado or es_operador,
-        'ver_sectores': es_admin or es_coordinador or es_delegado or es_operador,
+        'ver_vecinos': not es_cliente,
+        'ver_sectores': not es_cliente,
         'ver_reportes': es_admin or es_coordinador or es_delegado,
         'ver_portal_cliente': es_cliente,
     }
