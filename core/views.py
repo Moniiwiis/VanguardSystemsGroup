@@ -908,7 +908,7 @@ def gestion_usuarios(request):
 
     if request.method == 'POST':
         if not ctx['permisos'].get('puede_crear', True):
-            messages.error(request, "Acceso denegado: El perfil Lector/Consultor opera en modo solo lectura.")
+            messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para realizar esta acción.")
             return redirect('gestion_usuarios')
         nombre = request.POST.get('nombre', '').strip()
         correo = request.POST.get('correo', '').strip()
@@ -1663,7 +1663,7 @@ def gestion_atenciones(request):
     # Procesar guardado de atención
     if request.method == 'POST':
         if not ctx['permisos'].get('puede_ingresar_atencion', True):
-            messages.error(request, "Acceso denegado: El perfil Consultor opera exclusivamente en modo solo lectura y no puede ingresar atenciones.")
+            messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para ingresar atenciones.")
             return redirect('gestion_atenciones')
         if not del_activa:
             messages.error(request, "Selecciona una delegación activa antes de ingresar una atención.")
@@ -2129,7 +2129,7 @@ def gestion_atenciones(request):
 def gestion_atenciones_editar(request, atencion_id):
     ctx = global_context(request)
     if request.method != 'POST' or not ctx['permisos'].get('puede_ingresar_atencion', True):
-        messages.error(request, "Acceso denegado: El perfil Consultor opera exclusivamente en modo solo lectura.")
+        messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para realizar esta acción.")
         return redirect('gestion_atenciones')
 
     atencion = get_object_or_404(
@@ -2285,7 +2285,7 @@ def gestion_atenciones_eliminar(request, atencion_id):
 def gestion_atenciones_estado(request, atencion_id):
     ctx = global_context(request)
     if not ctx['permisos'].get('puede_cambiar_estado_atencion', True):
-        messages.error(request, "Acceso denegado: El perfil Consultor opera exclusivamente en modo solo lectura.")
+        messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para realizar esta acción.")
         return redirect('gestion_atenciones')
 
     atencion = get_object_or_404(AtencionCiudadana, id=atencion_id)
@@ -2575,7 +2575,7 @@ def gestion_vecinos(request):
 
     if request.method == 'POST':
         if not ctx['permisos'].get('puede_crear', True):
-            messages.error(request, "Acceso denegado: El perfil Lector/Consultor opera en modo solo lectura.")
+            messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para realizar esta acción.")
             return redirect('gestion_vecinos')
         nombre = request.POST.get('nombre', '').strip()
         rut = request.POST.get('rut', '').strip()
@@ -2882,7 +2882,7 @@ def gestion_sectores(request):
 
     if request.method == 'POST':
         if not ctx['permisos'].get('puede_crear', True):
-            messages.error(request, "Acceso denegado: El perfil Lector/Consultor opera en modo solo lectura.")
+            messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para realizar esta acción.")
             return redirect('gestion_sectores')
         nombre = request.POST.get('nombre', '').strip()
         codigo = request.POST.get('codigo', '').strip().upper()
@@ -3674,7 +3674,7 @@ def gestion_organizaciones(request):
     # Procesar creación de nueva organización comunitaria / JJVV
     if request.method == 'POST':
         if not ctx['permisos'].get('puede_crear', True):
-            messages.error(request, "Acceso denegado: El perfil Lector/Consultor opera en modo solo lectura.")
+            messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para realizar esta acción.")
             return redirect('gestion_organizaciones')
         nombre = request.POST.get('nombre', '').strip()
         tipo_org = request.POST.get('tipo_organizacion', 'Junta de Vecinos').strip()
@@ -4705,7 +4705,7 @@ def gestion_tubo_cambiar_estado(request, atencion_id):
     """
     ctx = global_context(request)
     if request.method != 'POST' or not ctx['permisos'].get('puede_cambiar_estado_atencion', True):
-        messages.error(request, "Acceso denegado: El perfil Lector/Consultor opera en modo solo lectura.")
+        messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para realizar esta acción.")
         return redirect('gestion_tubo')
 
     atencion = get_object_or_404(AtencionCiudadana, id=atencion_id)

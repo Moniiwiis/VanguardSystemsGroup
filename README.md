@@ -1,5 +1,5 @@
 # Sistema Municipal SGR — Municipalidad de La Serena
-**VanguardSystemsGroup · Proyecto Integrado 4to Semestre INACAP · Evaluación 3**
+**VanguardSystemsGroup · Proyecto Integrado y Programación BackEnd - INACAP La Serena 2026**
 
 ---
 
@@ -267,4 +267,4 @@ DATABASE_URL=sqlite:///db.sqlite3
 
 ---
 
-*Sistema desarrollado como proyecto académico para la asignatura Proyecto Integrado — INACAP La Serena, 4to Semestre 2026.*
+*Sistema desarrollado como proyecto académico para la asignatura Proyecto Integrado y Programación BackEnd — INACAP La Serena, 4to Semestre 2026.*
