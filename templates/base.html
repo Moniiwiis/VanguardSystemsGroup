@@ -52,7 +52,7 @@
     }
     html.sgr-sidebar-collapsed #appLayoutContainer,
     html.sgr-sidebar-collapsed #appHeaderInner {
-      max-width: 1540px !important;
+      max-width: 1480px !important;
     }
     html.sgr-sidebar-collapsed [data-sidebar-icon-open] {
       display: none !important;
@@ -63,7 +63,7 @@
     /* Tablas consistentes: al estar el menú desplegado mantienen su ancho legible con scroll horizontal */
     @media (min-width: 768px) {
       html:not(.sgr-sidebar-collapsed) .overflow-x-auto > table {
-        min-width: min(1240px, calc(100vw - 4rem));
+        min-width: min(1180px, calc(100vw - 4rem));
       }
     }
     /* Barra de desplazamiento horizontal limpia para tablas */
@@ -506,18 +506,6 @@
         </div>
 
       </nav>
-
-      <!-- Card Informativa Institucional -->
-      <div class="bg-white rounded-3xl p-4 shadow-sm border border-[rgba(196,18,48,0.15)] text-center flex flex-col items-center gap-2">
-        <img src="{% static 'vertical-color.svg' %}" 
-             alt="Escudo La Serena" 
-             class="h-10 w-auto object-contain"
-             onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
-        <p class="text-[10px] text-slate-500 font-medium">
-          Ilustre Municipalidad de La Serena<br>
-          <span class="font-bold text-slate-700">Gestión de Atención Ciudadana</span>
-        </p>
-      </div>
 
     </aside>
 

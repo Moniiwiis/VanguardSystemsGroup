@@ -617,26 +617,26 @@
                   </span>
                 {% endif %}
               </td>
-              <td class="py-2.5 px-2.5 font-bold text-slate-900 whitespace-nowrap">
-                <span>{{ a.solicitante }}</span>
+              <td class="py-2.5 px-2.5 font-bold text-slate-900 max-w-[210px]">
+                <span class="leading-snug">{{ a.solicitante }}</span>
                 {% if a.organizacion %}
                   <span class="inline-flex items-center gap-1 px-1.5 py-0.5 ml-1 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
                     {{ a.organizacion.tipo_organizacion }}
                   </span>
                 {% endif %}
                 {% if a.vecino and a.vecino.telefono %}
-                  <div class="text-[10px] text-slate-500 font-mono font-semibold flex items-center gap-1 mt-0.5">
-                    <i data-lucide="phone" class="w-3 h-3 text-[#C41230]"></i>
+                  <div class="text-[10px] text-slate-500 font-mono font-semibold flex items-center gap-1 mt-0.5 whitespace-nowrap">
+                    <i data-lucide="phone" class="w-3 h-3 text-[#C41230] shrink-0"></i>
                     <span>{{ a.vecino.telefono }}</span>
                   </div>
                 {% elif a.telefono_contacto %}
-                  <div class="text-[10px] text-slate-500 font-mono font-semibold flex items-center gap-1 mt-0.5">
-                    <i data-lucide="phone" class="w-3 h-3 text-[#C41230]"></i>
+                  <div class="text-[10px] text-slate-500 font-mono font-semibold flex items-center gap-1 mt-0.5 whitespace-nowrap">
+                    <i data-lucide="phone" class="w-3 h-3 text-[#C41230] shrink-0"></i>
                     <span>{{ a.telefono_contacto }}</span>
                   </div>
                 {% elif a.organizacion and a.organizacion.telefono_contacto %}
-                  <div class="text-[10px] text-slate-500 font-mono font-semibold flex items-center gap-1 mt-0.5">
-                    <i data-lucide="phone" class="w-3 h-3 text-[#C41230]"></i>
+                  <div class="text-[10px] text-slate-500 font-mono font-semibold flex items-center gap-1 mt-0.5 whitespace-nowrap">
+                    <i data-lucide="phone" class="w-3 h-3 text-[#C41230] shrink-0"></i>
                     <span>{{ a.organizacion.telefono_contacto }}</span>
                   </div>
                 {% endif %}
@@ -653,7 +653,7 @@
                   <span class="text-[10px] text-slate-400 block font-normal">{{ a.organizacion.territorio }}</span>
                 {% endif %}
               </td>
-              <td class="py-2.5 px-2.5 whitespace-nowrap">
+              <td class="py-2.5 px-2.5 max-w-[175px]">
                 <span class="font-bold text-slate-900 block leading-tight">{{ a.tipo_atencion.nombre }}</span>
                 <span class="text-slate-400 block text-[10px] mt-0.5">{{ a.sub_atencion.nombre }}</span>
               </td>

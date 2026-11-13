@@ -653,37 +653,37 @@
       <table class="w-full text-left text-xs text-slate-700">
         <thead class="bg-slate-50 text-slate-700 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200">
           <tr>
-            <th class="py-2.5 px-2.5 whitespace-nowrap">N° Tubo</th>
-            <th class="py-2.5 px-2.5 whitespace-nowrap">Fecha Solicitud</th>
-            <th class="py-2.5 px-2.5 whitespace-nowrap">Solicitante</th>
-            <th class="py-2.5 px-2.5 whitespace-nowrap">Territorio</th>
-            <th class="py-2.5 px-2.5 whitespace-nowrap">Tipo / Sub Atención</th>
-            <th class="py-2.5 px-2.5 whitespace-nowrap">Evidencia SGR</th>
-            <th class="py-2.5 px-2.5 whitespace-nowrap">Responsable</th>
-            <th class="py-2.5 px-2.5 whitespace-nowrap">Fecha Compromiso</th>
-            <th class="py-2.5 px-2.5 whitespace-nowrap">Área de Apoyo</th>
-            <th class="py-2.5 px-2.5 whitespace-nowrap">Avance / Observaciones</th>
-            <th class="py-2.5 px-2.5 text-center whitespace-nowrap">Estatus</th>
-            <th class="py-2.5 px-2.5 text-center whitespace-nowrap sticky right-0 bg-slate-50 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acciones</th>
+            <th class="py-2.5 px-2 whitespace-nowrap">N° Tubo</th>
+            <th class="py-2.5 px-2 leading-tight w-[86px]">Fecha Solicitud</th>
+            <th class="py-2.5 px-2 whitespace-nowrap">Solicitante</th>
+            <th class="py-2.5 px-2 whitespace-nowrap">Territorio</th>
+            <th class="py-2.5 px-2 leading-tight">Tipo / Sub Atención</th>
+            <th class="py-2.5 px-2 whitespace-nowrap">Evidencia SGR</th>
+            <th class="py-2.5 px-2 whitespace-nowrap">Responsable</th>
+            <th class="py-2.5 px-2 leading-tight w-[94px]">Fecha Compromiso</th>
+            <th class="py-2.5 px-2 leading-tight">Área de Apoyo</th>
+            <th class="py-2.5 px-2 leading-tight">Avance / Observaciones</th>
+            <th class="py-2.5 px-2 text-center whitespace-nowrap">Estatus</th>
+            <th class="py-2.5 px-2 text-center whitespace-nowrap sticky right-0 bg-slate-50 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acciones</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100 font-medium">
           {% for at in atenciones_tubo %}
           <tr class="hover:bg-slate-50/80 transition-colors">
             <!-- N° Tubo -->
-            <td class="py-2.5 px-2.5 font-mono whitespace-nowrap">
+            <td class="py-2.5 px-2 font-mono whitespace-nowrap">
               <span class="font-extrabold text-[#C41230] block">{{ at.codigo_tubo }}</span>
               <span class="text-[10px] font-bold {% if at.es_atencion %}text-slate-500{% else %}text-purple-700{% endif %}">{{ at.codigo_atencion }} · {{ at.origen|default:"EXT" }}</span>
             </td>
 
             <!-- Fecha Solicitud -->
-            <td class="py-2.5 px-2.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+            <td class="py-2.5 px-2 font-mono text-[11px] text-slate-600 whitespace-nowrap">
               {{ at.created_at|date:"d/m/Y" }}
             </td>
 
             <!-- Solicitante -->
-            <td class="py-2.5 px-2.5 whitespace-nowrap">
-              <div class="font-bold text-slate-900">
+            <td class="py-2.5 px-2 max-w-[190px]">
+              <div class="font-bold text-slate-900 leading-snug">
                 <span>{{ at.solicitante }}</span>
                 {% if at.organizacion %}
                   <span class="inline-flex items-center px-1.5 py-0.5 ml-1 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
@@ -700,21 +700,21 @@
             </td>
 
             <!-- Territorio -->
-            <td class="py-2.5 px-2.5 text-[11px] whitespace-nowrap">
-              <span class="font-bold text-slate-800">{{ at.delegacion.nombre|default:"—" }}</span>
+            <td class="py-2.5 px-2 text-[11px] max-w-[160px]">
+              <span class="font-bold text-slate-800 block leading-snug">{{ at.delegacion.nombre|default:"—" }}</span>
               {% if at.territorio_sub %}
-                <span class="text-[10px] text-slate-400 block font-normal">{{ at.territorio_sub }}</span>
+                <span class="text-[10px] text-slate-400 block font-normal leading-snug">{{ at.territorio_sub }}</span>
               {% endif %}
             </td>
 
             <!-- Tipo / Sub Atención -->
-            <td class="py-2.5 px-2.5 whitespace-nowrap">
+            <td class="py-2.5 px-2 max-w-[155px]">
               <span class="font-bold text-slate-800 block leading-tight">{{ at.tipo_nombre }}</span>
-              <span class="text-slate-400 block text-[10px] mt-0.5">{{ at.sub_nombre }}</span>
+              <span class="text-slate-400 block text-[10px] mt-0.5 leading-snug">{{ at.sub_nombre }}</span>
             </td>
 
             <!-- Evidencia SGR -->
-            <td class="py-2.5 px-2.5 whitespace-nowrap">
+            <td class="py-2.5 px-2 whitespace-nowrap">
               {% if at.es_atencion %}
                 <span class="font-mono font-bold text-slate-800 text-[11px] block leading-tight">{{ at.evidencia_codigo }}</span>
                 {% if at.actividad %}
@@ -764,16 +764,16 @@
             </td>
 
             <!-- Responsable -->
-            <td class="py-2.5 px-2.5 text-[11px] whitespace-nowrap">
-              <div class="font-bold text-slate-900 flex items-center gap-1">
-                <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#C41230]"></i>
+            <td class="py-2.5 px-2 text-[11px] max-w-[165px]">
+              <div class="font-bold text-slate-900 flex items-center gap-1 leading-snug">
+                <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#C41230] shrink-0"></i>
                 <span>{{ at.responsable_nombre }}</span>
               </div>
               <div class="text-[10px] text-slate-400">{{ at.responsable_rol }}</div>
             </td>
 
             <!-- Fecha Compromiso -->
-            <td class="py-2.5 px-2.5 font-mono text-[11px] whitespace-nowrap">
+            <td class="py-2.5 px-2 font-mono text-[11px] whitespace-nowrap">
               {% if at.fecha_compromiso %}
                 <span class="font-bold text-slate-900">{{ at.fecha_compromiso|date:"d/m/Y" }}</span>
               {% else %}
@@ -782,19 +782,19 @@
             </td>
 
             <!-- Área de Apoyo -->
-            <td class="py-2.5 px-2.5 text-[11px] font-semibold text-slate-700 whitespace-nowrap">
+            <td class="py-2.5 px-2 text-[11px] font-semibold text-slate-700 max-w-[155px] leading-snug">
               {{ at.area_apoyo|default:"—" }}
             </td>
 
             <!-- Avance / Observaciones -->
-            <td class="py-2.5 px-2.5 min-w-[210px] max-w-[300px]">
+            <td class="py-2.5 px-2 min-w-[180px] max-w-[250px]">
               <div class="desc-roll text-slate-600 text-[11px]">
                 {{ at.avance_observaciones|default:at.descripcion|default:"Sin observaciones registradas" }}
               </div>
             </td>
 
             <!-- Estatus -->
-            <td class="py-2.5 px-2.5 text-center whitespace-nowrap">
+            <td class="py-2.5 px-2 text-center whitespace-nowrap">
               {% if at.estado == 'Resuelta' or at.estado == 'Realizado' %}
                 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> REALIZADO
@@ -819,7 +819,7 @@
             </td>
 
             <!-- Acciones -->
-            <td class="py-2.5 px-2.5 text-center whitespace-nowrap sticky right-0 bg-white shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
+            <td class="py-2.5 px-2 text-center whitespace-nowrap sticky right-0 bg-white shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
               <div class="flex items-center justify-center gap-1">
                 <button type="button"
                         onclick="verDetalleAtencionBtn(this, false)"
