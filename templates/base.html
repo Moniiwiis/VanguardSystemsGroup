@@ -310,12 +310,12 @@
           </a>
         {% endif %}
 
-        <!-- 7b. Tubo SGR de Trabajo (Matriz Excel) -->
+        <!-- 7b. Tubo de Compromiso SGR -->
         {% if permisos.ver_atenciones or permisos.ver_reportes or permisos.es_admin %}
           <a href="{% url 'gestion_tubo' %}" 
              class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_tubo' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
             <i data-lucide="git-pull-request" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
-            <span>Tubo de Trabajo SGR</span>
+            <span>Tubo de Compromiso SGR</span>
           </a>
         {% endif %}
 

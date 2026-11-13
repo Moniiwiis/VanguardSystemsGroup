@@ -67,6 +67,11 @@
               <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
               <span>Vecino Existente</span>
             </button>
+            <button type="button" id="tab-vecino-organizacion" onclick="cambiarModoVecino('organizacion')"
+                    class="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900">
+              <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
+              <span>JJVV / Organización</span>
+            </button>
             <button type="button" id="tab-vecino-nuevo" onclick="cambiarModoVecino('nuevo')"
                     class="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900">
               <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
@@ -95,6 +100,81 @@
             <p class="text-[10px] text-amber-700">No hay vecinos activos registrados para la delegación activa.</p>
             {% endif %}
             <p class="text-[10px] text-slate-400">Selecciona del padrón vecinal o escribe su RUT / Nombre</p>
+          </div>
+
+          <!-- Opción 2: JJVV / Organización Comunitaria -->
+          <div id="seccion-organizacion" class="hidden space-y-3 p-3.5 bg-blue-50/40 rounded-2xl border border-blue-100">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div class="flex items-center gap-2 text-blue-900 text-xs font-extrabold">
+                <i data-lucide="building-2" class="w-4 h-4 text-blue-700"></i>
+                <span>Junta de Vecinos (JJVV) u Organización Comunitaria</span>
+              </div>
+              <label class="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-800 cursor-pointer">
+                <input type="checkbox" id="crear_nueva_org_chk" name="crear_nueva_org" value="1" onchange="toggleNuevaOrgAtencion(this.checked)"
+                       class="rounded border-slate-300 text-[#C41230] focus:ring-[#C41230]">
+                <span>Registrar nueva organización</span>
+              </label>
+            </div>
+
+            <div id="bloque-org-existente" class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Seleccionar JJVV u Organización <span class="text-[#C41230]">*</span></label>
+              <input type="text" id="organizacion_input" list="organizaciones-list" oninput="sincronizarOrganizacionExistente(this.value)"
+                     placeholder="Escribe para buscar por nombre o sector de la JJVV..."
+                     class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium" />
+              <input type="hidden" id="organizacion_id" name="organizacion_id" value="">
+              <datalist id="organizaciones-list">
+                {% for o in organizaciones %}
+                  <option value="{{ o.nombre }} ({{ o.tipo_organizacion }})" data-id="{{ o.id }}" data-tel="{{ o.telefono_contacto|default:'' }}">{{ o.territorio|default:'Organización Activa' }}{% if o.representante_legal %} · Dir: {{ o.representante_legal }}{% endif %}</option>
+                {% endfor %}
+              </datalist>
+              {% if not organizaciones %}
+              <p class="text-[10px] text-amber-700">No hay organizaciones activas registradas para la delegación activa; puedes marcar "Registrar nueva organización".</p>
+              {% else %}
+              <p class="text-[10px] text-slate-500">Catálogo de organizaciones activas de la delegación ({{ organizaciones|length }} disponibles).</p>
+              {% endif %}
+            </div>
+
+            <div id="bloque-org-nueva" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Nombre Organización / JJVV <span class="text-[#C41230]">*</span></label>
+                <input type="text" id="nueva_org_nombre" name="nueva_org_nombre" maxlength="200" placeholder="Ej: JJVV El Brillador"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium">
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Tipo de Organización</label>
+                <select id="nueva_org_tipo" name="nueva_org_tipo"
+                        class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+                  {% for val, lbl in tipos_organizacion %}
+                    <option value="{{ val }}" {% if val == 'Junta de Vecinos' %}selected{% endif %}>{{ lbl }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Dirigente / Representante</label>
+                <input type="text" id="nueva_org_representante" name="nueva_org_representante" maxlength="150" placeholder="Nombre presidente/a o representante"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium">
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Teléfono de Contacto</label>
+                <input type="text" id="nueva_org_telefono" name="nueva_org_telefono" maxlength="15" placeholder="+56 9 1234 5678"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium font-mono">
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Dirección de Sede</label>
+                <input type="text" id="nueva_org_direccion" name="nueva_org_direccion" maxlength="250" placeholder="Calle / Pasaje y número"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium">
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Sector / Territorio</label>
+                <select id="nueva_org_sector_id" name="nueva_org_sector_id"
+                        class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+                  <option value="">Delegación general...</option>
+                  {% for s in sectores %}
+                    <option value="{{ s.id }}">{{ s.nombre }}{% if permisos.es_admin and not delegacion_activa %} ({{ s.delegacion.nombre }}){% endif %}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
           </div>
 
           <!-- Opción 2: Registrar Nuevo Vecino -->
@@ -228,23 +308,23 @@
                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:border-[#C41230] focus:outline-none font-medium break-words [overflow-wrap:anywhere] max-h-40"></textarea>
         </div>
 
-        <!-- Lógica de Decisión Tubo SGR (Matriz Excel: ¿Va a Tubo de Trabajo?) -->
+        <!-- Lógica de Decisión Tubo de Compromiso SGR -->
         <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div class="flex items-center gap-2">
               <i data-lucide="git-pull-request" class="w-4 h-4 text-[#C41230]"></i>
               <label for="va_a_tubo_select" class="text-xs font-bold text-slate-800">
-                ¿Registrar en Tubo de Trabajo?
+                ¿Registrar en Tubo de Compromiso?
               </label>
             </div>
             <select name="va_a_tubo" id="va_a_tubo_select" onchange="toggleCamposTubo(this.value)"
                     class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-extrabold bg-white text-slate-900 focus:ring-2 focus:ring-[#C41230]">
               <option value="0">NO — Atención o trámite puntual directo</option>
-              <option value="1">SÍ — Compromiso a futuro (Tubo de Trabajo SGR)</option>
+              <option value="1">SÍ — Compromiso a futuro (Tubo de Compromiso SGR)</option>
             </select>
           </div>
           <p class="text-[10px] text-slate-500 leading-relaxed">
-            <em>Criterio Matriz SGR:</em> En el tubo va todo lo que sea a futuro (compromisos que requieren fecha, área de apoyo y cuadrilla). Las atenciones y orientaciones inmediatas quedan en el registro regular.
+            <em>Criterio Tubo de Compromiso:</em> Solo ingresan al tubo las atenciones con compromiso a futuro (requiere fecha compromiso y seguimiento). Las orientaciones inmediatas quedan únicamente en Atenciones.
           </p>
 
           <div id="seccion-campos-tubo" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2.5 border-t border-slate-200">
@@ -497,12 +577,19 @@
               <td class="py-2.5 px-3 font-mono whitespace-nowrap">
                 <span class="font-bold text-[#C41230] block">{{ a.codigo_atencion }}</span>
                 {% if a.va_a_tubo %}
-                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 mt-0.5 rounded text-[9px] font-black bg-red-100 text-[#8B1D19] border border-red-200" title="Requerimiento en Tubo de Trabajo SGR">
+                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 mt-0.5 rounded text-[9px] font-black bg-red-100 text-[#8B1D19] border border-red-200" title="Requerimiento en Tubo de Compromiso SGR">
                     <i data-lucide="git-pull-request" class="w-2.5 h-2.5"></i> TUBO
                   </span>
                 {% endif %}
               </td>
-              <td class="py-2.5 px-3 font-bold text-slate-900">{{ a.solicitante }}</td>
+              <td class="py-2.5 px-3 font-bold text-slate-900">
+                <span>{{ a.solicitante }}</span>
+                {% if a.organizacion %}
+                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 ml-1 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                    {{ a.organizacion.tipo_organizacion }}
+                  </span>
+                {% endif %}
+              </td>
               <td class="py-2.5 px-3 text-slate-700 text-[11px] whitespace-nowrap">{{ a.delegacion.nombre }}</td>
               <td class="py-2.5 px-3">
                 <span class="font-bold text-slate-900 block leading-tight">{{ a.tipo_atencion.nombre }}</span>
@@ -699,7 +786,7 @@
         <div class="flex items-center justify-between border-b border-red-100 pb-1.5">
           <div class="flex items-center gap-1.5">
             <i data-lucide="git-pull-request" class="w-3.5 h-3.5 text-[#C41230]"></i>
-            <span class="font-extrabold text-[#8B1D19] uppercase tracking-wider text-[11px]">Seguimiento Tubo de Trabajo SGR</span>
+            <span class="font-extrabold text-[#8B1D19] uppercase tracking-wider text-[11px]">Seguimiento Tubo de Compromiso SGR</span>
           </div>
           <span id="at-tubo-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold"></span>
         </div>
@@ -770,17 +857,17 @@
         </div>
       </div>
 
-      <!-- Sección Tubo de Trabajo en Edición -->
+      <!-- Sección Tubo de Compromiso en Edición -->
       <div class="p-3.5 rounded-2xl bg-white border border-blue-200 space-y-3">
         <div class="flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-1.5">
           <i data-lucide="git-pull-request" class="w-4 h-4 text-[#C41230]"></i>
-          <span class="font-extrabold text-xs">Parámetros del Tubo de Trabajo SGR</span>
+          <span class="font-extrabold text-xs">Parámetros del Tubo de Compromiso SGR</span>
         </div>
         <div class="space-y-1">
-          <label for="at-edit-vatubo" class="block text-slate-700 text-[11px]">¿Gestionar en Tubo de Trabajo?</label>
+          <label for="at-edit-vatubo" class="block text-slate-700 text-[11px]">¿Gestionar en Tubo de Compromiso?</label>
           <select id="at-edit-vatubo" name="va_a_tubo" onchange="toggleCamposTuboEdicion(this.value)"
                   class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-            <option value="true">Sí (En Tubo de Trabajo)</option>
+            <option value="true">Sí (En Tubo de Compromiso)</option>
             <option value="false">No (Registro Regular)</option>
           </select>
         </div>
@@ -947,50 +1034,97 @@
     }
   }
 
-  // Alternar entre selección de vecino existente y registro de nuevo vecino
+  // Alternar entre selección de vecino existente, JJVV/organización o nuevo vecino
   function cambiarModoVecino(modo) {
     const modoInput = document.getElementById('modo_vecino');
     const tabExistente = document.getElementById('tab-vecino-existente');
+    const tabOrg = document.getElementById('tab-vecino-organizacion');
     const tabNuevo = document.getElementById('tab-vecino-nuevo');
     const secExistente = document.getElementById('seccion-vecino-existente');
+    const secOrg = document.getElementById('seccion-organizacion');
     const secNuevo = document.getElementById('seccion-vecino-nuevo');
+
     const inputSolicitante = document.getElementById('solicitante');
     const inputNuevoNombre = document.getElementById('nuevo_vecino_nombre');
     const inputNuevoRut = document.getElementById('nuevo_vecino_rut');
     const selectNuevoSector = document.getElementById('nuevo_vecino_sector_id');
+    const inputOrg = document.getElementById('organizacion_input');
+    const chkNuevaOrg = document.getElementById('crear_nueva_org_chk');
+    const inputNuevaOrgNom = document.getElementById('nueva_org_nombre');
 
-    if (modo === 'nuevo') {
-      if (modoInput) modoInput.value = 'nuevo';
-      if (secExistente) secExistente.classList.add('hidden');
-      if (secNuevo) secNuevo.classList.remove('hidden');
-      if (inputSolicitante) inputSolicitante.removeAttribute('required');
-      if (inputNuevoNombre) inputNuevoNombre.setAttribute('required', 'required');
-      if (inputNuevoRut) inputNuevoRut.setAttribute('required', 'required');
-      if (selectNuevoSector) selectNuevoSector.setAttribute('required', 'required');
+    const activeCls = 'flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 bg-white text-[#C41230] shadow-sm border border-slate-200/80';
+    const inactiveCls = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
 
-      if (tabNuevo) {
-        tabNuevo.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 bg-white text-[#C41230] shadow-sm border border-slate-200/80';
-      }
-      if (tabExistente) {
-        tabExistente.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
-      }
+    if (modoInput) modoInput.value = modo;
+    if (secExistente) secExistente.classList.toggle('hidden', modo !== 'existente');
+    if (secOrg) secOrg.classList.toggle('hidden', modo !== 'organizacion');
+    if (secNuevo) secNuevo.classList.toggle('hidden', modo !== 'nuevo');
+
+    if (tabExistente) tabExistente.className = modo === 'existente' ? activeCls : inactiveCls;
+    if (tabOrg) tabOrg.className = modo === 'organizacion' ? activeCls : inactiveCls;
+    if (tabNuevo) tabNuevo.className = modo === 'nuevo' ? activeCls : inactiveCls;
+
+    if (inputSolicitante) {
+      if (modo === 'existente') inputSolicitante.setAttribute('required', 'required');
+      else inputSolicitante.removeAttribute('required');
+    }
+    if (inputNuevoNombre) {
+      if (modo === 'nuevo') inputNuevoNombre.setAttribute('required', 'required');
+      else inputNuevoNombre.removeAttribute('required');
+    }
+    if (inputNuevoRut) {
+      if (modo === 'nuevo') inputNuevoRut.setAttribute('required', 'required');
+      else inputNuevoRut.removeAttribute('required');
+    }
+    if (selectNuevoSector) {
+      if (modo === 'nuevo') selectNuevoSector.setAttribute('required', 'required');
+      else selectNuevoSector.removeAttribute('required');
+    }
+    if (modo === 'organizacion') {
+      toggleNuevaOrgAtencion(chkNuevaOrg ? chkNuevaOrg.checked : false);
     } else {
-      if (modoInput) modoInput.value = 'existente';
-      if (secExistente) secExistente.classList.remove('hidden');
-      if (secNuevo) secNuevo.classList.add('hidden');
-      if (inputSolicitante) inputSolicitante.setAttribute('required', 'required');
-      if (inputNuevoNombre) inputNuevoNombre.removeAttribute('required');
-      if (inputNuevoRut) inputNuevoRut.removeAttribute('required');
-      if (selectNuevoSector) selectNuevoSector.removeAttribute('required');
-
-      if (tabExistente) {
-        tabExistente.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 bg-white text-[#C41230] shadow-sm border border-slate-200/80';
-      }
-      if (tabNuevo) {
-        tabNuevo.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
-      }
+      if (inputOrg) inputOrg.removeAttribute('required');
+      if (inputNuevaOrgNom) inputNuevaOrgNom.removeAttribute('required');
     }
     if (window.lucide) lucide.createIcons();
+  }
+
+  function sincronizarOrganizacionExistente(val) {
+    const list = document.getElementById('organizaciones-list');
+    const hiddenId = document.getElementById('organizacion_id');
+    const telInput = document.getElementById('telefono_contacto');
+    if (!list || !hiddenId) return;
+    hiddenId.value = '';
+    const cleanVal = (val || '').trim().toLowerCase();
+    for (const opt of list.querySelectorAll('option')) {
+      if (opt.value.trim().toLowerCase() === cleanVal) {
+        hiddenId.value = opt.getAttribute('data-id') || '';
+        const tel = opt.getAttribute('data-tel') || '';
+        if (tel && telInput && !telInput.value) telInput.value = tel;
+        break;
+      }
+    }
+  }
+
+  function toggleNuevaOrgAtencion(esNueva) {
+    const bloqueExistente = document.getElementById('bloque-org-existente');
+    const bloqueNueva = document.getElementById('bloque-org-nueva');
+    const inputOrg = document.getElementById('organizacion_input');
+    const inputNuevaOrgNom = document.getElementById('nueva_org_nombre');
+    const hiddenId = document.getElementById('organizacion_id');
+    if (bloqueExistente) bloqueExistente.classList.toggle('hidden', !!esNueva);
+    if (bloqueNueva) bloqueNueva.classList.toggle('hidden', !esNueva);
+    if (document.getElementById('modo_vecino')?.value === 'organizacion') {
+      if (inputOrg) {
+        if (esNueva) inputOrg.removeAttribute('required');
+        else inputOrg.setAttribute('required', 'required');
+      }
+      if (inputNuevaOrgNom) {
+        if (esNueva) inputNuevaOrgNom.setAttribute('required', 'required');
+        else inputNuevaOrgNom.removeAttribute('required');
+      }
+    }
+    if (esNueva && hiddenId) hiddenId.value = '';
   }
 
   function sincronizarVecinoExistente(val) {
@@ -1039,22 +1173,38 @@
 
   function toggleCamposTuboEdicion(valor) {
     const sec = document.getElementById('seccion-campos-tubo-edicion');
+    const fechaInput = document.getElementById('at-edit-fechacomp');
+    const areaInput = document.getElementById('at-edit-areaapoyo');
     if (!sec) return;
     const isTubo = (valor === 'true' || valor === '1' || valor === true);
     if (isTubo) {
       sec.classList.remove('hidden');
+      if (fechaInput) fechaInput.setAttribute('required', 'required');
     } else {
       sec.classList.add('hidden');
+      if (fechaInput) {
+        fechaInput.removeAttribute('required');
+        fechaInput.value = '';
+      }
+      if (areaInput) areaInput.value = '';
     }
   }
 
   function toggleCamposTubo(valor) {
     const sec = document.getElementById('seccion-campos-tubo');
+    const fechaInput = document.getElementById('fecha_compromiso');
+    const areaInput = document.getElementById('area_apoyo');
     if (!sec) return;
     if (valor === '1' || valor === 'si' || valor === 1) {
       sec.classList.remove('hidden');
+      if (fechaInput) fechaInput.setAttribute('required', 'required');
     } else {
       sec.classList.add('hidden');
+      if (fechaInput) {
+        fechaInput.removeAttribute('required');
+        fechaInput.value = '';
+      }
+      if (areaInput) areaInput.value = '';
     }
   }
 
@@ -1180,7 +1330,7 @@
     const tuboBadge = document.getElementById('at-tubo-badge');
     if (tuboBadge) {
       if (isTubo) {
-        tuboBadge.textContent = 'En Tubo de Trabajo';
+        tuboBadge.textContent = 'En Tubo de Compromiso';
         tuboBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-[#C41230] border border-red-200';
       } else {
         tuboBadge.textContent = 'Registro Regular';
@@ -1336,5 +1486,16 @@
     if (btnEditar) btnEditar.classList.remove('hidden');
     if (window.lucide) lucide.createIcons();
   }
+
+  {% if abrir_tubo %}
+  document.addEventListener('DOMContentLoaded', function() {
+    abrirModalNuevaAtencion();
+    const selTubo = document.getElementById('va_a_tubo_select');
+    if (selTubo) {
+      selTubo.value = '1';
+      toggleCamposTubo('1');
+    }
+  });
+  {% endif %}
 </script>
 {% endblock %}

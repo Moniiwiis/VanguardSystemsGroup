@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Tubo SGR de Trabajo — Ilustre Municipalidad de La Serena{% endblock %}
+{% block title %}Tubo de Compromiso SGR — Ilustre Municipalidad de La Serena{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -11,14 +11,14 @@
       <div class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
         <span>Gestión Territorial</span>
         <span class="text-slate-300">/</span>
-        <span class="text-[#C41230]">Tubo SGR</span>
+        <span class="text-[#C41230]">Tubo de Compromiso SGR</span>
       </div>
       <h1 class="font-display text-xl sm:text-2xl font-extrabold text-[#8B1D19] flex items-center gap-2.5">
         <i data-lucide="git-pull-request" class="w-6 h-6 text-[#C41230]"></i>
-        <span>Módulo: Tubo SGR de Trabajo Territorial</span>
+        <span>Tubo de Compromiso SGR</span>
       </h1>
       <p class="text-xs text-slate-500 max-w-2xl leading-relaxed">
-        Seguimiento de compromisos territoriales a futuro, estatus operativo y cumplimiento de plazos. <em>"En el tubo va todo compromiso que sea a futuro".</em>
+        Seguimiento de compromisos territoriales originados exclusivamente desde Atenciones Ciudadanas. <em>"En el tubo va todo compromiso a futuro".</em>
       </p>
     </div>
 
@@ -31,24 +31,61 @@
         </div>
       {% endif %}
 
-      <a href="?export=excel&q={{ q }}&orden={{ orden }}&tab={{ tab }}{% if delegacion_seleccionada %}&delegacion={{ delegacion_seleccionada.id }}{% elif es_admin %}&delegacion=todas{% endif %}"
+      <a href="?export=excel&q={{ q }}&orden={{ orden }}&tab={{ tab }}&vista={{ vista }}{% if delegacion_seleccionada %}&delegacion={{ delegacion_seleccionada.id }}{% elif es_admin %}&delegacion=todas{% endif %}"
          class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-slate-900 hover:bg-slate-800 text-white transition-all flex items-center gap-2 shadow-sm">
         <i data-lucide="download" class="w-4 h-4"></i>
         <span>Exportar Excel</span>
       </a>
 
-      <a href="{% url 'gestion_atenciones' %}"
+      {% if not permisos.es_consultor %}
+      <a href="{% url 'gestion_atenciones' %}?abrir_tubo=1"
          class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white shadow-md border border-red-700/50 transition-all flex items-center gap-2">
         <i data-lucide="plus-circle" class="w-4 h-4"></i>
-        <span>+ Nuevo Ingreso al Tubo</span>
+        <span>Nueva Atención al Tubo</span>
       </a>
+      {% endif %}
     </div>
   </div>
 
-  <!-- Métricas Principales del Tubo SGR (Tarjetas Clickables que filtran automáticamente por Estado) -->
+  <!-- Métricas Principales del Tubo -->
+  {% if tab == 'requerimientos' and vista == 'canvas' %}
+  <!-- Vista Canvas: 4 Tarjetas KPI con borde izquierdo (estilo Kanban) -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <a href="?tab=requerimientos&vista=canvas&q={{ q }}&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="bg-white p-5 rounded-2xl border border-slate-200/90 border-l-4 border-l-[#8B1D19] shadow-sm hover:shadow-md transition-all block">
+      <span class="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">GESTIONES EN TUBO</span>
+      <span class="text-3xl font-black font-serif text-[#8B1D19] block mt-1.5">{{ tubo_total_count }}</span>
+      <span class="text-[11px] text-slate-500 font-medium mt-1 block">Derivadas para seguimiento</span>
+    </a>
+
+    <a href="?tab=requerimientos&vista=canvas&q={{ q }}&estado=Resuelta&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="bg-white p-5 rounded-2xl border border-slate-200/90 border-l-4 border-l-emerald-600 shadow-sm hover:shadow-md transition-all block">
+      <span class="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">REALIZADAS / CONCLUIDAS</span>
+      <span class="text-3xl font-black font-serif text-emerald-700 block mt-1.5">{{ realizados_count }}</span>
+      <span class="text-[11px] text-slate-500 font-medium mt-1 block">Tasa de resolución: {{ pct_realizado }}%</span>
+    </a>
+
+    <a href="?tab=requerimientos&vista=canvas&q={{ q }}&estado=En+proceso&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="bg-white p-5 rounded-2xl border border-slate-200/90 border-l-4 border-l-amber-500 shadow-sm hover:shadow-md transition-all block">
+      <span class="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">EN PROCESO ACTIVO</span>
+      <span class="text-3xl font-black font-serif text-amber-600 block mt-1.5">{{ proceso_count }}</span>
+      <span class="text-[11px] text-slate-500 font-medium mt-1 block">Con cuadrilla o área de apoyo</span>
+    </a>
+
+    <a href="?tab=requerimientos&vista=canvas&q={{ q }}&estado=Pendiente&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+       class="bg-white p-5 rounded-2xl border border-slate-200/90 border-l-4 border-l-red-700 shadow-sm hover:shadow-md transition-all block">
+      <span class="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">PENDIENTES / ALERTA</span>
+      <span class="text-3xl font-black font-serif text-red-700 block mt-1.5">{{ pendientes_count }}</span>
+      <span class="text-[11px] {% if alerta_pendientes_10 %}text-red-600 font-bold{% else %}text-slate-500 font-medium{% endif %} mt-1 block">
+        Esperando gestión técnica{% if alerta_pendientes_10 %} ({{ pct_pendientes }}% ⚠){% endif %}
+      </span>
+    </a>
+  </div>
+  {% else %}
+  <!-- Vista Tabla: 6 Tarjetas Clickables que filtran por Estado -->
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
     <!-- Total en Tubo -->
-    <a href="?tab={{ tab }}&q={{ q }}&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+    <a href="?tab={{ tab }}&vista={{ vista }}&q={{ q }}&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
        class="bg-white p-4 rounded-3xl border {% if not filtro_estado %}border-[#C41230] ring-2 ring-red-100 shadow-md{% else %}border-slate-200/90 hover:border-red-300 shadow-sm{% endif %} transition-all hover:shadow block group">
       <div class="flex items-center justify-between">
         <span class="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">Total Tubo</span>
@@ -59,7 +96,7 @@
     </a>
 
     <!-- Ingresados -->
-    <a href="?tab={{ tab }}&q={{ q }}&estado=Registrada&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+    <a href="?tab={{ tab }}&vista={{ vista }}&q={{ q }}&estado=Registrada&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
        class="bg-white p-4 rounded-3xl border {% if filtro_estado == 'Registrada' %}border-blue-500 ring-2 ring-blue-100 shadow-md{% else %}border-blue-100 hover:border-blue-300 shadow-sm{% endif %} bg-blue-50/20 transition-all hover:shadow block group">
       <div class="flex items-center justify-between">
         <span class="text-[10px] font-extrabold text-blue-700 uppercase tracking-wider block">Ingresados</span>
@@ -70,7 +107,7 @@
     </a>
 
     <!-- En Proceso -->
-    <a href="?tab={{ tab }}&q={{ q }}&estado=En+proceso&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+    <a href="?tab={{ tab }}&vista={{ vista }}&q={{ q }}&estado=En+proceso&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
        class="bg-white p-4 rounded-3xl border {% if filtro_estado == 'En proceso' %}border-amber-500 ring-2 ring-amber-100 shadow-md{% else %}border-amber-100 hover:border-amber-300 shadow-sm{% endif %} bg-amber-50/20 transition-all hover:shadow block group">
       <div class="flex items-center justify-between">
         <span class="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider block">En Proceso</span>
@@ -81,7 +118,7 @@
     </a>
 
     <!-- Pendientes con Alerta del 10% -->
-    <a href="?tab={{ tab }}&q={{ q }}&estado=Pendiente&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+    <a href="?tab={{ tab }}&vista={{ vista }}&q={{ q }}&estado=Pendiente&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
        class="bg-white p-4 rounded-3xl border {% if filtro_estado == 'Pendiente' %}border-red-500 ring-2 ring-red-100 shadow-md{% elif alerta_pendientes_10 %}border-red-300 hover:border-red-400 bg-red-50/40{% else %}border-orange-100 hover:border-orange-300 bg-orange-50/20{% endif %} shadow-sm transition-all hover:shadow block group">
       <div class="flex items-center justify-between">
         <span class="text-[10px] font-extrabold text-red-700 uppercase tracking-wider">Pendientes</span>
@@ -100,7 +137,7 @@
     </a>
 
     <!-- Realizados -->
-    <a href="?tab={{ tab }}&q={{ q }}&estado=Resuelta&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+    <a href="?tab={{ tab }}&vista={{ vista }}&q={{ q }}&estado=Resuelta&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
        class="bg-white p-4 rounded-3xl border {% if filtro_estado == 'Resuelta' %}border-emerald-500 ring-2 ring-emerald-100 shadow-md{% else %}border-emerald-100 hover:border-emerald-300 shadow-sm{% endif %} bg-emerald-50/20 transition-all hover:shadow block group">
       <div class="flex items-center justify-between">
         <span class="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider block">Realizados</span>
@@ -119,29 +156,47 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
-  <!-- Barra de Pestañas: 1. Requerimientos en Tubo | 2. Resumen por Colaborador -->
-  <div class="flex items-center gap-2 border-b border-slate-200">
-    <a href="?tab=requerimientos{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_responsable %}&responsable={{ filtro_responsable }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
-       class="pb-3 px-4 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all {% if tab == 'requerimientos' %}border-[#C41230] text-[#C41230]{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
-      <i data-lucide="clipboard-list" class="w-4 h-4"></i>
-      <span>Requerimientos en Tubo</span>
-      <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold {% if tab == 'requerimientos' %}bg-red-50 text-[#C41230]{% else %}bg-slate-100 text-slate-600{% endif %}">
-        {{ tubo_total_count }}
-      </span>
-    </a>
+  <!-- Barra de Pestañas + Switcher Tabla / Canvas -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-0">
+    <div class="flex items-center gap-2">
+      <a href="?tab=requerimientos&vista={{ vista }}{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_responsable %}&responsable={{ filtro_responsable }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+         class="pb-3 px-4 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all {% if tab == 'requerimientos' %}border-[#C41230] text-[#C41230]{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+        <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+        <span>Requerimientos en Tubo</span>
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold {% if tab == 'requerimientos' %}bg-red-50 text-[#C41230]{% else %}bg-slate-100 text-slate-600{% endif %}">
+          {{ tubo_total_count }}
+        </span>
+      </a>
 
-    <a href="?tab=colaboradores{% if q_colab %}&q_colab={{ q_colab }}{% endif %}{% if filtro_cumplimiento %}&cumplimiento={{ filtro_cumplimiento }}{% endif %}{% if orden_colab %}&orden_colab={{ orden_colab }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
-       class="pb-3 px-4 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all {% if tab == 'colaboradores' %}border-[#C41230] text-[#C41230]{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
-      <i data-lucide="users" class="w-4 h-4"></i>
-      <span>Resumen por Colaborador</span>
-      <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold {% if tab == 'colaboradores' %}bg-red-50 text-[#C41230]{% else %}bg-slate-100 text-slate-600{% endif %}">
-        {{ colaboradores_total_count }}
-      </span>
-    </a>
+      <a href="?tab=colaboradores&vista={{ vista }}{% if q_colab %}&q_colab={{ q_colab }}{% endif %}{% if filtro_cumplimiento %}&cumplimiento={{ filtro_cumplimiento }}{% endif %}{% if orden_colab %}&orden_colab={{ orden_colab }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+         class="pb-3 px-4 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all {% if tab == 'colaboradores' %}border-[#C41230] text-[#C41230]{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+        <i data-lucide="users" class="w-4 h-4"></i>
+        <span>Resumen por Colaborador</span>
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold {% if tab == 'colaboradores' %}bg-red-50 text-[#C41230]{% else %}bg-slate-100 text-slate-600{% endif %}">
+          {{ colaboradores_total_count }}
+        </span>
+      </a>
+    </div>
+
+    {% if tab == 'requerimientos' %}
+    <div class="inline-flex items-center gap-1 p-1 mb-2 bg-slate-100 rounded-xl border border-slate-200 self-start sm:self-auto" role="group" aria-label="Cambiar vista del Tubo de Compromiso">
+      <a href="?tab=requerimientos&vista=tabla{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_origen %}&origen={{ filtro_origen }}{% endif %}{% if filtro_responsable %}&responsable={{ filtro_responsable }}{% endif %}{% if orden %}&orden={{ orden }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all {% if vista == 'tabla' %}bg-white text-[#C41230] shadow-sm border border-slate-200/80{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+        <i data-lucide="table-2" class="w-3.5 h-3.5"></i>
+        <span>Tabla</span>
+      </a>
+      <a href="?tab=requerimientos&vista=canvas{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_origen %}&origen={{ filtro_origen }}{% endif %}{% if filtro_responsable %}&responsable={{ filtro_responsable }}{% endif %}{% if orden %}&orden={{ orden }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all {% if vista == 'canvas' %}bg-white text-[#C41230] shadow-sm border border-slate-200/80{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+        <i data-lucide="columns-4" class="w-3.5 h-3.5"></i>
+        <span>Canvas</span>
+      </a>
+    </div>
+    {% endif %}
   </div>
 
-  <!-- PESTAÑA 1: Tabla Principal de Requerimientos en Tubo -->
+  <!-- PESTAÑA 1: Requerimientos en Tubo (Tabla o Canvas) -->
   {% if tab == 'requerimientos' %}
   <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden space-y-0">
 
@@ -151,13 +206,13 @@
         <div>
           <h2 class="font-extrabold text-sm uppercase tracking-wider text-slate-800 flex items-center gap-2">
             <i data-lucide="list-filter" class="w-4 h-4 text-[#C41230]"></i>
-            <span>Seguimiento Territorial de Requerimientos</span>
+            <span>Seguimiento Territorial de Compromisos {% if vista == 'canvas' %}(Vista Canvas){% else %}(Vista Tabla){% endif %}</span>
           </h2>
           <p class="text-[11px] text-slate-400">Filtrado por delegación, responsable y estado del compromiso</p>
         </div>
 
         {% if filtro_estado or q or filtro_origen or filtro_responsable %}
-          <a href="?tab=requerimientos{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+          <a href="?tab=requerimientos&vista={{ vista }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
              class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1 self-start sm:self-auto">
             <i data-lucide="x" class="w-3.5 h-3.5"></i>
             <span>Limpiar todos los filtros</span>
@@ -168,6 +223,7 @@
       <!-- Barra de Filtros Activos -->
       <form method="GET" action="" class="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5 pt-1 flex-wrap">
         <input type="hidden" name="tab" value="requerimientos">
+        <input type="hidden" name="vista" value="{{ vista }}">
         
         <!-- Búsqueda General -->
         <div class="relative flex-1 min-w-[220px]">
@@ -221,7 +277,289 @@
       </form>
     </div>
 
-    <!-- Tabla del Tubo de Trabajo -->
+    {% if vista == 'canvas' %}
+    <!-- Vista Canvas (Kanban 4 Columnas estilo Tubo de Compromiso) -->
+    <div class="p-4 sm:p-5 bg-slate-50/40">
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+
+        <!-- COLUMNA 1: 1. INGRESADOS -->
+        <div class="tubo-kanban-col bg-slate-100/75 rounded-2xl border border-slate-200/80 p-3 flex flex-col gap-3 min-h-[280px]"
+             data-target-estado="Registrada"
+             {% if not permisos.es_consultor %}ondragover="tuboAllowDrop(event)" ondragleave="tuboDragLeave(event)" ondrop="tuboDrop(event, 'Registrada')"{% endif %}>
+          <div class="flex items-center justify-between px-1 pb-2 border-b border-slate-200/80">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-slate-700">1. INGRESADOS</span>
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-white text-slate-700 border border-slate-200 shadow-2xs">{{ canvas_ingresados|length }}</span>
+          </div>
+          {% for at in canvas_ingresados %}
+          <div class="tubo-kanban-card bg-white rounded-xl border border-slate-200 border-l-4 border-l-slate-400 p-3.5 shadow-xs hover:shadow-md transition-all space-y-2 {% if not permisos.es_consultor %}cursor-grab active:cursor-grabbing{% endif %}"
+               {% if not permisos.es_consultor %}draggable="true" ondragstart="tuboDragStart(event, {{ at.id }})"{% endif %}
+               data-atencion-id="{{ at.id }}">
+            {% if at.actividad %}
+              <div id="evidencias-atencion-{{ at.id }}" class="hidden">
+                {% for evidencia in at.actividad.evidencias.all %}
+                  <div class="evidence-item flex items-center justify-between gap-2 p-1.5 rounded-lg border border-slate-100 bg-slate-50/70" data-momento="{{ evidencia.momento }}">
+                    <div class="flex items-center gap-1.5">
+                      {% if evidencia.momento == 'antes' %}
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">Antes</span>
+                      {% else %}
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">Después</span>
+                      {% endif %}
+                      {% if evidencia.imagen %}
+                        <a href="{{ evidencia.imagen.url }}" data-momento="{{ evidencia.momento }}" data-titulo="Evidencia {{ evidencia.get_momento_display }} ({{ at.codigo_atencion }})" class="visor-evidencia text-[#C41230] font-bold hover:underline flex items-center gap-1">
+                          <i data-lucide="image" class="w-3 h-3"></i><span>Ver imagen</span>
+                        </a>
+                      {% endif %}
+                      {% if evidencia.archivo %}
+                        <a href="{{ evidencia.archivo.url }}" data-momento="{{ evidencia.momento }}" data-titulo="Evidencia {{ evidencia.get_momento_display }} ({{ at.codigo_atencion }})" class="visor-evidencia text-[#C41230] font-bold hover:underline flex items-center gap-1">
+                          <i data-lucide="file-text" class="w-3 h-3"></i><span>Ver archivo</span>
+                        </a>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono text-[11px] font-extrabold text-slate-500">{{ at.get_codigo_tubo }}</span>
+              <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/80 font-mono text-[10px] font-extrabold">{{ at.codigo_atencion }}</span>
+            </div>
+            <p class="text-xs font-extrabold text-slate-900 leading-snug line-clamp-3">{{ at.descripcion }}</p>
+            <div class="text-[11px] text-slate-600 space-y-0.5">
+              <div><strong class="text-slate-700">Solicitante:</strong> {{ at.solicitante }}{% if at.organizacion %} <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{{ at.organizacion.tipo_organizacion }}</span>{% endif %}</div>
+              {% if at.area_apoyo %}<div><strong class="text-slate-700">Apoyo:</strong> <span class="text-blue-700 font-semibold">{{ at.area_apoyo }}</span></div>{% endif %}
+              {% if at.fecha_compromiso %}<div><strong class="text-slate-700">Compromiso:</strong> <span class="font-mono">{{ at.fecha_compromiso|date:"d/m/Y" }}</span></div>{% endif %}
+            </div>
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+              <span class="text-[10px] text-slate-500 font-medium leading-tight">
+                Responsable: <strong class="text-slate-700">{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username }}</strong>
+              </span>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button type="button"
+                        onclick="verDetalleAtencion('{{ at.id }}', '{{ at.codigo_atencion|escapejs }}', '{{ at.solicitante|escapejs }}', '{{ at.delegacion.nombre|escapejs }}', '{{ at.tipo_atencion.nombre|escapejs }}', '{{ at.sub_atencion.nombre|escapejs }}', '{{ at.descripcion|escapejs }}', '{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username|escapejs }}', '{% if at.creado_por %}{{ at.creado_por.get_full_name|default:at.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ at.created_at|date:'d/m/Y H:i' }}', '{{ at.estado|escapejs }}', '{{ at.get_evidencia_codigo|escapejs }}', '{{ at.estado_evidencia|escapejs }}', '{{ at.usuario_responsable_id }}', '{{ at.responsable_rol|escapejs }}', '{{ at.delegacion_id }}', '{{ at.va_a_tubo|yesno:'1,0' }}', '{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}', '{{ at.area_apoyo|default:''|escapejs }}', '{{ at.avance_observaciones|default:''|escapejs }}')"
+                        class="text-[11px] font-extrabold text-[#C41230] hover:underline px-1">
+                  Ver
+                </button>
+                {% if not permisos.es_consultor %}
+                <button type="button" onclick="moverTarjetaTubo({{ at.id }}, 'Pendiente')"
+                        class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[10px] font-extrabold transition-colors">
+                  A Pendiente
+                </button>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="py-8 text-center text-[11px] text-slate-400 font-medium">Sin requerimientos ingresados</div>
+          {% endfor %}
+        </div>
+
+        <!-- COLUMNA 2: 2. PENDIENTES -->
+        <div class="tubo-kanban-col bg-slate-100/75 rounded-2xl border border-slate-200/80 p-3 flex flex-col gap-3 min-h-[280px]"
+             data-target-estado="Pendiente"
+             {% if not permisos.es_consultor %}ondragover="tuboAllowDrop(event)" ondragleave="tuboDragLeave(event)" ondrop="tuboDrop(event, 'Pendiente')"{% endif %}>
+          <div class="flex items-center justify-between px-1 pb-2 border-b border-slate-200/80">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-red-700">2. PENDIENTES</span>
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-white text-red-700 border border-red-200 shadow-2xs">{{ canvas_pendientes|length }}</span>
+          </div>
+          {% for at in canvas_pendientes %}
+          <div class="tubo-kanban-card bg-white rounded-xl border border-slate-200 border-l-4 border-l-red-700 p-3.5 shadow-xs hover:shadow-md transition-all space-y-2 {% if not permisos.es_consultor %}cursor-grab active:cursor-grabbing{% endif %}"
+               {% if not permisos.es_consultor %}draggable="true" ondragstart="tuboDragStart(event, {{ at.id }})"{% endif %}
+               data-atencion-id="{{ at.id }}">
+            {% if at.actividad %}
+              <div id="evidencias-atencion-{{ at.id }}" class="hidden">
+                {% for evidencia in at.actividad.evidencias.all %}
+                  <div class="evidence-item flex items-center justify-between gap-2 p-1.5 rounded-lg border border-slate-100 bg-slate-50/70" data-momento="{{ evidencia.momento }}">
+                    <div class="flex items-center gap-1.5">
+                      {% if evidencia.momento == 'antes' %}
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">Antes</span>
+                      {% else %}
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">Después</span>
+                      {% endif %}
+                      {% if evidencia.imagen %}
+                        <a href="{{ evidencia.imagen.url }}" data-momento="{{ evidencia.momento }}" data-titulo="Evidencia {{ evidencia.get_momento_display }} ({{ at.codigo_atencion }})" class="visor-evidencia text-[#C41230] font-bold hover:underline flex items-center gap-1">
+                          <i data-lucide="image" class="w-3 h-3"></i><span>Ver imagen</span>
+                        </a>
+                      {% endif %}
+                      {% if evidencia.archivo %}
+                        <a href="{{ evidencia.archivo.url }}" data-momento="{{ evidencia.momento }}" data-titulo="Evidencia {{ evidencia.get_momento_display }} ({{ at.codigo_atencion }})" class="visor-evidencia text-[#C41230] font-bold hover:underline flex items-center gap-1">
+                          <i data-lucide="file-text" class="w-3 h-3"></i><span>Ver archivo</span>
+                        </a>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono text-[11px] font-extrabold text-red-700">{{ at.get_codigo_tubo }}</span>
+              <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/80 font-mono text-[10px] font-extrabold">{{ at.codigo_atencion }}</span>
+            </div>
+            <p class="text-xs font-extrabold text-slate-900 leading-snug line-clamp-3">{{ at.descripcion }}</p>
+            <div class="text-[11px] text-slate-600 space-y-0.5">
+              <div><strong class="text-slate-700">Solicitante:</strong> {{ at.solicitante }}{% if at.organizacion %} <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{{ at.organizacion.tipo_organizacion }}</span>{% endif %}</div>
+              {% if at.area_apoyo %}<div><strong class="text-slate-700">Apoyo:</strong> <span class="text-blue-700 font-semibold">{{ at.area_apoyo }}</span></div>{% endif %}
+              {% if at.fecha_compromiso %}<div><strong class="text-slate-700">Compromiso:</strong> <span class="font-mono">{{ at.fecha_compromiso|date:"d/m/Y" }}</span></div>{% endif %}
+            </div>
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+              <span class="text-[10px] text-slate-500 font-medium leading-tight">
+                Responsable: <strong class="text-slate-700">{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username }}</strong>
+              </span>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button type="button"
+                        onclick="verDetalleAtencion('{{ at.id }}', '{{ at.codigo_atencion|escapejs }}', '{{ at.solicitante|escapejs }}', '{{ at.delegacion.nombre|escapejs }}', '{{ at.tipo_atencion.nombre|escapejs }}', '{{ at.sub_atencion.nombre|escapejs }}', '{{ at.descripcion|escapejs }}', '{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username|escapejs }}', '{% if at.creado_por %}{{ at.creado_por.get_full_name|default:at.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ at.created_at|date:'d/m/Y H:i' }}', '{{ at.estado|escapejs }}', '{{ at.get_evidencia_codigo|escapejs }}', '{{ at.estado_evidencia|escapejs }}', '{{ at.usuario_responsable_id }}', '{{ at.responsable_rol|escapejs }}', '{{ at.delegacion_id }}', '{{ at.va_a_tubo|yesno:'1,0' }}', '{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}', '{{ at.area_apoyo|default:''|escapejs }}', '{{ at.avance_observaciones|default:''|escapejs }}')"
+                        class="text-[11px] font-extrabold text-[#C41230] hover:underline px-1">
+                  Ver
+                </button>
+                {% if not permisos.es_consultor %}
+                <button type="button" onclick="moverTarjetaTubo({{ at.id }}, 'En proceso')"
+                        class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[10px] font-extrabold transition-colors">
+                  A Proceso
+                </button>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="py-8 text-center text-[11px] text-slate-400 font-medium">Sin requerimientos pendientes</div>
+          {% endfor %}
+        </div>
+
+        <!-- COLUMNA 3: 3. EN PROCESO -->
+        <div class="tubo-kanban-col bg-slate-100/75 rounded-2xl border border-slate-200/80 p-3 flex flex-col gap-3 min-h-[280px]"
+             data-target-estado="En proceso"
+             {% if not permisos.es_consultor %}ondragover="tuboAllowDrop(event)" ondragleave="tuboDragLeave(event)" ondrop="tuboDrop(event, 'En proceso')"{% endif %}>
+          <div class="flex items-center justify-between px-1 pb-2 border-b border-slate-200/80">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-amber-700">3. EN PROCESO</span>
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-white text-amber-700 border border-amber-200 shadow-2xs">{{ canvas_proceso|length }}</span>
+          </div>
+          {% for at in canvas_proceso %}
+          <div class="tubo-kanban-card bg-white rounded-xl border border-slate-200 border-l-4 border-l-amber-500 p-3.5 shadow-xs hover:shadow-md transition-all space-y-2 {% if not permisos.es_consultor %}cursor-grab active:cursor-grabbing{% endif %}"
+               {% if not permisos.es_consultor %}draggable="true" ondragstart="tuboDragStart(event, {{ at.id }})"{% endif %}
+               data-atencion-id="{{ at.id }}">
+            {% if at.actividad %}
+              <div id="evidencias-atencion-{{ at.id }}" class="hidden">
+                {% for evidencia in at.actividad.evidencias.all %}
+                  <div class="evidence-item flex items-center justify-between gap-2 p-1.5 rounded-lg border border-slate-100 bg-slate-50/70" data-momento="{{ evidencia.momento }}">
+                    <div class="flex items-center gap-1.5">
+                      {% if evidencia.momento == 'antes' %}
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">Antes</span>
+                      {% else %}
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">Después</span>
+                      {% endif %}
+                      {% if evidencia.imagen %}
+                        <a href="{{ evidencia.imagen.url }}" data-momento="{{ evidencia.momento }}" data-titulo="Evidencia {{ evidencia.get_momento_display }} ({{ at.codigo_atencion }})" class="visor-evidencia text-[#C41230] font-bold hover:underline flex items-center gap-1">
+                          <i data-lucide="image" class="w-3 h-3"></i><span>Ver imagen</span>
+                        </a>
+                      {% endif %}
+                      {% if evidencia.archivo %}
+                        <a href="{{ evidencia.archivo.url }}" data-momento="{{ evidencia.momento }}" data-titulo="Evidencia {{ evidencia.get_momento_display }} ({{ at.codigo_atencion }})" class="visor-evidencia text-[#C41230] font-bold hover:underline flex items-center gap-1">
+                          <i data-lucide="file-text" class="w-3 h-3"></i><span>Ver archivo</span>
+                        </a>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono text-[11px] font-extrabold text-amber-700">{{ at.get_codigo_tubo }}</span>
+              <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/80 font-mono text-[10px] font-extrabold">{{ at.codigo_atencion }}</span>
+            </div>
+            <p class="text-xs font-extrabold text-slate-900 leading-snug line-clamp-3">{{ at.descripcion }}</p>
+            <div class="text-[11px] text-slate-600 space-y-0.5">
+              <div><strong class="text-slate-700">Solicitante:</strong> {{ at.solicitante }}{% if at.organizacion %} <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{{ at.organizacion.tipo_organizacion }}</span>{% endif %}</div>
+              {% if at.area_apoyo %}<div><strong class="text-slate-700">Apoyo:</strong> <span class="text-blue-700 font-semibold">{{ at.area_apoyo }}</span></div>{% endif %}
+              {% if at.fecha_compromiso %}<div><strong class="text-slate-700">Compromiso:</strong> <span class="font-mono">{{ at.fecha_compromiso|date:"d/m/Y" }}</span></div>{% endif %}
+            </div>
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+              <span class="text-[10px] text-slate-500 font-medium leading-tight">
+                Responsable: <strong class="text-slate-700">{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username }}</strong>
+              </span>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button type="button"
+                        onclick="verDetalleAtencion('{{ at.id }}', '{{ at.codigo_atencion|escapejs }}', '{{ at.solicitante|escapejs }}', '{{ at.delegacion.nombre|escapejs }}', '{{ at.tipo_atencion.nombre|escapejs }}', '{{ at.sub_atencion.nombre|escapejs }}', '{{ at.descripcion|escapejs }}', '{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username|escapejs }}', '{% if at.creado_por %}{{ at.creado_por.get_full_name|default:at.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ at.created_at|date:'d/m/Y H:i' }}', '{{ at.estado|escapejs }}', '{{ at.get_evidencia_codigo|escapejs }}', '{{ at.estado_evidencia|escapejs }}', '{{ at.usuario_responsable_id }}', '{{ at.responsable_rol|escapejs }}', '{{ at.delegacion_id }}', '{{ at.va_a_tubo|yesno:'1,0' }}', '{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}', '{{ at.area_apoyo|default:''|escapejs }}', '{{ at.avance_observaciones|default:''|escapejs }}')"
+                        class="text-[11px] font-extrabold text-[#C41230] hover:underline px-1">
+                  Ver
+                </button>
+                {% if not permisos.es_consultor %}
+                <button type="button" onclick="moverTarjetaTubo({{ at.id }}, 'Resuelta')"
+                        class="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-extrabold transition-colors">
+                  Realizar
+                </button>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="py-8 text-center text-[11px] text-slate-400 font-medium">Sin requerimientos en proceso</div>
+          {% endfor %}
+        </div>
+
+        <!-- COLUMNA 4: 4. REALIZADOS -->
+        <div class="tubo-kanban-col bg-slate-100/75 rounded-2xl border border-slate-200/80 p-3 flex flex-col gap-3 min-h-[280px]"
+             data-target-estado="Resuelta"
+             {% if not permisos.es_consultor %}ondragover="tuboAllowDrop(event)" ondragleave="tuboDragLeave(event)" ondrop="tuboDrop(event, 'Resuelta')"{% endif %}>
+          <div class="flex items-center justify-between px-1 pb-2 border-b border-slate-200/80">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-700">4. REALIZADOS</span>
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-white text-emerald-700 border border-emerald-200 shadow-2xs">{{ canvas_realizados|length }}</span>
+          </div>
+          {% for at in canvas_realizados %}
+          <div class="tubo-kanban-card bg-white rounded-xl border border-slate-200 border-l-4 border-l-emerald-600 p-3.5 shadow-xs hover:shadow-md transition-all space-y-2 {% if not permisos.es_consultor %}cursor-grab active:cursor-grabbing{% endif %}"
+               {% if not permisos.es_consultor %}draggable="true" ondragstart="tuboDragStart(event, {{ at.id }})"{% endif %}
+               data-atencion-id="{{ at.id }}">
+            {% if at.actividad %}
+              <div id="evidencias-atencion-{{ at.id }}" class="hidden">
+                {% for evidencia in at.actividad.evidencias.all %}
+                  <div class="evidence-item flex items-center justify-between gap-2 p-1.5 rounded-lg border border-slate-100 bg-slate-50/70" data-momento="{{ evidencia.momento }}">
+                    <div class="flex items-center gap-1.5">
+                      {% if evidencia.momento == 'antes' %}
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">Antes</span>
+                      {% else %}
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">Después</span>
+                      {% endif %}
+                      {% if evidencia.imagen %}
+                        <a href="{{ evidencia.imagen.url }}" data-momento="{{ evidencia.momento }}" data-titulo="Evidencia {{ evidencia.get_momento_display }} ({{ at.codigo_atencion }})" class="visor-evidencia text-[#C41230] font-bold hover:underline flex items-center gap-1">
+                          <i data-lucide="image" class="w-3 h-3"></i><span>Ver imagen</span>
+                        </a>
+                      {% endif %}
+                      {% if evidencia.archivo %}
+                        <a href="{{ evidencia.archivo.url }}" data-momento="{{ evidencia.momento }}" data-titulo="Evidencia {{ evidencia.get_momento_display }} ({{ at.codigo_atencion }})" class="visor-evidencia text-[#C41230] font-bold hover:underline flex items-center gap-1">
+                          <i data-lucide="file-text" class="w-3 h-3"></i><span>Ver archivo</span>
+                        </a>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono text-[11px] font-extrabold text-emerald-700">{{ at.get_codigo_tubo }}</span>
+              <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/80 font-mono text-[10px] font-extrabold">{{ at.codigo_atencion }}</span>
+            </div>
+            <p class="text-xs font-extrabold text-slate-600 leading-snug line-clamp-3">{{ at.descripcion }}</p>
+            <div class="text-[11px] text-slate-600 space-y-0.5">
+              <div><strong class="text-slate-700">Solicitante:</strong> {{ at.solicitante }}{% if at.organizacion %} <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{{ at.organizacion.tipo_organizacion }}</span>{% endif %}</div>
+              {% if at.area_apoyo %}<div><strong class="text-slate-700">Apoyo:</strong> <span class="text-blue-700 font-semibold">{{ at.area_apoyo }}</span></div>{% endif %}
+            </div>
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+              <span class="text-[11px] font-extrabold text-emerald-700">Concluido</span>
+              <button type="button"
+                      onclick="verDetalleAtencion('{{ at.id }}', '{{ at.codigo_atencion|escapejs }}', '{{ at.solicitante|escapejs }}', '{{ at.delegacion.nombre|escapejs }}', '{{ at.tipo_atencion.nombre|escapejs }}', '{{ at.sub_atencion.nombre|escapejs }}', '{{ at.descripcion|escapejs }}', '{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username|escapejs }}', '{% if at.creado_por %}{{ at.creado_por.get_full_name|default:at.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ at.created_at|date:'d/m/Y H:i' }}', '{{ at.estado|escapejs }}', '{{ at.get_evidencia_codigo|escapejs }}', '{{ at.estado_evidencia|escapejs }}', '{{ at.usuario_responsable_id }}', '{{ at.responsable_rol|escapejs }}', '{{ at.delegacion_id }}', '{{ at.va_a_tubo|yesno:'1,0' }}', '{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}', '{{ at.area_apoyo|default:''|escapejs }}', '{{ at.avance_observaciones|default:''|escapejs }}')"
+                      class="text-[11px] font-extrabold text-[#C41230] hover:underline">
+                Ver Detalle
+              </button>
+            </div>
+          </div>
+          {% empty %}
+          <div class="py-8 text-center text-[11px] text-slate-400 font-medium">Sin requerimientos realizados</div>
+          {% endfor %}
+        </div>
+
+      </div>
+    </div>
+
+    {% else %}
+    <!-- Vista Tabla del Tubo de Compromiso -->
     <div class="overflow-x-auto">
       <table class="w-full text-left text-xs text-slate-700">
         <thead class="bg-slate-50 text-slate-700 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200">
@@ -245,8 +583,8 @@
           <tr class="hover:bg-slate-50/80 transition-colors">
             <!-- N° Tubo -->
             <td class="py-3 px-3.5 font-mono whitespace-nowrap">
-              <span class="font-extrabold text-[#C41230] block">{{ at.codigo_atencion }}</span>
-              <span class="text-[10px] font-bold text-slate-400">{{ at.origen|default:"EXT" }}</span>
+              <span class="font-extrabold text-[#C41230] block">{{ at.get_codigo_tubo }}</span>
+              <span class="text-[10px] font-bold text-slate-500">{{ at.codigo_atencion }} · {{ at.origen|default:"EXT" }}</span>
             </td>
 
             <!-- Fecha Solicitud -->
@@ -256,7 +594,14 @@
 
             <!-- Solicitante -->
             <td class="py-3 px-3.5">
-              <div class="font-bold text-slate-900">{{ at.solicitante }}</div>
+              <div class="font-bold text-slate-900">
+                <span>{{ at.solicitante }}</span>
+                {% if at.organizacion %}
+                  <span class="inline-flex items-center px-1.5 py-0.5 ml-1 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                    {{ at.organizacion.tipo_organizacion }}
+                  </span>
+                {% endif %}
+              </div>
             </td>
 
             <!-- Territorio -->
@@ -436,7 +781,7 @@
         {% endfor %}
 
         {% if page_obj.has_next %}
-          <a href="?tab=requerimientos{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_responsable %}&responsable={{ filtro_responsable }}{% endif %}{% if filtro_origen %}&origen={{ filtro_origen }}{% endif %}{% if orden %}&orden={{ orden }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}&page={{ page_obj.next_page_number }}"
+          <a href="?tab=requerimientos&vista={{ vista }}{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_responsable %}&responsable={{ filtro_responsable }}{% endif %}{% if filtro_origen %}&origen={{ filtro_origen }}{% endif %}{% if orden %}&orden={{ orden }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}&page={{ page_obj.next_page_number }}"
              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold transition-all shadow-sm">
             Siguiente
           </a>
@@ -447,6 +792,7 @@
         {% endif %}
       </div>
     </div>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -705,7 +1051,7 @@
         <div class="flex items-center justify-between border-b border-red-100 pb-1.5">
           <div class="flex items-center gap-1.5">
             <i data-lucide="git-pull-request" class="w-3.5 h-3.5 text-[#C41230]"></i>
-            <span class="font-extrabold text-[#8B1D19] uppercase tracking-wider text-[11px]">Seguimiento Tubo de Trabajo SGR</span>
+            <span class="font-extrabold text-[#8B1D19] uppercase tracking-wider text-[11px]">Seguimiento Tubo de Compromiso SGR</span>
           </div>
           <span id="at-tubo-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold"></span>
         </div>
@@ -776,17 +1122,17 @@
         </div>
       </div>
 
-      <!-- Sección Tubo de Trabajo en Edición -->
+      <!-- Sección Tubo de Compromiso en Edición -->
       <div class="p-3.5 rounded-2xl bg-white border border-blue-200 space-y-3">
         <div class="flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-1.5">
           <i data-lucide="git-pull-request" class="w-4 h-4 text-[#C41230]"></i>
-          <span class="font-extrabold text-xs">Parámetros del Tubo de Trabajo SGR</span>
+          <span class="font-extrabold text-xs">Parámetros del Tubo de Compromiso SGR</span>
         </div>
         <div class="space-y-1">
-          <label for="at-edit-vatubo" class="block text-slate-700 text-[11px]">¿Gestionar en Tubo de Trabajo?</label>
+          <label for="at-edit-vatubo" class="block text-slate-700 text-[11px]">¿Gestionar en Tubo de Compromiso?</label>
           <select id="at-edit-vatubo" name="va_a_tubo" onchange="toggleCamposTuboEdicion(this.value)"
                   class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-            <option value="true">Sí (En Tubo de Trabajo)</option>
+            <option value="true">Sí (En Tubo de Compromiso)</option>
             <option value="false">No (Registro Regular)</option>
           </select>
         </div>
@@ -936,12 +1282,20 @@
 
   function toggleCamposTuboEdicion(valor) {
     const sec = document.getElementById('seccion-campos-tubo-edicion');
+    const fechaInput = document.getElementById('at-edit-fechacomp');
+    const areaInput = document.getElementById('at-edit-areaapoyo');
     if (!sec) return;
     const isTubo = (valor === 'true' || valor === '1' || valor === true);
     if (isTubo) {
       sec.classList.remove('hidden');
+      if (fechaInput) fechaInput.setAttribute('required', 'required');
     } else {
       sec.classList.add('hidden');
+      if (fechaInput) {
+        fechaInput.removeAttribute('required');
+        fechaInput.value = '';
+      }
+      if (areaInput) areaInput.value = '';
     }
   }
 
@@ -983,7 +1337,7 @@
     const tuboBadge = document.getElementById('at-tubo-badge');
     if (tuboBadge) {
       if (isTubo) {
-        tuboBadge.textContent = 'En Tubo de Trabajo';
+        tuboBadge.textContent = 'En Tubo de Compromiso';
         tuboBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-[#C41230] border border-red-200';
       } else {
         tuboBadge.textContent = 'Registro Regular';
@@ -1155,5 +1509,71 @@
       modal.classList.add('hidden');
     }
   });
+
+  function _getCookieTubo(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      for (const c of document.cookie.split(';')) {
+        const cookie = c.trim();
+        if (cookie.startsWith(name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  let _tuboDragId = null;
+  function tuboDragStart(ev, atencionId) {
+    _tuboDragId = atencionId;
+    if (ev.dataTransfer) {
+      ev.dataTransfer.effectAllowed = 'move';
+      ev.dataTransfer.setData('text/plain', String(atencionId));
+    }
+  }
+
+  function tuboAllowDrop(ev) {
+    ev.preventDefault();
+    ev.currentTarget.classList.add('ring-2', 'ring-[#C41230]/40', 'bg-red-50/40');
+  }
+
+  function tuboDragLeave(ev) {
+    ev.currentTarget.classList.remove('ring-2', 'ring-[#C41230]/40', 'bg-red-50/40');
+  }
+
+  function tuboDrop(ev, nuevoEstado) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('ring-2', 'ring-[#C41230]/40', 'bg-red-50/40');
+    const rawId = ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : null;
+    const atencionId = rawId || _tuboDragId;
+    if (atencionId) {
+      moverTarjetaTubo(atencionId, nuevoEstado);
+    }
+    _tuboDragId = null;
+  }
+
+  async function moverTarjetaTubo(atencionId, nuevoEstado) {
+    const formData = new FormData();
+    formData.append('nuevo_estado', nuevoEstado);
+    try {
+      const resp = await fetch(`/gestion/tubo/${atencionId}/estado/`, {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRFToken': _getCookieTubo('csrftoken') || '',
+        },
+        body: formData,
+      });
+      const data = await resp.json();
+      if (resp.ok && data.ok) {
+        window.location.reload();
+      } else {
+        alert(data.error || 'No fue posible actualizar el estado del requerimiento.');
+      }
+    } catch (err) {
+      alert('Error de conexión al actualizar el estado.');
+    }
+  }
 </script>
 {% endblock %}

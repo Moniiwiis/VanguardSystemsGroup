@@ -345,6 +345,9 @@ class AtencionCiudadana(BaseModel):
             return self.actividad.codigo_evidencia_unico
         return f"EVI-{self.codigo_atencion.replace('AT-', '')}"
 
+    def get_codigo_tubo(self):
+        return f"TUB-{self.id:05d}" if self.id else "TUB-00000"
+
     def estado_evidencia(self):
         if self.actividad:
             return self.actividad.estado_validacion()
@@ -457,7 +460,11 @@ def get_or_create_actividad_para_atencion(atencion):
 
     # 6. Datos de contacto seguros
     contacto_nombre = (atencion.solicitante[:100] if atencion.solicitante else 'Vecino/a')
-    contacto_tel = atencion.telefono_contacto or (atencion.vecino.telefono if atencion.vecino else None)
+    contacto_tel = (
+        atencion.telefono_contacto
+        or (atencion.vecino.telefono if atencion.vecino else None)
+        or (atencion.organizacion.telefono_contacto if atencion.organizacion else None)
+    )
     if contacto_tel:
         contacto_tel = str(contacto_tel)[:20]
 

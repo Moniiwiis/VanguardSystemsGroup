@@ -1,3 +1,4 @@
+import datetime
 from io import BytesIO
 import re
 from tempfile import TemporaryDirectory
@@ -10,7 +11,8 @@ from django.urls import reverse
 from PIL import Image
 
 from accounts.models import Cargo, Delegacion, Funcionario, FuncionarioRol, Rol, Sector
-from activities.models import Actividad, AtencionCiudadana, Evidencia, ValidacionEvidencia, Vecino
+from activities.models import Actividad, AtencionCiudadana, Evidencia, OrganizacionComunitaria, ValidacionEvidencia, Vecino
+from agenda.models import CompromisoAgenda
 from configuration.models import ItemMedicion, Periodo, SubAtencion, TipoAtencion
 from core.utils import build_accent_query
 from core.views import _apply_list_ordering, _get_page_size, _validate_password
@@ -1098,3 +1100,226 @@ class SectorYTerritorioTests(TestCase):
             'estado': 'Activo',
         })
         self.assertTrue(Vecino.objects.filter(rut='18.999.888-0').exists())
+
+
+class TuboCompromisoYOrganizacionesTests(TestCase):
+    def setUp(self):
+        self.delegacion = Delegacion.objects.create(nombre='Delegación Centro', estado='Activa')
+        self.otra_delegacion = Delegacion.objects.create(nombre='Delegación Norte', estado='Activa')
+        self.cargo = Cargo.objects.create(nombre_cargo='Delegado Territorial')
+        self.user = User.objects.create_user(
+            username='delegado_tubo',
+            first_name='Carla',
+            last_name='Vega',
+            email='carla@example.test',
+            password='Prueba123!',
+        )
+        self.func = Funcionario.objects.create(
+            user=self.user,
+            identificador_institucional='FUNC-TUB01',
+            cargo=self.cargo,
+            delegacion=self.delegacion,
+            estado='Activo',
+        )
+        self.rol = Rol.objects.create(nombre_rol='Delegado', alcance='Delegación', estado='Activo')
+        FuncionarioRol.objects.create(funcionario=self.func, rol=self.rol)
+        self.tipo = TipoAtencion.objects.create(nombre='Social', estado='Activo')
+        self.sub = SubAtencion.objects.create(nombre='Luminarias', tipo_atencion=self.tipo, estado='Activa')
+        self.org_local = OrganizacionComunitaria.objects.create(
+            nombre='JJVV El Brillador',
+            tipo_organizacion='Junta de Vecinos',
+            delegacion=self.delegacion,
+            territorio='El Brillador',
+            representante_legal='Marta Henríquez',
+            telefono_contacto='+56 9 1234 5678',
+            estado='Activo',
+        )
+        self.org_externa = OrganizacionComunitaria.objects.create(
+            nombre='JJVV Las Compañías Norte',
+            tipo_organizacion='Junta de Vecinos',
+            delegacion=self.otra_delegacion,
+            estado='Activo',
+        )
+
+    def test_atencion_permite_jjvv_existente_y_nueva(self):
+        self.client.force_login(self.user)
+
+        # 1. Crear atención con JJVV existente y envío a Tubo de Compromiso
+        resp = self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'organizacion_id': self.org_local.id,
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Instalación de reductores de velocidad en Av. Islón',
+            'va_a_tubo': '1',
+            'fecha_compromiso': '2026-12-01',
+            'area_apoyo': 'Dirección de Tránsito',
+            'origen': 'EXT',
+        })
+        self.assertRedirects(resp, reverse('gestion_atenciones'))
+        at1 = AtencionCiudadana.objects.filter(organizacion=self.org_local).first()
+        self.assertIsNotNone(at1)
+        self.assertTrue(at1.va_a_tubo)
+        self.assertIn('JJVV El Brillador', at1.solicitante)
+        self.assertEqual(at1.area_apoyo, 'Dirección de Tránsito')
+        self.assertEqual(at1.get_codigo_tubo(), f'TUB-{at1.id:05d}')
+
+        # 2. Crear nueva JJVV inline dentro de la atención
+        resp_new = self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'crear_nueva_org': '1',
+            'nueva_org_nombre': 'JJVV Terrazas del Brillador',
+            'nueva_org_tipo': 'Junta de Vecinos',
+            'nueva_org_representante': 'Carlos Pérez',
+            'nueva_org_telefono': '+56 9 8765 4321',
+            'nueva_org_direccion': 'Av. El Brillador 450',
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Solicitud de poda',
+            'va_a_tubo': '0',
+        })
+        self.assertRedirects(resp_new, reverse('gestion_atenciones'))
+        nueva_org = OrganizacionComunitaria.objects.filter(nombre='JJVV Terrazas del Brillador').first()
+        self.assertIsNotNone(nueva_org)
+        at2 = AtencionCiudadana.objects.filter(organizacion=nueva_org).first()
+        self.assertIsNotNone(at2)
+        self.assertFalse(at2.va_a_tubo)
+
+        # 3. Una JJVV de otra delegación NO se expone ni puede vincularse
+        resp_get = self.client.get(reverse('gestion_atenciones'))
+        org_ids = [o['id'] for o in resp_get.context['organizaciones']]
+        self.assertIn(self.org_local.id, org_ids)
+        self.assertNotIn(self.org_externa.id, org_ids)
+
+    def test_regla_estricta_no_crear_tubo_sin_atencion(self):
+        self.client.force_login(self.user)
+
+        # 1. POST directo en /gestion/tubo/ NO crea registros
+        total_antes = AtencionCiudadana.objects.count()
+        resp_tubo_post = self.client.post(reverse('gestion_tubo'), {
+            'descripcion': 'Intento suelto',
+            'va_a_tubo': '1',
+        })
+        self.assertRedirects(resp_tubo_post, reverse('gestion_tubo'))
+        self.assertEqual(AtencionCiudadana.objects.count(), total_antes)
+
+        # 2. POST en /gestion/agenda/ redirige al Tubo sin crear CompromisoAgenda independiente
+        resp_agenda_post = self.client.post(reverse('gestion_agenda'), {
+            'solicitante': 'Alguien sin atención',
+            'fecha_comprometida': '2026-12-10',
+        })
+        self.assertRedirects(resp_agenda_post, reverse('gestion_tubo'))
+        self.assertEqual(CompromisoAgenda.objects.count(), 0)
+
+        # 3. En atenciones: marcar va_a_tubo='1' SIN fecha_compromiso es rechazado
+        self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'organizacion_id': self.org_local.id,
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Compromiso sin fecha',
+            'va_a_tubo': '1',
+            'fecha_compromiso': '',
+        })
+        self.assertEqual(AtencionCiudadana.objects.filter(descripcion='Compromiso sin fecha').count(), 0)
+
+        # 4. Con va_a_tubo='0', incluso si envían fecha_compromiso/area_apoyo, NO entra al Tubo
+        self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'organizacion_id': self.org_local.id,
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Atención regular limpia',
+            'va_a_tubo': '0',
+            'fecha_compromiso': '2026-12-05',
+            'area_apoyo': 'Tránsito',
+        })
+        at_reg = AtencionCiudadana.objects.get(descripcion='Atención regular limpia')
+        self.assertFalse(at_reg.va_a_tubo)
+        self.assertIsNone(at_reg.fecha_compromiso)
+        self.assertEqual(at_reg.area_apoyo, '')
+
+    def test_tubo_vistas_tabla_y_canvas_y_transicion_estado(self):
+        self.client.force_login(self.user)
+
+        at_ing = AtencionCiudadana.objects.create(
+            solicitante='Marta Henríquez',
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Revisión de luminarias en Pasaje Las Rosas',
+            usuario_responsable=self.user,
+            estado='Registrada',
+            va_a_tubo=True,
+            fecha_compromiso=datetime.date(2026, 12, 1),
+            area_apoyo='Alumbrado',
+        )
+        at_pend = AtencionCiudadana.objects.create(
+            solicitante='JJVV El Brillador',
+            organizacion=self.org_local,
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Salida a terreno y catastro con dirigentes',
+            usuario_responsable=self.user,
+            estado='Pendiente',
+            va_a_tubo=True,
+            fecha_compromiso=datetime.date(2026, 12, 2),
+            area_apoyo='Obras Municipales',
+        )
+        at_real = AtencionCiudadana.objects.create(
+            solicitante='Beatriz Ossa',
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Evaluación social urgente',
+            usuario_responsable=self.user,
+            estado='Resuelta',
+            va_a_tubo=True,
+            fecha_compromiso=datetime.date(2026, 11, 20),
+        )
+
+        # Vista Tabla
+        resp_tabla = self.client.get(reverse('gestion_tubo') + '?vista=tabla')
+        self.assertEqual(resp_tabla.status_code, 200)
+        self.assertEqual(resp_tabla.context['vista'], 'tabla')
+        self.assertContains(resp_tabla, 'Tubo de Compromiso SGR')
+        self.assertContains(resp_tabla, at_ing.get_codigo_tubo())
+
+        # Vista Canvas (Kanban 4 columnas + KPI cards)
+        resp_canvas = self.client.get(reverse('gestion_tubo') + '?vista=canvas')
+        self.assertEqual(resp_canvas.status_code, 200)
+        self.assertEqual(resp_canvas.context['vista'], 'canvas')
+        self.assertContains(resp_canvas, '1. INGRESADOS')
+        self.assertContains(resp_canvas, '2. PENDIENTES')
+        self.assertContains(resp_canvas, '3. EN PROCESO')
+        self.assertContains(resp_canvas, '4. REALIZADOS')
+        self.assertContains(resp_canvas, 'GESTIONES EN TUBO')
+        self.assertContains(resp_canvas, at_ing.get_codigo_tubo())
+        self.assertContains(resp_canvas, at_pend.get_codigo_tubo())
+        self.assertContains(resp_canvas, at_real.get_codigo_tubo())
+
+        # Sesión recuerda vista=canvas si se omite parámetro
+        resp_persist = self.client.get(reverse('gestion_tubo'))
+        self.assertEqual(resp_persist.context['vista'], 'canvas')
+
+        # Transición AJAX en Canvas (Ingresado -> En proceso -> Realizado)
+        resp_ajax = self.client.post(
+            reverse('gestion_tubo_cambiar_estado', args=[at_ing.id]),
+            {'nuevo_estado': 'En proceso'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(resp_ajax.status_code, 200)
+        self.assertEqual(resp_ajax.json()['estado'], 'En proceso')
+        at_ing.refresh_from_db()
+        self.assertEqual(at_ing.estado, 'En proceso')
+
+        resp_realizar = self.client.post(
+            reverse('gestion_tubo_cambiar_estado', args=[at_ing.id]),
+            {'nuevo_estado': 'Realizado'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(resp_realizar.status_code, 200)
+        self.assertEqual(resp_realizar.json()['estado'], 'Resuelta')
+        at_ing.refresh_from_db()
+        self.assertEqual(at_ing.estado, 'Resuelta')
