@@ -46,7 +46,7 @@
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
     <!-- Tarjeta Izquierda: Fotografía de Perfil -->
-    <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-5 flex flex-col items-center text-center">
+    <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-5 flex flex-col items-center text-center min-w-0 overflow-hidden">
       <div class="space-y-2">
         <h2 class="text-base font-extrabold text-slate-900">Foto de Perfil</h2>
       </div>
@@ -63,10 +63,10 @@
         {% endif %}
       </div>
 
-      <div class="text-xs space-y-1">
-        <p class="font-extrabold text-slate-900 text-sm">{{ request.user.get_full_name|default:request.user.username }}</p>
-        <p class="text-slate-500 font-mono">{{ request.user.email|default:"Sin correo electrónico" }}</p>
-        <span class="inline-block mt-1 px-3 py-1 rounded-full text-[10px] font-extrabold bg-red-50 text-[#C41230] border border-red-200">
+      <div class="text-xs space-y-1 w-full min-w-0">
+        <p class="font-extrabold text-slate-900 text-sm w-full break-words [overflow-wrap:anywhere]">{{ request.user.get_full_name|default:request.user.username }}</p>
+        <p class="text-slate-500 font-mono w-full break-words [overflow-wrap:anywhere]">{{ request.user.email|default:"Sin correo electrónico" }}</p>
+        <span class="inline-block mt-1 px-3 py-1 rounded-full text-[10px] font-extrabold bg-red-50 text-[#C41230] border border-red-200 max-w-full truncate">
           {{ user_rol_name }}
         </span>
       </div>
@@ -82,7 +82,7 @@
     </div>
 
     <!-- Tarjeta Derecha: Formularios de Datos y Contraseña -->
-    <div class="lg:col-span-2 space-y-6">
+    <div class="lg:col-span-2 space-y-6 min-w-0">
 
       <!-- Formulario 1: Datos Personales -->
       <div class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-4">

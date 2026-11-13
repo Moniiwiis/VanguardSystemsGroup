@@ -105,6 +105,14 @@
     table.sgr-sticky-actions tbody tr:hover td:last-child:not([colspan]) {
       background-color: #f8fafc;
     }
+    /* Evitar desbordamiento horizontal por textos largos sin espacios */
+    main, aside {
+      min-width: 0;
+    }
+    .overflow-x-auto td,
+    .overflow-x-auto th {
+      overflow-wrap: anywhere;
+    }
     body {
       font-family: 'Public Sans', sans-serif;
       background-color: #FDF6F6;
@@ -208,8 +216,8 @@
                     aria-haspopup="true"
                     aria-expanded="false"
                     class="flex items-center gap-2.5 bg-[#700F17]/95 hover:bg-[#5C0A10] active:scale-95 text-white text-xs font-bold px-4 py-2 rounded-full border border-white/30 shadow-md transition-all cursor-pointer select-none">
-              <i data-lucide="{% if delegacion_activa %}building-2{% else %}globe{% endif %}" class="w-3.5 h-3.5 text-white/90"></i>
-              <span>{% if delegacion_activa %}{{ delegacion_activa.get_codigo }} · {{ delegacion_activa.nombre }}{% else %}Global · Todas las delegaciones{% endif %}</span>
+              <i data-lucide="{% if delegacion_activa %}building-2{% else %}globe{% endif %}" class="w-3.5 h-3.5 text-white/90 shrink-0"></i>
+              <span class="max-w-[180px] sm:max-w-[260px] truncate">{% if delegacion_activa %}{{ delegacion_activa.get_codigo }} · {{ delegacion_activa.nombre }}{% else %}Global · Todas las delegaciones{% endif %}</span>
               <i data-lucide="chevron-down" id="delegacionChevron" class="w-3.5 h-3.5 text-white/80 transition-transform duration-200"></i>
             </button>
             
@@ -270,22 +278,22 @@
       </div>
 
       <!-- Derecha: Identificación de Usuario, Rol y Salir (Wireframe C3-C6) -->
-      <div class="flex items-center gap-3 shrink-0 text-xs">
-        <a href="{% url 'perfil_usuario' %}" class="flex items-center gap-2 group hover:opacity-90 transition-opacity">
+      <div class="flex items-center gap-3 shrink-0 min-w-0 text-xs">
+        <a href="{% url 'perfil_usuario' %}" title="{{ request.user.get_full_name|default:request.user.username }}" class="flex items-center gap-2 min-w-0 group hover:opacity-90 transition-opacity">
           {% if funcionario_actual and funcionario_actual.foto %}
-            <img src="{{ funcionario_actual.foto.url }}" alt="{{ request.user.username }}" class="w-8 h-8 rounded-full object-cover ring-2 ring-white/40 shadow-sm" />
+            <img src="{{ funcionario_actual.foto.url }}" alt="{{ request.user.username }}" class="w-8 h-8 rounded-full object-cover ring-2 ring-white/40 shadow-sm shrink-0" />
           {% elif request.user.funcionario.foto %}
-            <img src="{{ request.user.funcionario.foto.url }}" alt="{{ request.user.username }}" class="w-8 h-8 rounded-full object-cover ring-2 ring-white/40 shadow-sm" />
+            <img src="{{ request.user.funcionario.foto.url }}" alt="{{ request.user.username }}" class="w-8 h-8 rounded-full object-cover ring-2 ring-white/40 shadow-sm shrink-0" />
           {% else %}
-            <div class="w-8 h-8 rounded-full bg-white/20 ring-2 ring-white/30 flex items-center justify-center font-bold text-white text-xs">
+            <div class="w-8 h-8 rounded-full bg-white/20 ring-2 ring-white/30 flex items-center justify-center font-bold text-white text-xs shrink-0">
               {{ request.user.first_name|default:request.user.username|make_list|first|upper }}
             </div>
           {% endif %}
-          <div class="text-right hidden sm:block">
-            <div class="font-bold text-white text-xs leading-tight group-hover:underline">
+          <div class="text-right hidden sm:block min-w-0 max-w-[160px] md:max-w-[200px]">
+            <div class="font-bold text-white text-xs leading-tight group-hover:underline truncate">
               {{ request.user.first_name|default:request.user.username }}
             </div>
-            <div class="text-[11px] text-white/80 leading-tight">
+            <div class="text-[11px] text-white/80 leading-tight truncate">
               <span>{{ user_rol_name }}</span>
             </div>
           </div>

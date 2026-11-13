@@ -75,9 +75,9 @@
         <tbody class="divide-y divide-slate-100 font-medium">
           {% for f in funcionarios %}
           <tr class="hover:bg-slate-50/70 transition-colors">
-            <td class="py-3.5 px-6 font-bold text-slate-900 whitespace-nowrap">
-              <div class="flex items-center gap-2">
-                <span>{{ f.user.first_name|default:f.user.username }}</span>
+            <td class="py-3.5 px-6 font-bold text-slate-900 max-w-[220px] [overflow-wrap:anywhere]">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="min-w-0 break-words [overflow-wrap:anywhere]">{{ f.user.first_name|default:f.user.username }}</span>
                 {% if f.debe_cambiar_contrasena %}
                   <span onmouseenter="mostrarTooltipClave(this)" onmouseleave="ocultarTooltipClave()"
                         class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-50 text-amber-600 border border-amber-300 hover:bg-amber-100 hover:text-amber-700 transition-colors cursor-help shrink-0">
@@ -86,8 +86,8 @@
                 {% endif %}
               </div>
             </td>
-            <td class="py-3.5 px-6 font-mono text-slate-700">{{ f.user.username }}</td>
-            <td class="py-3.5 px-6 text-slate-600">{{ f.user.email|default:"—" }}</td>
+            <td class="py-3.5 px-6 font-mono text-slate-700 max-w-[160px] [overflow-wrap:anywhere]">{{ f.user.username }}</td>
+            <td class="py-3.5 px-6 text-slate-600 max-w-[200px] [overflow-wrap:anywhere]">{{ f.user.email|default:"—" }}</td>
             <td class="py-3.5 px-6 text-slate-700">{{ f.cargo.nombre_cargo|default:"—" }}</td>
             <td class="py-3.5 px-6">
               {% with f.funcionariorol_set.first as rol_entry %}

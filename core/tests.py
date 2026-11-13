@@ -1678,3 +1678,67 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertContains(resp_inicio_op, 'Gestión Territorial')
         self.assertContains(resp_inicio_op, 'Padrón y Comunidad')
         self.assertNotContains(resp_inicio_op, 'CRUD Delegaciones')
+
+    def test_crear_vecino_crea_usuario_cliente_fuera_de_tabla_usuarios_y_overflow_perfil(self):
+        admin = User.objects.create_superuser('admin_vec_usr', 'avu@example.test', 'Admin123!')
+        sector = Sector.objects.create(nombre='Sector Prueba Usuario', delegacion=self.delegacion, estado='Activo')
+        rut_vec = '11.111.111-1'
+        rut_sin_puntos = '11111111-1'
+
+        self.client.force_login(admin)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        resp_post = self.client.post(reverse('gestion_vecinos'), {
+            'nombre': 'Ximena ' + ('x' * 130),
+            'rut': rut_vec,
+            'correo': 'ximena.vecina@example.test',
+            'direccion': 'Av. Balmaceda 1234',
+            'telefono': '+56 9 8123 4567',
+            'sector_id': sector.id,
+            'estado': 'Activo',
+        })
+        self.assertRedirects(resp_post, reverse('gestion_vecinos'))
+
+        vec_creado = Vecino.objects.get(rut=rut_vec)
+        user_vec = User.objects.get(username=rut_vec)
+        self.assertFalse(user_vec.is_staff)
+        self.assertEqual(user_vec.email, 'ximena.vecina@example.test')
+
+        # Aparece en la tabla de Vecinos, pero NO en la tabla de Usuarios ni en colaboradores del Tubo
+        resp_vec = self.client.get(reverse('gestion_vecinos'))
+        self.assertContains(resp_vec, rut_vec)
+        self.assertContains(resp_vec, 'ximena.vecina@example.test')
+
+        resp_usr = self.client.get(reverse('gestion_usuarios'))
+        uids_tabla_usuarios = {f.user_id for f in resp_usr.context['funcionarios']}
+        self.assertNotIn(user_vec.id, uids_tabla_usuarios)
+
+        resp_tubo_col = self.client.get(reverse('gestion_tubo') + '?tab=colaboradores&delegacion=todas')
+        colab_uids = {c['user_id'] for c in resp_tubo_col.context['resumen_colaboradores']}
+        self.assertNotIn(user_vec.id, colab_uids)
+
+        # El vecino puede acceder a su portal ciudadano y perfil tras cambio inicial de contraseña
+        from core.views import _obtener_vecino_de_cliente
+        self.assertEqual(_obtener_vecino_de_cliente(user_vec).id, vec_creado.id)
+        func_vec = Funcionario.objects.get(user=user_vec)
+        self.assertTrue(func_vec.debe_cambiar_contrasena)
+        func_vec.debe_cambiar_contrasena = False
+        func_vec.save(update_fields=['debe_cambiar_contrasena'])
+
+        self.client.force_login(user_vec)
+        resp_portal = self.client.get(reverse('portal_cliente'))
+        self.assertEqual(resp_portal.status_code, 200)
+        self.assertContains(resp_portal, '[overflow-wrap:anywhere]')
+
+        resp_perfil = self.client.get(reverse('perfil_usuario'))
+        self.assertEqual(resp_perfil.status_code, 200)
+        self.assertContains(resp_perfil, '[overflow-wrap:anywhere]')
+        self.assertContains(resp_perfil, 'truncate')
+
+        # Eliminar el vecino desactiva su usuario asociado
+        self.client.force_login(admin)
+        self.client.post(reverse('gestion_vecinos_eliminar', args=[vec_creado.id]))
+        user_vec.refresh_from_db()
+        self.assertFalse(user_vec.is_active)

@@ -225,8 +225,12 @@ def login_view(request):
         identifier = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
 
-        # Buscar por username o correo
+        # Buscar por username, RUT normalizado o correo
         user_candidate = User.objects.filter(Q(username__iexact=identifier) | Q(email__iexact=identifier)).first()
+        if not user_candidate:
+            rut_ok, rut_fmt = validar_rut(identifier)
+            if rut_ok:
+                user_candidate = User.objects.filter(username__iexact=rut_fmt).first()
         username_to_auth = user_candidate.username if user_candidate else identifier
 
         user = authenticate(request, username=username_to_auth, password=password)
@@ -581,12 +585,12 @@ def gestion_inicio(request):
     # En contexto global, el administrador consulta el agregado de todas las delegaciones.
     if del_activa:
         atenciones_del_qs = AtencionCiudadana.objects.filter(delegacion=del_activa)
-        funcionarios_del_qs = Funcionario.objects.filter(delegacion=del_activa)
+        funcionarios_del_qs = _funcionarios_municipales_qs(Funcionario.objects.filter(delegacion=del_activa))
         metas_del_qs = ConfiguracionMeta.objects.filter(funcionario__delegacion=del_activa).select_related('periodo', 'item', 'funcionario')
         val_del_qs = ValidacionEvidencia.objects.filter(actividad__funcionario__delegacion=del_activa)
     elif es_admin:
         atenciones_del_qs = AtencionCiudadana.objects.all()
-        funcionarios_del_qs = Funcionario.objects.all()
+        funcionarios_del_qs = _funcionarios_municipales_qs(Funcionario.objects.all())
         metas_del_qs = ConfiguracionMeta.objects.all().select_related('periodo', 'item', 'funcionario')
         val_del_qs = ValidacionEvidencia.objects.all()
     else:
@@ -896,6 +900,108 @@ def gestion_roles_eliminar(request, rol_id):
     return redirect('gestion_roles')
 
 
+def _funcionarios_municipales_qs(qs=None):
+    """Retorna funcionarios municipales excluyendo cuentas ciudadanas/vecinos (Rol Cliente)."""
+    base = qs if qs is not None else Funcionario.objects
+    return base.exclude(
+        funcionariorol__rol__nombre_rol__icontains='cliente'
+    ).exclude(
+        identificador_institucional__startswith='VEC-'
+    ).distinct()
+
+
+def _identificador_vecino(rut_str):
+    clean = ''.join(c for c in (rut_str or '').upper() if c.isalnum())
+    return f"VEC-{clean}"[:20]
+
+
+def _buscar_func_vecino(rut_str):
+    ident = _identificador_vecino(rut_str)
+    return Funcionario.all_objects.select_related('user').filter(
+        Q(identificador_institucional=ident)
+        | (Q(user__username__iexact=rut_str) & Q(identificador_institucional__startswith='VEC-'))
+    ).first()
+
+
+def _crear_o_sincronizar_usuario_vecino(vecino, correo='', anterior_rut='', crear=False, actualizar_correo=False):
+    """
+    Crea o sincroniza la cuenta de acceso ciudadano (Rol Cliente) asociada a un Vecino,
+    sin exponerla en la tabla administrativa de Usuarios del sistema.
+    """
+    ident_vec = _identificador_vecino(vecino.rut)
+    func_vec = _buscar_func_vecino(anterior_rut or vecino.rut) or _buscar_func_vecino(vecino.rut)
+
+    if func_vec:
+        user_vec = func_vec.user
+        user_vec.first_name = vecino.nombre[:150]
+        if actualizar_correo:
+            user_vec.email = correo
+        user_vec.is_active = (vecino.estado == 'Activo')
+        if anterior_rut and anterior_rut != vecino.rut and user_vec.username.lower() == anterior_rut.lower():
+            if not User.objects.filter(username__iexact=vecino.rut).exclude(id=user_vec.id).exists():
+                user_vec.username = vecino.rut
+        user_vec.save()
+
+        if func_vec.identificador_institucional != ident_vec and not Funcionario.all_objects.filter(
+            identificador_institucional=ident_vec
+        ).exclude(id=func_vec.id).exists():
+            func_vec.identificador_institucional = ident_vec
+        func_vec.delegacion = vecino.delegacion
+        func_vec.telefono = (vecino.telefono or '')[:20]
+        func_vec.estado = vecino.estado
+        func_vec.deleted_at = None
+        func_vec.save()
+        return user_vec, None, False
+
+    if not crear:
+        return None, None, False
+
+    rol_cliente = (
+        Rol.objects.filter(nombre_rol__iexact='Cliente').first()
+        or Rol.objects.create(nombre_rol='Cliente', alcance='Personal', estado='Activo')
+    )
+    cargo_vecino = (
+        Cargo.objects.filter(nombre_cargo__icontains='Vecino').first()
+        or Cargo.objects.filter(nombre_cargo__icontains='Cliente').first()
+        or Cargo.objects.create(nombre_cargo='Vecino / Ciudadano')
+    )
+
+    username_dest = vecino.rut
+    if User.objects.filter(username__iexact=username_dest).exists():
+        clean_rut = ''.join(c for c in vecino.rut.lower() if c.isalnum())
+        username_dest = f"vec_{clean_rut}"[:150]
+        suf = 1
+        while User.objects.filter(username__iexact=username_dest).exists():
+            username_dest = f"vec_{clean_rut}_{suf}"[:150]
+            suf += 1
+
+    provisional_password = _generate_provisional_password()
+    user_vec = User.objects.create_user(
+        username=username_dest,
+        email=correo,
+        first_name=vecino.nombre[:150],
+        password=provisional_password,
+        is_staff=False,
+    )
+    user_vec.is_active = (vecino.estado == 'Activo')
+    user_vec.save()
+
+    if Funcionario.all_objects.filter(identificador_institucional=ident_vec).exists():
+        ident_vec = f"VEC-{vecino.id:05d}"[:20]
+
+    func_vec = Funcionario.all_objects.create(
+        user=user_vec,
+        identificador_institucional=ident_vec,
+        delegacion=vecino.delegacion,
+        cargo=cargo_vecino,
+        telefono=(vecino.telefono or '')[:20],
+        estado=vecino.estado,
+        debe_cambiar_contrasena=True,
+    )
+    FuncionarioRol.objects.create(funcionario=func_vec, rol=rol_cliente)
+    return user_vec, provisional_password, True
+
+
 # --- 3. CRUD USUARIOS (Wireframe C4) ---
 
 @login_required
@@ -1022,9 +1128,11 @@ def gestion_usuarios(request):
     todas_delegaciones = Delegacion.objects.filter(estado='Activa').order_by('id')
     delegacion_seleccionada = None
 
-    qs = Funcionario.objects.select_related(
-        'user', 'delegacion', 'cargo'
-    ).prefetch_related('funcionariorol_set__rol').order_by('-id')
+    qs = _funcionarios_municipales_qs(
+        Funcionario.objects.select_related(
+            'user', 'delegacion', 'cargo'
+        ).prefetch_related('funcionariorol_set__rol')
+    ).order_by('-id')
 
     # Scoping de seguridad en el servidor:
     # Delegado Municipal solo ve usuarios de su delegación asignada
@@ -2258,10 +2366,12 @@ def gestion_atenciones(request):
         atencion.responsable_rol = ', '.join(roles_por_usuario.get(atencion.usuario_responsable_id, [])) or 'Sin rol registrado'
 
     encargados_edicion = []
-    funcionarios_edicion = Funcionario.objects.filter(
-        delegacion_id__in=delegacion_ids,
-        estado__iexact='Activo',
-        user__is_active=True,
+    funcionarios_edicion = _funcionarios_municipales_qs(
+        Funcionario.objects.filter(
+            delegacion_id__in=delegacion_ids,
+            estado__iexact='Activo',
+            user__is_active=True,
+        )
     ).select_related('user', 'delegacion').order_by('user__first_name', 'user__username')
     funcionarios_ids = [funcionario.id for funcionario in funcionarios_edicion]
     roles_encargados = {}
@@ -2814,6 +2924,7 @@ def gestion_vecinos(request):
             return redirect('gestion_vecinos')
         nombre = request.POST.get('nombre', '').strip()
         rut = request.POST.get('rut', '').strip()
+        correo = request.POST.get('correo', '').strip()
         direccion = request.POST.get('direccion', '').strip()
         telefono = request.POST.get('telefono', '').strip()
         sector_id = request.POST.get('sector_id')
@@ -2838,6 +2949,17 @@ def gestion_vecinos(request):
         # Validaciones de límites de caracteres (Poner límite de caracteres en todo)
         ok, err = validar_largo(nombre, 150, "Nombre Completo")
         if not ok: messages.error(request, err); return redirect('gestion_vecinos')
+        if correo:
+            ok, err = validar_largo(correo, 100, "Correo Electrónico")
+            if not ok: messages.error(request, err); return redirect('gestion_vecinos')
+            try:
+                validate_email(correo)
+            except ValidationError:
+                messages.error(request, "El correo electrónico ingresado no es válido.")
+                return redirect('gestion_vecinos')
+            if User.objects.filter(email__iexact=correo).exists():
+                messages.error(request, "Ese correo electrónico ya se encuentra asociado a otra cuenta.")
+                return redirect('gestion_vecinos')
         ok, err = validar_direccion(direccion, "Dirección", 200)
         if not ok: messages.error(request, err); return redirect('gestion_vecinos')
         ok, err = validar_telefono_chileno(telefono)
@@ -2874,13 +2996,41 @@ def gestion_vecinos(request):
             estado=estado
         )
 
+        user_vec, provisional_password, _ = _crear_o_sincronizar_usuario_vecino(
+            nuevo_v, correo=correo, crear=True, actualizar_correo=bool(correo)
+        )
+
         # Notificación WebSocket en tiempo real
         del_id_ws = del_obj.id if del_obj else "global"
         def notificar_ws_vecino():
             publish_module_changed("vecinos", del_id_ws, "create", nuevo_v.id)
         transaction.on_commit(notificar_ws_vecino)
 
-        messages.success(request, f"Vecino/a '{nombre}' ({rut}) registrado exitosamente en {del_obj.nombre if del_obj else 'el padrón'}.")
+        correo_enviado = False
+        if correo and user_vec and provisional_password:
+            try:
+                _send_welcome_provisional_password(
+                    user=user_vec,
+                    provisional_password=provisional_password,
+                    rol_nombre='Cliente (Portal Ciudadano)',
+                    delegacion_nombre=del_obj.nombre if del_obj else 'Comuna',
+                )
+                correo_enviado = True
+            except (OSError, SMTPException, BadHeaderError):
+                logger.exception("No se pudo enviar correo de bienvenida al vecino creado.")
+
+        if correo_enviado:
+            messages.success(
+                request,
+                f"Vecino/a '{nombre}' ({rut}) registrado con cuenta de acceso '{user_vec.username}'. Credenciales enviadas a '{correo}'.",
+            )
+        elif user_vec and provisional_password:
+            messages.success(
+                request,
+                f"Vecino/a '{nombre}' ({rut}) registrado exitosamente. Usuario Portal Ciudadano: '{user_vec.username}' · Clave provisional: {provisional_password}",
+            )
+        else:
+            messages.success(request, f"Vecino/a '{nombre}' ({rut}) registrado exitosamente en {del_obj.nombre if del_obj else 'el padrón'}.")
         return redirect('gestion_vecinos')
 
     q = request.GET.get('q', '').strip()
@@ -2954,6 +3104,16 @@ def gestion_vecinos(request):
     total_vecinos = qs.count()
     page_obj = Paginator(qs, page_size).get_page(request.GET.get('page', 1))
 
+    vecinos_pagina = list(page_obj.object_list)
+    idents_vec = [_identificador_vecino(v.rut) for v in vecinos_pagina]
+    emails_vec_map = {}
+    for func_v in Funcionario.all_objects.select_related('user').filter(
+        identificador_institucional__in=idents_vec
+    ):
+        emails_vec_map[func_v.identificador_institucional] = func_v.user.email or ''
+    for v in vecinos_pagina:
+        v.usuario_email = emails_vec_map.get(_identificador_vecino(v.rut), '')
+
     if del_activa:
         sectores_vecinos = Sector.objects.filter(delegacion=del_activa, estado='Activo').order_by('nombre')
     elif delegacion_seleccionada:
@@ -2962,7 +3122,7 @@ def gestion_vecinos(request):
         sectores_vecinos = Sector.objects.none()
 
     return render(request, 'gestion/vecinos.html', {
-        'vecinos': page_obj.object_list,
+        'vecinos': vecinos_pagina,
         'page_obj': page_obj,
         'tipos_gestion': tipos_gestion,
         'todas_delegaciones': todas_delegaciones,
@@ -3021,8 +3181,11 @@ def gestion_vecinos_editar(request, vecino_id):
                 messages.error(request, "El sector seleccionado no pertenece a la delegación del vecino.")
                 return redirect('gestion_vecinos')
 
+        anterior_rut = vecino.rut
         nuevo_nombre = request.POST.get('nombre', vecino.nombre).strip()
         nuevo_rut = request.POST.get('rut', vecino.rut).strip()
+        nuevo_correo = request.POST.get('correo', '').strip()
+        correo_presente = 'correo' in request.POST
         nueva_dir = request.POST.get('direccion', vecino.direccion).strip()
         nuevo_tel = request.POST.get('telefono', vecino.telefono).strip()
 
@@ -3039,6 +3202,19 @@ def gestion_vecinos_editar(request, vecino_id):
 
         ok, err = validar_largo(nuevo_nombre, 150, "Nombre Completo")
         if not ok: messages.error(request, err); return redirect('gestion_vecinos')
+        if correo_presente and nuevo_correo:
+            ok, err = validar_largo(nuevo_correo, 100, "Correo Electrónico")
+            if not ok: messages.error(request, err); return redirect('gestion_vecinos')
+            try:
+                validate_email(nuevo_correo)
+            except ValidationError:
+                messages.error(request, "El correo electrónico ingresado no es válido.")
+                return redirect('gestion_vecinos')
+            func_actual = _buscar_func_vecino(anterior_rut)
+            uid_actual = func_actual.user_id if func_actual else None
+            if User.objects.filter(email__iexact=nuevo_correo).exclude(id=uid_actual).exists():
+                messages.error(request, "Ese correo electrónico ya pertenece a otro usuario.")
+                return redirect('gestion_vecinos')
         ok, err = validar_direccion(nueva_dir, "Dirección", 200)
         if not ok: messages.error(request, err); return redirect('gestion_vecinos')
         ok, err = validar_telefono_chileno(nuevo_tel)
@@ -3062,6 +3238,14 @@ def gestion_vecinos_editar(request, vecino_id):
         vecino.tipo_gestion_id = tg_id if tg_id else None
         vecino.estado = request.POST.get('estado', vecino.estado)
         vecino.save()
+
+        _crear_o_sincronizar_usuario_vecino(
+            vecino,
+            correo=nuevo_correo,
+            anterior_rut=anterior_rut,
+            crear=False,
+            actualizar_correo=correo_presente,
+        )
 
         del_id_ws = del_obj.id if del_obj else "global"
         def notificar_ws_edit():
@@ -3092,6 +3276,12 @@ def gestion_vecinos_eliminar(request, vecino_id):
     if request.method == 'POST':
         nombre = vecino.nombre
         del_id_ws = vecino.delegacion_id if vecino.delegacion_id else "global"
+        func_vec = _buscar_func_vecino(vecino.rut)
+        if func_vec:
+            u_vec = func_vec.user
+            u_vec.is_active = False
+            u_vec.save(update_fields=['is_active'])
+            func_vec.delete()
         vecino.delete()
 
         def notificar_ws_del():
@@ -3408,7 +3598,9 @@ def gestion_actividades(request):
     page_obj = Paginator(actividades, page_size).get_page(request.GET.get('page', 1))
 
     if del_activa:
-        funcionarios = Funcionario.objects.select_related('user', 'delegacion').filter(estado='Activo', delegacion=del_activa).order_by('user__first_name', 'user__username')
+        funcionarios = _funcionarios_municipales_qs(
+            Funcionario.objects.select_related('user', 'delegacion').filter(estado='Activo', delegacion=del_activa)
+        ).order_by('user__first_name', 'user__username')
     else:
         funcionarios = Funcionario.objects.none()
     items = ItemMedicion.objects.all()
@@ -3517,7 +3709,7 @@ def gestion_configuracion(request):
     page_obj = Paginator(metas, page_size).get_page(request.GET.get('page', 1))
     items = ItemMedicion.objects.all()
     periodos = Periodo.objects.all()
-    funcionarios = Funcionario.objects.select_related('user').all()
+    funcionarios = _funcionarios_municipales_qs(Funcionario.objects.select_related('user').all())
     return render(request, 'gestion/configuracion.html', {
         'metas': page_obj.object_list,
         'page_obj': page_obj,
@@ -3767,9 +3959,11 @@ def gestion_reportes(request):
     # Funcionarios y períodos para el modal del Delegado (filtrados estrictamente por delegación activa)
     del_objetivo_ajuste = del_activa or delegacion_seleccionada
     if del_objetivo_ajuste:
-        funcionarios_ajuste = Funcionario.objects.select_related('user', 'delegacion', 'cargo').filter(
-            estado='Activo',
-            delegacion=del_objetivo_ajuste,
+        funcionarios_ajuste = _funcionarios_municipales_qs(
+            Funcionario.objects.select_related('user', 'delegacion', 'cargo').filter(
+                estado='Activo',
+                delegacion=del_objetivo_ajuste,
+            )
         )
     else:
         funcionarios_ajuste = Funcionario.objects.none()
@@ -3831,7 +4025,9 @@ def gestion_ajuste_desempenio(request):
         motivo = request.POST.get('motivo', '').strip()
 
         del_activa = ctx['delegacion_activa']
-        func_qs = Funcionario.objects.select_related('user', 'delegacion', 'cargo').filter(estado='Activo')
+        func_qs = _funcionarios_municipales_qs(
+            Funcionario.objects.select_related('user', 'delegacion', 'cargo').filter(estado='Activo')
+        )
         if del_activa:
             func_qs = func_qs.filter(delegacion=del_activa)
 
@@ -4514,12 +4710,18 @@ def _obtener_vecino_de_cliente(user):
         if v:
             return v
 
-    # Búsqueda por RUT o identificador
+    # Búsqueda por RUT, identificador VEC-* o nombre
     v = Vecino.objects.filter(
         Q(rut__iexact=identificador) | Q(rut__iexact=user.username)
     ).first()
     if v:
         return v
+    if identificador.upper().startswith('VEC-'):
+        ok_rut, rut_fmt = validar_rut(identificador[4:])
+        if ok_rut:
+            v = Vecino.objects.filter(rut__iexact=rut_fmt).first()
+            if v:
+                return v
 
     # Búsqueda por nombre completo exacto del usuario
     full_name = f"{user.first_name} {user.last_name}".strip()
@@ -5076,10 +5278,12 @@ def gestion_tubo(request):
         delegacion_ids.add(del_activa.id)
 
     encargados_edicion = []
-    funcionarios_edicion = Funcionario.objects.filter(
-        delegacion_id__in=delegacion_ids,
-        estado__iexact='Activo',
-        user__is_active=True,
+    funcionarios_edicion = _funcionarios_municipales_qs(
+        Funcionario.objects.filter(
+            delegacion_id__in=delegacion_ids,
+            estado__iexact='Activo',
+            user__is_active=True,
+        )
     ).select_related('user', 'delegacion').order_by('user__first_name', 'user__username')
     funcionarios_ids = [funcionario.id for funcionario in funcionarios_edicion]
     roles_encargados = {}
@@ -5117,8 +5321,10 @@ def gestion_tubo(request):
         encargados_modal_tubo = []
 
     # ── PESTAÑA 2: Resumen Completo por Colaborador ──
-    funcionarios_scope = Funcionario.objects.filter(
-        estado='Activo', user__is_active=True
+    funcionarios_scope = _funcionarios_municipales_qs(
+        Funcionario.objects.filter(
+            estado='Activo', user__is_active=True
+        )
     ).select_related('user', 'delegacion', 'cargo').order_by('user__first_name')
     if not es_admin:
         if del_activa:
