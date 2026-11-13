@@ -155,7 +155,7 @@
             <td class="py-3.5 px-4 text-center">
               <div class="flex items-center justify-center gap-1">
                 <button type="button" 
-                        onclick="verDetalleVecino('{{ v.nombre|escapejs }}', '{{ v.rut|escapejs }}', '{{ v.direccion|default:''|escapejs }}', '{{ v.telefono|default:''|escapejs }}', '{{ v.delegacion.nombre|default:'Sin asignar'|escapejs }}', '{{ v.territorio|default:''|escapejs }}', '{{ v.tipo_gestion.nombre|default:'Solicitud'|escapejs }}', '{{ v.estado|escapejs }}')"
+                        onclick="verDetalleVecino('{{ v.nombre|escapejs }}', '{{ v.rut|escapejs }}', '{{ v.direccion|default:''|escapejs }}', '{{ v.telefono|default:''|escapejs }}', '{{ v.delegacion.nombre|default:'Sin asignar'|escapejs }}', '{% if v.sector %}{{ v.sector.nombre|escapejs }}{% else %}{{ v.territorio|default:''|escapejs }}{% endif %}', '{{ v.tipo_gestion.nombre|default:'Solicitud'|escapejs }}', '{{ v.estado|escapejs }}')"
                         title="Ver ficha completa"
                         class="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all">
                   <i data-lucide="eye" class="w-4 h-4"></i>

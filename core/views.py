@@ -1751,6 +1751,71 @@ def _adjuntar_roles_atenciones(atenciones):
     return atenciones
 
 
+def _guardar_evidencias_atencion(atencion, momento, imagenes, archivos):
+    """Persiste imágenes y archivos adjuntos como Evidencia SGR y marca validación pendiente."""
+    if not atencion or momento not in {'antes', 'despues'}:
+        return False, 0, "Selecciona si la evidencia corresponde al antes o después del trabajo."
+    if not imagenes and not archivos:
+        return True, 0, None
+
+    actividad = get_or_create_actividad_para_atencion(atencion)
+    if not actividad:
+        return False, 0, "No se pudo asociar la actividad a esta atención. Por favor, intente nuevamente."
+    if actividad.estado_validacion() == 'Aprobado':
+        return False, 0, "La evidencia ya fue aprobada y no se puede modificar."
+
+    archivos_guardados = 0
+    try:
+        import os
+        from pathlib import Path
+        from django.conf import settings
+        media_dir = Path(settings.MEDIA_ROOT)
+        os.makedirs(media_dir / 'evidencias' / 'imagenes', exist_ok=True)
+        os.makedirs(media_dir / 'evidencias' / 'archivos', exist_ok=True)
+
+        for imagen in imagenes:
+            try:
+                if hasattr(imagen, 'seek'):
+                    imagen.seek(0)
+                img_clean = forms.ImageField().clean(imagen)
+                if hasattr(img_clean, 'seek'):
+                    img_clean.seek(0)
+                Evidencia.objects.create(
+                    actividad=actividad,
+                    imagen=img_clean,
+                    momento=momento,
+                )
+            except ValidationError:
+                if hasattr(imagen, 'seek'):
+                    imagen.seek(0)
+                Evidencia.objects.create(
+                    actividad=actividad,
+                    archivo=imagen,
+                    momento=momento,
+                )
+            archivos_guardados += 1
+
+        for archivo in archivos:
+            if hasattr(archivo, 'seek'):
+                archivo.seek(0)
+            Evidencia.objects.create(
+                actividad=actividad,
+                archivo=archivo,
+                momento=momento,
+            )
+            archivos_guardados += 1
+    except Exception:
+        return False, archivos_guardados, "Ocurrió un error al guardar los archivos adjuntos. Por favor, intenta nuevamente."
+
+    validacion = ValidacionEvidencia.objects.filter(actividad=actividad).order_by('-created_at').first()
+    if validacion:
+        validacion.resultado = 'Pendiente'
+        validacion.observaciones = "Se adjuntó nueva evidencia; requiere revisión."
+        validacion.save(update_fields=['resultado', 'observaciones', 'updated_at'])
+
+    return True, archivos_guardados, None
+
+
 @login_required
 def gestion_atenciones(request):
     ctx = global_context(request)
@@ -1953,10 +2018,13 @@ def gestion_atenciones(request):
             if not solicitante:
                 solicitante = f"{vecino_obj.nombre} ({vecino_obj.rut})"
 
-        # Determinar representante asignado para la atención
+        # Determinar representante asignado para la atención (acotado exclusivamente a la delegación activa)
         responsable_user = request.user
+        reps_scope = User.objects.filter(is_active=True).filter(
+            Q(funcionario__delegacion=del_activa) | Q(id=request.user.id)
+        )
         if responsable_id and responsable_id.isdigit():
-            user_encontrado = User.objects.filter(id=int(responsable_id), is_active=True).first()
+            user_encontrado = reps_scope.filter(id=int(responsable_id)).first()
             if user_encontrado:
                 responsable_user = user_encontrado
         elif request.POST.get('representante_input', '').strip():
@@ -1964,12 +2032,13 @@ def gestion_atenciones(request):
             u_enc = None
             if '(' in rep_text and ')' in rep_text:
                 candidate = rep_text.split('(')[-1].replace(')', '').strip().lstrip('@')
-                u_enc = User.objects.filter(username__iexact=candidate, is_active=True).first()
+                u_enc = reps_scope.filter(username__iexact=candidate).first()
             if not u_enc:
-                u_enc = User.objects.filter(
-                    Q(username__iexact=rep_text) |
-                    Q(first_name__icontains=rep_text)
-                ).filter(is_active=True).first()
+                rep_nombre = rep_text.split('·')[0].strip() if '·' in rep_text else rep_text
+                u_enc = reps_scope.filter(
+                    Q(username__iexact=rep_nombre) |
+                    Q(first_name__icontains=rep_nombre)
+                ).first()
             if u_enc:
                 responsable_user = u_enc
 
@@ -2045,28 +2114,12 @@ def gestion_atenciones(request):
             )
 
             # Adjuntar evidencia inicial opcional al crear la atención (siempre corresponde a 'antes')
-            momento_ini = 'antes'
             imagenes_ini = request.FILES.getlist('imagenes_evidencia')
             archivos_ini = request.FILES.getlist('archivos_evidencia')
             if atencion and (imagenes_ini or archivos_ini):
-                actividad_ini = get_or_create_actividad_para_atencion(atencion)
-                try:
-                    import os
-                    from pathlib import Path
-                    from django.conf import settings
-                    media_dir = Path(settings.MEDIA_ROOT)
-                    os.makedirs(media_dir / 'evidencias' / 'imagenes', exist_ok=True)
-                    os.makedirs(media_dir / 'evidencias' / 'archivos', exist_ok=True)
-                    for img in imagenes_ini:
-                        try:
-                            img_clean = forms.ImageField().clean(img)
-                            Evidencia.objects.create(actividad=actividad_ini, imagen=img_clean, momento=momento_ini)
-                        except ValidationError:
-                            Evidencia.objects.create(actividad=actividad_ini, archivo=img, momento=momento_ini)
-                    for arch in archivos_ini:
-                        Evidencia.objects.create(actividad=actividad_ini, archivo=arch, momento=momento_ini)
-                except Exception:
-                    messages.warning(request, "Atención registrada, pero ocurrió un problema al adjuntar las evidencias iniciales.")
+                ok_ev, _, err_ev = _guardar_evidencias_atencion(atencion, 'antes', imagenes_ini, archivos_ini)
+                if not ok_ev and err_ev:
+                    messages.warning(request, f"Atención registrada, pero hubo un problema al adjuntar las evidencias iniciales: {err_ev}")
 
             # Notificación en tiempo real por WebSocket (Channels) tras commit en BD
             del_id_ws = del_activa.id if del_activa else "global"
@@ -2094,7 +2147,8 @@ def gestion_atenciones(request):
     delegacion_seleccionada = None
 
     qs_base = AtencionCiudadana.objects.select_related(
-        'delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'creado_por', 'vecino', 'organizacion', 'actividad'
+        'delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'creado_por',
+        'vecino', 'vecino__sector', 'organizacion', 'organizacion__sector', 'actividad'
     ).prefetch_related('actividad__evidencias')
 
     # Scoping territorial por perfil (si no es admin global, se restringe a su delegación activa)
@@ -2236,14 +2290,15 @@ def gestion_atenciones(request):
         .values('id', 'nombre', 'tipo_organizacion', 'territorio', 'telefono_contacto', 'representante_legal')
     )
 
-    # Representantes / Funcionarios disponibles para asignación (filtrados exclusivamente por delegación)
-    delegacion_efectiva = del_activa or delegacion_seleccionada
-    representantes_qs = User.objects.filter(is_active=True).select_related('funcionario__delegacion', 'funcionario__cargo')
-    if delegacion_efectiva:
-        representantes_qs = representantes_qs.filter(
-            Q(funcionario__delegacion=delegacion_efectiva) | Q(id=request.user.id)
-        ).distinct()
-    representantes_qs = representantes_qs.order_by('first_name', 'username')
+    # Representantes / Funcionarios disponibles para asignación (filtrados exclusivamente por delegación activa)
+    if del_activa:
+        representantes_qs = User.objects.filter(is_active=True).select_related(
+            'funcionario__delegacion', 'funcionario__cargo'
+        ).filter(
+            Q(funcionario__delegacion=del_activa) | Q(id=request.user.id)
+        ).distinct().order_by('first_name', 'username')
+    else:
+        representantes_qs = User.objects.none()
     representantes_disponibles = []
     for u in representantes_qs:
         cargo_nom = ""
@@ -2269,10 +2324,8 @@ def gestion_atenciones(request):
 
     if del_activa:
         sectores_disponibles = Sector.objects.filter(delegacion=del_activa, estado='Activo').order_by('nombre')
-    elif delegacion_seleccionada:
-        sectores_disponibles = Sector.objects.filter(delegacion=delegacion_seleccionada, estado='Activo').order_by('nombre')
     else:
-        sectores_disponibles = Sector.objects.filter(estado='Activo').order_by('delegacion__nombre', 'nombre')
+        sectores_disponibles = Sector.objects.none()
 
     return render(request, 'gestion/atenciones.html', {
         'page_obj': page_obj,
@@ -2333,18 +2386,24 @@ def gestion_atenciones_editar(request, atencion_id):
 
     descripcion = request.POST.get('descripcion', '').strip()
     responsable_id = request.POST.get('responsable_id', '').strip()
-    responsable = User.objects.filter(id=int(responsable_id), is_active=True).first() if (responsable_id and responsable_id.isdigit()) else None
+    reps_del = User.objects.filter(
+        is_active=True,
+        funcionario__delegacion=atencion.delegacion,
+        funcionario__estado__iexact='Activo',
+    )
+    responsable = reps_del.filter(id=int(responsable_id)).first() if (responsable_id and responsable_id.isdigit()) else None
     if not responsable and request.POST.get('responsable_input', '').strip():
         rep_text = request.POST.get('responsable_input', '').strip()
         u_enc = None
         if '(' in rep_text and ')' in rep_text:
             candidate = rep_text.split('(')[-1].replace(')', '').strip().lstrip('@')
-            u_enc = User.objects.filter(username__iexact=candidate, is_active=True).first()
+            u_enc = reps_del.filter(username__iexact=candidate).first()
         if not u_enc:
-            u_enc = User.objects.filter(
-                Q(username__iexact=rep_text) |
-                Q(first_name__icontains=rep_text)
-            ).filter(is_active=True).first()
+            rep_limpio = rep_text.split('·')[0].strip() if '·' in rep_text else rep_text
+            u_enc = reps_del.filter(
+                Q(username__iexact=rep_limpio) |
+                Q(first_name__icontains=rep_limpio)
+            ).first()
         if u_enc:
             responsable = u_enc
 
@@ -2428,29 +2487,52 @@ def gestion_atenciones_editar(request, atencion_id):
                 updated_at=timezone.now(),
             )
 
+    # Evidencias opcionales adjuntadas durante la edición (se suben aunque no se presione el botón de adjuntar)
+    imagenes_ev = request.FILES.getlist('imagenes') or request.FILES.getlist('imagenes_evidencia')
+    archivos_ev = request.FILES.getlist('archivos') or request.FILES.getlist('archivos_evidencia')
+    evidencias_subidas = 0
+    err_ev = None
+    if imagenes_ev or archivos_ev:
+        atencion.refresh_from_db()
+        momento_ev = request.POST.get('momento', '').strip()
+        if momento_ev not in {'antes', 'despues'}:
+            tiene_antes = bool(atencion.actividad_id and atencion.actividad.evidencias.filter(momento='antes').exists())
+            momento_ev = 'despues' if tiene_antes else 'antes'
+        ok_ev, evidencias_subidas, err_ev = _guardar_evidencias_atencion(atencion, momento_ev, imagenes_ev, archivos_ev)
+
     # Notificación WebSocket en tiempo real
     del_id_ws = atencion.delegacion_id if atencion.delegacion_id else "global"
     def notificar_ws_edicion():
         publish_module_changed("atenciones", del_id_ws, "update", atencion.id)
+        publish_module_changed("tubo", del_id_ws, "update", atencion.id)
     transaction.on_commit(notificar_ws_edicion)
 
-    messages.success(request, f"Atención {atencion.codigo_atencion} actualizada exitosamente.")
+    if err_ev:
+        messages.warning(request, f"Atención {atencion.codigo_atencion} actualizada, pero: {err_ev}")
+    elif evidencias_subidas:
+        messages.success(
+            request,
+            f"Atención {atencion.codigo_atencion} actualizada y {evidencias_subidas} evidencia(s) adjuntada(s) exitosamente.",
+        )
+    else:
+        messages.success(request, f"Atención {atencion.codigo_atencion} actualizada exitosamente.")
     return redirect(request.META.get('HTTP_REFERER') or 'gestion_atenciones')
 
 
 @login_required
 def gestion_atenciones_eliminar(request, atencion_id):
     ctx = global_context(request)
+    redirect_target = request.META.get('HTTP_REFERER') or 'gestion_atenciones'
     if request.method != 'POST' or not ctx['permisos'].get('puede_eliminar', False):
         messages.error(request, "Acceso denegado: Tu perfil no tiene autorización para eliminar o archivar registros.")
-        return redirect('gestion_atenciones')
+        return redirect(redirect_target)
 
     atencion = get_object_or_404(AtencionCiudadana, id=atencion_id)
     if not ctx['permisos']['es_admin']:
         del_activa = ctx['delegacion_activa']
         if not del_activa or atencion.delegacion != del_activa:
             messages.error(request, "Acceso denegado: No tienes autorización para eliminar atenciones de otra delegación.")
-            return redirect('gestion_atenciones')
+            return redirect(redirect_target)
 
     codigo = atencion.codigo_atencion
     del_id_ws = atencion.delegacion_id if atencion.delegacion_id else "global"
@@ -2462,13 +2544,14 @@ def gestion_atenciones_eliminar(request, atencion_id):
 
     def notificar_ws_elim():
         publish_module_changed("atenciones", del_id_ws, "delete", atencion_id)
+        publish_module_changed("tubo", del_id_ws, "delete", atencion_id)
     transaction.on_commit(notificar_ws_elim)
 
     messages.success(
         request,
         f"Atención {codigo} eliminada del listado. Sus evidencias y registros asociados se conservaron.",
     )
-    return redirect('gestion_atenciones')
+    return redirect(redirect_target)
 
 
 @login_required
@@ -2618,48 +2701,10 @@ def gestion_atenciones_subir_evidencia(request, atencion_id):
         messages.error(request, "Selecciona al menos una imagen o archivo para adjuntar.")
         return redirect(redirect_target)
 
-    archivos_guardados = 0
-    try:
-        import os
-        from pathlib import Path
-        from django.conf import settings
-        media_dir = Path(settings.MEDIA_ROOT)
-        os.makedirs(media_dir / 'evidencias' / 'imagenes', exist_ok=True)
-        os.makedirs(media_dir / 'evidencias' / 'archivos', exist_ok=True)
-
-        for imagen in imagenes:
-            try:
-                img_clean = forms.ImageField().clean(imagen)
-                Evidencia.objects.create(
-                    actividad=actividad,
-                    imagen=img_clean,
-                    momento=momento,
-                )
-            except ValidationError:
-                Evidencia.objects.create(
-                    actividad=actividad,
-                    archivo=imagen,
-                    momento=momento,
-                )
-            archivos_guardados += 1
-
-        for archivo in archivos:
-            Evidencia.objects.create(
-                actividad=actividad,
-                archivo=archivo,
-                momento=momento,
-            )
-            archivos_guardados += 1
-
-    except Exception:
-        messages.error(request, "Ocurrió un error al guardar los archivos adjuntos. Por favor, intenta nuevamente.")
+    ok_ev, archivos_guardados, err_ev = _guardar_evidencias_atencion(atencion, momento, imagenes, archivos)
+    if not ok_ev:
+        messages.error(request, err_ev or "Ocurrió un error al guardar los archivos adjuntos. Por favor, intenta nuevamente.")
         return redirect(redirect_target)
-
-    validacion = ValidacionEvidencia.objects.filter(actividad=actividad).order_by('-created_at').first()
-    if validacion:
-        validacion.resultado = 'Pendiente'
-        validacion.observaciones = "Se adjuntó nueva evidencia; requiere revisión."
-        validacion.save(update_fields=['resultado', 'observaciones', 'updated_at'])
 
     del_id_ws = atencion.delegacion_id if atencion.delegacion_id else "global"
     def notificar_ws_evidencia():
@@ -2914,7 +2959,7 @@ def gestion_vecinos(request):
     elif delegacion_seleccionada:
         sectores_vecinos = Sector.objects.filter(delegacion=delegacion_seleccionada, estado='Activo').order_by('nombre')
     else:
-        sectores_vecinos = Sector.objects.filter(estado='Activo').order_by('delegacion__nombre', 'nombre')
+        sectores_vecinos = Sector.objects.none()
 
     return render(request, 'gestion/vecinos.html', {
         'vecinos': page_obj.object_list,
@@ -3250,7 +3295,18 @@ def gestion_funcionarios_eliminar(request, funcionario_id):
 
 @login_required
 def gestion_actividades(request):
+    ctx = global_context(request)
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+
     if request.method == 'POST':
+        if not ctx['permisos'].get('puede_ingresar_atencion', True):
+            messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para registrar actividades.")
+            return redirect('gestion_actividades')
+        if not del_activa:
+            messages.error(request, "Selecciona una delegación activa antes de registrar una actividad.")
+            return redirect('gestion_actividades')
+
         fecha_actividad = request.POST.get('fecha_actividad', '').strip()
         descripcion = request.POST.get('descripcion_solicitud', '').strip()
         accion = request.POST.get('accion_ejecutada', '').strip()
@@ -3265,11 +3321,11 @@ def gestion_actividades(request):
             messages.error(request, "Selecciona un funcionario, ítem y período válidos.")
             return redirect('gestion_actividades')
 
-        funcionario = Funcionario.objects.filter(id=int(funcionario_id)).first()
+        funcionario = Funcionario.objects.filter(id=int(funcionario_id), delegacion=del_activa, estado='Activo').first()
         item = ItemMedicion.objects.filter(id=int(item_id)).first()
         periodo = Periodo.objects.filter(id=int(periodo_id)).first()
         if not all((funcionario, item, periodo)):
-            messages.error(request, "Selecciona un funcionario, ítem y período válidos.")
+            messages.error(request, "Selecciona un funcionario activo de la delegación activa, un ítem y período válidos.")
             return redirect('gestion_actividades')
 
         try:
@@ -3313,7 +3369,7 @@ def gestion_actividades(request):
     q = request.GET.get('q', '').strip()
     filtro_validacion = request.GET.get('validacion', '').strip()
     actividades = Actividad.objects.select_related(
-        'funcionario__user', 'item', 'periodo'
+        'funcionario__user', 'funcionario__delegacion', 'item', 'periodo'
     ).prefetch_related('evidencias').annotate(
         estado_validacion_actual=Subquery(
             ValidacionEvidencia.objects.filter(
@@ -3321,6 +3377,10 @@ def gestion_actividades(request):
             ).order_by('-created_at').values('resultado')[:1]
         )
     )
+    if del_activa:
+        actividades = actividades.filter(funcionario__delegacion=del_activa)
+    elif not es_admin:
+        actividades = actividades.none()
     if q:
         actividades = actividades.filter(build_accent_query([
             'codigo_evidencia_unico', 'descripcion_solicitud', 'accion_ejecutada',
@@ -3347,7 +3407,10 @@ def gestion_actividades(request):
     page_size = _get_page_size(request)
     page_obj = Paginator(actividades, page_size).get_page(request.GET.get('page', 1))
 
-    funcionarios = Funcionario.objects.select_related('user').filter(estado='Activo')
+    if del_activa:
+        funcionarios = Funcionario.objects.select_related('user', 'delegacion').filter(estado='Activo', delegacion=del_activa).order_by('user__first_name', 'user__username')
+    else:
+        funcionarios = Funcionario.objects.none()
     items = ItemMedicion.objects.all()
     periodos = Periodo.objects.all()
 
@@ -3701,11 +3764,15 @@ def gestion_reportes(request):
     elif delegacion_seleccionada:
         ajustes_qs = ajustes_qs.filter(funcionario__delegacion=delegacion_seleccionada)
 
-    # Funcionarios y períodos para el modal del Delegado (filtrados por delegación activa)
-    funcionarios_ajuste = Funcionario.objects.select_related('user', 'delegacion', 'cargo').filter(estado='Activo')
-    del_objetivo_ajuste = delegacion_seleccionada or del_activa
+    # Funcionarios y períodos para el modal del Delegado (filtrados estrictamente por delegación activa)
+    del_objetivo_ajuste = del_activa or delegacion_seleccionada
     if del_objetivo_ajuste:
-        funcionarios_ajuste = funcionarios_ajuste.filter(delegacion=del_objetivo_ajuste)
+        funcionarios_ajuste = Funcionario.objects.select_related('user', 'delegacion', 'cargo').filter(
+            estado='Activo',
+            delegacion=del_objetivo_ajuste,
+        )
+    else:
+        funcionarios_ajuste = Funcionario.objects.none()
     periodos_ajuste = Periodo.objects.filter(estado='Abierto') or Periodo.objects.all()
 
     context = {
@@ -4088,7 +4155,7 @@ def gestion_organizaciones(request):
     elif delegacion_seleccionada:
         sectores_org = Sector.objects.filter(delegacion=delegacion_seleccionada, estado='Activo').order_by('nombre')
     else:
-        sectores_org = Sector.objects.filter(estado='Activo').order_by('delegacion__nombre', 'nombre')
+        sectores_org = Sector.objects.none()
 
     return render(request, 'gestion/organizaciones.html', {
         'organizaciones': page_obj.object_list,
@@ -4586,7 +4653,26 @@ def _construir_item_tubo(origen_tipo, obj):
     if origen_tipo == 'atencion':
         resp_user = obj.usuario_responsable
         creador = obj.creado_por
-        territorio_sub = obj.vecino.territorio if (obj.vecino and obj.vecino.territorio) else ''
+        territorio_sub = ''
+        if obj.vecino_id:
+            if getattr(obj.vecino, 'sector_id', None) and obj.vecino.sector:
+                territorio_sub = obj.vecino.sector.nombre
+            elif obj.vecino.territorio:
+                territorio_sub = obj.vecino.territorio
+        if not territorio_sub and obj.organizacion_id:
+            if getattr(obj.organizacion, 'sector_id', None) and obj.organizacion.sector:
+                territorio_sub = obj.organizacion.sector.nombre
+            elif obj.organizacion.territorio:
+                territorio_sub = obj.organizacion.territorio
+
+        telefono_val = ''
+        if obj.vecino_id and obj.vecino.telefono:
+            telefono_val = obj.vecino.telefono
+        elif obj.telefono_contacto:
+            telefono_val = obj.telefono_contacto
+        elif obj.organizacion_id and obj.organizacion.telefono_contacto:
+            telefono_val = obj.organizacion.telefono_contacto
+
         estado_val = _normalizar_estado_tubo(obj.estado)
         return {
             'item_tipo': 'atencion',
@@ -4597,6 +4683,7 @@ def _construir_item_tubo(origen_tipo, obj):
             'origen': obj.origen or 'EXT',
             'created_at': obj.created_at,
             'solicitante': obj.solicitante,
+            'telefono': telefono_val,
             'organizacion': obj.organizacion,
             'delegacion': obj.delegacion,
             'delegacion_id': obj.delegacion_id,
@@ -4621,12 +4708,13 @@ def _construir_item_tubo(origen_tipo, obj):
             'estado_grupo': _estado_grupo_tubo(estado_val),
             'url_cambiar_estado': reverse('gestion_tubo_cambiar_estado', args=[obj.id]),
             'url_editar': reverse('gestion_atenciones_editar', args=[obj.id]),
-            'url_eliminar': None,
+            'url_eliminar': reverse('gestion_atenciones_eliminar', args=[obj.id]),
         }
 
     resp_user = obj.responsable.user if obj.responsable_id else None
     creador = obj.creado_por
     sec_nom = obj.sector.nombre if obj.sector_id else (obj.territorio or 'Sector Territorial')
+    telefono_sec = obj.organizacion.telefono_contacto if (obj.organizacion_id and obj.organizacion.telefono_contacto) else ''
     estado_val = _normalizar_estado_tubo(obj.estado)
     return {
         'item_tipo': 'sector',
@@ -4637,6 +4725,7 @@ def _construir_item_tubo(origen_tipo, obj):
         'origen': obj.origen or 'INT',
         'created_at': obj.created_at,
         'solicitante': obj.solicitante,
+        'telefono': telefono_sec,
         'organizacion': obj.organizacion,
         'delegacion': obj.delegacion,
         'delegacion_id': obj.delegacion_id,
@@ -4686,7 +4775,10 @@ def _crear_compromiso_sector_tubo(request, ctx):
         return redirect('gestion_tubo')
 
     del_activa = ctx['delegacion_activa']
-    es_admin = ctx['permisos']['es_admin']
+    if not del_activa:
+        messages.error(request, "Debes tener una delegación activa seleccionada antes de registrar un compromiso sectorial.")
+        return redirect('gestion_tubo')
+
     sector_id = request.POST.get('sector_id', '').strip()
     descripcion = request.POST.get('descripcion', '').strip()
     fecha_str = request.POST.get('fecha_compromiso', '').strip()
@@ -4704,13 +4796,9 @@ def _crear_compromiso_sector_tubo(request, ctx):
         )
         return redirect('gestion_tubo')
 
-    sec_qs = Sector.objects.filter(id=int(sector_id), estado='Activo')
-    if not es_admin:
-        if not del_activa:
-            messages.error(request, "Selecciona una delegación activa antes de registrar un compromiso.")
-            return redirect('gestion_tubo')
-        sec_qs = sec_qs.filter(delegacion=del_activa)
-    sector_obj = sec_qs.first()
+    sector_obj = Sector.objects.filter(
+        id=int(sector_id), estado='Activo', delegacion=del_activa
+    ).first()
     if not sector_obj:
         messages.error(request, "El sector seleccionado no existe o no pertenece a tu delegación activa.")
         return redirect('gestion_tubo')
@@ -4744,7 +4832,7 @@ def _crear_compromiso_sector_tubo(request, ctx):
         messages.error(request, "La fecha de compromiso ingresada no es válida.")
         return redirect('gestion_tubo')
 
-    delegacion_obj = sector_obj.delegacion or del_activa
+    delegacion_obj = del_activa
     organizacion_obj = None
     if organizacion_id and organizacion_id.isdigit():
         organizacion_obj = _organizaciones_activas_para_delegacion(delegacion_obj).filter(id=int(organizacion_id)).first()
@@ -4753,13 +4841,14 @@ def _crear_compromiso_sector_tubo(request, ctx):
     if responsable_id and responsable_id.isdigit():
         func_resp = Funcionario.objects.filter(
             Q(user_id=int(responsable_id)) | Q(id=int(responsable_id)),
+            delegacion=delegacion_obj,
             estado='Activo',
         ).first()
     if not func_resp:
         func_resp = (
-            Funcionario.objects.filter(user=request.user, estado='Activo').first()
+            Funcionario.objects.filter(user=request.user, delegacion=delegacion_obj, estado='Activo').first()
             or Funcionario.objects.filter(delegacion=delegacion_obj, estado='Activo').first()
-            or Funcionario.all_objects.first()
+            or Funcionario.objects.filter(user=request.user, estado='Activo').first()
         )
     if not func_resp:
         messages.error(request, "No hay un funcionario responsable activo disponible para asignar el compromiso.")
@@ -4814,11 +4903,11 @@ def gestion_tubo(request):
 
     qs_at = AtencionCiudadana.objects.filter(va_a_tubo=True).select_related(
         'delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'creado_por',
-        'vecino', 'organizacion', 'actividad'
+        'vecino', 'vecino__sector', 'organizacion', 'organizacion__sector', 'actividad'
     ).prefetch_related('actividad__evidencias')
 
     qs_sec = CompromisoAgenda.objects.filter(sector__isnull=False).select_related(
-        'delegacion', 'sector', 'organizacion', 'responsable__user', 'creado_por'
+        'delegacion', 'sector', 'organizacion', 'organizacion__sector', 'responsable__user', 'creado_por'
     )
 
     if not es_admin:
@@ -5004,19 +5093,22 @@ def gestion_tubo(request):
             'label': f"{nombre} · {roles}",
         })
 
-    # Sectores y organizaciones disponibles para el modal "Nuevo Compromiso Sectorial"
-    delegacion_modal = del_activa or delegacion_seleccionada
-    sectores_tubo = Sector.objects.filter(estado='Activo').select_related('delegacion').order_by('nombre')
-    if delegacion_modal:
-        sectores_tubo = sectores_tubo.filter(delegacion=delegacion_modal)
-    elif not es_admin:
-        sectores_tubo = sectores_tubo.none()
-
-    organizaciones_tubo = list(
-        _organizaciones_activas_para_delegacion(delegacion_modal)
-        .order_by('nombre')
-        .values('id', 'nombre', 'tipo_organizacion', 'territorio')
-    )
+    # Sectores, organizaciones y encargados disponibles para "Nuevo Compromiso Sectorial" (solo si hay delegación activa)
+    puede_crear_compromiso_sector = bool(del_activa) and ctx['permisos'].get('puede_ingresar_atencion', True)
+    if del_activa:
+        sectores_tubo = Sector.objects.filter(delegacion=del_activa, estado='Activo').select_related('delegacion').order_by('nombre')
+        organizaciones_tubo = list(
+            _organizaciones_activas_para_delegacion(del_activa)
+            .order_by('nombre')
+            .values('id', 'nombre', 'tipo_organizacion', 'territorio')
+        )
+        encargados_modal_tubo = [
+            enc for enc in encargados_edicion if enc['delegacion_id'] == del_activa.id
+        ]
+    else:
+        sectores_tubo = Sector.objects.none()
+        organizaciones_tubo = []
+        encargados_modal_tubo = []
 
     # ── PESTAÑA 2: Resumen Completo por Colaborador ──
     funcionarios_scope = Funcionario.objects.filter(
@@ -5135,6 +5227,8 @@ def gestion_tubo(request):
             len(canvas_ingresados) + len(canvas_pendientes) + len(canvas_proceso) + len(canvas_realizados)
         ),
         'encargados_edicion': encargados_edicion,
+        'encargados_modal_tubo': encargados_modal_tubo,
+        'puede_crear_compromiso_sector': puede_crear_compromiso_sector,
         'sectores_tubo': sectores_tubo,
         'organizaciones_tubo': organizaciones_tubo,
         'tubo_total_count': tubo_total_count,
@@ -5318,6 +5412,7 @@ def gestion_tubo_sector_editar(request, compromiso_id):
     if responsable_id and responsable_id.isdigit():
         func_nuevo = Funcionario.objects.filter(
             Q(user_id=int(responsable_id)) | Q(id=int(responsable_id)),
+            delegacion=comp.delegacion,
             estado='Activo',
         ).first()
         if func_nuevo:

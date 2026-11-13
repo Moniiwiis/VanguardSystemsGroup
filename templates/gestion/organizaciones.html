@@ -242,10 +242,10 @@
               {% if o.delegacion %}
                 <span class="font-bold text-[#C41230] text-[11px] block">{{ o.delegacion.nombre }}</span>
               {% endif %}
-              {% if o.territorio %}
-                <span class="text-[10px] text-slate-500 font-semibold block">{{ o.territorio }}</span>
-              {% elif o.sector %}
+              {% if o.sector %}
                 <span class="text-[10px] text-slate-500 font-semibold block">{{ o.sector.nombre }}</span>
+              {% elif o.territorio %}
+                <span class="text-[10px] text-slate-500 font-semibold block">{{ o.territorio }}</span>
               {% elif not o.delegacion %}
                 <span class="text-slate-400">—</span>
               {% endif %}

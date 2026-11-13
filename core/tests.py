@@ -1287,7 +1287,7 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertContains(resp_tabla, 'Tubo de Compromiso SGR')
         self.assertContains(resp_tabla, at_ing.get_codigo_tubo())
 
-        # Vista Canvas (Kanban 4 columnas + KPI cards)
+        # Vista Canvas (Kanban 4 columnas + mismas 6 tarjetas KPI que Tabla)
         resp_canvas = self.client.get(reverse('gestion_tubo') + '?vista=canvas')
         self.assertEqual(resp_canvas.status_code, 200)
         self.assertEqual(resp_canvas.context['vista'], 'canvas')
@@ -1295,7 +1295,8 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertContains(resp_canvas, '2. PENDIENTES')
         self.assertContains(resp_canvas, '3. EN PROCESO')
         self.assertContains(resp_canvas, '4. REALIZADOS')
-        self.assertContains(resp_canvas, 'GESTIONES EN TUBO')
+        for kpi in ('Total Tubo', 'Ingresados', 'En Proceso', 'Pendientes', 'Realizados', '% Cumplimiento'):
+            self.assertContains(resp_canvas, kpi)
         self.assertContains(resp_canvas, at_ing.get_codigo_tubo())
         self.assertContains(resp_canvas, at_pend.get_codigo_tubo())
         self.assertContains(resp_canvas, at_real.get_codigo_tubo())
@@ -1484,3 +1485,149 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(club.presidente_rut, '11.111.111-1')
         self.assertEqual(club.tesorero_correo, 'pedro@solnaciente.cl')
         self.assertEqual(club.secretario_nombre, 'Elena Paredes')
+
+    def test_editar_atencion_sube_evidencias_al_guardar_y_eliminar_en_tubo(self):
+        from io import BytesIO
+        from PIL import Image
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        admin = User.objects.create_superuser('admin_evi_tubo', 'admin_et@example.test', 'Admin123!')
+        sector_norte = Sector.objects.create(nombre='Sector Las Compañías', delegacion=self.delegacion, estado='Activo')
+        vecino_tel = Vecino.objects.create(
+            nombre='Carlos Muñoz',
+            rut='15.555.555-5',
+            telefono='+56 9 8877 6655',
+            delegacion=self.delegacion,
+            sector=sector_norte,
+            territorio='Sector Las Compañías',
+            estado='Activo',
+        )
+        at = AtencionCiudadana.objects.create(
+            delegacion=self.delegacion,
+            vecino=vecino_tel,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            usuario_responsable=self.user,
+            creado_por=self.user,
+            solicitante=f'{vecino_tel.nombre} ({vecino_tel.rut})',
+            descripcion='Revisión de luminaria LED en esquina',
+            va_a_tubo=True,
+            fecha_compromiso=datetime.date(2026, 12, 18),
+        )
+
+        self.client.force_login(self.user)
+        # Teléfono del vecino y sector elegido visibles en Atenciones y Tubo (Tabla y Canvas)
+        resp_at_list = self.client.get(reverse('gestion_atenciones'))
+        self.assertContains(resp_at_list, '+56 9 8877 6655')
+        self.assertContains(resp_at_list, 'Sector Las Compañías')
+
+        resp_tubo_canvas = self.client.get(reverse('gestion_tubo') + '?vista=canvas')
+        self.assertContains(resp_tubo_canvas, 'Sector Las Compañías')
+
+        # Al guardar edición con imagen/archivo adjunto, la evidencia se guarda aunque no se presione "Adjuntar Evidencia"
+        buf = BytesIO()
+        Image.new('RGB', (12, 12), color='red').save(buf, format='PNG')
+        img_file = SimpleUploadedFile('antes_obra.png', buf.getvalue(), content_type='image/png')
+        pdf_file = SimpleUploadedFile('respaldo_acta.txt', b'Acta respaldo SGR', content_type='text/plain')
+
+        tubo_url = reverse('gestion_tubo')
+        resp_save = self.client.post(
+            reverse('gestion_atenciones_editar', args=[at.id]),
+            {
+                'descripcion': 'Luminaria revisada con respaldo adjunto al guardar',
+                'responsable_id': self.user.id,
+                'estado': 'En proceso',
+                'va_a_tubo': 'true',
+                'fecha_compromiso': '2026-12-22',
+                'area_apoyo': 'Alumbrado Público',
+                'avance_observaciones': 'Se adjuntó respaldo al guardar',
+                'momento': 'antes',
+                'imagenes': [img_file],
+                'archivos': [pdf_file],
+            },
+            HTTP_REFERER=tubo_url,
+        )
+        self.assertRedirects(resp_save, tubo_url)
+        at.refresh_from_db()
+        self.assertEqual(at.descripcion, 'Luminaria revisada con respaldo adjunto al guardar')
+        self.assertIsNotNone(at.actividad)
+        self.assertEqual(at.actividad.evidencias.filter(momento='antes').count(), 2)
+
+        # Eliminación directa desde Tubo redirige de vuelta al Tubo cuando tiene HTTP_REFERER
+        self.client.force_login(admin)
+        resp_del_tubo = self.client.post(
+            reverse('gestion_atenciones_eliminar', args=[at.id]),
+            HTTP_REFERER=tubo_url,
+        )
+        self.assertRedirects(resp_del_tubo, tubo_url)
+        self.assertFalse(AtencionCiudadana.objects.filter(id=at.id).exists())
+
+    def test_compromiso_sectorial_solo_con_delegacion_activa_y_scoping_formularios(self):
+        from accounts.models import Cargo
+        admin = User.objects.create_superuser('admin_scope_check', 'admin_sc@example.test', 'Admin123!')
+        del_otra = Delegacion.objects.create(nombre='Delegación Sur', codigo='SUR')
+        sector_norte = Sector.objects.create(nombre='Sector Norte Activo', delegacion=self.delegacion, estado='Activo')
+        sector_sur = Sector.objects.create(nombre='Sector Sur Oculto', delegacion=del_otra, estado='Activo')
+        vecino_sur = Vecino.objects.create(
+            nombre='Vecino Sur Aislado',
+            rut='16.666.666-6',
+            delegacion=del_otra,
+            sector=sector_sur,
+            estado='Activo',
+        )
+        org_sur = OrganizacionComunitaria.objects.create(
+            nombre='JJVV Sur Oculta',
+            tipo_organizacion='Junta de Vecinos',
+            delegacion=del_otra,
+            sector=sector_sur,
+            estado='Activa',
+        )
+        user_sur = User.objects.create_user('func_sur_aislado', 'fsur@example.test', 'Pass123!', first_name='Pedro Sur')
+        cargo_test = Cargo.objects.create(nombre_cargo='Gestor Territorial')
+        Funcionario.objects.create(user=user_sur, delegacion=del_otra, cargo=cargo_test, estado='Activo')
+
+        # Admin sin delegación activa (modo Global) NO puede crear compromiso sectorial y los formularios no mezclan regiones
+        self.client.force_login(admin)
+        resp_tubo_global = self.client.get(reverse('gestion_tubo'))
+        self.assertFalse(resp_tubo_global.context['puede_crear_compromiso_sector'])
+        self.assertEqual(resp_tubo_global.context['sectores_tubo'].count(), 0)
+        self.assertEqual(len(resp_tubo_global.context['organizaciones_tubo']), 0)
+
+        resp_post_global = self.client.post(reverse('gestion_tubo'), {
+            'sector_id': sector_norte.id,
+            'descripcion': 'Intento sin delegación activa',
+            'fecha_compromiso': '2026-12-25',
+        })
+        self.assertRedirects(resp_post_global, reverse('gestion_tubo'))
+        self.assertEqual(CompromisoAgenda.objects.filter(observacion='Intento sin delegación activa').count(), 0)
+
+        # Seleccionando Delegación Norte como delegación activa para admin -> solo ve Norte y sí puede crear
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        resp_tubo_norte = self.client.get(reverse('gestion_tubo'))
+        self.assertTrue(resp_tubo_norte.context['puede_crear_compromiso_sector'])
+        sec_ids_tubo = set(resp_tubo_norte.context['sectores_tubo'].values_list('id', flat=True))
+        self.assertIn(sector_norte.id, sec_ids_tubo)
+        self.assertNotIn(sector_sur.id, sec_ids_tubo)
+        org_ids_tubo = {o['id'] for o in resp_tubo_norte.context['organizaciones_tubo']}
+        self.assertIn(self.org_local.id, org_ids_tubo)
+        self.assertNotIn(org_sur.id, org_ids_tubo)
+        rep_ids_tubo = {e['id'] for e in resp_tubo_norte.context['encargados_modal_tubo']}
+        self.assertNotIn(user_sur.id, rep_ids_tubo)
+
+        resp_at_norte = self.client.get(reverse('gestion_atenciones'))
+        self.assertNotIn(sector_sur.id, set(resp_at_norte.context['sectores'].values_list('id', flat=True)))
+        self.assertNotIn(vecino_sur.id, set(resp_at_norte.context['vecinos'].values_list('id', flat=True)))
+        self.assertNotIn(org_sur.id, {o['id'] for o in resp_at_norte.context['organizaciones']})
+        self.assertNotIn(user_sur.id, {r['id'] for r in resp_at_norte.context['representantes_disponibles']})
+
+        resp_vec_norte = self.client.get(reverse('gestion_vecinos'))
+        self.assertNotIn(sector_sur.id, set(resp_vec_norte.context['sectores'].values_list('id', flat=True)))
+
+        resp_org_norte = self.client.get(reverse('gestion_organizaciones'))
+        self.assertNotIn(sector_sur.id, set(resp_org_norte.context['sectores'].values_list('id', flat=True)))
+
+        resp_act_norte = self.client.get(reverse('gestion_actividades'))
+        self.assertNotIn(user_sur.id, set(resp_act_norte.context['funcionarios'].values_list('user_id', flat=True)))
