@@ -1631,3 +1631,15 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
 
         resp_act_norte = self.client.get(reverse('gestion_actividades'))
         self.assertNotIn(user_sur.id, set(resp_act_norte.context['funcionarios'].values_list('user_id', flat=True)))
+
+        # Verificar secciones organizadas de módulos en Inicio / Sidebar (Admin ve todas; Operador solo las suyas)
+        resp_inicio_admin = self.client.get(reverse('gestion_inicio'))
+        self.assertEqual(resp_inicio_admin.status_code, 200)
+        for sec_lbl in ('Gestión Territorial', 'Padrón y Comunidad', 'Metas y Catálogos', 'Administración', 'Cuenta y Comunicación'):
+            self.assertContains(resp_inicio_admin, sec_lbl)
+
+        self.client.force_login(self.user)
+        resp_inicio_op = self.client.get(reverse('gestion_inicio'))
+        self.assertContains(resp_inicio_op, 'Gestión Territorial')
+        self.assertContains(resp_inicio_op, 'Padrón y Comunidad')
+        self.assertNotContains(resp_inicio_op, 'CRUD Delegaciones')

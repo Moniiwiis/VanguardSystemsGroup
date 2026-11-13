@@ -235,152 +235,175 @@
     <!-- Sidebar Navegación de Módulos (Filtrado según Perfil del Usuario) -->
     <aside class="w-full md:w-60 shrink-0 flex flex-col gap-5">
       
-      <!-- Menú Módulos Flat y Adaptable según wireframes C3-C6 -->
-      <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-1 text-xs font-bold">
+      <!-- Menú de Módulos Organizado por Secciones -->
+      <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-3 text-xs font-bold">
         
         <!-- Inicio (Oculto para rol Cliente) -->
         {% if permisos.ver_inicio %}
-        <a href="{% url 'gestion_inicio' %}" 
-           class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_inicio' or request.resolver_match.url_name == 'gestion_inicio_alt' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-          <i data-lucide="home" class="w-4 h-4 shrink-0"></i>
-          <span>Inicio</span>
-        </a>
-        {% endif %}
-
-        <!-- 1. Delegaciones (Solo Administrador) -->
-        {% if permisos.ver_delegaciones %}
-          <a href="{% url 'gestion_delegaciones' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_delegaciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="building-2" class="w-4 h-4 shrink-0"></i>
-            <span>Delegaciones</span>
+        <div class="space-y-1">
+          <a href="{% url 'gestion_inicio' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_inicio' or request.resolver_match.url_name == 'gestion_inicio_alt' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="home" class="w-4 h-4 shrink-0"></i>
+            <span>Inicio</span>
           </a>
+        </div>
         {% endif %}
 
-        <!-- 2. Roles (Solo Administrador) -->
-        {% if permisos.ver_roles %}
-          <a href="{% url 'gestion_roles' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_roles' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="shield-check" class="w-4 h-4 shrink-0"></i>
-            <span>Roles</span>
-          </a>
-        {% endif %}
-
-        <!-- 3. Usuarios (Administrador y Delegado Municipal) -->
-        {% if permisos.ver_usuarios %}
-          <a href="{% url 'gestion_usuarios' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_usuarios' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="users" class="w-4 h-4 shrink-0"></i>
-            <span>Usuarios</span>
-          </a>
-        {% endif %}
-
-        <!-- 4. Ítems y metas (Administrador y Coordinador) -->
-        {% if permisos.ver_metas %}
-          <a href="{% url 'gestion_metas' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_metas' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="target" class="w-4 h-4 shrink-0"></i>
-            <span>Ítems y metas</span>
-          </a>
-        {% endif %}
-
-        <!-- 5. Tipo de Atención (Administrador y Coordinador) -->
-        {% if permisos.ver_tipo_atencion %}
-          <a href="{% url 'gestion_tipo_atencion' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_tipo_atencion' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="heart-handshake" class="w-4 h-4 shrink-0"></i>
-            <span>Tipo de Atención</span>
-          </a>
-        {% endif %}
-
-        <!-- 6. Sub Atención (Administrador y Coordinador) -->
-        {% if permisos.ver_sub_atencion %}
-          <a href="{% url 'gestion_sub_atencion' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_sub_atencion' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="git-branch" class="w-4 h-4 shrink-0"></i>
-            <span>Sub Atención</span>
-          </a>
-        {% endif %}
-
-        <!-- 7. Atenciones (Ingreso y Gestión) -->
-        {% if permisos.ver_atenciones %}
-          <a href="{% url 'gestion_atenciones' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_atenciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0"></i>
-            <span>Atenciones</span>
-          </a>
-        {% endif %}
-
-        <!-- 7b. Tubo de Compromiso SGR -->
+        <!-- Sección 1: Gestión Territorial -->
         {% if permisos.ver_atenciones or permisos.ver_reportes or permisos.es_admin %}
-          <a href="{% url 'gestion_tubo' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_tubo' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="git-pull-request" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
-            <span>Tubo de Compromiso SGR</span>
+        <div class="pt-2 border-t border-slate-100 space-y-1">
+          <p class="px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+            Gestión Territorial
+          </p>
+          {% if permisos.ver_atenciones %}
+            <a href="{% url 'gestion_atenciones' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_atenciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0"></i>
+              <span>Atenciones</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_atenciones or permisos.ver_reportes or permisos.es_admin %}
+            <a href="{% url 'gestion_tubo' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_tubo' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="git-pull-request" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
+              <span>Tubo de Compromiso SGR</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_reportes %}
+            <a href="{% url 'gestion_reportes' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_reportes' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="bar-chart-3" class="w-4 h-4 shrink-0"></i>
+              <span>Reportes</span>
+            </a>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Sección 2: Padrón y Comunidad -->
+        {% if permisos.ver_vecinos or permisos.ver_organizaciones or permisos.ver_sectores %}
+        <div class="pt-2 border-t border-slate-100 space-y-1">
+          <p class="px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+            Padrón y Comunidad
+          </p>
+          {% if permisos.ver_vecinos %}
+            <a href="{% url 'gestion_vecinos' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_vecinos' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="user-check" class="w-4 h-4 shrink-0"></i>
+              <span>Vecinos</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_organizaciones %}
+            <a href="{% url 'gestion_organizaciones' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_organizaciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="landmark" class="w-4 h-4 shrink-0"></i>
+              <span>JJVV y Organizaciones</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_sectores %}
+            <a href="{% url 'gestion_sectores' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_sectores' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="map-pin" class="w-4 h-4 shrink-0"></i>
+              <span>Sectores / Territorio</span>
+            </a>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Sección 3: Metas y Catálogos -->
+        {% if permisos.ver_metas or permisos.ver_tipo_atencion or permisos.ver_sub_atencion %}
+        <div class="pt-2 border-t border-slate-100 space-y-1">
+          <p class="px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+            Metas y Catálogos
+          </p>
+          {% if permisos.ver_metas %}
+            <a href="{% url 'gestion_metas' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_metas' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="target" class="w-4 h-4 shrink-0"></i>
+              <span>Ítems y metas</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_tipo_atencion %}
+            <a href="{% url 'gestion_tipo_atencion' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_tipo_atencion' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="heart-handshake" class="w-4 h-4 shrink-0"></i>
+              <span>Tipo de Atención</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_sub_atencion %}
+            <a href="{% url 'gestion_sub_atencion' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_sub_atencion' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="git-branch" class="w-4 h-4 shrink-0"></i>
+              <span>Sub Atención</span>
+            </a>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Sección 4: Administración -->
+        {% if permisos.ver_delegaciones or permisos.ver_roles or permisos.ver_usuarios %}
+        <div class="pt-2 border-t border-slate-100 space-y-1">
+          <p class="px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+            Administración
+          </p>
+          {% if permisos.ver_delegaciones %}
+            <a href="{% url 'gestion_delegaciones' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_delegaciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="building-2" class="w-4 h-4 shrink-0"></i>
+              <span>Delegaciones</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_roles %}
+            <a href="{% url 'gestion_roles' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_roles' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="shield-check" class="w-4 h-4 shrink-0"></i>
+              <span>Roles</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_usuarios %}
+            <a href="{% url 'gestion_usuarios' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_usuarios' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="users" class="w-4 h-4 shrink-0"></i>
+              <span>Usuarios</span>
+            </a>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Sección 5: Cuenta y Comunicación -->
+        <div class="{% if permisos.ver_inicio or permisos.ver_atenciones or permisos.ver_vecinos or permisos.ver_metas or permisos.ver_delegaciones or permisos.ver_usuarios %}pt-2 border-t border-slate-100 {% endif %}space-y-1">
+          <p class="px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+            Cuenta y Comunicación
+          </p>
+          {% if permisos.ver_portal_cliente or permisos.es_cliente %}
+            <a href="{% url 'portal_cliente' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'portal_cliente' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
+              <span>Mis Registros</span>
+            </a>
+          {% endif %}
+
+          {% if not permisos.es_cliente %}
+          <a href="{% url 'websocket:chat_index' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'chat' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="messages-square" class="w-4 h-4 shrink-0 text-red-600"></i>
+            <span>Chat en Vivo</span>
           </a>
-        {% endif %}
+          {% endif %}
 
-        <!-- 8. Vecinos -->
-        {% if permisos.ver_vecinos %}
-          <a href="{% url 'gestion_vecinos' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_vecinos' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="user-check" class="w-4 h-4 shrink-0"></i>
-            <span>Vecinos</span>
+          <a href="{% url 'perfil_usuario' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'perfil_usuario' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="user-cog" class="w-4 h-4 shrink-0"></i>
+            <span>Mi Perfil y Foto</span>
           </a>
-        {% endif %}
-
-        <!-- 8a. Organizaciones Comunitarias / JJVV (Coherencia Excel JJVV) -->
-        {% if permisos.ver_organizaciones %}
-          <a href="{% url 'gestion_organizaciones' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_organizaciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="landmark" class="w-4 h-4 shrink-0"></i>
-            <span>JJVV y Organizaciones</span>
-          </a>
-        {% endif %}
-
-        <!-- 8b. Sectores / Territorio por Delegación -->
-        {% if permisos.ver_sectores %}
-          <a href="{% url 'gestion_sectores' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_sectores' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="map-pin" class="w-4 h-4 shrink-0"></i>
-            <span>Sectores / Territorio</span>
-          </a>
-        {% endif %}
-
-        <!-- 9. Reportes (Administrador, Coordinador y Delegado) -->
-        {% if permisos.ver_reportes %}
-          <a href="{% url 'gestion_reportes' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_reportes' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="bar-chart-3" class="w-4 h-4 shrink-0"></i>
-            <span>Reportes</span>
-          </a>
-        {% endif %}
-
-        {% if not permisos.es_cliente %}
-        <div class="pt-2 border-t border-slate-100 my-1"></div>
-
-        <!-- Tiempo Real / Chat (Channels WebSockets - Solo Funcionarios) -->
-        <a href="{% url 'websocket:chat_index' %}" 
-           class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'chat' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-          <i data-lucide="messages-square" class="w-4 h-4 shrink-0 text-red-600"></i>
-          <span>Chat en Vivo</span>
-        </a>
-        {% endif %}
-
-        <!-- Portal Ciudadano (Acceso para rol Cliente) -->
-        {% if permisos.ver_portal_cliente or permisos.es_cliente %}
-          <a href="{% url 'portal_cliente' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'portal_cliente' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
-            <span>Mis Registros</span>
-          </a>
-        {% endif %}
-
-        <!-- Mi Perfil (Croppr.js y Credenciales) -->
-        <a href="{% url 'perfil_usuario' %}" 
-           class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'perfil_usuario' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-          <i data-lucide="user-cog" class="w-4 h-4 shrink-0"></i>
-          <span>Mi Perfil y Foto</span>
-        </a>
+        </div>
 
       </nav>
 
