@@ -113,7 +113,7 @@
           {% for v in vecinos %}
           <tr class="hover:bg-red-50/20 transition-colors">
             <td class="py-3.5 px-4 font-semibold text-slate-400 text-center">{{ forloop.counter }}</td>
-            <td class="py-3.5 px-4 max-w-[220px] [overflow-wrap:anywhere]">
+            <td class="py-3.5 px-4 min-w-[160px] max-w-[220px] [overflow-wrap:anywhere]">
               <span class="font-bold text-slate-900 block leading-tight">{{ v.nombre }}</span>
               <span class="font-mono text-slate-500 font-bold text-[11px] block mt-0.5">{{ v.rut }}</span>
               {% if v.usuario_email %}
