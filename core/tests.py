@@ -1650,7 +1650,30 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         resp_sec_html = self.client.get(reverse('gestion_sectores'))
         self.assertContains(resp_sec_html, 'overflow-x-auto')
 
+        # Admin en Resumen por Colaborador usa delegación activa por defecto y puede filtrar por otra o Todas
+        resp_colab_def = self.client.get(reverse('gestion_tubo') + '?tab=colaboradores')
+        self.assertContains(resp_colab_def, '<select name="delegacion"')
+        colab_ids_def = {c['user_id'] for c in resp_colab_def.context['resumen_colaboradores']}
+        self.assertIn(self.user.id, colab_ids_def)
+        self.assertNotIn(user_sur.id, colab_ids_def)
+
+        resp_colab_sur = self.client.get(reverse('gestion_tubo') + f'?tab=colaboradores&delegacion={del_otra.id}')
+        colab_ids_sur = {c['user_id'] for c in resp_colab_sur.context['resumen_colaboradores']}
+        self.assertIn(user_sur.id, colab_ids_sur)
+        self.assertNotIn(self.user.id, colab_ids_sur)
+
+        resp_colab_todas = self.client.get(reverse('gestion_tubo') + '?tab=colaboradores&delegacion=todas')
+        colab_ids_todas = {c['user_id'] for c in resp_colab_todas.context['resumen_colaboradores']}
+        self.assertIn(self.user.id, colab_ids_todas)
+        self.assertIn(user_sur.id, colab_ids_todas)
+
         self.client.force_login(self.user)
+        resp_colab_op = self.client.get(reverse('gestion_tubo') + f'?tab=colaboradores&delegacion={del_otra.id}')
+        self.assertNotContains(resp_colab_op, '<select name="delegacion"')
+        colab_ids_op = {c['user_id'] for c in resp_colab_op.context['resumen_colaboradores']}
+        self.assertIn(self.user.id, colab_ids_op)
+        self.assertNotIn(user_sur.id, colab_ids_op)
+
         resp_inicio_op = self.client.get(reverse('gestion_inicio'))
         self.assertContains(resp_inicio_op, 'Gestión Territorial')
         self.assertContains(resp_inicio_op, 'Padrón y Comunidad')

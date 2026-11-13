@@ -138,7 +138,7 @@
   <!-- Barra de Pestañas + Switcher Tabla / Canvas -->
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-0">
     <div class="flex items-center gap-2">
-      <a href="?tab=requerimientos&vista={{ vista }}{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_responsable %}&responsable={{ filtro_responsable }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+      <a href="?tab=requerimientos&vista={{ vista }}{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_responsable %}&responsable={{ filtro_responsable }}{% endif %}{% if es_admin %}&delegacion={% if delegacion_seleccionada %}{{ delegacion_seleccionada.id }}{% else %}todas{% endif %}{% endif %}"
          class="pb-3 px-4 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all {% if tab == 'requerimientos' %}border-[#C41230] text-[#C41230]{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
         <i data-lucide="clipboard-list" class="w-4 h-4"></i>
         <span>Requerimientos en Tubo</span>
@@ -147,7 +147,7 @@
         </span>
       </a>
 
-      <a href="?tab=colaboradores&vista={{ vista }}{% if q_colab %}&q_colab={{ q_colab }}{% endif %}{% if filtro_cumplimiento %}&cumplimiento={{ filtro_cumplimiento }}{% endif %}{% if orden_colab %}&orden_colab={{ orden_colab }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+      <a href="?tab=colaboradores&vista={{ vista }}{% if q_colab %}&q_colab={{ q_colab }}{% endif %}{% if filtro_cumplimiento %}&cumplimiento={{ filtro_cumplimiento }}{% endif %}{% if orden_colab %}&orden_colab={{ orden_colab }}{% endif %}{% if es_admin %}&delegacion={% if delegacion_seleccionada %}{{ delegacion_seleccionada.id }}{% else %}todas{% endif %}{% endif %}"
          class="pb-3 px-4 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all {% if tab == 'colaboradores' %}border-[#C41230] text-[#C41230]{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
         <i data-lucide="users" class="w-4 h-4"></i>
         <span>Resumen por Colaborador</span>
@@ -159,12 +159,12 @@
 
     {% if tab == 'requerimientos' %}
     <div class="inline-flex items-center gap-1 p-1 mb-2 bg-slate-100 rounded-xl border border-slate-200 self-start sm:self-auto" role="group" aria-label="Cambiar vista del Tubo de Compromiso">
-      <a href="?tab=requerimientos&vista=tabla{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_origen %}&origen={{ filtro_origen }}{% endif %}{% if filtro_responsable %}&responsable={{ filtro_responsable }}{% endif %}{% if orden %}&orden={{ orden }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+      <a href="?tab=requerimientos&vista=tabla{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_origen %}&origen={{ filtro_origen }}{% endif %}{% if filtro_responsable %}&responsable={{ filtro_responsable }}{% endif %}{% if orden %}&orden={{ orden }}{% endif %}{% if es_admin %}&delegacion={% if delegacion_seleccionada %}{{ delegacion_seleccionada.id }}{% else %}todas{% endif %}{% endif %}"
          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all {% if vista == 'tabla' %}bg-white text-[#C41230] shadow-sm border border-slate-200/80{% else %}text-slate-600 hover:text-slate-900{% endif %}">
         <i data-lucide="table-2" class="w-3.5 h-3.5"></i>
         <span>Tabla</span>
       </a>
-      <a href="?tab=requerimientos&vista=canvas{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_origen %}&origen={{ filtro_origen }}{% endif %}{% if filtro_responsable %}&responsable={{ filtro_responsable }}{% endif %}{% if orden %}&orden={{ orden }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+      <a href="?tab=requerimientos&vista=canvas{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_origen %}&origen={{ filtro_origen }}{% endif %}{% if filtro_responsable %}&responsable={{ filtro_responsable }}{% endif %}{% if orden %}&orden={{ orden }}{% endif %}{% if es_admin %}&delegacion={% if delegacion_seleccionada %}{{ delegacion_seleccionada.id }}{% else %}todas{% endif %}{% endif %}"
          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all {% if vista == 'canvas' %}bg-white text-[#C41230] shadow-sm border border-slate-200/80{% else %}text-slate-600 hover:text-slate-900{% endif %}">
         <i data-lucide="columns-4" class="w-3.5 h-3.5"></i>
         <span>Canvas</span>
@@ -189,7 +189,7 @@
         </div>
 
         {% if filtro_estado or q or filtro_origen or filtro_responsable %}
-          <a href="?tab=requerimientos&vista={{ vista }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+          <a href="?tab=requerimientos&vista={{ vista }}{% if es_admin %}&delegacion={% if delegacion_seleccionada %}{{ delegacion_seleccionada.id }}{% else %}todas{% endif %}{% endif %}"
              class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1 self-start sm:self-auto">
             <i data-lucide="x" class="w-3.5 h-3.5"></i>
             <span>Limpiar todos los filtros</span>
@@ -975,7 +975,7 @@
         </div>
 
         {% if q_colab or filtro_cumplimiento or orden_colab != '-total' %}
-          <a href="?tab=colaboradores{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+          <a href="?tab=colaboradores{% if es_admin %}&delegacion={% if delegacion_seleccionada %}{{ delegacion_seleccionada.id }}{% else %}todas{% endif %}{% endif %}"
              class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1 self-start sm:self-auto">
             <i data-lucide="x" class="w-3.5 h-3.5"></i>
             <span>Limpiar filtros</span>
@@ -986,9 +986,6 @@
       <!-- Filtros de Colaboradores -->
       <form method="GET" action="" class="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5 pt-1 flex-wrap">
         <input type="hidden" name="tab" value="colaboradores">
-        {% if delegacion_seleccionada and es_admin %}
-          <input type="hidden" name="delegacion" value="{{ delegacion_seleccionada.id }}">
-        {% endif %}
 
         <!-- Búsqueda por Nombre o Cargo -->
         <div class="relative flex-1 min-w-[220px]">
@@ -996,6 +993,21 @@
                  class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-[#C41230] focus:outline-none bg-white">
           <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
         </div>
+
+        <!-- Filtro Delegación (Admin) -->
+        {% if es_admin %}
+        <div>
+          <select name="delegacion" onchange="this.form.submit()"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-[#C41230] focus:outline-none bg-white">
+            <option value="todas" {% if not delegacion_seleccionada %}selected{% endif %}>Delegación: Todas</option>
+            {% for d in todas_delegaciones %}
+              <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
+                {{ d.nombre }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
 
         <!-- Filtro por Nivel de Cumplimiento -->
         <div>
@@ -1077,7 +1089,7 @@
               </span>
             </td>
             <td class="py-3 px-3.5 text-center whitespace-nowrap">
-              <a href="?tab=requerimientos&responsable={{ c.user_id }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+              <a href="?tab=requerimientos&responsable={{ c.user_id }}{% if es_admin %}&delegacion={% if delegacion_seleccionada %}{{ delegacion_seleccionada.id }}{% else %}todas{% endif %}{% endif %}"
                  class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-[#C41230] hover:text-white text-slate-700 transition-all inline-flex items-center gap-1.5 shadow-sm">
                 <i data-lucide="eye" class="w-3.5 h-3.5"></i>
                 <span>Ver Requerimientos</span>
@@ -1103,7 +1115,7 @@
       </div>
       <div class="flex items-center gap-1.5 flex-nowrap whitespace-nowrap overflow-x-auto max-w-full">
         {% if page_obj_colab.has_previous %}
-          <a href="?tab=colaboradores&page_colab={{ page_obj_colab.previous_page_number }}{% if q_colab %}&q_colab={{ q_colab }}{% endif %}{% if filtro_cumplimiento %}&cumplimiento={{ filtro_cumplimiento }}{% endif %}{% if orden_colab %}&orden_colab={{ orden_colab }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+          <a href="?tab=colaboradores&page_colab={{ page_obj_colab.previous_page_number }}{% if q_colab %}&q_colab={{ q_colab }}{% endif %}{% if filtro_cumplimiento %}&cumplimiento={{ filtro_cumplimiento }}{% endif %}{% if orden_colab %}&orden_colab={{ orden_colab }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}{% if es_admin %}&delegacion={% if delegacion_seleccionada %}{{ delegacion_seleccionada.id }}{% else %}todas{% endif %}{% endif %}"
              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold transition-all shadow-sm">
             Anterior
           </a>
@@ -1118,7 +1130,7 @@
             {% if p == page_obj_colab.number %}
               <span class="px-3 py-1.5 rounded-lg bg-[#C41230] text-white font-bold shadow-sm">{{ p }}</span>
             {% else %}
-              <a href="?tab=colaboradores&page_colab={{ p }}{% if q_colab %}&q_colab={{ q_colab }}{% endif %}{% if filtro_cumplimiento %}&cumplimiento={{ filtro_cumplimiento }}{% endif %}{% if orden_colab %}&orden_colab={{ orden_colab }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+              <a href="?tab=colaboradores&page_colab={{ p }}{% if q_colab %}&q_colab={{ q_colab }}{% endif %}{% if filtro_cumplimiento %}&cumplimiento={{ filtro_cumplimiento }}{% endif %}{% if orden_colab %}&orden_colab={{ orden_colab }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}{% if es_admin %}&delegacion={% if delegacion_seleccionada %}{{ delegacion_seleccionada.id }}{% else %}todas{% endif %}{% endif %}"
                  class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all">{{ p }}</a>
             {% endif %}
           {% elif p == 2 and page_obj_colab.number > 4 %}
@@ -1129,7 +1141,7 @@
         {% endfor %}
 
         {% if page_obj_colab.has_next %}
-          <a href="?tab=colaboradores&page_colab={{ page_obj_colab.next_page_number }}{% if q_colab %}&q_colab={{ q_colab }}{% endif %}{% if filtro_cumplimiento %}&cumplimiento={{ filtro_cumplimiento }}{% endif %}{% if orden_colab %}&orden_colab={{ orden_colab }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+          <a href="?tab=colaboradores&page_colab={{ page_obj_colab.next_page_number }}{% if q_colab %}&q_colab={{ q_colab }}{% endif %}{% if filtro_cumplimiento %}&cumplimiento={{ filtro_cumplimiento }}{% endif %}{% if orden_colab %}&orden_colab={{ orden_colab }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}{% if es_admin %}&delegacion={% if delegacion_seleccionada %}{{ delegacion_seleccionada.id }}{% else %}todas{% endif %}{% endif %}"
              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold transition-all shadow-sm">
             Siguiente
           </a>

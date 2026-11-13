@@ -4640,9 +4640,15 @@ def _resolver_delegacion_tubo(request, ctx):
     del_activa = ctx['delegacion_activa']
     delegacion_seleccionada = None
     if es_admin:
-        del_param = request.GET.get('delegacion', '').strip()
-        if del_param and del_param.isdigit():
-            delegacion_seleccionada = Delegacion.objects.filter(id=int(del_param), estado='Activa').first()
+        del_param_raw = request.GET.get('delegacion')
+        if del_param_raw is not None:
+            del_param = del_param_raw.strip()
+            if del_param and del_param.isdigit():
+                delegacion_seleccionada = Delegacion.objects.filter(id=int(del_param), estado='Activa').first()
+            else:
+                delegacion_seleccionada = None
+        elif del_activa:
+            delegacion_seleccionada = del_activa
     else:
         delegacion_seleccionada = del_activa
     return delegacion_seleccionada
@@ -5160,15 +5166,16 @@ def gestion_tubo(request):
         u = User.objects.filter(id=uid).first()
         if not u:
             continue
+        f_extra = Funcionario.objects.filter(user=u).select_related('delegacion', 'cargo').first()
         u_total, u_ing, u_pend, u_proc, u_real, u_pct = _stats_usuario(u.id)
         resumen_colaboradores.append({
             'user_id': u.id,
-            'funcionario_id': None,
+            'funcionario_id': f_extra.id if f_extra else None,
             'usuario': u,
             'nombre': u.get_full_name() or u.username,
             'username': u.username,
-            'cargo': 'Encargado de Gestión',
-            'delegacion_nombre': '',
+            'cargo': (f_extra.cargo.nombre_cargo if f_extra and f_extra.cargo else 'Encargado de Gestión'),
+            'delegacion_nombre': (f_extra.delegacion.nombre if f_extra and f_extra.delegacion else 'Global'),
             'total': u_total,
             'ingresados': u_ing,
             'pendientes': u_pend,
