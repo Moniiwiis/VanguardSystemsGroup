@@ -118,6 +118,9 @@ urlpatterns = [
     # 15. Módulo Tubo SGR de Trabajo (Matriz Excel)
     path('gestion/tubo/', views.gestion_tubo, name='gestion_tubo'),
     path('gestion/tubo/<int:atencion_id>/cambiar-estado/', views.gestion_tubo_cambiar_estado, name='gestion_tubo_cambiar_estado'),
+    path('gestion/tubo/sector/<int:compromiso_id>/cambiar-estado/', views.gestion_tubo_sector_cambiar_estado, name='gestion_tubo_sector_cambiar_estado'),
+    path('gestion/tubo/sector/<int:compromiso_id>/editar/', views.gestion_tubo_sector_editar, name='gestion_tubo_sector_editar'),
+    path('gestion/tubo/sector/<int:compromiso_id>/eliminar/', views.gestion_tubo_sector_eliminar, name='gestion_tubo_sector_eliminar'),
 ]
 
 from django.views.static import serve

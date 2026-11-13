@@ -232,8 +232,8 @@
               <div class="desc-roll text-slate-800 font-medium leading-tight">
                 {{ o.domicilio_legal|default:o.direccion_sede|default:"—" }}
               </div>
-              {% if o.representante_legal %}
-                <span class="text-[10px] text-slate-400 block mt-0.5">Rep.: {{ o.representante_legal }}</span>
+              {% if o.presidente_nombre or o.representante_legal %}
+                <span class="text-[10px] text-slate-500 block mt-0.5">Pres./Rep.: {{ o.presidente_nombre|default:o.representante_legal }}</span>
               {% endif %}
             </td>
 
@@ -318,15 +318,73 @@
             <!-- ACCIONES -->
             <td class="py-3 px-3.5 text-center whitespace-nowrap sticky right-0 bg-white group-hover:bg-slate-50 transition-colors shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
               <div class="flex items-center justify-center gap-1">
-                <button type="button" 
-                        onclick="verDetalleOrg('{{ o.id }}', '{{ o.nombre|escapejs }}', '{{ o.tipo_organizacion|escapejs }}', '{{ o.domicilio_legal|default:o.direccion_sede|default:''|escapejs }}', '{{ o.delegacion.nombre|default:''|escapejs }}', '{{ o.territorio|default:''|escapejs }}', '{{ o.socios_activos|default:0 }}', '{{ o.fecha_constitucion|date:'d/m/Y'|default:'' }}', '{{ o.numero_registro_pj|default:o.personalidad_juridica|default:''|escapejs }}', '{{ o.fecha_inscripcion_registro|date:'d/m/Y'|default:'' }}', '{{ o.registro_directiva_numero|default:''|escapejs }}', '{{ o.rut|default:''|escapejs }}', '{{ o.directiva_actual|default:''|escapejs }}', '{{ o.representante_legal|default:''|escapejs }}', '{{ o.telefono_contacto|default:''|escapejs }}', '{{ o.email_contacto|default:''|escapejs }}', '{{ o.estado|escapejs }}', '{{ o.observaciones|default:''|escapejs }}')"
+                <button type="button"
+                        data-id="{{ o.id }}"
+                        data-nombre="{{ o.nombre }}"
+                        data-tipo="{{ o.tipo_organizacion }}"
+                        data-domicilio="{{ o.domicilio_legal|default:o.direccion_sede|default:'' }}"
+                        data-delegacion="{{ o.delegacion.nombre|default:'' }}"
+                        data-del-id="{{ o.delegacion_id|default:'' }}"
+                        data-sector-id="{{ o.sector_id|default:'' }}"
+                        data-territorio="{{ o.territorio|default:'' }}"
+                        data-socios="{{ o.socios_activos|default:0 }}"
+                        data-fconst-disp="{{ o.fecha_constitucion|date:'d/m/Y'|default:'' }}"
+                        data-fconst-iso="{{ o.fecha_constitucion|date:'Y-m-d'|default:'' }}"
+                        data-numpj="{{ o.numero_registro_pj|default:o.personalidad_juridica|default:'' }}"
+                        data-finsc-disp="{{ o.fecha_inscripcion_registro|date:'d/m/Y'|default:'' }}"
+                        data-finsc-iso="{{ o.fecha_inscripcion_registro|date:'Y-m-d'|default:'' }}"
+                        data-regdir="{{ o.registro_directiva_numero|default:'' }}"
+                        data-rut="{{ o.rut|default:'' }}"
+                        data-directiva="{{ o.directiva_actual|default:'' }}"
+                        data-rep="{{ o.representante_legal|default:'' }}"
+                        data-tel="{{ o.telefono_contacto|default:'' }}"
+                        data-email="{{ o.email_contacto|default:'' }}"
+                        data-estado="{{ o.estado }}"
+                        data-obs="{{ o.observaciones|default:'' }}"
+                        data-pres-nombre="{{ o.presidente_nombre|default:'' }}"
+                        data-pres-rut="{{ o.presidente_rut|default:'' }}"
+                        data-pres-correo="{{ o.presidente_correo|default:'' }}"
+                        data-tes-nombre="{{ o.tesorero_nombre|default:'' }}"
+                        data-tes-rut="{{ o.tesorero_rut|default:'' }}"
+                        data-tes-correo="{{ o.tesorero_correo|default:'' }}"
+                        data-sec-nombre="{{ o.secretario_nombre|default:'' }}"
+                        data-sec-rut="{{ o.secretario_rut|default:'' }}"
+                        data-sec-correo="{{ o.secretario_correo|default:'' }}"
+                        onclick="verDetalleOrgBtn(this)"
                         title="Ver detalle"
                         class="p-1.5 rounded-lg text-slate-500 hover:text-[#C41230] hover:bg-red-50 transition-all">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
                 {% if not permisos.es_consultor %}
-                  <button type="button" 
-                          onclick="abrirModalEditarOrg('{{ o.id }}', '{{ o.nombre|escapejs }}', '{{ o.tipo_organizacion|escapejs }}', '{{ o.domicilio_legal|default:o.direccion_sede|default:''|escapejs }}', '{{ o.delegacion_id|default:'' }}', '{{ o.sector_id|default:'' }}', '{{ o.socios_activos|default:0 }}', '{{ o.fecha_constitucion|date:'Y-m-d'|default:'' }}', '{{ o.numero_registro_pj|default:o.personalidad_juridica|default:''|escapejs }}', '{{ o.fecha_inscripcion_registro|date:'Y-m-d'|default:'' }}', '{{ o.registro_directiva_numero|default:''|escapejs }}', '{{ o.rut|default:''|escapejs }}', '{{ o.directiva_actual|default:''|escapejs }}', '{{ o.representante_legal|default:''|escapejs }}', '{{ o.telefono_contacto|default:''|escapejs }}', '{{ o.email_contacto|default:''|escapejs }}', '{{ o.estado|escapejs }}', '{{ o.observaciones|default:''|escapejs }}')"
+                  <button type="button"
+                          data-id="{{ o.id }}"
+                          data-nombre="{{ o.nombre }}"
+                          data-tipo="{{ o.tipo_organizacion }}"
+                          data-domicilio="{{ o.domicilio_legal|default:o.direccion_sede|default:'' }}"
+                          data-del-id="{{ o.delegacion_id|default:'' }}"
+                          data-sector-id="{{ o.sector_id|default:'' }}"
+                          data-socios="{{ o.socios_activos|default:0 }}"
+                          data-fconst-iso="{{ o.fecha_constitucion|date:'Y-m-d'|default:'' }}"
+                          data-numpj="{{ o.numero_registro_pj|default:o.personalidad_juridica|default:'' }}"
+                          data-finsc-iso="{{ o.fecha_inscripcion_registro|date:'Y-m-d'|default:'' }}"
+                          data-regdir="{{ o.registro_directiva_numero|default:'' }}"
+                          data-rut="{{ o.rut|default:'' }}"
+                          data-directiva="{{ o.directiva_actual|default:'' }}"
+                          data-rep="{{ o.representante_legal|default:'' }}"
+                          data-tel="{{ o.telefono_contacto|default:'' }}"
+                          data-email="{{ o.email_contacto|default:'' }}"
+                          data-estado="{{ o.estado }}"
+                          data-obs="{{ o.observaciones|default:'' }}"
+                          data-pres-nombre="{{ o.presidente_nombre|default:'' }}"
+                          data-pres-rut="{{ o.presidente_rut|default:'' }}"
+                          data-pres-correo="{{ o.presidente_correo|default:'' }}"
+                          data-tes-nombre="{{ o.tesorero_nombre|default:'' }}"
+                          data-tes-rut="{{ o.tesorero_rut|default:'' }}"
+                          data-tes-correo="{{ o.tesorero_correo|default:'' }}"
+                          data-sec-nombre="{{ o.secretario_nombre|default:'' }}"
+                          data-sec-rut="{{ o.secretario_rut|default:'' }}"
+                          data-sec-correo="{{ o.secretario_correo|default:'' }}"
+                          onclick="abrirModalEditarOrgBtn(this)"
                           title="Editar"
                           class="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all">
                     <i data-lucide="edit-3" class="w-4 h-4"></i>
@@ -516,8 +574,68 @@
           </select>
         </div>
 
+        <!-- Directiva estructurada (Presidente, Tesorero y Secretario) -->
+        <div class="sm:col-span-3 p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-3">
+          <div class="flex items-center gap-2 text-xs font-extrabold text-slate-800 border-b border-slate-200 pb-1.5">
+            <i data-lucide="users" class="w-4 h-4 text-[#C41230]"></i>
+            <span>Directiva de la Organización (Presidente, Tesorero y Secretario)</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Presidente — Nombre y Apellido</label>
+              <input type="text" name="presidente_nombre" maxlength="150" placeholder="Nombre y apellido"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Presidente — RUT</label>
+              <input type="text" name="presidente_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              <div class="rut-feedback"></div>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Presidente — Correo</label>
+              <input type="email" name="presidente_correo" maxlength="100" placeholder="presidente@correo.cl"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Tesorero — Nombre y Apellido</label>
+              <input type="text" name="tesorero_nombre" maxlength="150" placeholder="Nombre y apellido"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Tesorero — RUT</label>
+              <input type="text" name="tesorero_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              <div class="rut-feedback"></div>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Tesorero — Correo</label>
+              <input type="email" name="tesorero_correo" maxlength="100" placeholder="tesorero@correo.cl"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Secretario — Nombre y Apellido</label>
+              <input type="text" name="secretario_nombre" maxlength="150" placeholder="Nombre y apellido"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Secretario — RUT</label>
+              <input type="text" name="secretario_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              <div class="rut-feedback"></div>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Secretario — Correo</label>
+              <input type="email" name="secretario_correo" maxlength="100" placeholder="secretario@correo.cl"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+          </div>
+        </div>
+
         <div class="sm:col-span-3 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Nómina de Directiva Actual</label>
+          <label class="block text-xs font-bold text-slate-700">Nómina / Notas de Directiva</label>
           <textarea name="directiva_actual" rows="2" maxlength="1000" placeholder="Presidente, Secretario, Tesorero, Directores..."
                     class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
         </div>
@@ -647,8 +765,68 @@
           </select>
         </div>
 
+        <!-- Directiva estructurada (Presidente, Tesorero y Secretario) -->
+        <div class="sm:col-span-3 p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-3">
+          <div class="flex items-center gap-2 text-xs font-extrabold text-slate-800 border-b border-slate-200 pb-1.5">
+            <i data-lucide="users" class="w-4 h-4 text-[#C41230]"></i>
+            <span>Directiva de la Organización (Presidente, Tesorero y Secretario)</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Presidente — Nombre y Apellido</label>
+              <input type="text" id="edit-org-pres-nombre" name="presidente_nombre" maxlength="150" placeholder="Nombre y apellido"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Presidente — RUT</label>
+              <input type="text" id="edit-org-pres-rut" name="presidente_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              <div class="rut-feedback"></div>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Presidente — Correo</label>
+              <input type="email" id="edit-org-pres-correo" name="presidente_correo" maxlength="100" placeholder="presidente@correo.cl"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Tesorero — Nombre y Apellido</label>
+              <input type="text" id="edit-org-tes-nombre" name="tesorero_nombre" maxlength="150" placeholder="Nombre y apellido"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Tesorero — RUT</label>
+              <input type="text" id="edit-org-tes-rut" name="tesorero_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              <div class="rut-feedback"></div>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Tesorero — Correo</label>
+              <input type="email" id="edit-org-tes-correo" name="tesorero_correo" maxlength="100" placeholder="tesorero@correo.cl"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Secretario — Nombre y Apellido</label>
+              <input type="text" id="edit-org-sec-nombre" name="secretario_nombre" maxlength="150" placeholder="Nombre y apellido"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Secretario — RUT</label>
+              <input type="text" id="edit-org-sec-rut" name="secretario_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              <div class="rut-feedback"></div>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-700">Secretario — Correo</label>
+              <input type="email" id="edit-org-sec-correo" name="secretario_correo" maxlength="100" placeholder="secretario@correo.cl"
+                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            </div>
+          </div>
+        </div>
+
         <div class="sm:col-span-3 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Nómina de Directiva Actual</label>
+          <label class="block text-xs font-bold text-slate-700">Nómina / Notas de Directiva</label>
           <textarea id="edit-org-directiva" name="directiva_actual" rows="2" maxlength="1000"
                     class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
         </div>
@@ -676,50 +854,74 @@
     document.getElementById('modal-crear-org').classList.remove('hidden');
   }
 
-  function abrirModalEditarOrg(id, nombre, tipo, domicilio, delId, sectorId, socios, fConst, numPj, fInsc, regDir, rut, directiva, rep, tel, email, estado, obs) {
-    document.getElementById('form-editar-org').action = `/gestion/organizaciones/${id}/editar/`;
-    document.getElementById('edit-org-nombre').value = nombre || '';
-    document.getElementById('edit-org-tipo').value = tipo || 'Junta de Vecinos';
-    document.getElementById('edit-org-domicilio').value = domicilio || '';
-    document.getElementById('edit-org-socios').value = socios || 0;
-    document.getElementById('edit-org-fconst').value = fConst || '';
-    document.getElementById('edit-org-numpj').value = numPj || '';
-    document.getElementById('edit-org-finsc').value = fInsc || '';
-    document.getElementById('edit-org-regdir').value = regDir || '';
-    document.getElementById('edit-org-rut').value = rut || '';
-    document.getElementById('edit-org-directiva').value = directiva || '';
-    document.getElementById('edit-org-rep').value = rep || '';
-    document.getElementById('edit-org-tel').value = (tel && tel.trim() !== '') ? tel : '+56 9 ';
-    document.getElementById('edit-org-email').value = email || '';
-    document.getElementById('edit-org-estado').value = estado || 'Activa';
-    document.getElementById('edit-org-obs').value = obs || '';
-    if (delId) document.getElementById('edit-org-del').value = delId;
-    document.getElementById('edit-org-sector').value = sectorId || '';
+  function abrirModalEditarOrgBtn(btn) {
+    const d = btn.dataset;
+    document.getElementById('form-editar-org').action = `/gestion/organizaciones/${d.id}/editar/`;
+    document.getElementById('edit-org-nombre').value = d.nombre || '';
+    document.getElementById('edit-org-tipo').value = d.tipo || 'Junta de Vecinos';
+    document.getElementById('edit-org-domicilio').value = d.domicilio || '';
+    document.getElementById('edit-org-socios').value = d.socios || 0;
+    document.getElementById('edit-org-fconst').value = d.fconstIso || '';
+    document.getElementById('edit-org-numpj').value = d.numpj || '';
+    document.getElementById('edit-org-finsc').value = d.finscIso || '';
+    document.getElementById('edit-org-regdir').value = d.regdir || '';
+    document.getElementById('edit-org-rut').value = d.rut || '';
+    document.getElementById('edit-org-directiva').value = d.directiva || '';
+    document.getElementById('edit-org-rep').value = d.rep || '';
+    document.getElementById('edit-org-tel').value = (d.tel && d.tel.trim() !== '') ? d.tel : '+56 9 ';
+    document.getElementById('edit-org-email').value = d.email || '';
+    document.getElementById('edit-org-estado').value = d.estado || 'Activa';
+    document.getElementById('edit-org-obs').value = d.obs || '';
+    document.getElementById('edit-org-pres-nombre').value = d.presNombre || '';
+    document.getElementById('edit-org-pres-rut').value = d.presRut || '';
+    document.getElementById('edit-org-pres-correo').value = d.presCorreo || '';
+    document.getElementById('edit-org-tes-nombre').value = d.tesNombre || '';
+    document.getElementById('edit-org-tes-rut').value = d.tesRut || '';
+    document.getElementById('edit-org-tes-correo').value = d.tesCorreo || '';
+    document.getElementById('edit-org-sec-nombre').value = d.secNombre || '';
+    document.getElementById('edit-org-sec-rut').value = d.secRut || '';
+    document.getElementById('edit-org-sec-correo').value = d.secCorreo || '';
+    if (d.delId) document.getElementById('edit-org-del').value = d.delId;
+    document.getElementById('edit-org-sector').value = d.sectorId || '';
     document.getElementById('modal-editar-org').classList.remove('hidden');
   }
 
-  function verDetalleOrg(id, nombre, tipo, domicilio, delegacion, territorio, socios, fConst, numPj, fInsc, regDir, rut, directiva, rep, tel, email, estado, obs) {
+  function verDetalleOrgBtn(btn) {
+    const d = btn.dataset;
+    const esc = (s) => (s || '—').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const cargoRow = (titulo, nom, rut, mail) => `
+      <div class="bg-slate-50 p-2 rounded-lg border border-slate-200">
+        <div class="font-bold text-slate-800">${titulo}</div>
+        <div class="text-slate-700">${esc(nom)}</div>
+        <div class="text-[11px] font-mono text-slate-500">RUT: ${esc(rut)}</div>
+        <div class="text-[11px] text-slate-600 truncate">${esc(mail)}</div>
+      </div>`;
     Swal.fire({
-      title: nombre,
-      width: 600,
+      title: d.nombre,
+      width: 680,
       html: `
         <div class="text-left text-xs space-y-2.5 p-2">
           <div class="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
-            <p><strong>Tipo:</strong> ${tipo || '—'}</p>
-            <p><strong>Estado:</strong> ${estado || '—'}</p>
-            <p><strong>Domicilio Legal:</strong> ${domicilio || '—'}</p>
-            <p><strong>Territ. Deleg.:</strong> ${delegacion || '—'}${territorio ? ' (' + territorio + ')' : ''}</p>
-            <p><strong>Socios Activos:</strong> ${socios || '0'}</p>
-            <p><strong>Fecha Constit.:</strong> ${fConst || '—'}</p>
-            <p><strong>Nº Reg. P.J.:</strong> ${numPj || '—'}</p>
-            <p><strong>Fecha Inscripc en Reg.:</strong> ${fInsc || '—'}</p>
-            <p><strong>Reg. Dir. Nº:</strong> ${regDir || '—'}</p>
-            <p><strong>RUT:</strong> ${rut || '—'}</p>
+            <p><strong>Tipo:</strong> ${esc(d.tipo)}</p>
+            <p><strong>Estado:</strong> ${esc(d.estado)}</p>
+            <p><strong>Domicilio Legal:</strong> ${esc(d.domicilio)}</p>
+            <p><strong>Territ. Deleg.:</strong> ${esc(d.delegacion)}${d.territorio ? ' (' + esc(d.territorio) + ')' : ''}</p>
+            <p><strong>Socios Activos:</strong> ${esc(d.socios || '0')}</p>
+            <p><strong>Fecha Constit.:</strong> ${esc(d.fconstDisp)}</p>
+            <p><strong>Nº Reg. P.J.:</strong> ${esc(d.numpj)}</p>
+            <p><strong>Fecha Inscripc en Reg.:</strong> ${esc(d.finscDisp)}</p>
+            <p><strong>Reg. Dir. Nº:</strong> ${esc(d.regdir)}</p>
+            <p><strong>RUT Organización:</strong> ${esc(d.rut)}</p>
           </div>
-          <p><strong>Representante Legal:</strong> ${rep || '—'}</p>
-          <p><strong>Contacto:</strong> ${tel || '—'} ${email ? '· ' + email : ''}</p>
-          <p><strong>Directiva Actual:</strong><br><span class="text-slate-600">${directiva || '—'}</span></p>
-          <p><strong>Observaciones:</strong><br><span class="text-slate-600">${obs || '—'}</span></p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            ${cargoRow('Presidente', d.presNombre, d.presRut, d.presCorreo)}
+            ${cargoRow('Tesorero', d.tesNombre, d.tesRut, d.tesCorreo)}
+            ${cargoRow('Secretario', d.secNombre, d.secRut, d.secCorreo)}
+          </div>
+          <p><strong>Representante Legal:</strong> ${esc(d.rep)}</p>
+          <p><strong>Contacto:</strong> ${esc(d.tel)} ${d.email ? '· ' + esc(d.email) : ''}</p>
+          <p><strong>Directiva / Notas:</strong><br><span class="text-slate-600">${esc(d.directiva)}</span></p>
+          <p><strong>Observaciones:</strong><br><span class="text-slate-600">${esc(d.obs)}</span></p>
         </div>
       `,
       confirmButtonColor: '#C41230',

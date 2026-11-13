@@ -3,6 +3,7 @@ import secrets
 import datetime
 from smtplib import SMTPException
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth import login, logout, authenticate, update_session_auth_hash
 from django.contrib.auth.models import User
@@ -1659,10 +1660,80 @@ def _organizaciones_activas_para_delegacion(delegacion):
     """Retorna organizaciones comunitarias (JJVV y afines) activas de la delegación."""
     if not delegacion:
         return OrganizacionComunitaria.objects.none()
-    return OrganizacionComunitaria.objects.filter(estado='Activo').filter(
+    return OrganizacionComunitaria.objects.filter(estado__in=['Activo', 'Activa']).filter(
         Q(delegacion=delegacion)
         | (Q(delegacion__isnull=True) & Q(territorio__icontains=delegacion.nombre))
     )
+
+
+def _extraer_y_validar_directiva(request, field_prefix=''):
+    """Valida y normaliza Presidente, Tesorero y Secretario (nombre, RUT y correo)."""
+    directiva = {}
+    for cargo, label in (
+        ('presidente', 'Presidente'),
+        ('tesorero', 'Tesorero'),
+        ('secretario', 'Secretario'),
+    ):
+        nombre = request.POST.get(f'{field_prefix}{cargo}_nombre', '').strip()
+        rut = request.POST.get(f'{field_prefix}{cargo}_rut', '').strip()
+        correo = request.POST.get(f'{field_prefix}{cargo}_correo', '').strip()
+
+        ok, err = validar_largo(nombre, 150, f"{label} - Nombre y Apellido")
+        if not ok:
+            return None, err
+
+        ok, err = validar_largo(rut, 20, f"{label} - RUT")
+        if not ok:
+            return None, err
+        if rut:
+            rut_ok, rut_res = validar_rut(rut)
+            if not rut_ok:
+                return None, f"RUT de {label} inválido: {rut_res}"
+            rut = rut_res
+
+        ok, err = validar_largo(correo, 100, f"{label} - Correo")
+        if not ok:
+            return None, err
+        if correo:
+            try:
+                validate_email(correo)
+            except ValidationError:
+                return None, f"Correo de {label} inválido."
+
+        directiva[f'{cargo}_nombre'] = nombre or None
+        directiva[f'{cargo}_rut'] = rut or None
+        directiva[f'{cargo}_correo'] = correo or None
+    return directiva, None
+
+
+_ALIAS_ESTADO_TUBO = {
+    'ingresado': 'Registrada',
+    'registrada': 'Registrada',
+    'pendiente': 'Pendiente',
+    'en proceso': 'En proceso',
+    'realizado': 'Resuelta',
+    'resuelta': 'Resuelta',
+    'cancelada': 'Cancelada',
+}
+
+
+def _normalizar_estado_tubo(raw_estado):
+    return _ALIAS_ESTADO_TUBO.get((raw_estado or '').strip().lower(), (raw_estado or '').strip())
+
+
+def _estado_grupo_tubo(estado):
+    est = (estado or '').strip().lower()
+    if est in ('registrada', 'ingresado'):
+        return 'ingresado'
+    if est == 'pendiente':
+        return 'pendiente'
+    if est == 'en proceso':
+        return 'proceso'
+    if est in ('resuelta', 'realizado'):
+        return 'realizado'
+    if est == 'cancelada':
+        return 'cancelada'
+    return 'ingresado'
 
 
 def _adjuntar_roles_atenciones(atenciones):
@@ -1764,6 +1835,11 @@ def gestion_atenciones(request):
                 if nueva_org_tipo not in tipos_org_validos:
                     nueva_org_tipo = 'Junta de Vecinos'
 
+                directiva_org, err_dir_org = _extraer_y_validar_directiva(request, field_prefix='nueva_org_')
+                if err_dir_org:
+                    messages.error(request, err_dir_org)
+                    return redirect('gestion_atenciones')
+
                 sector_org = None
                 if nueva_org_sec_id and nueva_org_sec_id.isdigit():
                     sector_org = Sector.objects.filter(
@@ -1781,10 +1857,11 @@ def gestion_atenciones(request):
                         delegacion=del_activa,
                         sector=sector_org,
                         territorio=territorio_org,
-                        representante_legal=nueva_org_rep,
+                        representante_legal=nueva_org_rep or directiva_org.get('presidente_nombre'),
                         telefono_contacto=nueva_org_tel,
                         direccion_sede=nueva_org_dir,
-                        estado='Activo',
+                        estado='Activa',
+                        **directiva_org,
                     )
             elif organizacion_id and organizacion_id.isdigit():
                 organizacion_obj = _organizaciones_activas_para_delegacion(del_activa).filter(
@@ -3825,6 +3902,11 @@ def gestion_organizaciones(request):
         ok, err = validar_largo(observaciones, 1000, "Observaciones")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
 
+        directiva_data, err_dir = _extraer_y_validar_directiva(request)
+        if err_dir:
+            messages.error(request, err_dir)
+            return redirect('gestion_organizaciones')
+
         sector_obj = None
         if sector_id and sector_id.isdigit():
             sec_qs = Sector.objects.filter(id=int(sector_id), estado='Activo')
@@ -3872,12 +3954,13 @@ def gestion_organizaciones(request):
             estado=estado,
             rut=rut_org or None,
             personalidad_juridica=personalidad_jur or num_pj or None,
-            representante_legal=representante or None,
+            representante_legal=representante or directiva_data.get('presidente_nombre') or None,
             telefono_contacto=tel_contacto or None,
             email_contacto=email_contacto or None,
             direccion_sede=direccion_sede or domicilio or None,
             directiva_actual=directiva or None,
             observaciones=observaciones or None,
+            **directiva_data,
         )
 
         # Notificación en tiempo real por WebSocket
@@ -3922,6 +4005,9 @@ def gestion_organizaciones(request):
             'nombre', 'tipo_organizacion', 'domicilio_legal', 'territorio',
             'numero_registro_pj', 'registro_directiva_numero', 'sector__nombre', 'delegacion__nombre',
             'rut', 'representante_legal', 'directiva_actual', 'observaciones', 'direccion_sede',
+            'presidente_nombre', 'presidente_rut', 'presidente_correo',
+            'tesorero_nombre', 'tesorero_rut', 'tesorero_correo',
+            'secretario_nombre', 'secretario_rut', 'secretario_correo',
         ], q))
     if filtro_tipo:
         qs_metricas = qs_metricas.filter(tipo_organizacion__iexact=filtro_tipo)
@@ -3955,6 +4041,9 @@ def gestion_organizaciones(request):
             'SOCIOS ACTIVOS', 'FECHA CONSTIT.', 'Nº REG. P.J.',
             'FECHA INSCRIPC EN REG.', 'REG. DIR. Nº',
             'TIPO ORGANIZACIÓN', 'RUT', 'REPRESENTANTE LEGAL',
+            'PRESIDENTE (NOMBRE / RUT / CORREO)',
+            'TESORERO (NOMBRE / RUT / CORREO)',
+            'SECRETARIO (NOMBRE / RUT / CORREO)',
             'TELÉFONO CONTACTO', 'EMAIL CONTACTO', 'DIRECTIVA ACTUAL',
             'OBSERVACIONES', 'ESTADO'
         ]
@@ -3963,6 +4052,9 @@ def gestion_organizaciones(request):
             f_c = org.fecha_constitucion.strftime('%d/%m/%Y') if org.fecha_constitucion else '—'
             f_i = org.fecha_inscripcion_registro.strftime('%d/%m/%Y') if org.fecha_inscripcion_registro else '—'
             terr_del = org.territorio or (org.sector.nombre if org.sector else '') or (org.delegacion.nombre if org.delegacion else '—')
+            pres_txt = ' | '.join(filter(None, [org.presidente_nombre, org.presidente_rut, org.presidente_correo])) or '—'
+            tes_txt = ' | '.join(filter(None, [org.tesorero_nombre, org.tesorero_rut, org.tesorero_correo])) or '—'
+            sec_txt = ' | '.join(filter(None, [org.secretario_nombre, org.secretario_rut, org.secretario_correo])) or '—'
             rows.append([
                 org.nombre,
                 org.domicilio_legal or org.direccion_sede or '—',
@@ -3975,6 +4067,9 @@ def gestion_organizaciones(request):
                 org.tipo_organizacion,
                 org.rut or '—',
                 org.representante_legal or '—',
+                pres_txt,
+                tes_txt,
+                sec_txt,
                 org.telefono_contacto or '—',
                 org.email_contacto or '—',
                 org.directiva_actual or '—',
@@ -4090,6 +4185,11 @@ def gestion_organizaciones_editar(request, org_id):
         ok, err = validar_largo(observaciones_e, 1000, "Observaciones")
         if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
 
+        directiva_data, err_dir = _extraer_y_validar_directiva(request)
+        if err_dir:
+            messages.error(request, err_dir)
+            return redirect('gestion_organizaciones')
+
         if not nuevo_domicilio and direccion_sede_e:
             nuevo_domicilio = direccion_sede_e
         if not num_pj and personalidad_jur:
@@ -4129,12 +4229,14 @@ def gestion_organizaciones_editar(request, org_id):
         # Nuevos campos
         org.rut = rut_org or None
         org.personalidad_juridica = personalidad_jur or num_pj or None
-        org.representante_legal = representante or None
+        org.representante_legal = representante or directiva_data.get('presidente_nombre') or None
         org.telefono_contacto = tel_contacto or None
         org.email_contacto = email_contacto_e or None
         org.direccion_sede = direccion_sede_e or nuevo_domicilio or None
         org.directiva_actual = directiva_e or None
         org.observaciones = observaciones_e or None
+        for campo_dir, valor_dir in directiva_data.items():
+            setattr(org, campo_dir, valor_dir)
         org.save()
 
         del_id_ws = del_obj.id if del_obj else "global"
@@ -4466,68 +4568,290 @@ def error_500(request):
 # Seguimiento de compromisos territoriales a futuro, estatus y porcentajes
 # =====================================================================
 
-@login_required
-def gestion_tubo(request):
-    """
-    Módulo Tubo de Compromiso SGR:
-    Centraliza exclusivamente las atenciones ciudadanas derivadas a seguimiento territorial (`va_a_tubo=True`).
-    Soporta vista Tabla y vista Canvas (Kanban) conectadas a la misma Atención Ciudadana.
-    """
-    if request.method == 'POST':
-        messages.warning(
-            request,
-            "No es posible crear requerimientos en el Tubo sin una Atención Ciudadana asociada. "
-            "Registra la atención y marca 'Enviar al Tubo de Compromiso'.",
-        )
-        return redirect('gestion_tubo')
-
-    ctx = global_context(request)
+def _resolver_delegacion_tubo(request, ctx):
     es_admin = ctx['permisos']['es_admin']
     del_activa = ctx['delegacion_activa']
-
-    todas_delegaciones = Delegacion.objects.filter(estado='Activa').order_by('id')
     delegacion_seleccionada = None
-
     if es_admin:
         del_param = request.GET.get('delegacion', '').strip()
         if del_param and del_param.isdigit():
             delegacion_seleccionada = Delegacion.objects.filter(id=int(del_param), estado='Activa').first()
     else:
         delegacion_seleccionada = del_activa
+    return delegacion_seleccionada
 
-    # Query base: requerimientos que van al Tubo de Compromiso con prefetch de evidencias
-    qs_base = AtencionCiudadana.objects.filter(va_a_tubo=True).select_related(
+
+def _construir_item_tubo(origen_tipo, obj):
+    """Normaliza una AtencionCiudadana (`va_a_tubo`) o un CompromisoAgenda sectorial a una estructura común."""
+    if origen_tipo == 'atencion':
+        resp_user = obj.usuario_responsable
+        creador = obj.creado_por
+        territorio_sub = obj.vecino.territorio if (obj.vecino and obj.vecino.territorio) else ''
+        estado_val = _normalizar_estado_tubo(obj.estado)
+        return {
+            'item_tipo': 'atencion',
+            'es_atencion': True,
+            'id': obj.id,
+            'codigo_tubo': obj.get_codigo_tubo(),
+            'codigo_atencion': obj.codigo_atencion,
+            'origen': obj.origen or 'EXT',
+            'created_at': obj.created_at,
+            'solicitante': obj.solicitante,
+            'organizacion': obj.organizacion,
+            'delegacion': obj.delegacion,
+            'delegacion_id': obj.delegacion_id,
+            'sector_id': None,
+            'territorio_sub': territorio_sub,
+            'tipo_nombre': obj.tipo_atencion.nombre if obj.tipo_atencion else 'Atención',
+            'sub_nombre': obj.sub_atencion.nombre if obj.sub_atencion else '',
+            'descripcion': obj.descripcion,
+            'actividad': obj.actividad,
+            'evidencia_codigo': obj.get_evidencia_codigo(),
+            'estado_evidencia': obj.estado_evidencia(),
+            'usuario_responsable': resp_user,
+            'usuario_responsable_id': obj.usuario_responsable_id,
+            'responsable_nombre': (resp_user.get_full_name() or resp_user.username) if resp_user else 'Sin asignar',
+            'responsable_username': resp_user.username if resp_user else '',
+            'responsable_rol': '',
+            'creado_por_nombre': (creador.get_full_name() or creador.username) if creador else 'Sistema',
+            'fecha_compromiso': obj.fecha_compromiso,
+            'area_apoyo': obj.area_apoyo or '',
+            'avance_observaciones': obj.avance_observaciones or '',
+            'estado': estado_val,
+            'estado_grupo': _estado_grupo_tubo(estado_val),
+            'url_cambiar_estado': reverse('gestion_tubo_cambiar_estado', args=[obj.id]),
+            'url_editar': reverse('gestion_atenciones_editar', args=[obj.id]),
+            'url_eliminar': None,
+        }
+
+    resp_user = obj.responsable.user if obj.responsable_id else None
+    creador = obj.creado_por
+    sec_nom = obj.sector.nombre if obj.sector_id else (obj.territorio or 'Sector Territorial')
+    estado_val = _normalizar_estado_tubo(obj.estado)
+    return {
+        'item_tipo': 'sector',
+        'es_atencion': False,
+        'id': obj.id,
+        'codigo_tubo': obj.get_codigo_tubo(),
+        'codigo_atencion': obj.get_codigo_sector(),
+        'origen': obj.origen or 'INT',
+        'created_at': obj.created_at,
+        'solicitante': obj.solicitante,
+        'organizacion': obj.organizacion,
+        'delegacion': obj.delegacion,
+        'delegacion_id': obj.delegacion_id,
+        'sector_id': obj.sector_id,
+        'territorio_sub': sec_nom,
+        'tipo_nombre': 'Compromiso con Sector',
+        'sub_nombre': sec_nom,
+        'descripcion': obj.observacion or '',
+        'actividad': None,
+        'evidencia_codigo': obj.get_codigo_sector(),
+        'estado_evidencia': 'Sin Atención',
+        'usuario_responsable': resp_user,
+        'usuario_responsable_id': resp_user.id if resp_user else None,
+        'responsable_nombre': (resp_user.get_full_name() or resp_user.username) if resp_user else 'Sin asignar',
+        'responsable_username': resp_user.username if resp_user else '',
+        'responsable_rol': '',
+        'creado_por_nombre': (creador.get_full_name() or creador.username) if creador else 'Sistema',
+        'fecha_compromiso': obj.fecha_comprometida,
+        'area_apoyo': obj.area_apoyo or '',
+        'avance_observaciones': obj.avance_observaciones or '',
+        'estado': estado_val,
+        'estado_grupo': _estado_grupo_tubo(estado_val),
+        'url_cambiar_estado': reverse('gestion_tubo_sector_cambiar_estado', args=[obj.id]),
+        'url_editar': reverse('gestion_tubo_sector_editar', args=[obj.id]),
+        'url_eliminar': reverse('gestion_tubo_sector_eliminar', args=[obj.id]),
+    }
+
+
+def _adjuntar_roles_tubo_items(items):
+    responsables_ids = {it['usuario_responsable_id'] for it in items if it['usuario_responsable_id']}
+    roles_por_usuario = {}
+    if responsables_ids:
+        for user_id, rol_nombre in FuncionarioRol.objects.filter(
+            funcionario__user_id__in=responsables_ids,
+            rol__estado__iexact='Activo',
+        ).values_list('funcionario__user_id', 'rol__nombre_rol'):
+            roles_por_usuario.setdefault(user_id, []).append(rol_nombre)
+    for it in items:
+        it['responsable_rol'] = ', '.join(roles_por_usuario.get(it['usuario_responsable_id'], [])) or 'Sin rol registrado'
+    return items
+
+
+def _crear_compromiso_sector_tubo(request, ctx):
+    """Crea un compromiso directo con un Sector dentro del Tubo sin requerir Atención Ciudadana."""
+    if not ctx['permisos'].get('puede_ingresar_atencion', True):
+        messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para crear compromisos.")
+        return redirect('gestion_tubo')
+
+    del_activa = ctx['delegacion_activa']
+    es_admin = ctx['permisos']['es_admin']
+    sector_id = request.POST.get('sector_id', '').strip()
+    descripcion = request.POST.get('descripcion', '').strip()
+    fecha_str = request.POST.get('fecha_compromiso', '').strip()
+    area_apoyo = request.POST.get('area_apoyo', '').strip()
+    avance_obs = request.POST.get('avance_observaciones', '').strip()
+    origen = request.POST.get('origen', 'INT').strip().upper()
+    responsable_id = request.POST.get('responsable_id', '').strip()
+    organizacion_id = request.POST.get('organizacion_id', '').strip()
+    solicitante_custom = request.POST.get('solicitante', '').strip()
+
+    if not sector_id or not sector_id.isdigit():
+        messages.error(
+            request,
+            "Para crear un compromiso directo en el Tubo debes seleccionar un Sector válido, o bien registrarlo desde una Atención Ciudadana.",
+        )
+        return redirect('gestion_tubo')
+
+    sec_qs = Sector.objects.filter(id=int(sector_id), estado='Activo')
+    if not es_admin:
+        if not del_activa:
+            messages.error(request, "Selecciona una delegación activa antes de registrar un compromiso.")
+            return redirect('gestion_tubo')
+        sec_qs = sec_qs.filter(delegacion=del_activa)
+    sector_obj = sec_qs.first()
+    if not sector_obj:
+        messages.error(request, "El sector seleccionado no existe o no pertenece a tu delegación activa.")
+        return redirect('gestion_tubo')
+
+    if not descripcion:
+        messages.error(request, "La descripción del compromiso con el sector es obligatoria.")
+        return redirect('gestion_tubo')
+    ok, err = validar_largo(descripcion, 1000, "Descripción del compromiso")
+    if not ok:
+        messages.error(request, err)
+        return redirect('gestion_tubo')
+    ok, err = validar_largo(area_apoyo, 100, "Área de apoyo")
+    if not ok:
+        messages.error(request, err)
+        return redirect('gestion_tubo')
+    ok, err = validar_largo(avance_obs, 1000, "Avance u observaciones")
+    if not ok:
+        messages.error(request, err)
+        return redirect('gestion_tubo')
+    ok, err = validar_largo(solicitante_custom, 150, "Solicitante / Referente")
+    if not ok:
+        messages.error(request, err)
+        return redirect('gestion_tubo')
+
+    if not fecha_str:
+        messages.error(request, "Debes indicar una fecha de compromiso para el seguimiento del sector.")
+        return redirect('gestion_tubo')
+    try:
+        fecha_comp = datetime.date.fromisoformat(fecha_str)
+    except ValueError:
+        messages.error(request, "La fecha de compromiso ingresada no es válida.")
+        return redirect('gestion_tubo')
+
+    delegacion_obj = sector_obj.delegacion or del_activa
+    organizacion_obj = None
+    if organizacion_id and organizacion_id.isdigit():
+        organizacion_obj = _organizaciones_activas_para_delegacion(delegacion_obj).filter(id=int(organizacion_id)).first()
+
+    func_resp = None
+    if responsable_id and responsable_id.isdigit():
+        func_resp = Funcionario.objects.filter(
+            Q(user_id=int(responsable_id)) | Q(id=int(responsable_id)),
+            estado='Activo',
+        ).first()
+    if not func_resp:
+        func_resp = (
+            Funcionario.objects.filter(user=request.user, estado='Activo').first()
+            or Funcionario.objects.filter(delegacion=delegacion_obj, estado='Activo').first()
+            or Funcionario.all_objects.first()
+        )
+    if not func_resp:
+        messages.error(request, "No hay un funcionario responsable activo disponible para asignar el compromiso.")
+        return redirect('gestion_tubo')
+
+    solicitante_val = solicitante_custom
+    if not solicitante_val:
+        if organizacion_obj:
+            solicitante_val = f"{organizacion_obj.nombre} — {sector_obj.nombre}"[:150]
+        else:
+            solicitante_val = f"Sector {sector_obj.nombre}"[:150]
+
+    comp = CompromisoAgenda.objects.create(
+        delegacion=delegacion_obj,
+        sector=sector_obj,
+        organizacion=organizacion_obj,
+        origen=origen if origen in ('INT', 'EXT') else 'INT',
+        solicitante=solicitante_val,
+        territorio=sector_obj.nombre,
+        responsable=func_resp,
+        creado_por=request.user,
+        area_apoyo=area_apoyo,
+        fecha_comprometida=fecha_comp,
+        estado='Registrada',
+        observacion=descripcion,
+        avance_observaciones=avance_obs,
+    )
+
+    del_id_ws = delegacion_obj.id if delegacion_obj else "global"
+    transaction.on_commit(lambda: publish_module_changed("atenciones", del_id_ws, "create", comp.id))
+    messages.success(request, f"Compromiso sectorial {comp.get_codigo_tubo()} ({sector_obj.nombre}) creado en el Tubo de Compromiso.")
+    return redirect('gestion_tubo')
+
+
+@login_required
+def gestion_tubo(request):
+    """
+    Módulo Tubo de Compromiso SGR:
+    Centraliza tanto las Atenciones Ciudadanas enviadas al Tubo (`va_a_tubo=True`)
+    como los Compromisos Territoriales directos con un Sector (`CompromisoAgenda`).
+    Soporta vista Tabla y vista Canvas (Kanban).
+    """
+    ctx = global_context(request)
+    if request.method == 'POST':
+        return _crear_compromiso_sector_tubo(request, ctx)
+
+    es_admin = ctx['permisos']['es_admin']
+    del_activa = ctx['delegacion_activa']
+
+    todas_delegaciones = Delegacion.objects.filter(estado='Activa').order_by('id')
+    delegacion_seleccionada = _resolver_delegacion_tubo(request, ctx)
+
+    qs_at = AtencionCiudadana.objects.filter(va_a_tubo=True).select_related(
         'delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'creado_por',
         'vecino', 'organizacion', 'actividad'
     ).prefetch_related('actividad__evidencias')
 
-    # Scoping territorial
+    qs_sec = CompromisoAgenda.objects.filter(sector__isnull=False).select_related(
+        'delegacion', 'sector', 'organizacion', 'responsable__user', 'creado_por'
+    )
+
     if not es_admin:
         if del_activa:
-            qs_base = qs_base.filter(delegacion=del_activa)
+            qs_at = qs_at.filter(delegacion=del_activa)
+            qs_sec = qs_sec.filter(delegacion=del_activa)
         else:
-            qs_base = qs_base.none()
+            qs_at = qs_at.none()
+            qs_sec = qs_sec.none()
     elif delegacion_seleccionada:
-        qs_base = qs_base.filter(delegacion=delegacion_seleccionada)
+        qs_at = qs_at.filter(delegacion=delegacion_seleccionada)
+        qs_sec = qs_sec.filter(delegacion=delegacion_seleccionada)
 
-    # Métricas consolidadas del Tubo (calculadas sobre el conjunto base territorial)
-    tubo_total_count = qs_base.count()
-    ingresados_count = qs_base.filter(estado__in=['Registrada', 'Ingresado']).count()
-    proceso_count = qs_base.filter(estado='En proceso').count()
-    pendientes_count = qs_base.filter(estado='Pendiente').count()
-    realizados_count = qs_base.filter(estado__in=['Resuelta', 'Realizado', 'REALIZADO']).count()
-    canceladas_count = qs_base.filter(estado='Cancelada').count()
+    items_base = (
+        [_construir_item_tubo('atencion', at) for at in qs_at]
+        + [_construir_item_tubo('sector', comp) for comp in qs_sec]
+    )
+
+    tubo_total_count = len(items_base)
+    ingresados_count = sum(1 for it in items_base if it['estado_grupo'] == 'ingresado')
+    proceso_count = sum(1 for it in items_base if it['estado_grupo'] == 'proceso')
+    pendientes_count = sum(1 for it in items_base if it['estado_grupo'] == 'pendiente')
+    realizados_count = sum(1 for it in items_base if it['estado_grupo'] == 'realizado')
+    canceladas_count = sum(1 for it in items_base if it['estado_grupo'] == 'cancelada')
 
     pct_realizado = round((realizados_count / tubo_total_count * 100), 1) if tubo_total_count > 0 else 0.0
     pct_pendientes = round((pendientes_count / tubo_total_count * 100), 1) if tubo_total_count > 0 else 0.0
-    alerta_pendientes_10 = pct_pendientes > 10.0  # Alerta del indicador: "PENDIENTES EN TUBO MENOR A 10%"
+    alerta_pendientes_10 = pct_pendientes > 10.0
 
-    # Gestión de pestañas: 'requerimientos' (default) o 'colaboradores'
     tab = request.GET.get('tab', 'requerimientos').strip().lower()
     if tab not in ['requerimientos', 'colaboradores']:
         tab = 'requerimientos'
 
-    # Modo de visualización en Requerimientos: 'tabla' o 'canvas' (persistido en sesión)
     vista_param = request.GET.get('vista', '').strip().lower()
     if vista_param in ('tabla', 'canvas'):
         request.session['tubo_vista'] = vista_param
@@ -4535,36 +4859,42 @@ def gestion_tubo(request):
     if vista not in ('tabla', 'canvas'):
         vista = 'tabla'
 
-    # Filtros de la pestaña Requerimientos
     q = request.GET.get('q', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
     filtro_origen = request.GET.get('origen', '').strip()
     filtro_responsable = request.GET.get('responsable', '').strip()
 
-    qs = qs_base
-
+    items_filtrados = list(items_base)
     if q:
-        q_filter = build_accent_query([
-            'codigo_atencion', 'solicitante', 'descripcion', 'avance_observaciones',
-            'area_apoyo', 'usuario_responsable__first_name', 'usuario_responsable__username',
-            'vecino__nombre', 'vecino__rut',
-            'organizacion__nombre', 'organizacion__tipo_organizacion',
-            'sub_atencion__nombre', 'tipo_atencion__nombre',
-        ], q)
-        if q.upper().startswith('TUB-') and q[4:].isdigit():
-            q_filter = q_filter | Q(id=int(q[4:]))
-        qs = qs.filter(q_filter)
+        q_low = q.lower()
+        items_filtrados = [
+            it for it in items_filtrados
+            if (
+                q_low in it['codigo_tubo'].lower()
+                or q_low in it['codigo_atencion'].lower()
+                or q_low in it['solicitante'].lower()
+                or q_low in it['descripcion'].lower()
+                or q_low in it['avance_observaciones'].lower()
+                or q_low in it['area_apoyo'].lower()
+                or q_low in it['territorio_sub'].lower()
+                or q_low in it['responsable_nombre'].lower()
+                or q_low in it['responsable_username'].lower()
+                or (it['organizacion'] and q_low in it['organizacion'].nombre.lower())
+            )
+        ]
 
     if filtro_estado:
-        qs = qs.filter(estado__iexact=filtro_estado)
+        grupo_filtro = _estado_grupo_tubo(_normalizar_estado_tubo(filtro_estado))
+        items_filtrados = [it for it in items_filtrados if it['estado_grupo'] == grupo_filtro]
 
     if filtro_origen:
-        qs = qs.filter(origen__iexact=filtro_origen)
+        orig_low = filtro_origen.lower()
+        items_filtrados = [it for it in items_filtrados if it['origen'].lower() == orig_low]
 
     if filtro_responsable and filtro_responsable.isdigit():
-        qs = qs.filter(usuario_responsable_id=int(filtro_responsable))
+        resp_uid = int(filtro_responsable)
+        items_filtrados = [it for it in items_filtrados if it['usuario_responsable_id'] == resp_uid]
 
-    # Ordenamiento
     orden_opciones = [
         ('-fecha_registro', 'Fecha: recientes primero'),
         ('fecha_registro', 'Fecha: antiguas primero'),
@@ -4573,65 +4903,78 @@ def gestion_tubo(request):
         ('solicitante', 'Solicitante A-Z'),
         ('estado', 'Estado'),
     ]
-    qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-fecha_registro')
+    orden = request.GET.get('orden', '-fecha_registro').strip()
+    if orden not in {opt[0] for opt in orden_opciones}:
+        orden = '-fecha_registro'
+
+    if orden == 'fecha_registro':
+        items_filtrados.sort(key=lambda it: it['created_at'])
+    elif orden == 'fecha_compromiso':
+        items_filtrados.sort(key=lambda it: (it['fecha_compromiso'] is None, it['fecha_compromiso'] or datetime.date.max))
+    elif orden == '-fecha_compromiso':
+        items_filtrados.sort(key=lambda it: (it['fecha_compromiso'] is None, it['fecha_compromiso'] or datetime.date.min), reverse=True)
+    elif orden == 'solicitante':
+        items_filtrados.sort(key=lambda it: it['solicitante'].lower())
+    elif orden == 'estado':
+        items_filtrados.sort(key=lambda it: it['estado'].lower())
+    else:
+        items_filtrados.sort(key=lambda it: it['created_at'], reverse=True)
 
     # Exportación a Excel/CSV
     if request.GET.get('export') == 'excel':
         headers = [
-            'N° Tubo', 'N° Atención', 'Fecha Solicitud', 'Actividad / Solicitud', 'Int/Ext',
+            'N° Tubo', 'Origen / Código', 'Fecha Solicitud', 'Actividad / Solicitud', 'Int/Ext',
             'Solicitante', 'Territorio / Delegación', 'Responsable',
             'Fecha Compromiso', 'Área de Apoyo', 'Avance / Observaciones', 'Estatus'
         ]
         rows = []
-        for at in qs:
-            territorio_txt = at.delegacion.nombre if at.delegacion else ''
-            if at.organizacion:
-                territorio_txt += f" ({at.organizacion.nombre})"
-            elif at.vecino and at.vecino.territorio:
-                territorio_txt += f" ({at.vecino.territorio})"
+        for it in items_filtrados:
+            territorio_txt = it['delegacion'].nombre if it['delegacion'] else ''
+            if it['organizacion']:
+                territorio_txt += f" ({it['organizacion'].nombre})"
+            elif it['territorio_sub']:
+                territorio_txt += f" ({it['territorio_sub']})"
             rows.append([
-                at.get_codigo_tubo(),
-                at.codigo_atencion,
-                at.created_at.strftime('%d/%m/%Y'),
-                at.descripcion,
-                at.origen,
-                at.solicitante,
+                it['codigo_tubo'],
+                it['codigo_atencion'],
+                it['created_at'].strftime('%d/%m/%Y'),
+                it['descripcion'],
+                it['origen'],
+                it['solicitante'],
                 territorio_txt,
-                at.usuario_responsable.get_full_name() or at.usuario_responsable.username,
-                at.fecha_compromiso.strftime('%d/%m/%Y') if at.fecha_compromiso else 'Sin fecha',
-                at.area_apoyo or '',
-                at.avance_observaciones or '',
-                at.estado
+                it['responsable_nombre'],
+                it['fecha_compromiso'].strftime('%d/%m/%Y') if it['fecha_compromiso'] else 'Sin fecha',
+                it['area_apoyo'],
+                it['avance_observaciones'],
+                it['estado'],
             ])
         nom_del = delegacion_seleccionada.codigo if delegacion_seleccionada else ('todas' if es_admin else 'tubo')
         return export_to_excel_csv(f"tubo_compromiso_{nom_del}", headers, rows)
 
-    # Paginación (Tabla) y agrupación por columnas (Canvas / Kanban)
     page_size = _get_page_size(request)
-    page_obj = Paginator(qs, page_size).get_page(request.GET.get('page', 1))
-    atenciones_tubo_pagina = _adjuntar_roles_atenciones(list(page_obj.object_list))
+    page_obj = Paginator(items_filtrados, page_size).get_page(request.GET.get('page', 1))
+    atenciones_tubo_pagina = _adjuntar_roles_tubo_items(list(page_obj.object_list))
 
     canvas_ingresados = []
     canvas_pendientes = []
     canvas_proceso = []
     canvas_realizados = []
     if vista == 'canvas':
-        canvas_atenciones = _adjuntar_roles_atenciones(list(qs))
-        for at in canvas_atenciones:
-            if at.estado in ('Registrada', 'Ingresado'):
-                canvas_ingresados.append(at)
-            elif at.estado == 'Pendiente':
-                canvas_pendientes.append(at)
-            elif at.estado == 'En proceso':
-                canvas_proceso.append(at)
-            elif at.estado in ('Resuelta', 'Realizado', 'REALIZADO'):
-                canvas_realizados.append(at)
-        items_visibles = canvas_atenciones
+        canvas_items = _adjuntar_roles_tubo_items(items_filtrados)
+        for it in canvas_items:
+            if it['estado_grupo'] == 'ingresado':
+                canvas_ingresados.append(it)
+            elif it['estado_grupo'] == 'pendiente':
+                canvas_pendientes.append(it)
+            elif it['estado_grupo'] == 'proceso':
+                canvas_proceso.append(it)
+            elif it['estado_grupo'] == 'realizado':
+                canvas_realizados.append(it)
+        items_visibles = canvas_items
     else:
         items_visibles = atenciones_tubo_pagina
 
-    # Catálogo de encargados para edición idéntica a Atenciones
-    delegacion_ids = {at.delegacion_id for at in items_visibles if at.delegacion_id}
+    delegacion_ids = {it['delegacion_id'] for it in items_visibles if it['delegacion_id']}
     if delegacion_seleccionada:
         delegacion_ids.add(delegacion_seleccionada.id)
     if del_activa:
@@ -4661,8 +5004,21 @@ def gestion_tubo(request):
             'label': f"{nombre} · {roles}",
         })
 
-    # ── PESTAÑA 2: Resumen Completo por Colaborador con Búsqueda, Filtros y Paginación ──
-    from django.contrib.auth.models import User
+    # Sectores y organizaciones disponibles para el modal "Nuevo Compromiso Sectorial"
+    delegacion_modal = del_activa or delegacion_seleccionada
+    sectores_tubo = Sector.objects.filter(estado='Activo').select_related('delegacion').order_by('nombre')
+    if delegacion_modal:
+        sectores_tubo = sectores_tubo.filter(delegacion=delegacion_modal)
+    elif not es_admin:
+        sectores_tubo = sectores_tubo.none()
+
+    organizaciones_tubo = list(
+        _organizaciones_activas_para_delegacion(delegacion_modal)
+        .order_by('nombre')
+        .values('id', 'nombre', 'tipo_organizacion', 'territorio')
+    )
+
+    # ── PESTAÑA 2: Resumen Completo por Colaborador ──
     funcionarios_scope = Funcionario.objects.filter(
         estado='Activo', user__is_active=True
     ).select_related('user', 'delegacion', 'cargo').order_by('user__first_name')
@@ -4674,30 +5030,32 @@ def gestion_tubo(request):
     elif delegacion_seleccionada:
         funcionarios_scope = funcionarios_scope.filter(delegacion=delegacion_seleccionada)
 
-    uids_con_atencion = set(qs_base.values_list('usuario_responsable', flat=True).distinct())
+    uids_con_atencion = {it['usuario_responsable_id'] for it in items_base if it['usuario_responsable_id']}
     resumen_colaboradores = []
     procesados_uids = set()
+
+    def _stats_usuario(uid):
+        u_items = [it for it in items_base if it['usuario_responsable_id'] == uid]
+        u_total = len(u_items)
+        u_ing = sum(1 for it in u_items if it['estado_grupo'] == 'ingresado')
+        u_pend = sum(1 for it in u_items if it['estado_grupo'] == 'pendiente')
+        u_proc = sum(1 for it in u_items if it['estado_grupo'] == 'proceso')
+        u_real = sum(1 for it in u_items if it['estado_grupo'] == 'realizado')
+        u_pct = round((u_real / u_total * 100), 1) if u_total > 0 else 0.0
+        return u_total, u_ing, u_pend, u_proc, u_real, u_pct
 
     for f in funcionarios_scope:
         u = f.user
         procesados_uids.add(u.id)
-        u_qs = qs_base.filter(usuario_responsable=u)
-        u_total = u_qs.count()
-        u_ing = u_qs.filter(estado__in=['Registrada', 'Ingresado']).count()
-        u_pend = u_qs.filter(estado='Pendiente').count()
-        u_proc = u_qs.filter(estado='En proceso').count()
-        u_real = u_qs.filter(estado__in=['Resuelta', 'Realizado', 'REALIZADO']).count()
-        u_pct = round((u_real / u_total * 100), 1) if u_total > 0 else 0.0
-        cargo_nom = f.cargo.nombre_cargo if f.cargo else 'Funcionario Municipal'
-        del_nom = f.delegacion.nombre if f.delegacion else ''
+        u_total, u_ing, u_pend, u_proc, u_real, u_pct = _stats_usuario(u.id)
         resumen_colaboradores.append({
             'user_id': u.id,
             'funcionario_id': f.id,
             'usuario': u,
             'nombre': u.get_full_name() or u.username,
             'username': u.username,
-            'cargo': cargo_nom,
-            'delegacion_nombre': del_nom,
+            'cargo': f.cargo.nombre_cargo if f.cargo else 'Funcionario Municipal',
+            'delegacion_nombre': f.delegacion.nombre if f.delegacion else '',
             'total': u_total,
             'ingresados': u_ing,
             'pendientes': u_pend,
@@ -4706,17 +5064,11 @@ def gestion_tubo(request):
             'pct_realizado': u_pct,
         })
 
-    # Otros usuarios con atenciones asignadas en Tubo
     for uid in (uids_con_atencion - procesados_uids):
         u = User.objects.filter(id=uid).first()
-        if not u: continue
-        u_qs = qs_base.filter(usuario_responsable=u)
-        u_total = u_qs.count()
-        u_ing = u_qs.filter(estado__in=['Registrada', 'Ingresado']).count()
-        u_pend = u_qs.filter(estado='Pendiente').count()
-        u_proc = u_qs.filter(estado='En proceso').count()
-        u_real = u_qs.filter(estado__in=['Resuelta', 'Realizado', 'REALIZADO']).count()
-        u_pct = round((u_real / u_total * 100), 1) if u_total > 0 else 0.0
+        if not u:
+            continue
+        u_total, u_ing, u_pend, u_proc, u_real, u_pct = _stats_usuario(u.id)
         resumen_colaboradores.append({
             'user_id': u.id,
             'funcionario_id': None,
@@ -4733,7 +5085,6 @@ def gestion_tubo(request):
             'pct_realizado': u_pct,
         })
 
-    # Búsqueda en colaboradores
     q_colab = request.GET.get('q_colab', '').strip()
     if q_colab:
         q_lower = q_colab.lower()
@@ -4745,7 +5096,6 @@ def gestion_tubo(request):
                 q_lower in c['delegacion_nombre'].lower())
         ]
 
-    # Filtro por cumplimiento de colaboradores
     filtro_cumplimiento = request.GET.get('cumplimiento', '').strip()
     if filtro_cumplimiento == 'optimo':
         resumen_colaboradores = [c for c in resumen_colaboradores if c['pct_realizado'] >= 80]
@@ -4756,7 +5106,6 @@ def gestion_tubo(request):
     elif filtro_cumplimiento == 'con_pendientes':
         resumen_colaboradores = [c for c in resumen_colaboradores if c['pendientes'] > 0]
 
-    # Ordenamiento de colaboradores
     orden_colab = request.GET.get('orden_colab', '-total').strip()
     if orden_colab == 'total':
         resumen_colaboradores.sort(key=lambda x: x['total'])
@@ -4769,11 +5118,8 @@ def gestion_tubo(request):
     else:
         resumen_colaboradores.sort(key=lambda x: x['total'], reverse=True)
 
-    # Paginación de colaboradores
     colab_paginator = Paginator(resumen_colaboradores, page_size)
     page_obj_colab = colab_paginator.get_page(request.GET.get('page_colab', 1))
-
-    # Catálogo de responsables para el dropdown de filtro
     responsables_filtro = User.objects.filter(id__in=uids_con_atencion).order_by('first_name', 'username')
 
     return render(request, 'gestion/tubo.html', {
@@ -4789,6 +5135,8 @@ def gestion_tubo(request):
             len(canvas_ingresados) + len(canvas_pendientes) + len(canvas_proceso) + len(canvas_realizados)
         ),
         'encargados_edicion': encargados_edicion,
+        'sectores_tubo': sectores_tubo,
+        'organizaciones_tubo': organizaciones_tubo,
         'tubo_total_count': tubo_total_count,
         'ingresados_count': ingresados_count,
         'proceso_count': proceso_count,
@@ -4818,96 +5166,190 @@ def gestion_tubo(request):
     })
 
 
-@login_required
-def gestion_tubo_cambiar_estado(request, atencion_id):
-    """
-    Actualización y gestión de un requerimiento en el Tubo de Compromiso SGR.
-    Conectado directamente con la Atención Ciudadana: cualquier modificación se refleja en ambas partes.
-    Soporta POST tradicional y peticiones AJAX (drag & drop / transiciones rápidas en Canvas).
-    """
-    ctx = global_context(request)
+def _validar_acceso_mutacion_tubo(request, ctx, delegacion_obj):
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
-
     if request.method != 'POST' or not ctx['permisos'].get('puede_cambiar_estado_atencion', True):
+        msg = "Acceso denegado: Tu perfil no tiene permisos para realizar esta acción."
         if is_ajax:
-            return JsonResponse({'ok': False, 'error': "Acceso denegado: Tu perfil no tiene permisos para realizar esta acción."}, status=403)
-        messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para realizar esta acción.")
-        return redirect('gestion_tubo')
+            return False, JsonResponse({'ok': False, 'error': msg}, status=403)
+        messages.error(request, msg)
+        return False, redirect('gestion_tubo')
 
-    atencion = get_object_or_404(AtencionCiudadana, id=atencion_id, va_a_tubo=True)
     if not ctx['permisos']['es_admin']:
         del_activa = ctx['delegacion_activa']
-        if not del_activa or atencion.delegacion != del_activa:
+        if not del_activa or delegacion_obj != del_activa:
+            msg = "Acceso denegado: No puedes modificar requerimientos de otra delegación."
             if is_ajax:
-                return JsonResponse({'ok': False, 'error': "Acceso denegado: No puedes modificar requerimientos de otra delegación."}, status=403)
-            messages.error(request, "Acceso denegado: No puedes modificar requerimientos de otra delegación.")
-            return redirect('gestion_tubo')
+                return False, JsonResponse({'ok': False, 'error': msg}, status=403)
+            messages.error(request, msg)
+            return False, redirect('gestion_tubo')
+    return True, None
 
-    raw_estado = request.POST.get('nuevo_estado', '').strip()
-    alias_estados = {
-        'ingresado': 'Registrada',
-        'registrada': 'Registrada',
-        'pendiente': 'Pendiente',
-        'en proceso': 'En proceso',
-        'realizado': 'Resuelta',
-        'resuelta': 'Resuelta',
-        'cancelada': 'Cancelada',
-    }
-    nuevo_estado = alias_estados.get(raw_estado.lower(), raw_estado)
+
+def _respuesta_actualizacion_estado_tubo(request, obj_id, estado, codigo_tubo, codigo_ref, delegacion_id):
+    del_id_ws = delegacion_id if delegacion_id else "global"
+    transaction.on_commit(lambda: publish_module_changed("atenciones", del_id_ws, "update", obj_id))
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'ok': True,
+            'id': obj_id,
+            'estado': estado,
+            'codigo_tubo': codigo_tubo,
+            'codigo_atencion': codigo_ref,
+        })
+    messages.success(request, f"Requerimiento '{codigo_tubo}' ({codigo_ref}) actualizado exitosamente.")
+    return redirect(request.META.get('HTTP_REFERER') or 'gestion_tubo')
+
+
+@login_required
+def gestion_tubo_cambiar_estado(request, atencion_id):
+    """Actualización de estado/seguimiento de un requerimiento originado en Atención Ciudadana."""
+    ctx = global_context(request)
+    atencion = get_object_or_404(AtencionCiudadana, id=atencion_id, va_a_tubo=True)
+    ok, resp_err = _validar_acceso_mutacion_tubo(request, ctx, atencion.delegacion)
+    if not ok:
+        return resp_err
+
+    nuevo_estado = _normalizar_estado_tubo(request.POST.get('nuevo_estado', ''))
     nuevo_avance = request.POST.get('avance_observaciones', '').strip()
     nueva_area = request.POST.get('area_apoyo', '').strip()
     nueva_fecha_comp = request.POST.get('fecha_compromiso', '').strip()
     va_a_tubo_val = request.POST.get('va_a_tubo')
 
-    estados_validos = ['Registrada', 'En proceso', 'Pendiente', 'Resuelta', 'Cancelada']
-    if nuevo_estado in estados_validos:
+    if nuevo_estado in ('Registrada', 'En proceso', 'Pendiente', 'Resuelta', 'Cancelada'):
         atencion.estado = nuevo_estado
-
     if nueva_area:
         atencion.area_apoyo = nueva_area[:100]
-
     if nueva_fecha_comp:
         try:
             atencion.fecha_compromiso = datetime.date.fromisoformat(nueva_fecha_comp)
         except ValueError:
             pass
-
     if va_a_tubo_val is not None:
         va_tubo_bool = va_a_tubo_val in ['1', 'true', 'on', 'si', 's', True]
         atencion.va_a_tubo = va_tubo_bool
         if not va_tubo_bool:
             atencion.fecha_compromiso = None
             atencion.area_apoyo = ''
-
     if nuevo_avance:
-        if atencion.avance_observaciones:
-            atencion.avance_observaciones = f"{atencion.avance_observaciones}\n[{timezone.now().strftime('%d/%m/%Y')}] {nuevo_avance}"[:1000]
-        else:
-            atencion.avance_observaciones = nuevo_avance[:1000]
+        prefijo = f"{atencion.avance_observaciones}\n" if atencion.avance_observaciones else ""
+        atencion.avance_observaciones = f"{prefijo}[{timezone.now().strftime('%d/%m/%Y')}] {nuevo_avance}"[:1000]
 
     atencion.save()
-
-    # Sincronizar actividad si existe
     if atencion.actividad_id:
         Actividad.objects.filter(id=atencion.actividad_id).update(
             va_a_tubo=atencion.va_a_tubo,
             updated_at=timezone.now()
         )
+    return _respuesta_actualizacion_estado_tubo(
+        request, atencion.id, atencion.estado, atencion.get_codigo_tubo(), atencion.codigo_atencion, atencion.delegacion_id
+    )
 
-    # Publicar WebSocket en tiempo real
-    del_id_ws = atencion.delegacion.id if atencion.delegacion else "global"
-    transaction.on_commit(lambda: publish_module_changed("atenciones", del_id_ws, "update", atencion.id))
 
-    if is_ajax:
-        return JsonResponse({
-            'ok': True,
-            'id': atencion.id,
-            'estado': atencion.estado,
-            'codigo_tubo': atencion.get_codigo_tubo(),
-            'codigo_atencion': atencion.codigo_atencion,
-        })
+@login_required
+def gestion_tubo_sector_cambiar_estado(request, compromiso_id):
+    """Actualización de estado/seguimiento de un compromiso directo con Sector en el Tubo."""
+    ctx = global_context(request)
+    comp = get_object_or_404(CompromisoAgenda, id=compromiso_id)
+    ok, resp_err = _validar_acceso_mutacion_tubo(request, ctx, comp.delegacion)
+    if not ok:
+        return resp_err
 
-    messages.success(request, f"Requerimiento '{atencion.get_codigo_tubo()}' ({atencion.codigo_atencion}) actualizado exitosamente.")
+    nuevo_estado = _normalizar_estado_tubo(request.POST.get('nuevo_estado', ''))
+    nuevo_avance = request.POST.get('avance_observaciones', '').strip()
+    nueva_area = request.POST.get('area_apoyo', '').strip()
+    nueva_fecha_comp = request.POST.get('fecha_compromiso', '').strip()
+
+    if nuevo_estado in ('Registrada', 'En proceso', 'Pendiente', 'Resuelta', 'Cancelada'):
+        comp.estado = nuevo_estado
+    if nueva_area:
+        comp.area_apoyo = nueva_area[:100]
+    if nueva_fecha_comp:
+        try:
+            comp.fecha_comprometida = datetime.date.fromisoformat(nueva_fecha_comp)
+        except ValueError:
+            pass
+    if nuevo_avance:
+        prefijo = f"{comp.avance_observaciones}\n" if comp.avance_observaciones else ""
+        comp.avance_observaciones = f"{prefijo}[{timezone.now().strftime('%d/%m/%Y')}] {nuevo_avance}"[:1000]
+
+    comp.save()
+    return _respuesta_actualizacion_estado_tubo(
+        request, comp.id, comp.estado, comp.get_codigo_tubo(), comp.get_codigo_sector(), comp.delegacion_id
+    )
+
+
+@login_required
+def gestion_tubo_sector_editar(request, compromiso_id):
+    """Edita un compromiso territorial directo con un Sector desde el modal del Tubo."""
+    ctx = global_context(request)
+    comp = get_object_or_404(CompromisoAgenda, id=compromiso_id)
+    ok, resp_err = _validar_acceso_mutacion_tubo(request, ctx, comp.delegacion)
+    if not ok:
+        return resp_err
+
+    descripcion = request.POST.get('descripcion', '').strip()
+    if not descripcion:
+        messages.error(request, "La descripción del compromiso es obligatoria.")
+        return redirect('gestion_tubo')
+    ok_len, err_len = validar_largo(descripcion, 1000, "Descripción")
+    if not ok_len:
+        messages.error(request, err_len)
+        return redirect('gestion_tubo')
+
+    comp.observacion = descripcion
+    nuevo_estado = _normalizar_estado_tubo(request.POST.get('estado', ''))
+    if nuevo_estado in ('Registrada', 'En proceso', 'Pendiente', 'Resuelta', 'Cancelada'):
+        comp.estado = nuevo_estado
+
+    if 'area_apoyo' in request.POST:
+        comp.area_apoyo = request.POST.get('area_apoyo', '').strip()[:100]
+    if 'avance_observaciones' in request.POST:
+        comp.avance_observaciones = request.POST.get('avance_observaciones', '').strip()[:1000]
+
+    fecha_str = request.POST.get('fecha_compromiso', '').strip()
+    if fecha_str:
+        try:
+            comp.fecha_comprometida = datetime.date.fromisoformat(fecha_str)
+        except ValueError:
+            pass
+
+    responsable_id = request.POST.get('responsable_id', '').strip()
+    if responsable_id and responsable_id.isdigit():
+        func_nuevo = Funcionario.objects.filter(
+            Q(user_id=int(responsable_id)) | Q(id=int(responsable_id)),
+            estado='Activo',
+        ).first()
+        if func_nuevo:
+            comp.responsable = func_nuevo
+
+    comp.save()
+    del_id_ws = comp.delegacion_id if comp.delegacion_id else "global"
+    transaction.on_commit(lambda: publish_module_changed("atenciones", del_id_ws, "update", comp.id))
+    messages.success(request, f"Compromiso sectorial {comp.get_codigo_tubo()} actualizado exitosamente.")
     return redirect(request.META.get('HTTP_REFERER') or 'gestion_tubo')
+
+
+@login_required
+def gestion_tubo_sector_eliminar(request, compromiso_id):
+    """Archiva (soft-delete) un compromiso sectorial del Tubo de Compromiso."""
+    ctx = global_context(request)
+    if request.method != 'POST' or not ctx['permisos'].get('puede_eliminar', False):
+        messages.error(request, "Acceso denegado: Tu perfil no tiene autorización para eliminar compromisos.")
+        return redirect('gestion_tubo')
+
+    comp = get_object_or_404(CompromisoAgenda, id=compromiso_id)
+    if not ctx['permisos']['es_admin']:
+        del_activa = ctx['delegacion_activa']
+        if not del_activa or comp.delegacion != del_activa:
+            messages.error(request, "Acceso denegado: No puedes eliminar compromisos de otra delegación.")
+            return redirect('gestion_tubo')
+
+    codigo = comp.get_codigo_tubo()
+    del_id_ws = comp.delegacion_id if comp.delegacion_id else "global"
+    comp.delete()
+    transaction.on_commit(lambda: publish_module_changed("atenciones", del_id_ws, "delete", compromiso_id))
+    messages.success(request, f"Compromiso {codigo} archivado del Tubo de Compromiso.")
+    return redirect('gestion_tubo')
 
 

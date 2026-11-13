@@ -1191,10 +1191,10 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertIn(self.org_local.id, org_ids)
         self.assertNotIn(self.org_externa.id, org_ids)
 
-    def test_regla_estricta_no_crear_tubo_sin_atencion(self):
+    def test_regla_estricta_no_crear_tubo_sin_atencion_ni_sector(self):
         self.client.force_login(self.user)
 
-        # 1. POST directo en /gestion/tubo/ NO crea registros
+        # 1. POST directo en /gestion/tubo/ sin sector_id NO crea registros
         total_antes = AtencionCiudadana.objects.count()
         resp_tubo_post = self.client.post(reverse('gestion_tubo'), {
             'descripcion': 'Intento suelto',
@@ -1202,6 +1202,7 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         })
         self.assertRedirects(resp_tubo_post, reverse('gestion_tubo'))
         self.assertEqual(AtencionCiudadana.objects.count(), total_antes)
+        self.assertEqual(CompromisoAgenda.objects.count(), 0)
 
         # 2. POST en /gestion/agenda/ redirige al Tubo sin crear CompromisoAgenda independiente
         resp_agenda_post = self.client.post(reverse('gestion_agenda'), {
@@ -1323,3 +1324,163 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(resp_realizar.json()['estado'], 'Resuelta')
         at_ing.refresh_from_db()
         self.assertEqual(at_ing.estado, 'Resuelta')
+
+    def test_compromiso_sectorial_directo_en_tubo(self):
+        self.client.force_login(self.user)
+        sector = Sector.objects.create(nombre='Sector Las Rosas', delegacion=self.delegacion, estado='Activo')
+
+        resp = self.client.post(reverse('gestion_tubo'), {
+            'sector_id': sector.id,
+            'organizacion_id': self.org_local.id,
+            'solicitante': 'Mesa Territorial Las Rosas',
+            'origen': 'INT',
+            'descripcion': 'Operativo de limpieza y bacheo sectorial',
+            'fecha_compromiso': '2026-12-15',
+            'area_apoyo': 'OOCC Municipal',
+            'avance_observaciones': 'Coordinado con cuadrilla norte',
+        })
+        self.assertRedirects(resp, reverse('gestion_tubo'))
+        self.assertEqual(AtencionCiudadana.objects.count(), 0)
+        comp = CompromisoAgenda.objects.filter(sector=sector).first()
+        self.assertIsNotNone(comp)
+        self.assertEqual(comp.delegacion, self.delegacion)
+        self.assertEqual(comp.estado, 'Registrada')
+        self.assertEqual(comp.get_codigo_tubo(), f'TUB-S{comp.id:04d}')
+
+        # Se visualiza en Tabla y Canvas junto con botones de edición
+        resp_tabla = self.client.get(reverse('gestion_tubo') + '?vista=tabla')
+        self.assertContains(resp_tabla, comp.get_codigo_tubo())
+        self.assertContains(resp_tabla, 'Sector Las Rosas')
+
+        resp_canvas = self.client.get(reverse('gestion_tubo') + '?vista=canvas')
+        self.assertContains(resp_canvas, comp.get_codigo_tubo())
+        self.assertContains(resp_canvas, 'Mesa Territorial Las Rosas')
+
+        # Transición AJAX en Canvas para compromiso sectorial
+        resp_proc = self.client.post(
+            reverse('gestion_tubo_sector_cambiar_estado', args=[comp.id]),
+            {'nuevo_estado': 'En proceso'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(resp_proc.status_code, 200)
+        self.assertEqual(resp_proc.json()['estado'], 'En proceso')
+
+        resp_done = self.client.post(
+            reverse('gestion_tubo_sector_cambiar_estado', args=[comp.id]),
+            {'nuevo_estado': 'Realizado'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(resp_done.status_code, 200)
+        self.assertEqual(resp_done.json()['estado'], 'Resuelta')
+        comp.refresh_from_db()
+        self.assertEqual(comp.estado, 'Resuelta')
+
+        # Edición del compromiso sectorial
+        resp_edit = self.client.post(reverse('gestion_tubo_sector_editar', args=[comp.id]), {
+            'descripcion': 'Operativo ampliado con áreas verdes',
+            'estado': 'Pendiente',
+            'responsable_id': self.user.id,
+            'fecha_compromiso': '2026-12-20',
+            'area_apoyo': 'Parques y Jardines',
+            'avance_observaciones': 'Pendiente camión aljibe',
+        })
+        self.assertRedirects(resp_edit, reverse('gestion_tubo'))
+        comp.refresh_from_db()
+        self.assertEqual(comp.observacion, 'Operativo ampliado con áreas verdes')
+        self.assertEqual(comp.estado, 'Pendiente')
+        self.assertEqual(comp.area_apoyo, 'Parques y Jardines')
+
+        # Eliminación lógica por usuario con permiso de eliminación (superuser/admin)
+        admin = User.objects.create_superuser('admin_tubo_del', 'admin_t@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        resp_del = self.client.post(reverse('gestion_tubo_sector_eliminar', args=[comp.id]))
+        self.assertRedirects(resp_del, reverse('gestion_tubo'))
+        self.assertFalse(CompromisoAgenda.objects.filter(id=comp.id).exists())
+
+    def test_directiva_jjvv_presidente_tesorero_secretario_crud_y_atencion(self):
+        self.client.force_login(self.user)
+
+        # 1. Rechaza RUT o correo inválido en directiva
+        antes = OrganizacionComunitaria.objects.count()
+        self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV RUT Inválido',
+            'tipo_organizacion': 'Junta de Vecinos',
+            'presidente_nombre': 'Ana Pérez',
+            'presidente_rut': '12.345.678-0',
+            'presidente_correo': 'ana@jjvv.cl',
+        })
+        self.assertEqual(OrganizacionComunitaria.objects.count(), antes)
+
+        # 2. Crea JJVV con Presidente, Tesorero y Secretario válidos
+        resp_create = self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV Vista Hermosa',
+            'tipo_organizacion': 'Junta de Vecinos',
+            'representante_legal': 'Ana Pérez',
+            'presidente_nombre': 'Ana Pérez Soto',
+            'presidente_rut': '11111111-1',
+            'presidente_correo': 'presidencia@vistahermosa.cl',
+            'tesorero_nombre': 'Luis Rojas Moya',
+            'tesorero_rut': '12345678-5',
+            'tesorero_correo': 'tesoreria@vistahermosa.cl',
+            'secretario_nombre': 'Sofía Díaz Vera',
+            'secretario_rut': '8765432-K',
+            'secretario_correo': 'secretaria@vistahermosa.cl',
+            'estado': 'Activa',
+        })
+        self.assertRedirects(resp_create, reverse('gestion_organizaciones'))
+        org = OrganizacionComunitaria.objects.get(nombre='JJVV Vista Hermosa')
+        self.assertEqual(org.presidente_nombre, 'Ana Pérez Soto')
+        self.assertEqual(org.presidente_rut, '11.111.111-1')
+        self.assertEqual(org.presidente_correo, 'presidencia@vistahermosa.cl')
+        self.assertEqual(org.tesorero_nombre, 'Luis Rojas Moya')
+        self.assertEqual(org.tesorero_rut, '12.345.678-5')
+        self.assertEqual(org.secretario_rut, '8.765.432-K')
+        self.assertEqual(org.secretario_correo, 'secretaria@vistahermosa.cl')
+
+        # 3. Edita directiva existente
+        resp_edit = self.client.post(reverse('gestion_organizaciones_editar', args=[org.id]), {
+            'nombre': 'JJVV Vista Hermosa Sur',
+            'tipo_organizacion': 'Junta de Vecinos',
+            'presidente_nombre': 'Ana Pérez Soto',
+            'presidente_rut': '111111111',
+            'presidente_correo': 'ana@vistahermosa.cl',
+            'tesorero_nombre': 'Mario Lagos',
+            'tesorero_rut': '',
+            'tesorero_correo': 'mario@vistahermosa.cl',
+            'secretario_nombre': 'Sofía Díaz Vera',
+            'secretario_rut': '8765432k',
+            'secretario_correo': 'sofia@vistahermosa.cl',
+            'estado': 'Activa',
+        })
+        self.assertRedirects(resp_edit, reverse('gestion_organizaciones'))
+        org.refresh_from_db()
+        self.assertEqual(org.nombre, 'JJVV Vista Hermosa Sur')
+        self.assertEqual(org.presidente_correo, 'ana@vistahermosa.cl')
+        self.assertEqual(org.tesorero_nombre, 'Mario Lagos')
+        self.assertEqual(org.secretario_rut, '8.765.432-K')
+
+        # 4. Crear nueva JJVV inline en Atención Ciudadana con directiva completa
+        resp_at = self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'crear_nueva_org': '1',
+            'nueva_org_nombre': 'Club Adulto Mayor Sol Naciente',
+            'nueva_org_tipo': 'Club Adulto Mayor',
+            'nueva_org_presidente_nombre': 'Rosa Muñoz',
+            'nueva_org_presidente_rut': '11111111-1',
+            'nueva_org_presidente_correo': 'rosa@solnaciente.cl',
+            'nueva_org_tesorero_nombre': 'Pedro Jara',
+            'nueva_org_tesorero_rut': '12345678-5',
+            'nueva_org_tesorero_correo': 'pedro@solnaciente.cl',
+            'nueva_org_secretario_nombre': 'Elena Paredes',
+            'nueva_org_secretario_rut': '8765432-K',
+            'nueva_org_secretario_correo': 'elena@solnaciente.cl',
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Atención inline con directiva completa',
+            'va_a_tubo': '0',
+        })
+        self.assertRedirects(resp_at, reverse('gestion_atenciones'))
+        club = OrganizacionComunitaria.objects.get(nombre='Club Adulto Mayor Sol Naciente')
+        self.assertEqual(club.presidente_rut, '11.111.111-1')
+        self.assertEqual(club.tesorero_correo, 'pedro@solnaciente.cl')
+        self.assertEqual(club.secretario_nombre, 'Elena Paredes')

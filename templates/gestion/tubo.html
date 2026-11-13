@@ -18,7 +18,7 @@
         <span>Tubo de Compromiso SGR</span>
       </h1>
       <p class="text-xs text-slate-500 max-w-2xl leading-relaxed">
-        Seguimiento de compromisos territoriales originados exclusivamente desde Atenciones Ciudadanas. <em>"En el tubo va todo compromiso a futuro".</em>
+        Seguimiento de compromisos territoriales originados desde <strong>Atenciones Ciudadanas</strong> o directamente como <strong>Compromisos Sectoriales</strong>. <em>"En el tubo va todo compromiso a futuro".</em>
       </p>
     </div>
 
@@ -38,6 +38,11 @@
       </a>
 
       {% if not permisos.es_consultor %}
+      <button type="button" onclick="abrirModalCompromisoSector()"
+              class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-white hover:bg-red-50 text-[#C41230] border border-[#C41230]/40 shadow-sm transition-all flex items-center gap-2">
+        <i data-lucide="map-pin-plus" class="w-4 h-4"></i>
+        <span>Nuevo Compromiso Sectorial</span>
+      </button>
       <a href="{% url 'gestion_atenciones' %}?abrir_tubo=1"
          class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white shadow-md border border-red-700/50 transition-all flex items-center gap-2">
         <i data-lucide="plus-circle" class="w-4 h-4"></i>
@@ -292,7 +297,9 @@
           </div>
           {% for at in canvas_ingresados %}
           <div class="tubo-kanban-card bg-white rounded-xl border border-slate-200 border-l-4 border-l-slate-400 p-3.5 shadow-xs hover:shadow-md transition-all space-y-2 {% if not permisos.es_consultor %}cursor-grab active:cursor-grabbing{% endif %}"
-               {% if not permisos.es_consultor %}draggable="true" ondragstart="tuboDragStart(event, {{ at.id }})"{% endif %}
+               {% if not permisos.es_consultor %}draggable="true" ondragstart="tuboDragStart(event, this.dataset.urlEstado)"{% endif %}
+               data-url-estado="{{ at.url_cambiar_estado }}"
+               data-item-tipo="{{ at.item_tipo }}"
                data-atencion-id="{{ at.id }}">
             {% if at.actividad %}
               <div id="evidencias-atencion-{{ at.id }}" class="hidden">
@@ -320,27 +327,51 @@
               </div>
             {% endif %}
             <div class="flex items-center justify-between gap-2">
-              <span class="font-mono text-[11px] font-extrabold text-slate-500">{{ at.get_codigo_tubo }}</span>
-              <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/80 font-mono text-[10px] font-extrabold">{{ at.codigo_atencion }}</span>
+              <span class="font-mono text-[11px] font-extrabold text-slate-500">{{ at.codigo_tubo }}</span>
+              <span class="px-2 py-0.5 rounded {% if at.es_atencion %}bg-sky-50 text-sky-700 border-sky-200/80{% else %}bg-purple-50 text-purple-700 border-purple-200/80{% endif %} border font-mono text-[10px] font-extrabold">{{ at.codigo_atencion }}</span>
             </div>
             <p class="text-xs font-extrabold text-slate-900 leading-snug line-clamp-3">{{ at.descripcion }}</p>
             <div class="text-[11px] text-slate-600 space-y-0.5">
               <div><strong class="text-slate-700">Solicitante:</strong> {{ at.solicitante }}{% if at.organizacion %} <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{{ at.organizacion.tipo_organizacion }}</span>{% endif %}</div>
+              {% if not at.es_atencion and at.territorio_sub %}<div><strong class="text-slate-700">Sector:</strong> <span class="text-purple-700 font-semibold">{{ at.territorio_sub }}</span></div>{% endif %}
               {% if at.area_apoyo %}<div><strong class="text-slate-700">Apoyo:</strong> <span class="text-blue-700 font-semibold">{{ at.area_apoyo }}</span></div>{% endif %}
               {% if at.fecha_compromiso %}<div><strong class="text-slate-700">Compromiso:</strong> <span class="font-mono">{{ at.fecha_compromiso|date:"d/m/Y" }}</span></div>{% endif %}
             </div>
             <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
               <span class="text-[10px] text-slate-500 font-medium leading-tight">
-                Responsable: <strong class="text-slate-700">{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username }}</strong>
+                Responsable: <strong class="text-slate-700">{{ at.responsable_nombre }}</strong>
               </span>
               <div class="flex items-center gap-1.5 shrink-0">
                 <button type="button"
-                        onclick="verDetalleAtencion('{{ at.id }}', '{{ at.codigo_atencion|escapejs }}', '{{ at.solicitante|escapejs }}', '{{ at.delegacion.nombre|escapejs }}', '{{ at.tipo_atencion.nombre|escapejs }}', '{{ at.sub_atencion.nombre|escapejs }}', '{{ at.descripcion|escapejs }}', '{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username|escapejs }}', '{% if at.creado_por %}{{ at.creado_por.get_full_name|default:at.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ at.created_at|date:'d/m/Y H:i' }}', '{{ at.estado|escapejs }}', '{{ at.get_evidencia_codigo|escapejs }}', '{{ at.estado_evidencia|escapejs }}', '{{ at.usuario_responsable_id }}', '{{ at.responsable_rol|escapejs }}', '{{ at.delegacion_id }}', '{{ at.va_a_tubo|yesno:'1,0' }}', '{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}', '{{ at.area_apoyo|default:''|escapejs }}', '{{ at.avance_observaciones|default:''|escapejs }}')"
+                        onclick="verDetalleAtencionBtn(this, false)"
+                        data-id="{{ at.id }}"
+                        data-es-atencion="{{ at.es_atencion|yesno:'1,0' }}"
+                        data-codigo="{{ at.codigo_atencion }}"
+                        data-solicitante="{{ at.solicitante }}"
+                        data-delegacion="{{ at.delegacion.nombre|default:'' }}"
+                        data-tipo="{{ at.tipo_nombre }}"
+                        data-sub="{{ at.sub_nombre }}"
+                        data-descripcion="{{ at.descripcion }}"
+                        data-resp="{{ at.responsable_nombre }}"
+                        data-creador="{{ at.creado_por_nombre }}"
+                        data-fecha="{{ at.created_at|date:'d/m/Y H:i' }}"
+                        data-estado="{{ at.estado }}"
+                        data-evicod="{{ at.evidencia_codigo }}"
+                        data-eviestado="{{ at.estado_evidencia }}"
+                        data-respid="{{ at.usuario_responsable_id|default:'' }}"
+                        data-resprol="{{ at.responsable_rol }}"
+                        data-delid="{{ at.delegacion_id|default:'' }}"
+                        data-vatubo="{{ at.va_a_tubo|yesno:'1,0' }}"
+                        data-fechacomp="{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}"
+                        data-areaapoyo="{{ at.area_apoyo|default:'' }}"
+                        data-avanceobs="{{ at.avance_observaciones|default:'' }}"
+                        data-urleditar="{{ at.url_editar }}"
+                        data-urleliminar="{{ at.url_eliminar|default:'' }}"
                         class="text-[11px] font-extrabold text-[#C41230] hover:underline px-1">
                   Ver
                 </button>
                 {% if not permisos.es_consultor %}
-                <button type="button" onclick="moverTarjetaTubo({{ at.id }}, 'Pendiente')"
+                <button type="button" onclick="moverTarjetaTubo('{{ at.url_cambiar_estado }}', 'Pendiente')"
                         class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[10px] font-extrabold transition-colors">
                   A Pendiente
                 </button>
@@ -363,7 +394,9 @@
           </div>
           {% for at in canvas_pendientes %}
           <div class="tubo-kanban-card bg-white rounded-xl border border-slate-200 border-l-4 border-l-red-700 p-3.5 shadow-xs hover:shadow-md transition-all space-y-2 {% if not permisos.es_consultor %}cursor-grab active:cursor-grabbing{% endif %}"
-               {% if not permisos.es_consultor %}draggable="true" ondragstart="tuboDragStart(event, {{ at.id }})"{% endif %}
+               {% if not permisos.es_consultor %}draggable="true" ondragstart="tuboDragStart(event, this.dataset.urlEstado)"{% endif %}
+               data-url-estado="{{ at.url_cambiar_estado }}"
+               data-item-tipo="{{ at.item_tipo }}"
                data-atencion-id="{{ at.id }}">
             {% if at.actividad %}
               <div id="evidencias-atencion-{{ at.id }}" class="hidden">
@@ -391,27 +424,51 @@
               </div>
             {% endif %}
             <div class="flex items-center justify-between gap-2">
-              <span class="font-mono text-[11px] font-extrabold text-red-700">{{ at.get_codigo_tubo }}</span>
-              <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/80 font-mono text-[10px] font-extrabold">{{ at.codigo_atencion }}</span>
+              <span class="font-mono text-[11px] font-extrabold text-red-700">{{ at.codigo_tubo }}</span>
+              <span class="px-2 py-0.5 rounded {% if at.es_atencion %}bg-sky-50 text-sky-700 border-sky-200/80{% else %}bg-purple-50 text-purple-700 border-purple-200/80{% endif %} border font-mono text-[10px] font-extrabold">{{ at.codigo_atencion }}</span>
             </div>
             <p class="text-xs font-extrabold text-slate-900 leading-snug line-clamp-3">{{ at.descripcion }}</p>
             <div class="text-[11px] text-slate-600 space-y-0.5">
               <div><strong class="text-slate-700">Solicitante:</strong> {{ at.solicitante }}{% if at.organizacion %} <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{{ at.organizacion.tipo_organizacion }}</span>{% endif %}</div>
+              {% if not at.es_atencion and at.territorio_sub %}<div><strong class="text-slate-700">Sector:</strong> <span class="text-purple-700 font-semibold">{{ at.territorio_sub }}</span></div>{% endif %}
               {% if at.area_apoyo %}<div><strong class="text-slate-700">Apoyo:</strong> <span class="text-blue-700 font-semibold">{{ at.area_apoyo }}</span></div>{% endif %}
               {% if at.fecha_compromiso %}<div><strong class="text-slate-700">Compromiso:</strong> <span class="font-mono">{{ at.fecha_compromiso|date:"d/m/Y" }}</span></div>{% endif %}
             </div>
             <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
               <span class="text-[10px] text-slate-500 font-medium leading-tight">
-                Responsable: <strong class="text-slate-700">{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username }}</strong>
+                Responsable: <strong class="text-slate-700">{{ at.responsable_nombre }}</strong>
               </span>
               <div class="flex items-center gap-1.5 shrink-0">
                 <button type="button"
-                        onclick="verDetalleAtencion('{{ at.id }}', '{{ at.codigo_atencion|escapejs }}', '{{ at.solicitante|escapejs }}', '{{ at.delegacion.nombre|escapejs }}', '{{ at.tipo_atencion.nombre|escapejs }}', '{{ at.sub_atencion.nombre|escapejs }}', '{{ at.descripcion|escapejs }}', '{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username|escapejs }}', '{% if at.creado_por %}{{ at.creado_por.get_full_name|default:at.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ at.created_at|date:'d/m/Y H:i' }}', '{{ at.estado|escapejs }}', '{{ at.get_evidencia_codigo|escapejs }}', '{{ at.estado_evidencia|escapejs }}', '{{ at.usuario_responsable_id }}', '{{ at.responsable_rol|escapejs }}', '{{ at.delegacion_id }}', '{{ at.va_a_tubo|yesno:'1,0' }}', '{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}', '{{ at.area_apoyo|default:''|escapejs }}', '{{ at.avance_observaciones|default:''|escapejs }}')"
+                        onclick="verDetalleAtencionBtn(this, false)"
+                        data-id="{{ at.id }}"
+                        data-es-atencion="{{ at.es_atencion|yesno:'1,0' }}"
+                        data-codigo="{{ at.codigo_atencion }}"
+                        data-solicitante="{{ at.solicitante }}"
+                        data-delegacion="{{ at.delegacion.nombre|default:'' }}"
+                        data-tipo="{{ at.tipo_nombre }}"
+                        data-sub="{{ at.sub_nombre }}"
+                        data-descripcion="{{ at.descripcion }}"
+                        data-resp="{{ at.responsable_nombre }}"
+                        data-creador="{{ at.creado_por_nombre }}"
+                        data-fecha="{{ at.created_at|date:'d/m/Y H:i' }}"
+                        data-estado="{{ at.estado }}"
+                        data-evicod="{{ at.evidencia_codigo }}"
+                        data-eviestado="{{ at.estado_evidencia }}"
+                        data-respid="{{ at.usuario_responsable_id|default:'' }}"
+                        data-resprol="{{ at.responsable_rol }}"
+                        data-delid="{{ at.delegacion_id|default:'' }}"
+                        data-vatubo="{{ at.va_a_tubo|yesno:'1,0' }}"
+                        data-fechacomp="{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}"
+                        data-areaapoyo="{{ at.area_apoyo|default:'' }}"
+                        data-avanceobs="{{ at.avance_observaciones|default:'' }}"
+                        data-urleditar="{{ at.url_editar }}"
+                        data-urleliminar="{{ at.url_eliminar|default:'' }}"
                         class="text-[11px] font-extrabold text-[#C41230] hover:underline px-1">
                   Ver
                 </button>
                 {% if not permisos.es_consultor %}
-                <button type="button" onclick="moverTarjetaTubo({{ at.id }}, 'En proceso')"
+                <button type="button" onclick="moverTarjetaTubo('{{ at.url_cambiar_estado }}', 'En proceso')"
                         class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[10px] font-extrabold transition-colors">
                   A Proceso
                 </button>
@@ -434,7 +491,9 @@
           </div>
           {% for at in canvas_proceso %}
           <div class="tubo-kanban-card bg-white rounded-xl border border-slate-200 border-l-4 border-l-amber-500 p-3.5 shadow-xs hover:shadow-md transition-all space-y-2 {% if not permisos.es_consultor %}cursor-grab active:cursor-grabbing{% endif %}"
-               {% if not permisos.es_consultor %}draggable="true" ondragstart="tuboDragStart(event, {{ at.id }})"{% endif %}
+               {% if not permisos.es_consultor %}draggable="true" ondragstart="tuboDragStart(event, this.dataset.urlEstado)"{% endif %}
+               data-url-estado="{{ at.url_cambiar_estado }}"
+               data-item-tipo="{{ at.item_tipo }}"
                data-atencion-id="{{ at.id }}">
             {% if at.actividad %}
               <div id="evidencias-atencion-{{ at.id }}" class="hidden">
@@ -462,27 +521,51 @@
               </div>
             {% endif %}
             <div class="flex items-center justify-between gap-2">
-              <span class="font-mono text-[11px] font-extrabold text-amber-700">{{ at.get_codigo_tubo }}</span>
-              <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/80 font-mono text-[10px] font-extrabold">{{ at.codigo_atencion }}</span>
+              <span class="font-mono text-[11px] font-extrabold text-amber-700">{{ at.codigo_tubo }}</span>
+              <span class="px-2 py-0.5 rounded {% if at.es_atencion %}bg-sky-50 text-sky-700 border-sky-200/80{% else %}bg-purple-50 text-purple-700 border-purple-200/80{% endif %} border font-mono text-[10px] font-extrabold">{{ at.codigo_atencion }}</span>
             </div>
             <p class="text-xs font-extrabold text-slate-900 leading-snug line-clamp-3">{{ at.descripcion }}</p>
             <div class="text-[11px] text-slate-600 space-y-0.5">
               <div><strong class="text-slate-700">Solicitante:</strong> {{ at.solicitante }}{% if at.organizacion %} <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{{ at.organizacion.tipo_organizacion }}</span>{% endif %}</div>
+              {% if not at.es_atencion and at.territorio_sub %}<div><strong class="text-slate-700">Sector:</strong> <span class="text-purple-700 font-semibold">{{ at.territorio_sub }}</span></div>{% endif %}
               {% if at.area_apoyo %}<div><strong class="text-slate-700">Apoyo:</strong> <span class="text-blue-700 font-semibold">{{ at.area_apoyo }}</span></div>{% endif %}
               {% if at.fecha_compromiso %}<div><strong class="text-slate-700">Compromiso:</strong> <span class="font-mono">{{ at.fecha_compromiso|date:"d/m/Y" }}</span></div>{% endif %}
             </div>
             <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
               <span class="text-[10px] text-slate-500 font-medium leading-tight">
-                Responsable: <strong class="text-slate-700">{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username }}</strong>
+                Responsable: <strong class="text-slate-700">{{ at.responsable_nombre }}</strong>
               </span>
               <div class="flex items-center gap-1.5 shrink-0">
                 <button type="button"
-                        onclick="verDetalleAtencion('{{ at.id }}', '{{ at.codigo_atencion|escapejs }}', '{{ at.solicitante|escapejs }}', '{{ at.delegacion.nombre|escapejs }}', '{{ at.tipo_atencion.nombre|escapejs }}', '{{ at.sub_atencion.nombre|escapejs }}', '{{ at.descripcion|escapejs }}', '{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username|escapejs }}', '{% if at.creado_por %}{{ at.creado_por.get_full_name|default:at.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ at.created_at|date:'d/m/Y H:i' }}', '{{ at.estado|escapejs }}', '{{ at.get_evidencia_codigo|escapejs }}', '{{ at.estado_evidencia|escapejs }}', '{{ at.usuario_responsable_id }}', '{{ at.responsable_rol|escapejs }}', '{{ at.delegacion_id }}', '{{ at.va_a_tubo|yesno:'1,0' }}', '{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}', '{{ at.area_apoyo|default:''|escapejs }}', '{{ at.avance_observaciones|default:''|escapejs }}')"
+                        onclick="verDetalleAtencionBtn(this, false)"
+                        data-id="{{ at.id }}"
+                        data-es-atencion="{{ at.es_atencion|yesno:'1,0' }}"
+                        data-codigo="{{ at.codigo_atencion }}"
+                        data-solicitante="{{ at.solicitante }}"
+                        data-delegacion="{{ at.delegacion.nombre|default:'' }}"
+                        data-tipo="{{ at.tipo_nombre }}"
+                        data-sub="{{ at.sub_nombre }}"
+                        data-descripcion="{{ at.descripcion }}"
+                        data-resp="{{ at.responsable_nombre }}"
+                        data-creador="{{ at.creado_por_nombre }}"
+                        data-fecha="{{ at.created_at|date:'d/m/Y H:i' }}"
+                        data-estado="{{ at.estado }}"
+                        data-evicod="{{ at.evidencia_codigo }}"
+                        data-eviestado="{{ at.estado_evidencia }}"
+                        data-respid="{{ at.usuario_responsable_id|default:'' }}"
+                        data-resprol="{{ at.responsable_rol }}"
+                        data-delid="{{ at.delegacion_id|default:'' }}"
+                        data-vatubo="{{ at.va_a_tubo|yesno:'1,0' }}"
+                        data-fechacomp="{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}"
+                        data-areaapoyo="{{ at.area_apoyo|default:'' }}"
+                        data-avanceobs="{{ at.avance_observaciones|default:'' }}"
+                        data-urleditar="{{ at.url_editar }}"
+                        data-urleliminar="{{ at.url_eliminar|default:'' }}"
                         class="text-[11px] font-extrabold text-[#C41230] hover:underline px-1">
                   Ver
                 </button>
                 {% if not permisos.es_consultor %}
-                <button type="button" onclick="moverTarjetaTubo({{ at.id }}, 'Resuelta')"
+                <button type="button" onclick="moverTarjetaTubo('{{ at.url_cambiar_estado }}', 'Resuelta')"
                         class="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-extrabold transition-colors">
                   Realizar
                 </button>
@@ -505,7 +588,9 @@
           </div>
           {% for at in canvas_realizados %}
           <div class="tubo-kanban-card bg-white rounded-xl border border-slate-200 border-l-4 border-l-emerald-600 p-3.5 shadow-xs hover:shadow-md transition-all space-y-2 {% if not permisos.es_consultor %}cursor-grab active:cursor-grabbing{% endif %}"
-               {% if not permisos.es_consultor %}draggable="true" ondragstart="tuboDragStart(event, {{ at.id }})"{% endif %}
+               {% if not permisos.es_consultor %}draggable="true" ondragstart="tuboDragStart(event, this.dataset.urlEstado)"{% endif %}
+               data-url-estado="{{ at.url_cambiar_estado }}"
+               data-item-tipo="{{ at.item_tipo }}"
                data-atencion-id="{{ at.id }}">
             {% if at.actividad %}
               <div id="evidencias-atencion-{{ at.id }}" class="hidden">
@@ -533,18 +618,42 @@
               </div>
             {% endif %}
             <div class="flex items-center justify-between gap-2">
-              <span class="font-mono text-[11px] font-extrabold text-emerald-700">{{ at.get_codigo_tubo }}</span>
-              <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/80 font-mono text-[10px] font-extrabold">{{ at.codigo_atencion }}</span>
+              <span class="font-mono text-[11px] font-extrabold text-emerald-700">{{ at.codigo_tubo }}</span>
+              <span class="px-2 py-0.5 rounded {% if at.es_atencion %}bg-sky-50 text-sky-700 border-sky-200/80{% else %}bg-purple-50 text-purple-700 border-purple-200/80{% endif %} border font-mono text-[10px] font-extrabold">{{ at.codigo_atencion }}</span>
             </div>
             <p class="text-xs font-extrabold text-slate-600 leading-snug line-clamp-3">{{ at.descripcion }}</p>
             <div class="text-[11px] text-slate-600 space-y-0.5">
               <div><strong class="text-slate-700">Solicitante:</strong> {{ at.solicitante }}{% if at.organizacion %} <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{{ at.organizacion.tipo_organizacion }}</span>{% endif %}</div>
+              {% if not at.es_atencion and at.territorio_sub %}<div><strong class="text-slate-700">Sector:</strong> <span class="text-purple-700 font-semibold">{{ at.territorio_sub }}</span></div>{% endif %}
               {% if at.area_apoyo %}<div><strong class="text-slate-700">Apoyo:</strong> <span class="text-blue-700 font-semibold">{{ at.area_apoyo }}</span></div>{% endif %}
             </div>
             <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
               <span class="text-[11px] font-extrabold text-emerald-700">Concluido</span>
               <button type="button"
-                      onclick="verDetalleAtencion('{{ at.id }}', '{{ at.codigo_atencion|escapejs }}', '{{ at.solicitante|escapejs }}', '{{ at.delegacion.nombre|escapejs }}', '{{ at.tipo_atencion.nombre|escapejs }}', '{{ at.sub_atencion.nombre|escapejs }}', '{{ at.descripcion|escapejs }}', '{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username|escapejs }}', '{% if at.creado_por %}{{ at.creado_por.get_full_name|default:at.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ at.created_at|date:'d/m/Y H:i' }}', '{{ at.estado|escapejs }}', '{{ at.get_evidencia_codigo|escapejs }}', '{{ at.estado_evidencia|escapejs }}', '{{ at.usuario_responsable_id }}', '{{ at.responsable_rol|escapejs }}', '{{ at.delegacion_id }}', '{{ at.va_a_tubo|yesno:'1,0' }}', '{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}', '{{ at.area_apoyo|default:''|escapejs }}', '{{ at.avance_observaciones|default:''|escapejs }}')"
+                      onclick="verDetalleAtencionBtn(this, false)"
+                      data-id="{{ at.id }}"
+                      data-es-atencion="{{ at.es_atencion|yesno:'1,0' }}"
+                      data-codigo="{{ at.codigo_atencion }}"
+                      data-solicitante="{{ at.solicitante }}"
+                      data-delegacion="{{ at.delegacion.nombre|default:'' }}"
+                      data-tipo="{{ at.tipo_nombre }}"
+                      data-sub="{{ at.sub_nombre }}"
+                      data-descripcion="{{ at.descripcion }}"
+                      data-resp="{{ at.responsable_nombre }}"
+                      data-creador="{{ at.creado_por_nombre }}"
+                      data-fecha="{{ at.created_at|date:'d/m/Y H:i' }}"
+                      data-estado="{{ at.estado }}"
+                      data-evicod="{{ at.evidencia_codigo }}"
+                      data-eviestado="{{ at.estado_evidencia }}"
+                      data-respid="{{ at.usuario_responsable_id|default:'' }}"
+                      data-resprol="{{ at.responsable_rol }}"
+                      data-delid="{{ at.delegacion_id|default:'' }}"
+                      data-vatubo="{{ at.va_a_tubo|yesno:'1,0' }}"
+                      data-fechacomp="{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}"
+                      data-areaapoyo="{{ at.area_apoyo|default:'' }}"
+                      data-avanceobs="{{ at.avance_observaciones|default:'' }}"
+                      data-urleditar="{{ at.url_editar }}"
+                      data-urleliminar="{{ at.url_eliminar|default:'' }}"
                       class="text-[11px] font-extrabold text-[#C41230] hover:underline">
                 Ver Detalle
               </button>
@@ -583,8 +692,8 @@
           <tr class="hover:bg-slate-50/80 transition-colors">
             <!-- N° Tubo -->
             <td class="py-3 px-3.5 font-mono whitespace-nowrap">
-              <span class="font-extrabold text-[#C41230] block">{{ at.get_codigo_tubo }}</span>
-              <span class="text-[10px] font-bold text-slate-500">{{ at.codigo_atencion }} · {{ at.origen|default:"EXT" }}</span>
+              <span class="font-extrabold text-[#C41230] block">{{ at.codigo_tubo }}</span>
+              <span class="text-[10px] font-bold {% if at.es_atencion %}text-slate-500{% else %}text-purple-700{% endif %}">{{ at.codigo_atencion }} · {{ at.origen|default:"EXT" }}</span>
             </td>
 
             <!-- Fecha Solicitud -->
@@ -606,58 +715,64 @@
 
             <!-- Territorio -->
             <td class="py-3 px-3.5 text-[11px] whitespace-nowrap">
-              <span class="font-bold text-slate-800">{{ at.delegacion.nombre }}</span>
-              {% if at.vecino and at.vecino.territorio %}
-                <span class="text-[10px] text-slate-400 block font-normal">{{ at.vecino.territorio }}</span>
+              <span class="font-bold text-slate-800">{{ at.delegacion.nombre|default:"—" }}</span>
+              {% if at.territorio_sub %}
+                <span class="text-[10px] text-slate-400 block font-normal">{{ at.territorio_sub }}</span>
               {% endif %}
             </td>
 
             <!-- Tipo / Sub Atención -->
             <td class="py-3 px-3.5">
-              <span class="font-bold text-slate-800 block leading-tight">{{ at.tipo_atencion.nombre }}</span>
-              <span class="text-slate-400 block text-[10px] mt-0.5">{{ at.sub_atencion.nombre }}</span>
+              <span class="font-bold text-slate-800 block leading-tight">{{ at.tipo_nombre }}</span>
+              <span class="text-slate-400 block text-[10px] mt-0.5">{{ at.sub_nombre }}</span>
             </td>
 
             <!-- Evidencia SGR -->
             <td class="py-3 px-3.5 whitespace-nowrap">
-              <span class="font-mono font-bold text-slate-800 text-[11px] block leading-tight">{{ at.get_evidencia_codigo }}</span>
-              {% if at.actividad %}
-                <div id="evidencias-atencion-{{ at.id }}" class="flex flex-col gap-1 text-[10px]">
-                  {% for evidencia in at.actividad.evidencias.all %}
-                    <div class="evidence-item flex items-center justify-between gap-2 p-1.5 rounded-lg border border-slate-100 bg-slate-50/70" data-momento="{{ evidencia.momento }}">
-                      <div class="flex items-center gap-1.5">
-                        {% if evidencia.momento == 'antes' %}
-                          <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">Antes</span>
-                        {% else %}
-                          <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">Después</span>
-                        {% endif %}
-                        {% if evidencia.imagen %}
-                          <a href="{{ evidencia.imagen.url }}" data-momento="{{ evidencia.momento }}" data-titulo="Evidencia {{ evidencia.get_momento_display }} ({{ at.codigo_atencion }})" class="visor-evidencia text-[#C41230] font-bold hover:underline flex items-center gap-1">
-                            <i data-lucide="image" class="w-3 h-3"></i><span>Ver imagen</span>
-                          </a>
-                        {% endif %}
-                        {% if evidencia.archivo %}
-                          <a href="{{ evidencia.archivo.url }}" data-momento="{{ evidencia.momento }}" data-titulo="Evidencia {{ evidencia.get_momento_display }} ({{ at.codigo_atencion }})" class="visor-evidencia text-[#C41230] font-bold hover:underline flex items-center gap-1">
-                            <i data-lucide="file-text" class="w-3 h-3"></i><span>Ver archivo</span>
-                          </a>
-                        {% endif %}
+              {% if at.es_atencion %}
+                <span class="font-mono font-bold text-slate-800 text-[11px] block leading-tight">{{ at.evidencia_codigo }}</span>
+                {% if at.actividad %}
+                  <div id="evidencias-atencion-{{ at.id }}" class="flex flex-col gap-1 text-[10px]">
+                    {% for evidencia in at.actividad.evidencias.all %}
+                      <div class="evidence-item flex items-center justify-between gap-2 p-1.5 rounded-lg border border-slate-100 bg-slate-50/70" data-momento="{{ evidencia.momento }}">
+                        <div class="flex items-center gap-1.5">
+                          {% if evidencia.momento == 'antes' %}
+                            <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">Antes</span>
+                          {% else %}
+                            <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">Después</span>
+                          {% endif %}
+                          {% if evidencia.imagen %}
+                            <a href="{{ evidencia.imagen.url }}" data-momento="{{ evidencia.momento }}" data-titulo="Evidencia {{ evidencia.get_momento_display }} ({{ at.codigo_atencion }})" class="visor-evidencia text-[#C41230] font-bold hover:underline flex items-center gap-1">
+                              <i data-lucide="image" class="w-3 h-3"></i><span>Ver imagen</span>
+                            </a>
+                          {% endif %}
+                          {% if evidencia.archivo %}
+                            <a href="{{ evidencia.archivo.url }}" data-momento="{{ evidencia.momento }}" data-titulo="Evidencia {{ evidencia.get_momento_display }} ({{ at.codigo_atencion }})" class="visor-evidencia text-[#C41230] font-bold hover:underline flex items-center gap-1">
+                              <i data-lucide="file-text" class="w-3 h-3"></i><span>Ver archivo</span>
+                            </a>
+                          {% endif %}
+                        </div>
                       </div>
-                    </div>
-                  {% endfor %}
-                </div>
-              {% endif %}
+                    {% endfor %}
+                  </div>
+                {% endif %}
 
-              {% if at.estado_evidencia == 'Aprobado' %}
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Aprobada
-                </span>
-              {% elif at.estado_evidencia == 'Rechazado' %}
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-extrabold bg-red-50 text-red-700 border border-red-200">
-                  <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Rechazada
-                </span>
+                {% if at.estado_evidencia == 'Aprobado' %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Aprobada
+                  </span>
+                {% elif at.estado_evidencia == 'Rechazado' %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-extrabold bg-red-50 text-red-700 border border-red-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Rechazada
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Pendiente
+                  </span>
+                {% endif %}
               {% else %}
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
-                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Pendiente
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200">
+                  Compromiso Sectorial
                 </span>
               {% endif %}
             </td>
@@ -666,7 +781,7 @@
             <td class="py-3 px-3.5 text-[11px] whitespace-nowrap">
               <div class="font-bold text-slate-900 flex items-center gap-1">
                 <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#C41230]"></i>
-                <span>{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username }}</span>
+                <span>{{ at.responsable_nombre }}</span>
               </div>
               <div class="text-[10px] text-slate-400">{{ at.responsable_rol }}</div>
             </td>
@@ -688,7 +803,7 @@
             <!-- Avance / Observaciones -->
             <td class="py-3 px-3.5 max-w-[240px]">
               <div class="desc-roll text-slate-600 text-[11px]">
-                {{ at.avance_observaciones|default:"Sin observaciones registradas" }}
+                {{ at.avance_observaciones|default:at.descripcion|default:"Sin observaciones registradas" }}
               </div>
             </td>
 
@@ -713,19 +828,65 @@
               {% endif %}
             </td>
 
-            <!-- Acciones Idénticas a Atenciones -->
+            <!-- Acciones -->
             <td class="py-3 px-3.5 text-center whitespace-nowrap sticky right-0 bg-white shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
               <div class="flex items-center justify-center gap-1">
                 <button type="button"
-                        onclick="verDetalleAtencion('{{ at.id }}', '{{ at.codigo_atencion|escapejs }}', '{{ at.solicitante|escapejs }}', '{{ at.delegacion.nombre|escapejs }}', '{{ at.tipo_atencion.nombre|escapejs }}', '{{ at.sub_atencion.nombre|escapejs }}', '{{ at.descripcion|escapejs }}', '{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username|escapejs }}', '{% if at.creado_por %}{{ at.creado_por.get_full_name|default:at.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ at.created_at|date:'d/m/Y H:i' }}', '{{ at.estado|escapejs }}', '{{ at.get_evidencia_codigo|escapejs }}', '{{ at.estado_evidencia|escapejs }}', '{{ at.usuario_responsable_id }}', '{{ at.responsable_rol|escapejs }}', '{{ at.delegacion_id }}', '{{ at.va_a_tubo|yesno:'1,0' }}', '{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}', '{{ at.area_apoyo|default:''|escapejs }}', '{{ at.avance_observaciones|default:''|escapejs }}')"
-                        title="Ver ficha completa y evidencias"
+                        onclick="verDetalleAtencionBtn(this, false)"
+                        data-id="{{ at.id }}"
+                        data-es-atencion="{{ at.es_atencion|yesno:'1,0' }}"
+                        data-codigo="{{ at.codigo_atencion }}"
+                        data-solicitante="{{ at.solicitante }}"
+                        data-delegacion="{{ at.delegacion.nombre|default:'' }}"
+                        data-tipo="{{ at.tipo_nombre }}"
+                        data-sub="{{ at.sub_nombre }}"
+                        data-descripcion="{{ at.descripcion }}"
+                        data-resp="{{ at.responsable_nombre }}"
+                        data-creador="{{ at.creado_por_nombre }}"
+                        data-fecha="{{ at.created_at|date:'d/m/Y H:i' }}"
+                        data-estado="{{ at.estado }}"
+                        data-evicod="{{ at.evidencia_codigo }}"
+                        data-eviestado="{{ at.estado_evidencia }}"
+                        data-respid="{{ at.usuario_responsable_id|default:'' }}"
+                        data-resprol="{{ at.responsable_rol }}"
+                        data-delid="{{ at.delegacion_id|default:'' }}"
+                        data-vatubo="{{ at.va_a_tubo|yesno:'1,0' }}"
+                        data-fechacomp="{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}"
+                        data-areaapoyo="{{ at.area_apoyo|default:'' }}"
+                        data-avanceobs="{{ at.avance_observaciones|default:'' }}"
+                        data-urleditar="{{ at.url_editar }}"
+                        data-urleliminar="{{ at.url_eliminar|default:'' }}"
+                        title="Ver ficha completa"
                         class="p-1.5 rounded-lg text-slate-500 hover:text-[#C41230] hover:bg-red-50 transition-all inline-flex items-center justify-center">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
                 {% if not permisos.es_consultor %}
                   {% if at.estado != 'Cancelada' %}
                     <button type="button"
-                            onclick="verDetalleAtencion('{{ at.id }}', '{{ at.codigo_atencion|escapejs }}', '{{ at.solicitante|escapejs }}', '{{ at.delegacion.nombre|escapejs }}', '{{ at.tipo_atencion.nombre|escapejs }}', '{{ at.sub_atencion.nombre|escapejs }}', '{{ at.descripcion|escapejs }}', '{{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username|escapejs }}', '{% if at.creado_por %}{{ at.creado_por.get_full_name|default:at.creado_por.username|escapejs }}{% else %}Sistema{% endif %}', '{{ at.created_at|date:'d/m/Y H:i' }}', '{{ at.estado|escapejs }}', '{{ at.get_evidencia_codigo|escapejs }}', '{{ at.estado_evidencia|escapejs }}', '{{ at.usuario_responsable_id }}', '{{ at.responsable_rol|escapejs }}', '{{ at.delegacion_id }}', '{{ at.va_a_tubo|yesno:'1,0' }}', '{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}', '{{ at.area_apoyo|default:''|escapejs }}', '{{ at.avance_observaciones|default:''|escapejs }}'); activarEdicionAtencion()"
+                            onclick="verDetalleAtencionBtn(this, true)"
+                            data-id="{{ at.id }}"
+                            data-es-atencion="{{ at.es_atencion|yesno:'1,0' }}"
+                            data-codigo="{{ at.codigo_atencion }}"
+                            data-solicitante="{{ at.solicitante }}"
+                            data-delegacion="{{ at.delegacion.nombre|default:'' }}"
+                            data-tipo="{{ at.tipo_nombre }}"
+                            data-sub="{{ at.sub_nombre }}"
+                            data-descripcion="{{ at.descripcion }}"
+                            data-resp="{{ at.responsable_nombre }}"
+                            data-creador="{{ at.creado_por_nombre }}"
+                            data-fecha="{{ at.created_at|date:'d/m/Y H:i' }}"
+                            data-estado="{{ at.estado }}"
+                            data-evicod="{{ at.evidencia_codigo }}"
+                            data-eviestado="{{ at.estado_evidencia }}"
+                            data-respid="{{ at.usuario_responsable_id|default:'' }}"
+                            data-resprol="{{ at.responsable_rol }}"
+                            data-delid="{{ at.delegacion_id|default:'' }}"
+                            data-vatubo="{{ at.va_a_tubo|yesno:'1,0' }}"
+                            data-fechacomp="{{ at.fecha_compromiso|date:'Y-m-d'|default:'' }}"
+                            data-areaapoyo="{{ at.area_apoyo|default:'' }}"
+                            data-avanceobs="{{ at.avance_observaciones|default:'' }}"
+                            data-urleditar="{{ at.url_editar }}"
+                            data-urleliminar="{{ at.url_eliminar|default:'' }}"
                             title="Editar requerimiento en Tubo"
                             class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all inline-flex items-center justify-center">
                       <i data-lucide="edit-3" class="w-4 h-4"></i>
@@ -1128,7 +1289,7 @@
           <i data-lucide="git-pull-request" class="w-4 h-4 text-[#C41230]"></i>
           <span class="font-extrabold text-xs">Parámetros del Tubo de Compromiso SGR</span>
         </div>
-        <div class="space-y-1">
+        <div id="at-edit-vatubo-wrapper" class="space-y-1">
           <label for="at-edit-vatubo" class="block text-slate-700 text-[11px]">¿Gestionar en Tubo de Compromiso?</label>
           <select id="at-edit-vatubo" name="va_a_tubo" onchange="toggleCamposTuboEdicion(this.value)"
                   class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
@@ -1174,7 +1335,7 @@
     {% endif %}
 
     <!-- Evidencia Territorial SGR Disponible para Revisar / Aprobar -->
-    <div class="p-4 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-2.5 text-xs">
+    <div id="at-seccion-evidencias" class="p-4 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-2.5 text-xs">
       <div class="flex items-center justify-between">
         <span class="font-extrabold text-slate-900 flex items-center gap-1.5">
           <i data-lucide="file-check" class="w-4 h-4 text-[#C41230]"></i>
@@ -1255,7 +1416,20 @@
     </div>
 
     <!-- Pie del Modal -->
-    <div class="flex justify-end pt-2 border-t border-slate-100">
+    <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+      <div>
+        {% if permisos.puede_eliminar %}
+        <form id="form-eliminar-sector-modal" method="POST" action="" class="hidden"
+              onsubmit="return confirm('¿Deseas eliminar este compromiso sectorial del Tubo de Compromiso SGR?');">
+          {% csrf_token %}
+          <button type="submit"
+                  class="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-extrabold rounded-xl transition-all flex items-center gap-1.5">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>Eliminar Compromiso Sectorial</span>
+          </button>
+        </form>
+        {% endif %}
+      </div>
       <button type="button" onclick="document.getElementById('modal-detalle-atencion').classList.add('hidden')" 
               class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
         Cerrar
@@ -1263,6 +1437,117 @@
     </div>
   </div>
 </div>
+
+<!-- MODAL: Nuevo Compromiso con un Sector (Sin Atención Ciudadana) -->
+{% if not permisos.es_consultor %}
+<div id="modal-nuevo-compromiso-sector" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-xl w-full p-6 space-y-5 my-8 animate-fade-in">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+      <div class="flex items-center gap-2.5 text-[#8B1D19]">
+        <div class="p-2 rounded-2xl bg-red-50 text-[#C41230]">
+          <i data-lucide="map-pin-plus" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="font-extrabold text-slate-900 text-base leading-tight">Nuevo Compromiso Sectorial</h3>
+          <p class="text-[11px] text-slate-400 font-medium">Registra un compromiso directo con un sector o JJVV sin abrir Atención Ciudadana</p>
+        </div>
+      </div>
+      <button type="button" onclick="document.getElementById('modal-nuevo-compromiso-sector').classList.add('hidden')" class="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{% url 'gestion_tubo' %}" class="space-y-4">
+      {% csrf_token %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div class="space-y-1">
+          <label class="block text-xs font-extrabold text-slate-700">Sector Territorial <span class="text-[#C41230]">*</span></label>
+          <select name="sector_id" required
+                  class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="">Seleccionar sector...</option>
+            {% for s in sectores_tubo %}
+              <option value="{{ s.id }}">{{ s.nombre }}{% if es_admin and not delegacion_seleccionada %} ({{ s.delegacion.nombre }}){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="space-y-1">
+          <label class="block text-xs font-extrabold text-slate-700">Fecha de Compromiso <span class="text-[#C41230]">*</span></label>
+          <input type="date" name="fecha_compromiso" required
+                 class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono font-medium bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+
+        <div class="space-y-1">
+          <label class="block text-xs font-extrabold text-slate-700">JJVV u Organización Asociada</label>
+          <select name="organizacion_id"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-medium text-slate-800 bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="">Compromiso general del sector...</option>
+            {% for o in organizaciones_tubo %}
+              <option value="{{ o.id }}">{{ o.nombre }} ({{ o.tipo_organizacion }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="space-y-1">
+          <label class="block text-xs font-extrabold text-slate-700">Responsable Territorial</label>
+          <select name="responsable_id"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-medium text-slate-800 bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="">Asignar a mi usuario (actual)</option>
+            {% for enc in encargados_edicion %}
+              <option value="{{ enc.id }}">{{ enc.nombre }}{% if enc.delegacion_nombre %} · {{ enc.delegacion_nombre }}{% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="space-y-1">
+          <label class="block text-xs font-extrabold text-slate-700">Solicitante / Contraparte</label>
+          <input type="text" name="solicitante" maxlength="150" placeholder="Ej: Mesa Territorial / JJVV / Delegación"
+                 class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+
+        <div class="space-y-1">
+          <label class="block text-xs font-extrabold text-slate-700">Área o Cuadrilla de Apoyo</label>
+          <input type="text" name="area_apoyo" maxlength="100" placeholder="Ej: Obras Municipales, Parques y Jardines"
+                 class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+
+        <div class="space-y-1 sm:col-span-2">
+          <label class="block text-xs font-extrabold text-slate-700">Origen del Compromiso</label>
+          <select name="origen"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="INT">Interno (Iniciativa / Terreno Municipal)</option>
+            <option value="EXT">Externo (Solicitado en reunión sectorial / JJVV)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="space-y-1">
+        <label class="block text-xs font-extrabold text-slate-700">Descripción del Compromiso Sectorial <span class="text-[#C41230]">*</span></label>
+        <textarea name="descripcion" required rows="3" maxlength="1000" placeholder="Describe el compromiso acordado con el sector..."
+                  class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+      </div>
+
+      <div class="space-y-1">
+        <label class="block text-xs font-extrabold text-slate-700">Avance / Observaciones Iniciales</label>
+        <textarea name="avance_observaciones" rows="2" maxlength="1000" placeholder="Observaciones, coordinación previa o requerimientos..."
+                  class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+      </div>
+
+      <div class="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
+        <button type="button" onclick="document.getElementById('modal-nuevo-compromiso-sector').classList.add('hidden')"
+                class="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-600 transition-colors">
+          Cancelar
+        </button>
+        <button type="submit"
+                class="px-5 py-2 rounded-xl bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-extrabold shadow-sm transition-all flex items-center gap-1.5">
+          <i data-lucide="save" class="w-4 h-4"></i>
+          <span>Guardar Compromiso en Tubo</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
 
 <script>
   function sincronizarEncargadoEdicion(val) {
@@ -1299,15 +1584,55 @@
     }
   }
 
-  // Modal Ver Detalle y Gestión de Estado y Evidencia (con Tubo SGR)
-  function verDetalleAtencion(id, cod, sol, del, tipo, sub, desc, resp, creador, fecha, estado, eviCod, eviEstado, responsableId, responsableRol, delegacionId, vaTubo, fechaComp, areaApoyo, avanceObs) {
+  function abrirModalCompromisoSector() {
+    const modal = document.getElementById('modal-nuevo-compromiso-sector');
+    if (modal) {
+      modal.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+
+  function verDetalleAtencionBtn(btn, abrirEdicion) {
+    const d = btn.dataset;
+    verDetalleAtencion(
+      d.id,
+      d.codigo,
+      d.solicitante,
+      d.delegacion,
+      d.tipo,
+      d.sub,
+      d.descripcion,
+      d.resp,
+      d.creador,
+      d.fecha,
+      d.estado,
+      d.evicod,
+      d.eviestado,
+      d.respid,
+      d.resprol,
+      d.delid,
+      d.vatubo,
+      d.fechacomp,
+      d.areaapoyo,
+      d.avanceobs,
+      d.esAtencion === '1',
+      d.urleditar,
+      d.urleliminar
+    );
+    if (abrirEdicion) {
+      activarEdicionAtencion();
+    }
+  }
+
+  // Modal Ver Detalle y Gestión de Estado y Evidencia (Atención y Compromiso Sectorial)
+  function verDetalleAtencion(id, cod, sol, del, tipo, sub, desc, resp, creador, fecha, estado, eviCod, eviEstado, responsableId, responsableRol, delegacionId, vaTubo, fechaComp, areaApoyo, avanceObs, esAtencion = true, urlEditar = '', urlEliminar = '') {
     cancelarEdicionAtencion();
     const codEl = document.getElementById('at-cod');
     if (codEl) codEl.textContent = cod;
     const solEl = document.getElementById('at-solicitante');
     if (solEl) solEl.textContent = sol;
     const delEl = document.getElementById('at-del');
-    if (delEl) delEl.textContent = del;
+    if (delEl) delEl.textContent = del || 'Global';
     const tipoEl = document.getElementById('at-tipo');
     if (tipoEl) tipoEl.textContent = tipo;
     const subEl = document.getElementById('at-sub');
@@ -1328,15 +1653,14 @@
     const isTubo = (vaTubo === '1' || vaTubo === 'true' || vaTubo === true);
     const seccionLecturaTubo = document.getElementById('at-seccion-lectura-tubo');
     if (seccionLecturaTubo) {
-      if (isTubo) {
-        seccionLecturaTubo.classList.remove('hidden');
-      } else {
-        seccionLecturaTubo.classList.add('hidden');
-      }
+      seccionLecturaTubo.classList.toggle('hidden', !isTubo);
     }
     const tuboBadge = document.getElementById('at-tubo-badge');
     if (tuboBadge) {
-      if (isTubo) {
+      if (!esAtencion) {
+        tuboBadge.textContent = 'Compromiso Sectorial';
+        tuboBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200';
+      } else if (isTubo) {
         tuboBadge.textContent = 'En Tubo de Compromiso';
         tuboBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-[#C41230] border border-red-200';
       } else {
@@ -1358,21 +1682,23 @@
     const respInput = document.getElementById('at-edit-responsable-input');
     const respHidden = document.getElementById('at-edit-responsable');
     const estadoSelect = document.getElementById('at-edit-estado');
+    const vaTuboWrapper = document.getElementById('at-edit-vatubo-wrapper');
     const vaTuboSelect = document.getElementById('at-edit-vatubo');
     const fechaCompInput = document.getElementById('at-edit-fechacomp');
     const areaApoyoInput = document.getElementById('at-edit-areaapoyo');
     const avanceObsInput = document.getElementById('at-edit-avanceobs');
 
     if (formEditar) {
-      formEditar.action = `/gestion/atenciones/${id}/editar/`;
+      formEditar.action = urlEditar || `/gestion/atenciones/${id}/editar/`;
       formEditar.dataset.delegacionId = delegacionId || '';
       formEditar.dataset.responsableId = responsableId || '';
       formEditar.dataset.solicitante = sol || '';
 
       if (descInput) descInput.value = desc || '';
       if (estadoSelect) estadoSelect.value = estado || 'Registrada';
+      if (vaTuboWrapper) vaTuboWrapper.classList.toggle('hidden', !esAtencion);
       if (vaTuboSelect) {
-        vaTuboSelect.value = isTubo ? 'true' : 'false';
+        vaTuboSelect.value = (!esAtencion || isTubo) ? 'true' : 'false';
         toggleCamposTuboEdicion(vaTuboSelect.value);
       }
       if (fechaCompInput) fechaCompInput.value = fechaComp || '';
@@ -1392,7 +1718,23 @@
       if (editButton) editButton.classList.toggle('hidden', estado === 'Cancelada');
     }
 
-    // Evidencias SGR
+    const formEliminarSector = document.getElementById('form-eliminar-sector-modal');
+    if (formEliminarSector) {
+      if (!esAtencion && urlEliminar) {
+        formEliminarSector.action = urlEliminar;
+        formEliminarSector.classList.remove('hidden');
+      } else {
+        formEliminarSector.action = '';
+        formEliminarSector.classList.add('hidden');
+      }
+    }
+
+    // Evidencias SGR (solo aplica a Atenciones Ciudadanas con Actividad)
+    const seccionEvidencias = document.getElementById('at-seccion-evidencias');
+    if (seccionEvidencias) {
+      seccionEvidencias.classList.toggle('hidden', !esAtencion);
+    }
+
     const eviCodEl = document.getElementById('at-evi-cod');
     if (eviCodEl) eviCodEl.textContent = eviCod || 'EVI-GENERADA';
 
@@ -1421,7 +1763,7 @@
     const evidenceTarget = document.getElementById('at-evidencias-lista');
     if (evidenceTarget) {
       evidenceTarget.replaceChildren();
-      if (evidenceSource && evidenceSource.children.length) {
+      if (esAtencion && evidenceSource && evidenceSource.children.length) {
         Array.from(evidenceSource.children).forEach((item) => {
           evidenceTarget.appendChild(item.cloneNode(true));
         });
@@ -1500,6 +1842,10 @@
       if (modal && !modal.classList.contains('hidden')) {
         modal.classList.add('hidden');
       }
+      const modalSector = document.getElementById('modal-nuevo-compromiso-sector');
+      if (modalSector && !modalSector.classList.contains('hidden')) {
+        modalSector.classList.add('hidden');
+      }
     }
   });
 
@@ -1507,6 +1853,10 @@
     const modal = document.getElementById('modal-detalle-atencion');
     if (modal && e.target === modal) {
       modal.classList.add('hidden');
+    }
+    const modalSector = document.getElementById('modal-nuevo-compromiso-sector');
+    if (modalSector && e.target === modalSector) {
+      modalSector.classList.add('hidden');
     }
   });
 
@@ -1524,12 +1874,12 @@
     return cookieValue;
   }
 
-  let _tuboDragId = null;
-  function tuboDragStart(ev, atencionId) {
-    _tuboDragId = atencionId;
+  let _tuboDragUrl = null;
+  function tuboDragStart(ev, urlCambiarEstado) {
+    _tuboDragUrl = urlCambiarEstado;
     if (ev.dataTransfer) {
       ev.dataTransfer.effectAllowed = 'move';
-      ev.dataTransfer.setData('text/plain', String(atencionId));
+      ev.dataTransfer.setData('text/plain', String(urlCambiarEstado || ''));
     }
   }
 
@@ -1545,19 +1895,22 @@
   function tuboDrop(ev, nuevoEstado) {
     ev.preventDefault();
     ev.currentTarget.classList.remove('ring-2', 'ring-[#C41230]/40', 'bg-red-50/40');
-    const rawId = ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : null;
-    const atencionId = rawId || _tuboDragId;
-    if (atencionId) {
-      moverTarjetaTubo(atencionId, nuevoEstado);
+    const rawUrl = ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : null;
+    const urlCambiarEstado = rawUrl || _tuboDragUrl;
+    if (urlCambiarEstado) {
+      moverTarjetaTubo(urlCambiarEstado, nuevoEstado);
     }
-    _tuboDragId = null;
+    _tuboDragUrl = null;
   }
 
-  async function moverTarjetaTubo(atencionId, nuevoEstado) {
+  async function moverTarjetaTubo(urlCambiarEstado, nuevoEstado) {
+    const targetUrl = String(urlCambiarEstado).includes('/')
+      ? urlCambiarEstado
+      : `/gestion/tubo/${urlCambiarEstado}/cambiar-estado/`;
     const formData = new FormData();
     formData.append('nuevo_estado', nuevoEstado);
     try {
-      const resp = await fetch(`/gestion/tubo/${atencionId}/estado/`, {
+      const resp = await fetch(targetUrl, {
         method: 'POST',
         headers: {
           'X-Requested-With': 'XMLHttpRequest',
