@@ -37,8 +37,74 @@
   
   <!-- SweetAlert2 CDN -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <script>
+    try {
+      if (localStorage.getItem('sgr_sidebar_collapsed') === '1') {
+        document.documentElement.classList.add('sgr-sidebar-collapsed');
+      }
+    } catch (e) {}
+  </script>
   
   <style>
+    html.sgr-sidebar-collapsed #appSidebar {
+      display: none !important;
+    }
+    html.sgr-sidebar-collapsed #appLayoutContainer,
+    html.sgr-sidebar-collapsed #appHeaderInner {
+      max-width: 100% !important;
+    }
+    html.sgr-sidebar-collapsed [data-sidebar-icon-open] {
+      display: none !important;
+    }
+    html.sgr-sidebar-collapsed [data-sidebar-icon-closed] {
+      display: inline-flex !important;
+    }
+    /* Tablas consistentes: al estar el menú desplegado mantienen su ancho legible con scroll horizontal */
+    @media (min-width: 768px) {
+      html:not(.sgr-sidebar-collapsed) .overflow-x-auto > table {
+        min-width: min(1376px, calc(100vw - 4rem));
+      }
+    }
+    /* Barra de desplazamiento horizontal limpia para tablas */
+    .overflow-x-auto {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(196, 18, 48, 0.35) rgba(15, 23, 42, 0.05);
+    }
+    .overflow-x-auto::-webkit-scrollbar {
+      height: 8px;
+    }
+    .overflow-x-auto::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.05);
+      border-radius: 9999px;
+    }
+    .overflow-x-auto::-webkit-scrollbar-thumb {
+      background: rgba(196, 18, 48, 0.35);
+      border-radius: 9999px;
+    }
+    .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+      background: rgba(196, 18, 48, 0.65);
+    }
+    /* Columna Acciones (ver, editar, eliminar) fija siempre visible al hacer scroll */
+    table.sgr-sticky-actions thead th:last-child {
+      position: sticky;
+      right: 0;
+      z-index: 20;
+      background-color: #f8fafc;
+      box-shadow: -4px 0 8px -2px rgba(15, 23, 42, 0.06);
+      white-space: nowrap;
+    }
+    table.sgr-sticky-actions tbody td:last-child:not([colspan]) {
+      position: sticky;
+      right: 0;
+      z-index: 10;
+      background-color: #ffffff;
+      box-shadow: -4px 0 8px -2px rgba(15, 23, 42, 0.06);
+      white-space: nowrap;
+    }
+    table.sgr-sticky-actions tbody tr:hover td:last-child:not([colspan]) {
+      background-color: #f8fafc;
+    }
     body {
       font-family: 'Public Sans', sans-serif;
       background-color: #FDF6F6;
@@ -104,18 +170,32 @@
 
   <!-- TopBar Oficial de la Ilustre Municipalidad de La Serena (Wireframes C3-C6) -->
   <header class="sticky top-0 z-40 shadow-md text-white" style="background: linear-gradient(90deg, #8B1D19 0%, #C41230 60%, #DB3334 100%);">
-    <div class="max-w-[1440px] mx-auto px-4 md:px-8 py-2.5 flex items-center justify-between gap-4">
+    <div id="appHeaderInner" class="max-w-[1440px] mx-auto px-4 md:px-8 py-2.5 flex items-center justify-between gap-4">
       
-      <!-- Izquierda: Logo y Marca Institucional -->
-      <a href="{% if permisos.es_cliente %}{% url 'portal_cliente' %}{% else %}{% url 'gestion_inicio' %}{% endif %}" class="flex items-center gap-3 shrink-0 group">
-        <img src="{% static 'horizontal-blanco.svg' %}" 
-             alt="La Serena — Ilustre Municipalidad" 
-             class="h-9 w-auto object-contain drop-shadow-sm"
-             onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
-        <span class="hidden sm:inline-block font-extrabold tracking-wider text-xs uppercase text-white/95 border-l border-white/20 pl-3">
-          Sistema Municipal
-        </span>
-      </a>
+      <!-- Izquierda: Botón Ocultar/Mostrar Menú + Logo y Marca Institucional -->
+      <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
+        <button type="button"
+                id="btnToggleSidebar"
+                data-sidebar-toggle
+                aria-expanded="true"
+                aria-controls="appSidebar"
+                title="Ocultar / mostrar menú lateral"
+                class="inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white border border-white/25 transition-all cursor-pointer shadow-sm">
+          <i data-lucide="panel-left-close" data-sidebar-icon-open class="w-4 h-4"></i>
+          <i data-lucide="panel-left-open" data-sidebar-icon-closed class="w-4 h-4 hidden"></i>
+          <span class="hidden lg:inline text-[11px] font-bold tracking-wide" data-sidebar-label>Ocultar menú</span>
+        </button>
+
+        <a href="{% if permisos.es_cliente %}{% url 'portal_cliente' %}{% else %}{% url 'gestion_inicio' %}{% endif %}" class="flex items-center gap-3 shrink-0 group">
+          <img src="{% static 'horizontal-blanco.svg' %}" 
+               alt="La Serena — Ilustre Municipalidad" 
+               class="h-9 w-auto object-contain drop-shadow-sm"
+               onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
+          <span class="hidden sm:inline-block font-extrabold tracking-wider text-xs uppercase text-white/95 border-l border-white/20 pl-3">
+            Sistema Municipal
+          </span>
+        </a>
+      </div>
 
       <!-- Centro: Distintivo de Delegación Activa según el Perfil (Requisito Crítico A2 / Wireframes) -->
       <!-- Centro: Distintivo de Delegación Activa según el Perfil (Requisito Crítico A2 / Wireframes) -->
@@ -230,10 +310,10 @@
   </header>
 
   <!-- Contenedor Principal (Sidebar + Contenido) -->
-  <div class="flex-1 max-w-[1440px] w-full mx-auto px-4 md:px-8 py-6 flex flex-col md:flex-row gap-6">
+  <div id="appLayoutContainer" class="flex-1 max-w-[1440px] w-full mx-auto px-4 md:px-8 py-6 flex flex-col md:flex-row gap-6">
     
     <!-- Sidebar Navegación de Módulos (Filtrado según Perfil del Usuario) -->
-    <aside class="w-full md:w-60 shrink-0 flex flex-col gap-5">
+    <aside id="appSidebar" class="w-full md:w-60 shrink-0 flex flex-col gap-5">
       
       <!-- Menú de Módulos Organizado por Secciones -->
       <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-3 text-xs font-bold">
@@ -1374,6 +1454,43 @@
             } catch (e) {}
           }
         });
+      });
+
+      // Toggle global para ocultar / mostrar el menú lateral izquierdo
+      const syncSidebarBtnUI = () => {
+        const isCollapsed = document.documentElement.classList.contains('sgr-sidebar-collapsed');
+        document.querySelectorAll('[data-sidebar-toggle]').forEach((btn) => {
+          btn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+          const lbl = btn.querySelector('[data-sidebar-label]');
+          if (lbl) {
+            lbl.textContent = isCollapsed ? 'Mostrar menú' : 'Ocultar menú';
+          }
+        });
+      };
+      syncSidebarBtnUI();
+
+      document.querySelectorAll('[data-sidebar-toggle]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const isCollapsed = document.documentElement.classList.toggle('sgr-sidebar-collapsed');
+          try {
+            if (isCollapsed) {
+              localStorage.setItem('sgr_sidebar_collapsed', '1');
+            } else {
+              localStorage.removeItem('sgr_sidebar_collapsed');
+            }
+          } catch (e) {}
+          syncSidebarBtnUI();
+        });
+      });
+
+      // Fijar automáticamente la columna de Acciones (ver, editar, eliminar) en tablas con scroll
+      document.querySelectorAll('.overflow-x-auto > table').forEach((table) => {
+        const lastTh = table.querySelector('thead tr:last-child th:last-child');
+        if (!lastTh) return;
+        const headerText = (lastTh.textContent || '').trim().toLowerCase();
+        if (headerText.includes('acción') || headerText.includes('accion')) {
+          table.classList.add('sgr-sticky-actions');
+        }
       });
     });
   </script>

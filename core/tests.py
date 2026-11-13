@@ -1641,6 +1641,14 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertContains(resp_inicio_admin, 'data-section-body')
         self.assertContains(resp_inicio_admin, 'sgr_nav_sec_territorial')
         self.assertContains(resp_inicio_admin, 'sgr_inicio_sec_territorial')
+        self.assertContains(resp_inicio_admin, 'id="btnToggleSidebar"')
+        self.assertContains(resp_inicio_admin, 'id="appSidebar"')
+        self.assertContains(resp_inicio_admin, 'sgr-sticky-actions')
+
+        resp_vec_html = self.client.get(reverse('gestion_vecinos'))
+        self.assertContains(resp_vec_html, 'overflow-x-auto')
+        resp_sec_html = self.client.get(reverse('gestion_sectores'))
+        self.assertContains(resp_sec_html, 'overflow-x-auto')
 
         self.client.force_login(self.user)
         resp_inicio_op = self.client.get(reverse('gestion_inicio'))
