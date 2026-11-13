@@ -180,12 +180,16 @@
     </div>
 
     {% if permisos.ver_atenciones or permisos.ver_reportes or permisos.es_admin %}
-    <div class="space-y-2.5">
-      <h3 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-[#C41230]"></span>
-        <span>Gestión Territorial</span>
-      </h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div data-collapsible-section class="space-y-2.5">
+      <button type="button" data-section-toggle data-storage-key="sgr_inicio_sec_territorial" aria-expanded="true"
+        class="w-full flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors cursor-pointer">
+        <span class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-[#C41230]"></span>
+          <span>Gestión Territorial</span>
+        </span>
+        <i data-lucide="chevron-down" data-section-chevron class="w-4 h-4 text-slate-400 transition-transform duration-150"></i>
+      </button>
+      <div data-section-body class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {% if permisos.ver_atenciones %}
         <a href="{% url 'gestion_atenciones' %}" class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-[#C41230]/40 hover:shadow-md transition-all group">
           <div class="flex items-start justify-between">
@@ -229,12 +233,16 @@
     {% endif %}
 
     {% if permisos.ver_vecinos or permisos.ver_organizaciones or permisos.ver_sectores %}
-    <div class="space-y-2.5">
-      <h3 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-blue-600"></span>
-        <span>Padrón y Comunidad</span>
-      </h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div data-collapsible-section class="space-y-2.5">
+      <button type="button" data-section-toggle data-storage-key="sgr_inicio_sec_padron" aria-expanded="true"
+        class="w-full flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors cursor-pointer">
+        <span class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+          <span>Padrón y Comunidad</span>
+        </span>
+        <i data-lucide="chevron-down" data-section-chevron class="w-4 h-4 text-slate-400 transition-transform duration-150"></i>
+      </button>
+      <div data-section-body class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {% if permisos.ver_vecinos %}
         <a href="{% url 'gestion_vecinos' %}" class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-[#C41230]/40 hover:shadow-md transition-all group">
           <div class="flex items-start justify-between">
@@ -278,12 +286,16 @@
     {% endif %}
 
     {% if permisos.ver_metas or permisos.ver_tipo_atencion or permisos.ver_sub_atencion %}
-    <div class="space-y-2.5">
-      <h3 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-        <span>Metas y Catálogos</span>
-      </h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div data-collapsible-section class="space-y-2.5">
+      <button type="button" data-section-toggle data-storage-key="sgr_inicio_sec_metas" aria-expanded="true"
+        class="w-full flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors cursor-pointer">
+        <span class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+          <span>Metas y Catálogos</span>
+        </span>
+        <i data-lucide="chevron-down" data-section-chevron class="w-4 h-4 text-slate-400 transition-transform duration-150"></i>
+      </button>
+      <div data-section-body class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {% if permisos.ver_metas %}
         <a href="{% url 'gestion_metas' %}" class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-[#C41230]/40 hover:shadow-md transition-all group">
           <div class="flex items-start justify-between">
@@ -327,12 +339,16 @@
     {% endif %}
 
     {% if permisos.ver_delegaciones or permisos.ver_roles or permisos.ver_usuarios %}
-    <div class="space-y-2.5">
-      <h3 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-slate-700"></span>
-        <span>Administración</span>
-      </h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div data-collapsible-section class="space-y-2.5">
+      <button type="button" data-section-toggle data-storage-key="sgr_inicio_sec_admin" aria-expanded="true"
+        class="w-full flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors cursor-pointer">
+        <span class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-slate-700"></span>
+          <span>Administración</span>
+        </span>
+        <i data-lucide="chevron-down" data-section-chevron class="w-4 h-4 text-slate-400 transition-transform duration-150"></i>
+      </button>
+      <div data-section-body class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {% if permisos.ver_delegaciones %}
         <a href="{% url 'gestion_delegaciones' %}" class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-[#C41230]/40 hover:shadow-md transition-all group">
           <div class="flex items-start justify-between">

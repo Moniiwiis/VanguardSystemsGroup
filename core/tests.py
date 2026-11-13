@@ -1637,6 +1637,10 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(resp_inicio_admin.status_code, 200)
         for sec_lbl in ('Gestión Territorial', 'Padrón y Comunidad', 'Metas y Catálogos', 'Administración', 'Cuenta y Comunicación'):
             self.assertContains(resp_inicio_admin, sec_lbl)
+        self.assertContains(resp_inicio_admin, 'data-section-toggle')
+        self.assertContains(resp_inicio_admin, 'data-section-body')
+        self.assertContains(resp_inicio_admin, 'sgr_nav_sec_territorial')
+        self.assertContains(resp_inicio_admin, 'sgr_inicio_sec_territorial')
 
         self.client.force_login(self.user)
         resp_inicio_op = self.client.get(reverse('gestion_inicio'))

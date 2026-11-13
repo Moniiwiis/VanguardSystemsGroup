@@ -251,10 +251,13 @@
 
         <!-- Sección 1: Gestión Territorial -->
         {% if permisos.ver_atenciones or permisos.ver_reportes or permisos.es_admin %}
-        <div class="pt-2 border-t border-slate-100 space-y-1">
-          <p class="px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-            Gestión Territorial
-          </p>
+        <div data-collapsible-section class="pt-2 border-t border-slate-100 space-y-1">
+          <button type="button" data-section-toggle data-storage-key="sgr_nav_sec_territorial" aria-expanded="true"
+            class="w-full flex items-center justify-between px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+            <span>Gestión Territorial</span>
+            <i data-lucide="chevron-down" data-section-chevron class="w-3.5 h-3.5 transition-transform duration-150"></i>
+          </button>
+          <div data-section-body class="space-y-1">
           {% if permisos.ver_atenciones %}
             <a href="{% url 'gestion_atenciones' %}" 
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_atenciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
@@ -278,15 +281,19 @@
               <span>Reportes</span>
             </a>
           {% endif %}
+          </div>
         </div>
         {% endif %}
 
         <!-- Sección 2: Padrón y Comunidad -->
         {% if permisos.ver_vecinos or permisos.ver_organizaciones or permisos.ver_sectores %}
-        <div class="pt-2 border-t border-slate-100 space-y-1">
-          <p class="px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-            Padrón y Comunidad
-          </p>
+        <div data-collapsible-section class="pt-2 border-t border-slate-100 space-y-1">
+          <button type="button" data-section-toggle data-storage-key="sgr_nav_sec_padron" aria-expanded="true"
+            class="w-full flex items-center justify-between px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+            <span>Padrón y Comunidad</span>
+            <i data-lucide="chevron-down" data-section-chevron class="w-3.5 h-3.5 transition-transform duration-150"></i>
+          </button>
+          <div data-section-body class="space-y-1">
           {% if permisos.ver_vecinos %}
             <a href="{% url 'gestion_vecinos' %}" 
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_vecinos' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
@@ -310,15 +317,19 @@
               <span>Sectores / Territorio</span>
             </a>
           {% endif %}
+          </div>
         </div>
         {% endif %}
 
         <!-- Sección 3: Metas y Catálogos -->
         {% if permisos.ver_metas or permisos.ver_tipo_atencion or permisos.ver_sub_atencion %}
-        <div class="pt-2 border-t border-slate-100 space-y-1">
-          <p class="px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-            Metas y Catálogos
-          </p>
+        <div data-collapsible-section class="pt-2 border-t border-slate-100 space-y-1">
+          <button type="button" data-section-toggle data-storage-key="sgr_nav_sec_metas" aria-expanded="true"
+            class="w-full flex items-center justify-between px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+            <span>Metas y Catálogos</span>
+            <i data-lucide="chevron-down" data-section-chevron class="w-3.5 h-3.5 transition-transform duration-150"></i>
+          </button>
+          <div data-section-body class="space-y-1">
           {% if permisos.ver_metas %}
             <a href="{% url 'gestion_metas' %}" 
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_metas' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
@@ -342,15 +353,19 @@
               <span>Sub Atención</span>
             </a>
           {% endif %}
+          </div>
         </div>
         {% endif %}
 
         <!-- Sección 4: Administración -->
         {% if permisos.ver_delegaciones or permisos.ver_roles or permisos.ver_usuarios %}
-        <div class="pt-2 border-t border-slate-100 space-y-1">
-          <p class="px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-            Administración
-          </p>
+        <div data-collapsible-section class="pt-2 border-t border-slate-100 space-y-1">
+          <button type="button" data-section-toggle data-storage-key="sgr_nav_sec_admin" aria-expanded="true"
+            class="w-full flex items-center justify-between px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+            <span>Administración</span>
+            <i data-lucide="chevron-down" data-section-chevron class="w-3.5 h-3.5 transition-transform duration-150"></i>
+          </button>
+          <div data-section-body class="space-y-1">
           {% if permisos.ver_delegaciones %}
             <a href="{% url 'gestion_delegaciones' %}" 
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_delegaciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
@@ -374,14 +389,18 @@
               <span>Usuarios</span>
             </a>
           {% endif %}
+          </div>
         </div>
         {% endif %}
 
         <!-- Sección 5: Cuenta y Comunicación -->
-        <div class="{% if permisos.ver_inicio or permisos.ver_atenciones or permisos.ver_vecinos or permisos.ver_metas or permisos.ver_delegaciones or permisos.ver_usuarios %}pt-2 border-t border-slate-100 {% endif %}space-y-1">
-          <p class="px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-            Cuenta y Comunicación
-          </p>
+        <div data-collapsible-section class="{% if permisos.ver_inicio or permisos.ver_atenciones or permisos.ver_vecinos or permisos.ver_metas or permisos.ver_delegaciones or permisos.ver_usuarios %}pt-2 border-t border-slate-100 {% endif %}space-y-1">
+          <button type="button" data-section-toggle data-storage-key="sgr_nav_sec_cuenta" aria-expanded="true"
+            class="w-full flex items-center justify-between px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+            <span>Cuenta y Comunicación</span>
+            <i data-lucide="chevron-down" data-section-chevron class="w-3.5 h-3.5 transition-transform duration-150"></i>
+          </button>
+          <div data-section-body class="space-y-1">
           {% if permisos.ver_portal_cliente or permisos.es_cliente %}
             <a href="{% url 'portal_cliente' %}" 
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'portal_cliente' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
@@ -403,6 +422,7 @@
             <i data-lucide="user-cog" class="w-4 h-4 shrink-0"></i>
             <span>Mi Perfil y Foto</span>
           </a>
+          </div>
         </div>
 
       </nav>
@@ -1314,6 +1334,48 @@
       </div>
     </div>
   </div>
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('[data-section-toggle]').forEach((btn) => {
+        const section = btn.closest('[data-collapsible-section]');
+        if (!section) return;
+        const body = section.querySelector('[data-section-body]');
+        const storageKey = btn.dataset.storageKey;
+        if (!body) return;
+
+        const applyState = (collapsed) => {
+          body.classList.toggle('hidden', collapsed);
+          btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+          const chevron = btn.querySelector('[data-section-chevron]');
+          if (chevron) {
+            chevron.classList.toggle('-rotate-90', collapsed);
+          }
+        };
+
+        let isCollapsed = false;
+        if (storageKey) {
+          try {
+            isCollapsed = localStorage.getItem(storageKey) === '1';
+          } catch (e) {}
+        }
+        applyState(isCollapsed);
+
+        btn.addEventListener('click', () => {
+          const nextCollapsed = !body.classList.contains('hidden');
+          applyState(nextCollapsed);
+          if (storageKey) {
+            try {
+              if (nextCollapsed) {
+                localStorage.setItem(storageKey, '1');
+              } else {
+                localStorage.removeItem(storageKey);
+              }
+            } catch (e) {}
+          }
+        });
+      });
+    });
   </script>
   {% block extra_js %}{% endblock %}
 </body>
