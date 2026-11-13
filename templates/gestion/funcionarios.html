@@ -131,12 +131,8 @@
             </td>
             <td class="p-4 font-mono font-bold text-[#C41230]">{{ f.identificador_institucional }}</td>
             <td class="p-4 font-medium text-slate-800">{{ f.cargo.nombre_cargo }}</td>
-            <td class="p-4">
-              {% if f.delegacion %}
-                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">{{ f.delegacion.nombre }}</span>
-              {% else %}
-                <span class="italic text-slate-400">Transversal / Sin asignar</span>
-              {% endif %}
+            <td class="p-4 whitespace-nowrap">
+              {% include "gestion/includes/delegacion_cell.html" with nombre=f.delegacion.nombre fallback="Transversal / Sin asignar" %}
             </td>
             <td class="p-4">
               <div class="flex flex-wrap gap-1">

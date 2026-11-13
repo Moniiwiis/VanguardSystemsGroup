@@ -65,7 +65,9 @@
           {% for d in delegaciones %}
           <tr class="hover:bg-slate-50/70 transition-colors">
             <td class="py-3.5 px-6 font-mono font-bold text-slate-900">{{ d.get_codigo }}</td>
-            <td class="py-3.5 px-6 font-bold text-slate-900">{{ d.nombre }}</td>
+            <td class="py-3.5 px-6 whitespace-nowrap">
+              {% include "gestion/includes/delegacion_cell.html" with nombre=d.nombre %}
+            </td>
             <td class="py-3.5 px-6 text-slate-600">{{ d.comuna|default:"La Serena" }}</td>
             <td class="py-3.5 px-6">
               {% if d.estado == 'Activa' %}

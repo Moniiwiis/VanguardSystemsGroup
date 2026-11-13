@@ -240,15 +240,8 @@
           <tr class="hover:bg-red-50/30 transition-colors">
             <td class="p-4 font-bold text-slate-900">{{ m.item.nombre_item }}</td>
             <td class="p-4 font-medium">{{ m.periodo }}</td>
-            <td class="p-4">
-              {% if m.funcionario and m.funcionario.delegacion %}
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-extrabold bg-red-50 text-[#C41230] border border-red-100">
-                  <i data-lucide="map-pin" class="w-3 h-3"></i>
-                  {{ m.funcionario.delegacion.nombre }}
-                </span>
-              {% else %}
-                <span class="text-slate-400 italic text-[11px]">Global Comunal</span>
-              {% endif %}
+            <td class="p-4 whitespace-nowrap">
+              {% include "gestion/includes/delegacion_cell.html" with nombre=m.funcionario.delegacion.nombre fallback="Global Comunal" %}
             </td>
             <td class="p-4">
               {% if m.funcionario %}

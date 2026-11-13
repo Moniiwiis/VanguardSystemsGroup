@@ -100,7 +100,9 @@
                 {% endif %}
               {% endwith %}
             </td>
-            <td class="py-3.5 px-6 font-semibold text-slate-700">{{ f.delegacion.nombre|default:"Global" }}</td>
+            <td class="py-3.5 px-6 whitespace-nowrap">
+              {% include "gestion/includes/delegacion_cell.html" with nombre=f.delegacion.nombre fallback="Global" %}
+            </td>
             <td class="py-3.5 px-6 text-center">
               <div class="flex items-center justify-center gap-1.5">
                 <!-- Ver Detalle -->

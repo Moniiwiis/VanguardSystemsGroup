@@ -116,10 +116,8 @@
                 <span>{{ s.nombre }}</span>
               </div>
             </td>
-            <td class="py-3 px-4 text-slate-700 whitespace-nowrap">
-              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                {{ s.delegacion.nombre }}
-              </span>
+            <td class="py-3 px-4 whitespace-nowrap">
+              {% include "gestion/includes/delegacion_cell.html" with nombre=s.delegacion.nombre fallback="Sin delegación" %}
             </td>
             <td class="py-3 px-4 text-slate-500 max-w-xs truncate">
               {{ s.descripcion|default:"Sin descripción complementaria" }}

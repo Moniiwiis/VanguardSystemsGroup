@@ -434,10 +434,8 @@
               <span class="text-slate-400">›</span>
               <span>{{ atn.sub_atencion.nombre }}</span>
             </td>
-            <td class="py-3 px-4 text-slate-600">
-              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-red-50 text-[#C41230]">
-                {{ atn.delegacion.nombre }}
-              </span>
+            <td class="py-3 px-4 whitespace-nowrap">
+              {% include "gestion/includes/delegacion_cell.html" with nombre=atn.delegacion.nombre fallback="Sin delegación" %}
             </td>
             <td class="py-3 px-4 text-slate-600">{{ atn.usuario_responsable.username }}</td>
             <td class="py-3 px-4 text-slate-400 font-mono">{{ atn.fecha_registro|date:"d/m/Y H:i" }}</td>

@@ -305,7 +305,7 @@
             <p class="text-xs font-extrabold text-slate-900 leading-snug line-clamp-3">{{ at.descripcion }}</p>
             <div class="text-[11px] text-slate-600 space-y-0.5">
               <div><strong class="text-slate-700">Solicitante:</strong> {{ at.solicitante }}{% if at.organizacion %} <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{{ at.organizacion.tipo_organizacion }}</span>{% endif %}</div>
-              <div><strong class="text-slate-700">Territorio:</strong> {{ at.delegacion.nombre|default:"—" }}{% if at.territorio_sub %} · <span class="{% if not at.es_atencion %}text-purple-700{% else %}text-slate-600{% endif %} font-semibold">{{ at.territorio_sub }}</span>{% endif %}</div>
+              <div class="pt-0.5">{% include "gestion/includes/delegacion_cell.html" with nombre=at.delegacion.nombre sub=at.territorio_sub fallback="—" %}</div>
               {% if at.area_apoyo %}<div><strong class="text-slate-700">Apoyo:</strong> <span class="text-blue-700 font-semibold">{{ at.area_apoyo }}</span></div>{% endif %}
               {% if at.fecha_compromiso %}<div><strong class="text-slate-700">Compromiso:</strong> <span class="font-mono">{{ at.fecha_compromiso|date:"d/m/Y" }}</span></div>{% endif %}
             </div>
@@ -404,7 +404,7 @@
             <p class="text-xs font-extrabold text-slate-900 leading-snug line-clamp-3">{{ at.descripcion }}</p>
             <div class="text-[11px] text-slate-600 space-y-0.5">
               <div><strong class="text-slate-700">Solicitante:</strong> {{ at.solicitante }}{% if at.organizacion %} <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{{ at.organizacion.tipo_organizacion }}</span>{% endif %}</div>
-              <div><strong class="text-slate-700">Territorio:</strong> {{ at.delegacion.nombre|default:"—" }}{% if at.territorio_sub %} · <span class="{% if not at.es_atencion %}text-purple-700{% else %}text-slate-600{% endif %} font-semibold">{{ at.territorio_sub }}</span>{% endif %}</div>
+              <div class="pt-0.5">{% include "gestion/includes/delegacion_cell.html" with nombre=at.delegacion.nombre sub=at.territorio_sub fallback="—" %}</div>
               {% if at.area_apoyo %}<div><strong class="text-slate-700">Apoyo:</strong> <span class="text-blue-700 font-semibold">{{ at.area_apoyo }}</span></div>{% endif %}
               {% if at.fecha_compromiso %}<div><strong class="text-slate-700">Compromiso:</strong> <span class="font-mono">{{ at.fecha_compromiso|date:"d/m/Y" }}</span></div>{% endif %}
             </div>
@@ -503,7 +503,7 @@
             <p class="text-xs font-extrabold text-slate-900 leading-snug line-clamp-3">{{ at.descripcion }}</p>
             <div class="text-[11px] text-slate-600 space-y-0.5">
               <div><strong class="text-slate-700">Solicitante:</strong> {{ at.solicitante }}{% if at.organizacion %} <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{{ at.organizacion.tipo_organizacion }}</span>{% endif %}</div>
-              <div><strong class="text-slate-700">Territorio:</strong> {{ at.delegacion.nombre|default:"—" }}{% if at.territorio_sub %} · <span class="{% if not at.es_atencion %}text-purple-700{% else %}text-slate-600{% endif %} font-semibold">{{ at.territorio_sub }}</span>{% endif %}</div>
+              <div class="pt-0.5">{% include "gestion/includes/delegacion_cell.html" with nombre=at.delegacion.nombre sub=at.territorio_sub fallback="—" %}</div>
               {% if at.area_apoyo %}<div><strong class="text-slate-700">Apoyo:</strong> <span class="text-blue-700 font-semibold">{{ at.area_apoyo }}</span></div>{% endif %}
               {% if at.fecha_compromiso %}<div><strong class="text-slate-700">Compromiso:</strong> <span class="font-mono">{{ at.fecha_compromiso|date:"d/m/Y" }}</span></div>{% endif %}
             </div>
@@ -602,7 +602,7 @@
             <p class="text-xs font-extrabold text-slate-600 leading-snug line-clamp-3">{{ at.descripcion }}</p>
             <div class="text-[11px] text-slate-600 space-y-0.5">
               <div><strong class="text-slate-700">Solicitante:</strong> {{ at.solicitante }}{% if at.organizacion %} <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{{ at.organizacion.tipo_organizacion }}</span>{% endif %}</div>
-              <div><strong class="text-slate-700">Territorio:</strong> {{ at.delegacion.nombre|default:"—" }}{% if at.territorio_sub %} · <span class="{% if not at.es_atencion %}text-purple-700{% else %}text-slate-600{% endif %} font-semibold">{{ at.territorio_sub }}</span>{% endif %}</div>
+              <div class="pt-0.5">{% include "gestion/includes/delegacion_cell.html" with nombre=at.delegacion.nombre sub=at.territorio_sub fallback="—" %}</div>
               {% if at.area_apoyo %}<div><strong class="text-slate-700">Apoyo:</strong> <span class="text-blue-700 font-semibold">{{ at.area_apoyo }}</span></div>{% endif %}
             </div>
             <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
@@ -701,10 +701,7 @@
 
             <!-- Territorio -->
             <td class="py-2.5 px-2 text-[11px] max-w-[160px]">
-              <span class="font-bold text-slate-800 block leading-snug">{{ at.delegacion.nombre|default:"—" }}</span>
-              {% if at.territorio_sub %}
-                <span class="text-[10px] text-slate-400 block font-normal leading-snug">{{ at.territorio_sub }}</span>
-              {% endif %}
+              {% include "gestion/includes/delegacion_cell.html" with nombre=at.delegacion.nombre sub=at.territorio_sub fallback="—" %}
             </td>
 
             <!-- Tipo / Sub Atención -->
@@ -1075,7 +1072,9 @@
               <span class="text-[10px] text-slate-400 font-mono ml-4.5">{{ c.username }}</span>
             </td>
             <td class="py-3 px-3.5 text-slate-600 font-semibold">{{ c.cargo }}</td>
-            <td class="py-3 px-3.5 text-slate-600 whitespace-nowrap">{{ c.delegacion_nombre|default:"Comunal" }}</td>
+            <td class="py-3 px-3.5 whitespace-nowrap">
+              {% include "gestion/includes/delegacion_cell.html" with nombre=c.delegacion_nombre fallback="Comunal" %}
+            </td>
             <td class="py-3 px-3.5 text-center font-mono font-bold text-slate-900 text-sm">{{ c.total }}</td>
             <td class="py-3 px-3.5 text-center font-mono font-semibold text-blue-700">{{ c.ingresados }}</td>
             <td class="py-3 px-3.5 text-center font-mono font-bold text-amber-700">{{ c.en_proceso }}</td>

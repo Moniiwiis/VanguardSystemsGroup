@@ -641,16 +641,17 @@
                   </div>
                 {% endif %}
               </td>
-              <td class="py-2.5 px-3 text-slate-700 text-[11px] whitespace-nowrap">
-                <span class="font-bold text-slate-800 block">{{ a.delegacion.nombre }}</span>
+              <td class="py-2.5 px-3 text-[11px] whitespace-nowrap">
                 {% if a.vecino and a.vecino.sector %}
-                  <span class="text-[10px] text-slate-400 block font-normal">{{ a.vecino.sector.nombre }}</span>
+                  {% include "gestion/includes/delegacion_cell.html" with nombre=a.delegacion.nombre sub=a.vecino.sector.nombre fallback="Sin delegación" %}
                 {% elif a.vecino and a.vecino.territorio %}
-                  <span class="text-[10px] text-slate-400 block font-normal">{{ a.vecino.territorio }}</span>
+                  {% include "gestion/includes/delegacion_cell.html" with nombre=a.delegacion.nombre sub=a.vecino.territorio fallback="Sin delegación" %}
                 {% elif a.organizacion and a.organizacion.sector %}
-                  <span class="text-[10px] text-slate-400 block font-normal">{{ a.organizacion.sector.nombre }}</span>
+                  {% include "gestion/includes/delegacion_cell.html" with nombre=a.delegacion.nombre sub=a.organizacion.sector.nombre fallback="Sin delegación" %}
                 {% elif a.organizacion and a.organizacion.territorio %}
-                  <span class="text-[10px] text-slate-400 block font-normal">{{ a.organizacion.territorio }}</span>
+                  {% include "gestion/includes/delegacion_cell.html" with nombre=a.delegacion.nombre sub=a.organizacion.territorio fallback="Sin delegación" %}
+                {% else %}
+                  {% include "gestion/includes/delegacion_cell.html" with nombre=a.delegacion.nombre fallback="Sin delegación" %}
                 {% endif %}
               </td>
               <td class="py-2.5 px-2.5 max-w-[175px]">

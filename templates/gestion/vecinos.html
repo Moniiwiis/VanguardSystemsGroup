@@ -127,17 +127,7 @@
               {% endif %}
             </td>
             <td class="py-3.5 px-4">
-              {% if v.delegacion %}
-                <span class="inline-flex items-center gap-1 font-bold text-[#C41230] text-[11px]">
-                  <i data-lucide="map-pin" class="w-3 h-3 text-[#C41230]"></i>
-                  {{ v.delegacion.nombre }}
-                </span>
-              {% else %}
-                <span class="text-slate-400 italic text-[11px] block">Sin delegación</span>
-              {% endif %}
-              {% if v.territorio %}
-                <span class="text-slate-500 text-[11px] block">{{ v.territorio }}</span>
-              {% endif %}
+              {% include "gestion/includes/delegacion_cell.html" with nombre=v.delegacion.nombre sub=v.sector.nombre|default:v.territorio fallback="Sin delegación" %}
             </td>
             <td class="py-3.5 px-4">
               <span class="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
