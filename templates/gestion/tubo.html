@@ -655,14 +655,14 @@
           <tr>
             <th class="py-3 px-3.5 whitespace-nowrap">N° Tubo</th>
             <th class="py-3 px-3.5 whitespace-nowrap">Fecha Solicitud</th>
-            <th class="py-3 px-3.5">Solicitante</th>
+            <th class="py-3 px-3.5 whitespace-nowrap min-w-[185px]">Solicitante</th>
             <th class="py-3 px-3.5 whitespace-nowrap">Territorio</th>
-            <th class="py-3 px-3.5">Tipo / Sub Atención</th>
+            <th class="py-3 px-3.5 whitespace-nowrap min-w-[170px]">Tipo / Sub Atención</th>
             <th class="py-3 px-3.5 whitespace-nowrap">Evidencia SGR</th>
-            <th class="py-3 px-3.5">Responsable</th>
+            <th class="py-3 px-3.5 whitespace-nowrap">Responsable</th>
             <th class="py-3 px-3.5 whitespace-nowrap">Fecha Compromiso</th>
-            <th class="py-3 px-3.5">Área de Apoyo</th>
-            <th class="py-3 px-3.5">Avance / Observaciones</th>
+            <th class="py-3 px-3.5 whitespace-nowrap min-w-[170px]">Área de Apoyo</th>
+            <th class="py-3 px-3.5 whitespace-nowrap min-w-[260px]">Avance / Observaciones</th>
             <th class="py-3 px-3.5 text-center whitespace-nowrap">Estatus</th>
             <th class="py-3 px-3.5 text-center whitespace-nowrap sticky right-0 bg-slate-50 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acciones</th>
           </tr>
@@ -682,7 +682,7 @@
             </td>
 
             <!-- Solicitante -->
-            <td class="py-3 px-3.5">
+            <td class="py-3 px-3.5 min-w-[185px] whitespace-nowrap">
               <div class="font-bold text-slate-900">
                 <span>{{ at.solicitante }}</span>
                 {% if at.organizacion %}
@@ -692,8 +692,8 @@
                 {% endif %}
               </div>
               {% if at.telefono %}
-                <div class="text-[10px] text-slate-500 font-mono font-semibold flex items-center gap-1 mt-0.5">
-                  <i data-lucide="phone" class="w-3 h-3 text-[#C41230]"></i>
+                <div class="text-[10px] text-slate-500 font-mono font-semibold flex items-center gap-1 mt-0.5 whitespace-nowrap">
+                  <i data-lucide="phone" class="w-3 h-3 text-[#C41230] shrink-0"></i>
                   <span>{{ at.telefono }}</span>
                 </div>
               {% endif %}
@@ -708,7 +708,7 @@
             </td>
 
             <!-- Tipo / Sub Atención -->
-            <td class="py-3 px-3.5">
+            <td class="py-3 px-3.5 min-w-[170px] whitespace-nowrap">
               <span class="font-bold text-slate-800 block leading-tight">{{ at.tipo_nombre }}</span>
               <span class="text-slate-400 block text-[10px] mt-0.5">{{ at.sub_nombre }}</span>
             </td>
@@ -782,12 +782,12 @@
             </td>
 
             <!-- Área de Apoyo -->
-            <td class="py-3 px-3.5 text-[11px] font-semibold text-slate-700">
+            <td class="py-3 px-3.5 text-[11px] font-semibold text-slate-700 min-w-[170px] whitespace-nowrap">
               {{ at.area_apoyo|default:"—" }}
             </td>
 
             <!-- Avance / Observaciones -->
-            <td class="py-3 px-3.5 max-w-[240px]">
+            <td class="py-3 px-3.5 min-w-[260px] max-w-[340px]">
               <div class="desc-roll text-slate-600 text-[11px]">
                 {{ at.avance_observaciones|default:at.descripcion|default:"Sin observaciones registradas" }}
               </div>
