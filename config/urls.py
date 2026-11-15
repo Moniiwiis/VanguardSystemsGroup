@@ -132,3 +132,10 @@ handler400 = 'core.views.error_400'
 handler403 = 'core.views.error_403'
 handler404 = 'core.views.error_404'
 handler500 = 'core.views.error_500'
+
+
+# EXTENSIÓN ADITIVA: tablero Kanban de Tubo SGR. No reemplaza rutas existentes.
+from core.tubo_tablero import gestion_tubo_tablero
+urlpatterns += [
+    path('gestion/tubo/tablero/', gestion_tubo_tablero, name='gestion_tubo_tablero'),
+]

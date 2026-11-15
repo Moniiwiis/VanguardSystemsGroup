@@ -37,6 +37,13 @@
         <span>Exportar Excel</span>
       </a>
 
+      <!-- EXTENSIÓN ADITIVA: acceso al tablero Kanban sin reemplazar esta vista -->
+      <a href="{% url 'gestion_tubo_tablero' %}"
+         class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-[#8B1D19] hover:bg-[#C41230] text-white shadow-sm transition-all flex items-center gap-2">
+        <i data-lucide="columns-3" class="w-4 h-4"></i>
+        <span>Ver tablero (4 columnas)</span>
+      </a>
+
       <a href="{% url 'gestion_atenciones' %}"
          class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white shadow-md border border-red-700/50 transition-all flex items-center gap-2">
         <i data-lucide="plus-circle" class="w-4 h-4"></i>

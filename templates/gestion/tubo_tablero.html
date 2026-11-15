@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% block title %}Tablero del Tubo SGR — Municipalidad de La Serena{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+    <div>
+      <p class="uppercase tracking-widest text-[11px] font-extrabold text-slate-500">Gestión Territorial / Tubo SGR</p>
+      <h1 class="text-2xl font-black text-[#8B1D19] mt-1">Tablero del Tubo de Trabajo</h1>
+      <p class="mt-1 text-sm text-slate-600">Compromisos territoriales a futuro. Vista adicional en cuatro etapas.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="{% url 'gestion_tubo' %}" class="rounded-xl bg-slate-900 px-4 py-2.5 text-white font-bold text-xs hover:bg-slate-700">Ver tabla original</a>
+      {% if permisos.puede_ingresar_atencion %}
+      <a href="{% url 'gestion_atenciones' %}" class="rounded-xl bg-[#C41230] px-4 py-2.5 text-white font-bold text-xs hover:bg-[#8B1D19]">+ Nuevo ingreso</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div class="bg-white border-l-4 border-[#A70000] border border-slate-200 shadow-sm p-5">
+      <p class="font-extrabold uppercase tracking-widest text-[10px] sm:text-xs text-slate-500">Gestiones en tubo</p>
+      <p class="text-3xl mt-5 font-serif text-[#A70000]">{{ total_tubo_tablero }}</p>
+      <p class="text-xs text-slate-500 mt-3">Derivadas para seguimiento</p>
+    </div>
+    <div class="bg-white border-l-4 border-emerald-700 border border-slate-200 shadow-sm p-5">
+      <p class="font-extrabold uppercase tracking-widest text-[10px] sm:text-xs text-slate-500">Realizadas / Concluidas</p>
+      <p class="text-3xl mt-5 font-serif text-emerald-700">{{ realizados_tablero }}</p>
+      <p class="text-xs text-slate-500 mt-3">Tasa de resolución: {{ porcentaje_tubo_tablero }}%</p>
+    </div>
+    <div class="bg-white border-l-4 border-amber-600 border border-slate-200 shadow-sm p-5">
+      <p class="font-extrabold uppercase tracking-widest text-[10px] sm:text-xs text-slate-500">En proceso activo</p>
+      <p class="text-3xl mt-5 font-serif text-amber-600">{{ proceso_tablero }}</p>
+      <p class="text-xs text-slate-500 mt-3">Con área de apoyo o gestión asignada</p>
+    </div>
+    <div class="bg-white border-l-4 border-red-700 border border-slate-200 shadow-sm p-5">
+      <p class="font-extrabold uppercase tracking-widest text-[10px] sm:text-xs text-slate-500">Pendientes / Alerta</p>
+      <p class="text-3xl mt-5 font-serif text-red-700">{{ pendientes_tablero }}</p>
+      <p class="text-xs text-slate-500 mt-3">{{ porcentaje_pendientes_tablero }}% pendientes {% if alerta_tubo_tablero %}· Supera 10%{% endif %}</p>
+    </div>
+  </div>
+
+  <form method="get" class="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap gap-3 items-end">
+    <div class="flex-1 min-w-[180px]">
+      <label for="buscar-tablero" class="block text-xs font-bold text-slate-600 mb-1">Buscar requerimiento</label>
+      <input id="buscar-tablero" type="search" name="q" value="{{ busqueda_tablero }}" placeholder="Código, solicitante, actividad..." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+    </div>
+    {% if es_admin %}
+    <div class="min-w-[180px]">
+      <label for="delegacion-tablero" class="block text-xs font-bold text-slate-600 mb-1">Delegación</label>
+      <select id="delegacion-tablero" name="delegacion" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        <option value="">Todas las delegaciones</option>
+        {% for d in delegaciones_tablero %}
+        <option value="{{ d.id }}" {% if delegacion_seleccionada_tablero and d.id == delegacion_seleccionada_tablero.id %}selected{% endif %}>{{ d.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <button type="submit" class="rounded-lg bg-[#8B1D19] text-white px-4 py-2 text-sm font-bold">Filtrar</button>
+    <a href="{% url 'gestion_tubo_tablero' %}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Limpiar</a>
+  </form>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+    {% for columna in columnas_tablero %}
+    <section class="rounded-xl border border-[#E5DFDB] bg-[#F4EEEA] p-4 min-h-[420px]">
+      <header class="mb-4 pb-3 border-b border-[#DDD4CF] flex justify-between items-center gap-2">
+        <h2 class="text-sm font-black tracking-widest
+          {% if columna.clave == 'pendientes' %}text-red-800{% elif columna.clave == 'proceso' %}text-amber-800{% elif columna.clave == 'realizados' %}text-emerald-800{% else %}text-slate-700{% endif %}">{{ columna.titulo }}</h2>
+        <span class="bg-white border border-slate-200 rounded-full py-1 px-2.5 text-xs font-bold">{{ columna.cantidad }}</span>
+      </header>
+      <div class="space-y-3">
+      {% for at in columna.registros %}
+        <article class="bg-white border-l-[3px] shadow-sm border border-slate-200 p-4
+          {% if columna.clave == 'pendientes' %}border-l-red-700{% elif columna.clave == 'proceso' %}border-l-amber-600{% elif columna.clave == 'realizados' %}border-l-emerald-700{% else %}border-l-slate-600{% endif %}">
+          <div class="flex gap-2 justify-between items-start mb-2">
+            <span class="font-mono text-xs font-bold {% if columna.clave == 'realizados' %}text-emerald-700{% elif columna.clave == 'pendientes' %}text-red-800{% else %}text-slate-700{% endif %}">TUB-{{ at.id|stringformat:'05d' }}</span>
+            <span class="font-mono text-[10px] text-blue-700 bg-blue-50 px-1.5 py-1 rounded" title="Código real de la atención">{{ at.codigo_atencion }}</span>
+          </div>
+          <h3 class="font-extrabold text-sm text-slate-900 leading-5 mb-3 {% if columna.clave == 'realizados' %}line-through text-slate-500{% endif %}">{{ at.descripcion|truncatechars:145 }}</h3>
+          <div class="text-[12px] leading-5 text-slate-600 space-y-1">
+            <p><strong>Solicitante:</strong> {{ at.solicitante }}</p>
+            <p><strong>Responsable:</strong> {{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username }}</p>
+            {% if at.organizacion and at.organizacion.territorio %}
+            <p><strong>Territorio:</strong> {{ at.organizacion.territorio }}</p>
+            {% elif at.vecino and at.vecino.territorio %}
+            <p><strong>Territorio:</strong> {{ at.vecino.territorio }}</p>
+            {% endif %}
+            {% if at.area_apoyo %}<p><strong>Apoyo:</strong> {{ at.area_apoyo }}</p>{% endif %}
+            {% if at.fecha_compromiso %}<p><strong>Compromiso:</strong> {{ at.fecha_compromiso|date:'d/m/Y' }}</p>{% endif %}
+            {% if at.avance_observaciones %}<p class="text-slate-500" title="{{ at.avance_observaciones }}"><strong>Avance:</strong> {{ at.avance_observaciones|truncatechars:120 }}</p>{% endif %}
+          </div>
+          <div class="border-t border-slate-100 pt-3 mt-3 flex flex-wrap justify-end items-center gap-2">
+            <details class="w-full text-xs">
+              <summary class="cursor-pointer font-bold text-[#8B1D19] hover:underline py-1">Ver detalle</summary>
+              <div class="bg-slate-50 rounded-lg p-3 mt-2 mb-2 space-y-1.5 text-slate-700 break-words">
+                <p><strong>Descripción completa:</strong> {{ at.descripcion }}</p>
+                <p><strong>Código original:</strong> {{ at.codigo_atencion }}</p>
+                <p><strong>Delegación:</strong> {{ at.delegacion.nombre }}</p>
+                <p><strong>Origen:</strong> {{ at.origen }}</p>
+                <p><strong>Estado:</strong> {{ at.estado }}</p>
+                <p><strong>Fecha solicitud:</strong> {{ at.fecha_registro|date:'d/m/Y' }}</p>
+                <p><strong>Fecha compromiso:</strong> {{ at.fecha_compromiso|date:'d/m/Y'|default:'Sin fecha registrada' }}</p>
+                <p><strong>Solicitante:</strong> {{ at.solicitante }}</p>
+                {% if at.telefono_contacto %}
+                <p><strong>Teléfono de contacto:</strong> {{ at.telefono_contacto }}</p>
+                {% elif at.vecino and at.vecino.telefono %}
+                <p><strong>Teléfono de contacto:</strong> {{ at.vecino.telefono }}</p>
+                {% else %}
+                <p><strong>Teléfono de contacto:</strong> No registrado</p>
+                {% endif %}
+                {% if at.organizacion %}<p><strong>Organización:</strong> {{ at.organizacion.nombre }}</p>{% endif %}
+                {% if at.organizacion and at.organizacion.territorio %}
+                <p><strong>Territorio:</strong> {{ at.organizacion.territorio }}</p>
+                {% elif at.vecino and at.vecino.territorio %}
+                <p><strong>Territorio:</strong> {{ at.vecino.territorio }}</p>
+                {% else %}
+                <p><strong>Territorio:</strong> Sin territorio registrado</p>
+                {% endif %}
+                <p><strong>Responsable:</strong> {{ at.usuario_responsable.get_full_name|default:at.usuario_responsable.username }}</p>
+                <p><strong>Área de apoyo:</strong> {{ at.area_apoyo|default:'No asignada' }}</p>
+                <p><strong>Observaciones:</strong> {{ at.avance_observaciones|default:'Sin observaciones' }}</p>
+                <a class="inline-block mt-2 text-[#C41230] font-extrabold hover:underline" href="{% url 'gestion_tubo' %}?q={{ at.codigo_atencion|urlencode }}">Abrir ficha completa en Tubo original</a>
+              </div>
+            </details>
+            {% if permisos.puede_cambiar_estado_atencion %}
+              {% if columna.clave == 'ingresados' %}
+              <form method="post" action="{% url 'gestion_tubo_cambiar_estado' at.id %}">
+                {% csrf_token %}<input type="hidden" name="nuevo_estado" value="Pendiente" />
+                <button type="submit" class="rounded bg-amber-100 px-2 py-1.5 text-[11px] font-bold text-slate-800 hover:bg-amber-200">A Pendiente</button>
+              </form>
+              {% elif columna.clave == 'pendientes' %}
+              <form method="post" action="{% url 'gestion_tubo_cambiar_estado' at.id %}">
+                {% csrf_token %}<input type="hidden" name="nuevo_estado" value="En proceso" />
+                <button type="submit" class="rounded bg-amber-100 px-2 py-1.5 text-[11px] font-bold text-slate-800 hover:bg-amber-200">A Proceso</button>
+              </form>
+              {% elif columna.clave == 'proceso' %}
+              <form method="post" action="{% url 'gestion_tubo_cambiar_estado' at.id %}">
+                {% csrf_token %}<input type="hidden" name="nuevo_estado" value="Resuelta" />
+                <button type="submit" class="rounded bg-emerald-100 px-2 py-1.5 text-[11px] font-bold text-slate-800 hover:bg-emerald-200">Realizar</button>
+              </form>
+              {% endif %}
+            {% endif %}
+          </div>
+        </article>
+      {% empty %}
+        <div class="text-center text-xs text-slate-500 py-12 border border-dashed border-slate-300 bg-white/40 rounded-lg">Sin requerimientos en esta etapa</div>
+      {% endfor %}
+      {% if columna.hay_mas %}
+        <p class="text-xs font-semibold text-slate-600 text-center pt-2">Se muestran 100 de {{ columna.cantidad }} registros. Consulta el listado completo en la vista de tabla.</p>
+      {% endif %}
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+  {% if total_cancelados_tablero %}
+    <p class="text-xs text-slate-500">{{ total_cancelados_tablero }} registro(s) cancelado(s) quedan fuera de las cuatro etapas; siguen disponibles en la vista de tabla.</p>
+  {% endif %}
+</div>
+{% endblock %}
