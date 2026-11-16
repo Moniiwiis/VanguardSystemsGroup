@@ -360,6 +360,14 @@
             </a>
           {% endif %}
 
+          {% if permisos.ver_atenciones or permisos.es_admin %}
+            <a href="{% url 'cartas_listado' %}"
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'cartas_listado' or request.resolver_match.url_name == 'cartas_nueva' or request.resolver_match.url_name == 'cartas_detalle' or request.resolver_match.url_name == 'cartas_editar' or request.resolver_match.url_name == 'cartas_eliminar' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="mail" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
+              <span>Tubo de Cartas</span>
+            </a>
+          {% endif %}
+
           {% if permisos.ver_reportes %}
             <a href="{% url 'gestion_reportes' %}" 
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_reportes' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
