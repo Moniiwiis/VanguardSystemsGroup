@@ -84,11 +84,15 @@
     <!-- Tarjeta Derecha: Formularios de Datos y Contraseña -->
     <div class="lg:col-span-2 space-y-6 min-w-0">
 
-      <!-- Formulario 1: Datos Personales -->
+      {% if org_perfil %}
+        {% include "portal/includes/org_datos_card.html" with organizacion=org_perfil %}
+      {% endif %}
+
+      <!-- Formulario 1: Datos Personales / Organización -->
       <div class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-4">
         <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
           <i data-lucide="user" class="w-4 h-4 text-[#C41230]"></i>
-          <h2 class="text-base font-extrabold text-slate-900">Información Personal</h2>
+          <h2 class="text-base font-extrabold text-slate-900">{% if org_perfil %}Editar Contacto de la Organización{% else %}Información Personal{% endif %}</h2>
         </div>
 
         <form method="POST" action="{% url 'perfil_usuario' %}" class="space-y-4">
@@ -161,7 +165,7 @@
 
             <div class="space-y-1">
               <label class="block text-xs font-bold text-slate-700">Teléfono Móvil (Chile)</label>
-              <input type="text" name="telefono" maxlength="15" value="{{ funcionario.telefono|default:'' }}"
+              <input type="text" name="telefono" maxlength="15" value="{% if org_perfil %}{{ funcionario.telefono|default:org_perfil.telefono_contacto|default:'' }}{% else %}{{ funcionario.telefono|default:'' }}{% endif %}"
                      placeholder="+56 9 8765 4321"
                      class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
               <div class="tel-feedback"></div>

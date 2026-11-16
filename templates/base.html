@@ -504,7 +504,7 @@
           <a href="{% url 'perfil_usuario' %}" 
              class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'perfil_usuario' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
             <i data-lucide="user-cog" class="w-4 h-4 shrink-0"></i>
-            <span>Mi Perfil y Foto</span>
+            <span>{% if permisos.es_cliente %}Mis Datos y Perfil{% else %}Mi Perfil y Foto{% endif %}</span>
           </a>
           </div>
         </div>

@@ -2590,6 +2590,27 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         session.save()
 
         sec = Sector.objects.create(nombre='Sector Org Portal', delegacion=self.delegacion, estado='Activo')
+        vec_existente = Vecino.objects.create(
+            nombre='Raúl Andrés Gómez Tapia',
+            primer_nombre='Raúl',
+            segundo_nombre='Andrés',
+            apellido_paterno='Gómez',
+            apellido_materno='Tapia',
+            rut='8.765.432-K',
+            telefono='+56 9 4444 5555',
+            delegacion=self.delegacion,
+            sector=sec,
+            estado='Activo',
+        )
+
+        # GET Organizaciones verifica búsqueda de vecinos en directiva (Primer Nombre + Apellido Paterno) y sin texto Opcional en editar
+        resp_org_get = self.client.get(reverse('gestion_organizaciones'))
+        self.assertEqual(resp_org_get.status_code, 200)
+        self.assertContains(resp_org_get, 'id="vecinos-directiva-list"')
+        self.assertContains(resp_org_get, 'value="Raúl Gómez"')
+        self.assertContains(resp_org_get, 'name="presidente_primer_nombre"')
+        self.assertContains(resp_org_get, 'name="presidente_apellido_paterno"')
+        self.assertNotContains(resp_org_get, '(Opcional — si se deja vacío usa el del contacto prioritario)')
 
         # 1. Rechaza crear organización si no se ingresa correo institucional ni en directiva
         antes = OrganizacionComunitaria.objects.count()
@@ -2601,7 +2622,8 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertRedirects(resp_no_mail, reverse('gestion_organizaciones'))
         self.assertEqual(OrganizacionComunitaria.objects.count(), antes)
 
-        # 2. Al crear organización con correo se crea su User (Rol Cliente), Funcionario ORG- y se envía contraseña provisoria
+        # 2. Al crear organización con correo y representantes (Primer Nombre + Apellido Paterno),
+        # crea usuario de la organización + envía provisoria + crea vecinos nuevos si no existen en padrón
         mail.outbox.clear()
         resp_create = self.client.post(reverse('gestion_organizaciones'), {
             'nombre': 'JJVV Portal Las Compañías',
@@ -2613,14 +2635,37 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             'registro_directiva_numero': 'DIR-77',
             'sector_id': sec.id,
             'contacto_prioritario': 'presidente',
-            'presidente_nombre': 'Carmen Presidenta',
+            'presidente_primer_nombre': 'Carmen',
+            'presidente_apellido_paterno': 'Soto',
             'presidente_rut': '11.111.111-1',
             'presidente_telefono': '912345678',
             'presidente_correo': 'contacto@jjvvcompanias.test',
+            'tesorero_primer_nombre': 'Marta',
+            'tesorero_apellido_paterno': 'Rojas',
+            'tesorero_rut': '12.345.678-5',
+            'tesorero_telefono': '922223333',
+            'tesorero_correo': 'marta.tesorera@jjvvcompanias.test',
+            'secretario_primer_nombre': 'Raúl',
+            'secretario_apellido_paterno': 'Gómez',
+            'secretario_rut': '8.765.432-K',
             'estado': 'Activa',
         })
         self.assertRedirects(resp_create, reverse('gestion_organizaciones'))
         org = OrganizacionComunitaria.objects.get(nombre='JJVV Portal Las Compañías')
+        self.assertEqual(org.presidente_nombre, 'Carmen Soto')
+        self.assertEqual(org.tesorero_nombre, 'Marta Rojas')
+        self.assertEqual(org.secretario_nombre, 'Raúl Gómez')
+
+        # Representantes que no existían fueron creados en Vecinos; el existente se reutilizó sin duplicar
+        vec_pres = Vecino.objects.filter(rut='11.111.111-1').first()
+        self.assertIsNotNone(vec_pres)
+        self.assertEqual(vec_pres.primer_nombre, 'Carmen')
+        self.assertEqual(vec_pres.apellido_paterno, 'Soto')
+        vec_tes = Vecino.objects.filter(rut='12.345.678-5').first()
+        self.assertIsNotNone(vec_tes)
+        self.assertEqual(vec_tes.primer_nombre, 'Marta')
+        self.assertEqual(vec_tes.apellido_paterno, 'Rojas')
+        self.assertEqual(Vecino.objects.filter(rut='8.765.432-K').count(), 1)
         user_org = User.objects.filter(email='contacto@jjvvcompanias.test').first()
         self.assertIsNotNone(user_org)
         self.assertFalse(user_org.is_staff)
@@ -2634,13 +2679,14 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         resp_func = self.client.get(reverse('gestion_usuarios'))
         self.assertNotContains(resp_func, '65.987.654-K')
 
-        # Correo enviado con contraseña provisoria
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(mail.outbox[0].to, ['contacto@jjvvcompanias.test'])
-        m = re.search(r'Contraseña provisoria:\s*(\S+)', mail.outbox[0].body)
+        # Correo enviado con contraseña provisoria (al correo de la organización y opcionalmente a nuevo vecino representante con correo propio)
+        emails_org = [e for e in mail.outbox if e.to == ['contacto@jjvvcompanias.test']]
+        self.assertEqual(len(emails_org), 1)
+        m = re.search(r'Contraseña provisoria:\s*(\S+)', emails_org[0].body)
         self.assertIsNotNone(m)
         prov_pwd = m.group(1)
         self.assertTrue(user_org.check_password(prov_pwd))
+        self.assertTrue(any(e.to == ['marta.tesorera@jjvvcompanias.test'] for e in mail.outbox))
 
         # Registrar una atención y un compromiso vinculados a la organización + una atención ajena
         at_propia = AtencionCiudadana.objects.create(
@@ -2708,7 +2754,8 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertContains(resp_portal, '65.987.654-K')
         self.assertContains(resp_portal, 'Av. Viña del Mar 123')
         self.assertContains(resp_portal, 'PJ-5544')
-        self.assertContains(resp_portal, 'Carmen Presidenta')
+        self.assertContains(resp_portal, 'Carmen Soto')
+        self.assertContains(resp_portal, 'Marta Rojas')
         self.assertContains(resp_portal, 'Solicitud propia de sede comunitaria')
         self.assertContains(resp_portal, 'Compromiso territorial de luminarias')
         self.assertNotContains(resp_portal, 'Solicitud confidencial ajena')
@@ -2718,8 +2765,12 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(self.client.get(reverse('portal_cliente_detalle', args=[at_ajena.id])).status_code, 404)
         self.assertEqual(self.client.get(reverse('gestion_organizaciones')).status_code, 403)
 
-        # Mi Perfil muestra datos de la organización y sincroniza correo/teléfono
+        # Mi Perfil (Mis Datos) muestra ficha completa de la organización igual al portal y permite editar correo/teléfono
         resp_perf = self.client.get(reverse('perfil_usuario'))
+        self.assertContains(resp_perf, 'Directiva de la Organización')
+        self.assertContains(resp_perf, 'Socios Activos')
+        self.assertContains(resp_perf, 'PJ-5544')
+        self.assertContains(resp_perf, 'Carmen Soto')
         self.assertContains(resp_perf, 'Nombre de la Organización')
         self.assertContains(resp_perf, 'JJVV Portal Las Compañías')
         self.client.post(reverse('perfil_usuario'), {
@@ -2730,6 +2781,8 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         org.refresh_from_db()
         self.assertEqual(org.email_contacto, 'nuevo.correo@jjvvcompanias.test')
         self.assertEqual(org.telefono_contacto, '+56 9 8888 7777')
+        self.assertEqual(org.presidente_correo, 'nuevo.correo@jjvvcompanias.test')
+        self.assertEqual(org.presidente_telefono, '+56 9 8888 7777')
 
         # También puede ingresar al Portal usando su RUT de organización
         self.client.logout()

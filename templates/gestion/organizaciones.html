@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load sgr_tags %}
 
 {% block title %}Juntas de Vecinos y Organizaciones — Sistema Municipal La Serena{% endblock %}
 
@@ -236,7 +237,7 @@
                 {{ o.domicilio_legal|default:o.direccion_sede|default:"—" }}
               </div>
               {% if o.representante_legal or o.presidente_nombre %}
-                <span class="text-[10px] text-slate-500 block mt-0.5">{{ o.get_contacto_prioritario_display }}: {{ o.representante_legal|default:o.presidente_nombre }}{% if o.telefono_contacto %} · <span class="font-mono text-slate-600">{{ o.telefono_contacto }}</span>{% endif %}</span>
+                <span class="text-[10px] text-slate-500 block mt-0.5">{{ o.get_contacto_prioritario_display }}: {{ o.representante_legal|default:o.presidente_nombre|nombre_corto }}{% if o.telefono_contacto %} · <span class="font-mono text-slate-600">{{ o.telefono_contacto }}</span>{% endif %}</span>
               {% endif %}
             </td>
 
@@ -334,7 +335,7 @@
                         data-regdir="{{ o.registro_directiva_numero|default:'' }}"
                         data-rut="{{ o.rut|default:'' }}"
                         data-directiva="{{ o.directiva_actual|default:'' }}"
-                        data-rep="{{ o.representante_legal|default:'' }}"
+                        data-rep="{{ o.representante_legal|default:''|nombre_corto }}"
                         data-prioridad="{{ o.contacto_prioritario|default:'presidente' }}"
                         data-prioridad-label="{{ o.get_contacto_prioritario_display|default:'Presidente' }}"
                         data-tel="{{ o.telefono_contacto|default:'' }}"
@@ -342,15 +343,15 @@
                         data-estado="{{ o.estado }}"
                         data-usuario="{{ o.usuario_username|default:'' }}"
                         data-obs="{{ o.observaciones|default:'' }}"
-                        data-pres-nombre="{{ o.presidente_nombre|default:'' }}"
+                        data-pres-nombre="{{ o.pres_corto|default:'' }}"
                         data-pres-rut="{{ o.presidente_rut|default:'' }}"
                         data-pres-tel="{{ o.presidente_telefono|default:'' }}"
                         data-pres-correo="{{ o.presidente_correo|default:'' }}"
-                        data-tes-nombre="{{ o.tesorero_nombre|default:'' }}"
+                        data-tes-nombre="{{ o.tes_corto|default:'' }}"
                         data-tes-rut="{{ o.tesorero_rut|default:'' }}"
                         data-tes-tel="{{ o.tesorero_telefono|default:'' }}"
                         data-tes-correo="{{ o.tesorero_correo|default:'' }}"
-                        data-sec-nombre="{{ o.secretario_nombre|default:'' }}"
+                        data-sec-nombre="{{ o.sec_corto|default:'' }}"
                         data-sec-rut="{{ o.secretario_rut|default:'' }}"
                         data-sec-tel="{{ o.secretario_telefono|default:'' }}"
                         data-sec-correo="{{ o.secretario_correo|default:'' }}"
@@ -381,15 +382,18 @@
                           data-email="{{ o.email_contacto|default:'' }}"
                           data-estado="{{ o.estado }}"
                           data-obs="{{ o.observaciones|default:'' }}"
-                          data-pres-nombre="{{ o.presidente_nombre|default:'' }}"
+                          data-pres-pn="{{ o.pres_pn|default:'' }}"
+                          data-pres-ap="{{ o.pres_ap|default:'' }}"
                           data-pres-rut="{{ o.presidente_rut|default:'' }}"
                           data-pres-tel="{{ o.presidente_telefono|default:'' }}"
                           data-pres-correo="{{ o.presidente_correo|default:'' }}"
-                          data-tes-nombre="{{ o.tesorero_nombre|default:'' }}"
+                          data-tes-pn="{{ o.tes_pn|default:'' }}"
+                          data-tes-ap="{{ o.tes_ap|default:'' }}"
                           data-tes-rut="{{ o.tesorero_rut|default:'' }}"
                           data-tes-tel="{{ o.tesorero_telefono|default:'' }}"
                           data-tes-correo="{{ o.tesorero_correo|default:'' }}"
-                          data-sec-nombre="{{ o.secretario_nombre|default:'' }}"
+                          data-sec-pn="{{ o.sec_pn|default:'' }}"
+                          data-sec-ap="{{ o.sec_ap|default:'' }}"
                           data-sec-rut="{{ o.secretario_rut|default:'' }}"
                           data-sec-tel="{{ o.secretario_telefono|default:'' }}"
                           data-sec-correo="{{ o.secretario_correo|default:'' }}"
@@ -599,97 +603,13 @@
         </div>
 
         <div class="sm:col-span-3 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Correo Electrónico Institucional (Opcional — si se deja vacío usa el del contacto prioritario)</label>
+          <label class="block text-xs font-bold text-slate-700">Correo Electrónico Institucional <span class="text-[#C41230]">*</span> <span class="font-normal text-slate-500">(o correo en Directiva)</span></label>
           <input type="email" id="edit-org-email" name="email_contacto" maxlength="100"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
 
         <!-- Directiva estructurada (3 columnas por representante) -->
-        <div class="sm:col-span-3 p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-3">
-          <div class="flex items-center gap-2 text-xs font-extrabold text-slate-800 border-b border-slate-200 pb-1.5">
-            <i data-lucide="users" class="w-4 h-4 text-[#C41230]"></i>
-            <span>Directiva de la Organización (Presidente, Tesorero y Secretario)</span>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
-              <div class="text-[11px] font-extrabold uppercase tracking-wider text-[#C41230] border-b border-slate-100 pb-1">Presidente</div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Nombre y Apellido</label>
-                <input type="text" id="edit-org-pres-nombre" name="presidente_nombre" maxlength="150" placeholder="Nombre y apellido"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">RUT</label>
-                <input type="text" id="edit-org-pres-rut" name="presidente_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-                <div class="rut-feedback"></div>
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Teléfono</label>
-                <input type="text" id="edit-org-pres-tel" name="presidente_telefono" maxlength="15" placeholder="+56 9 8765 4321"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-                <div class="tel-feedback"></div>
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
-                <input type="email" id="edit-org-pres-correo" name="presidente_correo" maxlength="100" placeholder="presidente@correo.cl"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-              </div>
-            </div>
-
-            <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
-              <div class="text-[11px] font-extrabold uppercase tracking-wider text-[#C41230] border-b border-slate-100 pb-1">Tesorero</div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Nombre y Apellido</label>
-                <input type="text" id="edit-org-tes-nombre" name="tesorero_nombre" maxlength="150" placeholder="Nombre y apellido"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">RUT</label>
-                <input type="text" id="edit-org-tes-rut" name="tesorero_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-                <div class="rut-feedback"></div>
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Teléfono</label>
-                <input type="text" id="edit-org-tes-tel" name="tesorero_telefono" maxlength="15" placeholder="+56 9 8765 4321"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-                <div class="tel-feedback"></div>
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
-                <input type="email" id="edit-org-tes-correo" name="tesorero_correo" maxlength="100" placeholder="tesorero@correo.cl"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-              </div>
-            </div>
-
-            <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
-              <div class="text-[11px] font-extrabold uppercase tracking-wider text-[#C41230] border-b border-slate-100 pb-1">Secretario</div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Nombre y Apellido</label>
-                <input type="text" id="edit-org-sec-nombre" name="secretario_nombre" maxlength="150" placeholder="Nombre y apellido"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">RUT</label>
-                <input type="text" id="edit-org-sec-rut" name="secretario_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-                <div class="rut-feedback"></div>
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Teléfono</label>
-                <input type="text" id="edit-org-sec-tel" name="secretario_telefono" maxlength="15" placeholder="+56 9 8765 4321"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-                <div class="tel-feedback"></div>
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
-                <input type="email" id="edit-org-sec-correo" name="secretario_correo" maxlength="100" placeholder="secretario@correo.cl"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-              </div>
-            </div>
-          </div>
-        </div>
+        {% include 'gestion/includes/org_directiva_fields.html' with p='' idp='edit-org-' include_datalist=False %}
 
         <div class="sm:col-span-3 space-y-1">
           <label class="block text-xs font-bold text-slate-700">Nómina / Notas de Directiva</label>
@@ -763,24 +683,25 @@
     document.getElementById('edit-org-rut').value = d.rut || '';
     document.getElementById('edit-org-directiva').value = d.directiva || '';
     document.getElementById('edit-org-prioridad').value = d.prioridad || 'presidente';
-    const prioEmails = {
-      presidente: d.presCorreo || '',
-      tesorero: d.tesCorreo || '',
-      secretario: d.secCorreo || '',
-    };
-    const oldPrioEmail = prioEmails[d.prioridad || 'presidente'] || '';
-    document.getElementById('edit-org-email').value = (d.email && d.email !== oldPrioEmail) ? d.email : '';
+    document.getElementById('edit-org-email').value = d.email || '';
     document.getElementById('edit-org-estado').value = d.estado || 'Activa';
     document.getElementById('edit-org-obs').value = d.obs || '';
-    document.getElementById('edit-org-pres-nombre').value = d.presNombre || '';
+    formEdit.querySelectorAll('[list="vecinos-directiva-list"], [data-source-list="vecinos-directiva-list"]').forEach((el) => {
+      el.value = '';
+      if (el._sgrSyncUI) el._sgrSyncUI();
+    });
+    document.getElementById('edit-org-pres-pn').value = d.presPn || '';
+    document.getElementById('edit-org-pres-ap').value = d.presAp || '';
     document.getElementById('edit-org-pres-rut').value = d.presRut || '';
     document.getElementById('edit-org-pres-tel').value = d.presTel || '';
     document.getElementById('edit-org-pres-correo').value = d.presCorreo || '';
-    document.getElementById('edit-org-tes-nombre').value = d.tesNombre || '';
+    document.getElementById('edit-org-tes-pn').value = d.tesPn || '';
+    document.getElementById('edit-org-tes-ap').value = d.tesAp || '';
     document.getElementById('edit-org-tes-rut').value = d.tesRut || '';
     document.getElementById('edit-org-tes-tel').value = d.tesTel || '';
     document.getElementById('edit-org-tes-correo').value = d.tesCorreo || '';
-    document.getElementById('edit-org-sec-nombre').value = d.secNombre || '';
+    document.getElementById('edit-org-sec-pn').value = d.secPn || '';
+    document.getElementById('edit-org-sec-ap').value = d.secAp || '';
     document.getElementById('edit-org-sec-rut').value = d.secRut || '';
     document.getElementById('edit-org-sec-tel').value = d.secTel || '';
     document.getElementById('edit-org-sec-correo').value = d.secCorreo || '';
