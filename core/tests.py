@@ -2509,6 +2509,41 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         resp_func_home = self.client.get(reverse('gestion_atenciones'))
         self.assertContains(resp_func_home, 'María González')
 
+    def test_database_tables_in_english(self):
+        from django.apps import apps
+        from django.db import connection
+
+        expected = {
+            ('accounts', 'Delegacion'): 'accounts_delegation',
+            ('accounts', 'Sector'): 'accounts_sector',
+            ('accounts', 'Cargo'): 'accounts_position',
+            ('accounts', 'Funcionario'): 'accounts_staff',
+            ('accounts', 'Rol'): 'accounts_role',
+            ('accounts', 'FuncionarioRol'): 'accounts_staff_role',
+            ('activities', 'Actividad'): 'activities_activity',
+            ('activities', 'Evidencia'): 'activities_evidence',
+            ('activities', 'ValidacionEvidencia'): 'activities_evidence_validation',
+            ('activities', 'AtencionSocialGestion'): 'activities_social_management',
+            ('activities', 'TipoGestion'): 'activities_management_type',
+            ('activities', 'OrganizacionComunitaria'): 'activities_community_organization',
+            ('activities', 'Vecino'): 'activities_neighbor',
+            ('activities', 'AtencionCiudadana'): 'activities_citizen_request',
+            ('agenda', 'CompromisoAgenda'): 'agenda_commitment',
+            ('agenda', 'AjusteDesempenio'): 'agenda_performance_adjustment',
+            ('configuration', 'Periodo'): 'configuration_period',
+            ('configuration', 'TipoAtencion'): 'configuration_request_type',
+            ('configuration', 'SubAtencion'): 'configuration_request_subtype',
+            ('configuration', 'CatalogoActividad'): 'configuration_activity_catalog',
+            ('configuration', 'ItemMedicion'): 'configuration_measurement_item',
+            ('configuration', 'ConfiguracionMeta'): 'configuration_goal_configuration',
+        }
+        actual_tables = set(connection.introspection.table_names())
+        for (app_label, model_name), table_name in expected.items():
+            model = apps.get_model(app_label, model_name)
+            self.assertEqual(model._meta.db_table, table_name)
+            self.assertIn(table_name, actual_tables)
+
+
 
 
 

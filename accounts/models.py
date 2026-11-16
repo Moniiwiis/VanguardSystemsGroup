@@ -18,6 +18,9 @@ class Delegacion(BaseModel):
     def __str__(self):
         return f"{self.get_codigo()} - {self.nombre}"
 
+    class Meta:
+        db_table = 'accounts_delegation'
+
 class Sector(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
     nombre = models.CharField(max_length=150)
@@ -34,6 +37,7 @@ class Sector(BaseModel):
         return f"{self.nombre} ({self.delegacion.nombre})"
 
     class Meta:
+        db_table = 'accounts_sector'
         verbose_name = "Sector / Territorio"
         verbose_name_plural = "Sectores / Territorios"
         ordering = ['delegacion', 'nombre']
@@ -44,6 +48,9 @@ class Cargo(BaseModel):
 
     def __str__(self):
         return self.nombre_cargo
+
+    class Meta:
+        db_table = 'accounts_position'
 
 class Funcionario(BaseModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='funcionario')
@@ -101,6 +108,9 @@ class Funcionario(BaseModel):
     def __str__(self):
         return f"{self.user.username} - {self.identificador_institucional}"
 
+    class Meta:
+        db_table = 'accounts_staff'
+
 class Rol(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
     nombre_rol = models.CharField(max_length=50)
@@ -117,9 +127,13 @@ class Rol(BaseModel):
     def __str__(self):
         return self.nombre_rol
 
+    class Meta:
+        db_table = 'accounts_role'
+
 class FuncionarioRol(BaseModel):
     funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE)
     rol = models.ForeignKey(Rol, on_delete=models.CASCADE)
 
     class Meta:
+        db_table = 'accounts_staff_role'
         unique_together = ('funcionario', 'rol')

@@ -154,6 +154,9 @@ class Actividad(BaseModel):
     def __str__(self):
         return f"Actividad {self.codigo_evidencia_unico} {'✓' if self.da_puntaje else '✗'}"
 
+    class Meta:
+        db_table = 'activities_activity'
+
 class Evidencia(BaseModel):
     MOMENTO_CHOICES = [
         ('antes', 'Antes del trabajo'),
@@ -167,11 +170,17 @@ class Evidencia(BaseModel):
     momento = models.CharField(max_length=10, choices=MOMENTO_CHOICES, default='despues')
     metadatos = models.TextField(null=True, blank=True)
 
+    class Meta:
+        db_table = 'activities_evidence'
+
 class ValidacionEvidencia(BaseModel):
     actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE)
     verificador = models.ForeignKey("accounts.Funcionario", on_delete=models.RESTRICT)
     resultado = models.CharField(max_length=30)
     observaciones = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'activities_evidence_validation'
 
 class AtencionSocialGestion(BaseModel):
     actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE)
@@ -180,6 +189,7 @@ class AtencionSocialGestion(BaseModel):
     fecha_gestion = models.DateField()
     resultado_gestion = models.TextField(null=True, blank=True)
     class Meta:
+        db_table = 'activities_social_management'
         # Garantiza que una actividad no tenga dos veces la gestión número 1, 2 o 3
         unique_together = ('actividad', 'numero_gestion')
 
@@ -193,6 +203,9 @@ class TipoGestion(BaseModel):
 
     def __str__(self):
         return self.nombre
+
+    class Meta:
+        db_table = 'activities_management_type'
 
 class OrganizacionComunitaria(BaseModel):
     """
@@ -285,6 +298,7 @@ class OrganizacionComunitaria(BaseModel):
         return f"{self.nombre} ({self.tipo_organizacion})"
 
     class Meta:
+        db_table = 'activities_community_organization'
         verbose_name = "Organización Comunitaria / JJVV"
         verbose_name_plural = "Organizaciones Comunitarias / JJVV"
         ordering = ['nombre']
@@ -355,6 +369,9 @@ class Vecino(BaseModel):
     def __str__(self):
         return f"{self.nombre} ({self.rut})"
 
+    class Meta:
+        db_table = 'activities_neighbor'
+
 class AtencionCiudadana(BaseModel):
     codigo_atencion = models.CharField(max_length=50, unique=True, blank=True)
     solicitante = models.CharField(max_length=150)
@@ -424,6 +441,9 @@ class AtencionCiudadana(BaseModel):
 
     def __str__(self):
         return f"{self.codigo_atencion} - {self.solicitante}"
+
+    class Meta:
+        db_table = 'activities_citizen_request'
 
 
 def get_or_create_actividad_para_atencion(atencion):

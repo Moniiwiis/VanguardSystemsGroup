@@ -37,6 +37,9 @@ class Periodo(BaseModel):
         termino_fmt = self.fecha_termino.strftime('%d-%m-%Y') if self.fecha_termino else ''
         return f"Período {inicio_fmt} a {termino_fmt}"
 
+    class Meta:
+        db_table = 'configuration_period'
+
 class TipoAtencion(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
     nombre = models.CharField(max_length=100)
@@ -50,6 +53,9 @@ class TipoAtencion(BaseModel):
 
     def __str__(self):
         return f"{self.get_codigo()} - {self.nombre}"
+
+    class Meta:
+        db_table = 'configuration_request_type'
 
 class SubAtencion(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
@@ -65,6 +71,9 @@ class SubAtencion(BaseModel):
     def __str__(self):
         return f"{self.get_codigo()} - {self.nombre} ({self.tipo_atencion.nombre})"
 
+    class Meta:
+        db_table = 'configuration_request_subtype'
+
 class CatalogoActividad(BaseModel):
     tipo_actividad = models.CharField(max_length=100)
     servicio = models.CharField(max_length=100)
@@ -74,6 +83,9 @@ class CatalogoActividad(BaseModel):
 
     def __str__(self):
         return f"{self.tipo_actividad} - {self.servicio}"
+
+    class Meta:
+        db_table = 'configuration_activity_catalog'
 
 class ItemMedicion(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
@@ -92,6 +104,9 @@ class ItemMedicion(BaseModel):
     def __str__(self):
         return f"{self.get_codigo()} - {self.nombre_item}"
 
+    class Meta:
+        db_table = 'configuration_measurement_item'
+
 class ConfiguracionMeta(BaseModel):
     item = models.ForeignKey(ItemMedicion, on_delete=models.RESTRICT)
     periodo = models.ForeignKey(Periodo, on_delete=models.RESTRICT)
@@ -109,6 +124,7 @@ class ConfiguracionMeta(BaseModel):
             raise ValidationError({'ponderacion': 'La ponderación debe estar entre 0% y 100%.'})
 
     class Meta:
+        db_table = 'configuration_goal_configuration'
         # Asegura que no exista una meta duplicada para la misma combinación de ítem, período y funcionario
         unique_together = ('item', 'periodo', 'funcionario')
 
@@ -194,4 +210,4 @@ class ConfiguracionMeta(BaseModel):
             return 'ROJO'
 
     def __str__(self):
-        return f"Meta para {self.item} - Período {self.periodo}"
+        return f"Meta para {self.item} - Período {self.periodo}"

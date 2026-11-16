@@ -34,6 +34,9 @@ class CompromisoAgenda(BaseModel):
     def __str__(self):
         return f"{self.get_codigo_tubo()} - {self.solicitante} ({self.estado})"
 
+    class Meta:
+        db_table = 'agenda_commitment'
+
 class AjusteDesempenio(BaseModel):
     funcionario = models.ForeignKey("accounts.Funcionario", on_delete=models.RESTRICT, related_name='ajustes')
     periodo = models.ForeignKey("configuration.Periodo", on_delete=models.RESTRICT)
@@ -41,3 +44,6 @@ class AjusteDesempenio(BaseModel):
     valor_porcentaje = models.DecimalField(max_digits=5, decimal_places=2)
     motivo = models.TextField()
     autorizador = models.ForeignKey("accounts.Funcionario", on_delete=models.RESTRICT, related_name='ajustes_autorizados')
+
+    class Meta:
+        db_table = 'agenda_performance_adjustment'
