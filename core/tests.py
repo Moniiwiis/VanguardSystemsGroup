@@ -2115,3 +2115,24 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
 
         resp_rep = self.client.get(reverse('gestion_reportes'))
         self.assertContains(resp_rep, '12.345.678-5')
+
+    def test_custom_404_page_renders_with_debug_true_and_preserves_append_slash(self):
+        admin = User.objects.create_superuser('admin_404', 'admin404@example.test', 'Admin123!')
+        with self.settings(DEBUG=True):
+            # Usuario anónimo y autenticado reciben la plantilla personalizada 404
+            resp_anon = self.client.get('/gestion/atenciones/fgdgfdgdf')
+            self.assertEqual(resp_anon.status_code, 404)
+            self.assertContains(resp_anon, 'Página no encontrada', status_code=404)
+            self.assertNotContains(resp_anon, 'Using the URLconf defined in', status_code=404)
+
+            self.client.force_login(admin)
+            resp_auth = self.client.get('/gestion/atenciones/fgdgfdgdf')
+            self.assertEqual(resp_auth.status_code, 404)
+            self.assertContains(resp_auth, 'Página no encontrada', status_code=404)
+            self.assertNotContains(resp_auth, 'Using the URLconf defined in', status_code=404)
+
+            # APPEND_SLASH sigue redirigiendo rutas válidas sin slash final
+            resp_slash = self.client.get('/gestion/atenciones')
+            self.assertEqual(resp_slash.status_code, 301)
+            self.assertTrue(resp_slash['Location'].endswith('/gestion/atenciones/'))
+

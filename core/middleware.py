@@ -5,6 +5,32 @@ from accounts.models import Funcionario
 from core.context_processors import global_context
 
 
+def _get_asset_prefixes():
+    static_url = settings.STATIC_URL
+    media_url = settings.MEDIA_URL
+    static_path = static_url if static_url.startswith('/') else f'/{static_url}'
+    media_path = media_url if media_url.startswith('/') else f'/{media_url}'
+    return (static_path, media_path)
+
+
+class CustomErrorPagesMiddleware:
+    """Muestra la plantilla personalizada errors/404.html incluso cuando DEBUG=True."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if settings.DEBUG and response.status_code == 404:
+            if request.path.startswith(_get_asset_prefixes()) or request.path.startswith('/gestion/api/'):
+                return response
+            accept = request.headers.get('Accept', '')
+            if 'application/json' in accept and 'text/html' not in accept:
+                return response
+            return render(request, 'errors/404.html', status=404)
+        return response
+
+
 class PasswordChangeRequiredMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
@@ -15,15 +41,11 @@ class PasswordChangeRequiredMiddleware:
                 user=request.user,
                 debe_cambiar_contrasena=True,
             ).exists()
-            static_url = settings.STATIC_URL
-            media_url = settings.MEDIA_URL
-            static_path = static_url if static_url.startswith('/') else f'/{static_url}'
-            media_path = media_url if media_url.startswith('/') else f'/{media_url}'
             allowed_paths = {
                 '/cambiar-contrasena-inicial/',
                 '/logout/',
             }
-            is_asset = request.path.startswith((static_path, media_path))
+            is_asset = request.path.startswith(_get_asset_prefixes())
             if must_change_password and not is_asset and request.path not in allowed_paths:
                 return redirect('cambiar_contrasena_inicial')
 
