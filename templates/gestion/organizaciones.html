@@ -232,8 +232,8 @@
               <div class="desc-roll text-slate-800 font-medium leading-tight">
                 {{ o.domicilio_legal|default:o.direccion_sede|default:"—" }}
               </div>
-              {% if o.presidente_nombre or o.representante_legal %}
-                <span class="text-[10px] text-slate-500 block mt-0.5">Pres./Rep.: {{ o.presidente_nombre|default:o.representante_legal }}</span>
+              {% if o.representante_legal or o.presidente_nombre %}
+                <span class="text-[10px] text-slate-500 block mt-0.5">{{ o.get_contacto_prioritario_display }}: {{ o.representante_legal|default:o.presidente_nombre }}{% if o.telefono_contacto %} · <span class="font-mono text-slate-600">{{ o.telefono_contacto }}</span>{% endif %}</span>
               {% endif %}
             </td>
 
@@ -332,18 +332,23 @@
                         data-rut="{{ o.rut|default:'' }}"
                         data-directiva="{{ o.directiva_actual|default:'' }}"
                         data-rep="{{ o.representante_legal|default:'' }}"
+                        data-prioridad="{{ o.contacto_prioritario|default:'presidente' }}"
+                        data-prioridad-label="{{ o.get_contacto_prioritario_display|default:'Presidente' }}"
                         data-tel="{{ o.telefono_contacto|default:'' }}"
                         data-email="{{ o.email_contacto|default:'' }}"
                         data-estado="{{ o.estado }}"
                         data-obs="{{ o.observaciones|default:'' }}"
                         data-pres-nombre="{{ o.presidente_nombre|default:'' }}"
                         data-pres-rut="{{ o.presidente_rut|default:'' }}"
+                        data-pres-tel="{{ o.presidente_telefono|default:'' }}"
                         data-pres-correo="{{ o.presidente_correo|default:'' }}"
                         data-tes-nombre="{{ o.tesorero_nombre|default:'' }}"
                         data-tes-rut="{{ o.tesorero_rut|default:'' }}"
+                        data-tes-tel="{{ o.tesorero_telefono|default:'' }}"
                         data-tes-correo="{{ o.tesorero_correo|default:'' }}"
                         data-sec-nombre="{{ o.secretario_nombre|default:'' }}"
                         data-sec-rut="{{ o.secretario_rut|default:'' }}"
+                        data-sec-tel="{{ o.secretario_telefono|default:'' }}"
                         data-sec-correo="{{ o.secretario_correo|default:'' }}"
                         onclick="verDetalleOrgBtn(this)"
                         title="Ver detalle"
@@ -356,6 +361,7 @@
                           data-nombre="{{ o.nombre }}"
                           data-tipo="{{ o.tipo_organizacion }}"
                           data-domicilio="{{ o.domicilio_legal|default:o.direccion_sede|default:'' }}"
+                          data-delegacion="{{ o.delegacion.nombre|default:'' }}"
                           data-del-id="{{ o.delegacion_id|default:'' }}"
                           data-sector-id="{{ o.sector_id|default:'' }}"
                           data-socios="{{ o.socios_activos|default:0 }}"
@@ -366,18 +372,22 @@
                           data-rut="{{ o.rut|default:'' }}"
                           data-directiva="{{ o.directiva_actual|default:'' }}"
                           data-rep="{{ o.representante_legal|default:'' }}"
+                          data-prioridad="{{ o.contacto_prioritario|default:'presidente' }}"
                           data-tel="{{ o.telefono_contacto|default:'' }}"
                           data-email="{{ o.email_contacto|default:'' }}"
                           data-estado="{{ o.estado }}"
                           data-obs="{{ o.observaciones|default:'' }}"
                           data-pres-nombre="{{ o.presidente_nombre|default:'' }}"
                           data-pres-rut="{{ o.presidente_rut|default:'' }}"
+                          data-pres-tel="{{ o.presidente_telefono|default:'' }}"
                           data-pres-correo="{{ o.presidente_correo|default:'' }}"
                           data-tes-nombre="{{ o.tesorero_nombre|default:'' }}"
                           data-tes-rut="{{ o.tesorero_rut|default:'' }}"
+                          data-tes-tel="{{ o.tesorero_telefono|default:'' }}"
                           data-tes-correo="{{ o.tesorero_correo|default:'' }}"
                           data-sec-nombre="{{ o.secretario_nombre|default:'' }}"
                           data-sec-rut="{{ o.secretario_rut|default:'' }}"
+                          data-sec-tel="{{ o.secretario_telefono|default:'' }}"
                           data-sec-correo="{{ o.secretario_correo|default:'' }}"
                           onclick="abrirModalEditarOrgBtn(this)"
                           title="Editar"
@@ -545,21 +555,12 @@
           <div class="rut-feedback"></div>
         </div>
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Representante Legal / Presidente</label>
-          <input type="text" name="representante_legal" maxlength="150" placeholder="Nombre completo"
-                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-        </div>
-        <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Teléfono de Contacto</label>
-          <input type="text" name="telefono_contacto" maxlength="15" placeholder="+56 9 8765 4321"
-                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
-          <div class="tel-feedback"></div>
-        </div>
-
-        <div class="sm:col-span-2 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Correo Electrónico de Contacto</label>
-          <input type="email" name="email_contacto" maxlength="100" placeholder="contacto@jjvv.cl"
-                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <label class="block text-xs font-bold text-slate-700">Representante / Prioridad de Contacto</label>
+          <select name="contacto_prioritario" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="presidente" selected>Presidente (Prioritario)</option>
+            <option value="tesorero">Tesorero (Prioritario)</option>
+            <option value="secretario">Secretario (Prioritario)</option>
+          </select>
         </div>
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Estado de Vigencia</label>
@@ -568,6 +569,12 @@
             <option value="En tramite">En trámite</option>
             <option value="Inactiva">Inactiva</option>
           </select>
+        </div>
+
+        <div class="sm:col-span-3 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Correo Electrónico Institucional (Opcional — si se deja vacío usa el del contacto prioritario)</label>
+          <input type="email" name="email_contacto" maxlength="100" placeholder="contacto@jjvv.cl"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
 
         <!-- Directiva estructurada (3 columnas por representante) -->
@@ -591,6 +598,12 @@
                 <div class="rut-feedback"></div>
               </div>
               <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Teléfono</label>
+                <input type="text" name="presidente_telefono" maxlength="15" placeholder="+56 9 8765 4321"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                <div class="tel-feedback"></div>
+              </div>
+              <div class="space-y-1">
                 <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
                 <input type="email" name="presidente_correo" maxlength="100" placeholder="presidente@correo.cl"
                        class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
@@ -611,6 +624,12 @@
                 <div class="rut-feedback"></div>
               </div>
               <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Teléfono</label>
+                <input type="text" name="tesorero_telefono" maxlength="15" placeholder="+56 9 8765 4321"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                <div class="tel-feedback"></div>
+              </div>
+              <div class="space-y-1">
                 <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
                 <input type="email" name="tesorero_correo" maxlength="100" placeholder="tesorero@correo.cl"
                        class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
@@ -629,6 +648,12 @@
                 <input type="text" name="secretario_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
                        class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
                 <div class="rut-feedback"></div>
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Teléfono</label>
+                <input type="text" name="secretario_telefono" maxlength="15" placeholder="+56 9 8765 4321"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                <div class="tel-feedback"></div>
               </div>
               <div class="space-y-1">
                 <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
@@ -745,21 +770,12 @@
           <div class="rut-feedback"></div>
         </div>
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Representante Legal</label>
-          <input type="text" id="edit-org-rep" name="representante_legal" maxlength="150"
-                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-        </div>
-        <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Teléfono de Contacto</label>
-          <input type="text" id="edit-org-tel" name="telefono_contacto" maxlength="15" placeholder="+56 9 8765 4321"
-                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
-          <div class="tel-feedback"></div>
-        </div>
-
-        <div class="sm:col-span-2 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Correo Electrónico de Contacto</label>
-          <input type="email" id="edit-org-email" name="email_contacto" maxlength="100"
-                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <label class="block text-xs font-bold text-slate-700">Representante / Prioridad de Contacto</label>
+          <select id="edit-org-prioridad" name="contacto_prioritario" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+            <option value="presidente">Presidente (Prioritario)</option>
+            <option value="tesorero">Tesorero (Prioritario)</option>
+            <option value="secretario">Secretario (Prioritario)</option>
+          </select>
         </div>
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Estado</label>
@@ -768,6 +784,12 @@
             <option value="En tramite">En trámite</option>
             <option value="Inactiva">Inactiva</option>
           </select>
+        </div>
+
+        <div class="sm:col-span-3 space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Correo Electrónico Institucional (Opcional — si se deja vacío usa el del contacto prioritario)</label>
+          <input type="email" id="edit-org-email" name="email_contacto" maxlength="100"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
 
         <!-- Directiva estructurada (3 columnas por representante) -->
@@ -791,6 +813,12 @@
                 <div class="rut-feedback"></div>
               </div>
               <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Teléfono</label>
+                <input type="text" id="edit-org-pres-tel" name="presidente_telefono" maxlength="15" placeholder="+56 9 8765 4321"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                <div class="tel-feedback"></div>
+              </div>
+              <div class="space-y-1">
                 <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
                 <input type="email" id="edit-org-pres-correo" name="presidente_correo" maxlength="100" placeholder="presidente@correo.cl"
                        class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
@@ -811,6 +839,12 @@
                 <div class="rut-feedback"></div>
               </div>
               <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Teléfono</label>
+                <input type="text" id="edit-org-tes-tel" name="tesorero_telefono" maxlength="15" placeholder="+56 9 8765 4321"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                <div class="tel-feedback"></div>
+              </div>
+              <div class="space-y-1">
                 <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
                 <input type="email" id="edit-org-tes-correo" name="tesorero_correo" maxlength="100" placeholder="tesorero@correo.cl"
                        class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
@@ -829,6 +863,12 @@
                 <input type="text" id="edit-org-sec-rut" name="secretario_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
                        class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
                 <div class="rut-feedback"></div>
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Teléfono</label>
+                <input type="text" id="edit-org-sec-tel" name="secretario_telefono" maxlength="15" placeholder="+56 9 8765 4321"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                <div class="tel-feedback"></div>
               </div>
               <div class="space-y-1">
                 <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
@@ -910,19 +950,27 @@
     document.getElementById('edit-org-regdir').value = d.regdir || '';
     document.getElementById('edit-org-rut').value = d.rut || '';
     document.getElementById('edit-org-directiva').value = d.directiva || '';
-    document.getElementById('edit-org-rep').value = d.rep || '';
-    document.getElementById('edit-org-tel').value = (d.tel && d.tel.trim() !== '') ? d.tel : '+56 9 ';
-    document.getElementById('edit-org-email').value = d.email || '';
+    document.getElementById('edit-org-prioridad').value = d.prioridad || 'presidente';
+    const prioEmails = {
+      presidente: d.presCorreo || '',
+      tesorero: d.tesCorreo || '',
+      secretario: d.secCorreo || '',
+    };
+    const oldPrioEmail = prioEmails[d.prioridad || 'presidente'] || '';
+    document.getElementById('edit-org-email').value = (d.email && d.email !== oldPrioEmail) ? d.email : '';
     document.getElementById('edit-org-estado').value = d.estado || 'Activa';
     document.getElementById('edit-org-obs').value = d.obs || '';
     document.getElementById('edit-org-pres-nombre').value = d.presNombre || '';
     document.getElementById('edit-org-pres-rut').value = d.presRut || '';
+    document.getElementById('edit-org-pres-tel').value = d.presTel || '';
     document.getElementById('edit-org-pres-correo').value = d.presCorreo || '';
     document.getElementById('edit-org-tes-nombre').value = d.tesNombre || '';
     document.getElementById('edit-org-tes-rut').value = d.tesRut || '';
+    document.getElementById('edit-org-tes-tel').value = d.tesTel || '';
     document.getElementById('edit-org-tes-correo').value = d.tesCorreo || '';
     document.getElementById('edit-org-sec-nombre').value = d.secNombre || '';
     document.getElementById('edit-org-sec-rut').value = d.secRut || '';
+    document.getElementById('edit-org-sec-tel').value = d.secTel || '';
     document.getElementById('edit-org-sec-correo').value = d.secCorreo || '';
     document.getElementById('edit-org-del').value = d.delId || '';
     document.getElementById('edit-org-del-nombre').value = d.delegacion || 'Sin delegación';
@@ -952,13 +1000,20 @@
   function verDetalleOrgBtn(btn) {
     const d = btn.dataset;
     const esc = (s) => (s || '—').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const cargoRow = (titulo, nom, rut, mail) => `
-      <div class="bg-slate-50 p-2 rounded-lg border border-slate-200">
-        <div class="font-bold text-slate-800">${titulo}</div>
-        <div class="text-slate-700">${esc(nom)}</div>
+    const cargoRow = (clave, titulo, nom, rut, tel, mail) => {
+      const esPrio = (d.prioridad || 'presidente') === clave;
+      return `
+      <div class="bg-slate-50 p-2.5 rounded-lg border ${esPrio ? 'border-[#C41230]/50 ring-1 ring-red-100' : 'border-slate-200'}">
+        <div class="flex items-center justify-between gap-1">
+          <span class="font-bold text-slate-800">${titulo}</span>
+          ${esPrio ? '<span class="px-1.5 py-0.5 rounded bg-red-50 text-[#C41230] text-[9px] font-extrabold uppercase">Prioritario</span>' : ''}
+        </div>
+        <div class="text-slate-700 mt-0.5">${esc(nom)}</div>
         <div class="text-[11px] font-mono text-slate-500">RUT: ${esc(rut)}</div>
+        <div class="text-[11px] font-mono text-slate-700 font-semibold">Tel: ${esc(tel)}</div>
         <div class="text-[11px] text-slate-600 truncate">${esc(mail)}</div>
       </div>`;
+    };
     Swal.fire({
       title: d.nombre,
       width: 680,
@@ -977,12 +1032,12 @@
             <p><strong>RUT Organización:</strong> ${esc(d.rut)}</p>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            ${cargoRow('Presidente', d.presNombre, d.presRut, d.presCorreo)}
-            ${cargoRow('Tesorero', d.tesNombre, d.tesRut, d.tesCorreo)}
-            ${cargoRow('Secretario', d.secNombre, d.secRut, d.secCorreo)}
+            ${cargoRow('presidente', 'Presidente', d.presNombre, d.presRut, d.presTel, d.presCorreo)}
+            ${cargoRow('tesorero', 'Tesorero', d.tesNombre, d.tesRut, d.tesTel, d.tesCorreo)}
+            ${cargoRow('secretario', 'Secretario', d.secNombre, d.secRut, d.secTel, d.secCorreo)}
           </div>
-          <p><strong>Representante Legal:</strong> ${esc(d.rep)}</p>
-          <p><strong>Contacto:</strong> ${esc(d.tel)} ${d.email ? '· ' + esc(d.email) : ''}</p>
+          <p><strong>Contacto Prioritario (${esc(d.prioridadLabel || 'Presidente')}):</strong> ${esc(d.rep)}</p>
+          <p><strong>Teléfono / Correo principal:</strong> ${esc(d.tel)} ${d.email ? '· ' + esc(d.email) : ''}</p>
           <p><strong>Directiva / Notas:</strong><br><span class="text-slate-600">${esc(d.directiva)}</span></p>
           <p><strong>Observaciones:</strong><br><span class="text-slate-600">${esc(d.obs)}</span></p>
         </div>

@@ -1990,3 +1990,83 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         resp_sec_filtro = self.client.get(reverse('gestion_sectores') + f'?delegacion={del_otra.id}')
         self.assertContains(resp_sec_filtro, sec_otra.nombre)
         self.assertNotContains(resp_sec_filtro, sec_principal.nombre)
+
+    def test_organizaciones_telefonos_por_cargo_y_contacto_prioritario(self):
+        admin = User.objects.create_superuser('admin_prio_org', 'apo@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        # Rechazar teléfono inválido en un cargo
+        self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV Tel Malo',
+            'contacto_prioritario': 'tesorero',
+            'tesorero_nombre': 'Luis Rojas',
+            'tesorero_telefono': '123',
+        })
+        self.assertFalse(OrganizacionComunitaria.objects.filter(nombre='JJVV Tel Malo').exists())
+
+        # Crear con teléfonos en los 3 cargos y Tesorero como contacto prioritario
+        resp_cre = self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV Prioridad Tesorero',
+            'contacto_prioritario': 'tesorero',
+            'presidente_nombre': 'Ana Presidente',
+            'presidente_telefono': '911112222',
+            'presidente_correo': 'pres@jjvv.test',
+            'tesorero_nombre': 'Luis Tesorero',
+            'tesorero_telefono': '933334444',
+            'tesorero_correo': 'tes@jjvv.test',
+            'secretario_nombre': 'Rosa Secretaria',
+            'secretario_telefono': '955556666',
+            'secretario_correo': 'sec@jjvv.test',
+        })
+        self.assertRedirects(resp_cre, reverse('gestion_organizaciones'))
+        org = OrganizacionComunitaria.objects.get(nombre='JJVV Prioridad Tesorero')
+        self.assertEqual(org.contacto_prioritario, 'tesorero')
+        self.assertEqual(org.representante_legal, 'Luis Tesorero')
+        self.assertEqual(org.telefono_contacto, '+56 9 3333 4444')
+        self.assertEqual(org.email_contacto, 'tes@jjvv.test')
+        self.assertEqual(org.presidente_telefono, '+56 9 1111 2222')
+        self.assertEqual(org.tesorero_telefono, '+56 9 3333 4444')
+        self.assertEqual(org.secretario_telefono, '+56 9 5555 6666')
+
+        # Al editar cambiando prioridad a Secretario, se actualiza automáticamente representante/teléfono
+        resp_ed = self.client.post(reverse('gestion_organizaciones_editar', args=[org.id]), {
+            'nombre': 'JJVV Prioridad Tesorero',
+            'contacto_prioritario': 'secretario',
+            'presidente_nombre': 'Ana Presidente',
+            'presidente_telefono': '911112222',
+            'presidente_correo': 'pres@jjvv.test',
+            'tesorero_nombre': 'Luis Tesorero',
+            'tesorero_telefono': '933334444',
+            'tesorero_correo': 'tes@jjvv.test',
+            'secretario_nombre': 'Rosa Secretaria',
+            'secretario_telefono': '955556666',
+            'secretario_correo': 'sec@jjvv.test',
+        })
+        self.assertRedirects(resp_ed, reverse('gestion_organizaciones'))
+        org.refresh_from_db()
+        self.assertEqual(org.contacto_prioritario, 'secretario')
+        self.assertEqual(org.representante_legal, 'Rosa Secretaria')
+        self.assertEqual(org.telefono_contacto, '+56 9 5555 6666')
+        self.assertEqual(org.email_contacto, 'sec@jjvv.test')
+
+        # Crear inline desde Atención Ciudadana con prioridad Secretario
+        resp_at = self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'crear_nueva_org': '1',
+            'nueva_org_nombre': 'JJVV Inline Prioridad',
+            'nueva_org_tipo': 'Junta de Vecinos',
+            'nueva_org_contacto_prioritario': 'secretario',
+            'nueva_org_secretario_nombre': 'Carla Secretaria',
+            'nueva_org_secretario_telefono': '977778888',
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Prueba prioridad contacto inline',
+        })
+        self.assertRedirects(resp_at, reverse('gestion_atenciones'))
+        org_inline = OrganizacionComunitaria.objects.get(nombre='JJVV Inline Prioridad')
+        self.assertEqual(org_inline.contacto_prioritario, 'secretario')
+        self.assertEqual(org_inline.representante_legal, 'Carla Secretaria')
+        self.assertEqual(org_inline.telefono_contacto, '+56 9 7777 8888')

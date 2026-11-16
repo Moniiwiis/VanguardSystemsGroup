@@ -210,6 +210,12 @@ class OrganizacionComunitaria(BaseModel):
         ('Otra Organización Funcional', 'Otra Organización Funcional'),
     ]
 
+    CONTACTO_PRIORITARIO_CHOICES = [
+        ('presidente', 'Presidente'),
+        ('tesorero', 'Tesorero'),
+        ('secretario', 'Secretario'),
+    ]
+
     nombre = models.CharField(max_length=200)
     tipo_organizacion = models.CharField(max_length=100, choices=TIPO_CHOICES, default='Junta de Vecinos')
     domicilio_legal = models.CharField(max_length=250, null=True, blank=True)
@@ -229,16 +235,25 @@ class OrganizacionComunitaria(BaseModel):
     telefono_contacto = models.CharField(max_length=20, null=True, blank=True, verbose_name="Teléfono Contacto")
     email_contacto = models.EmailField(max_length=100, null=True, blank=True, verbose_name="Correo Contacto")
     direccion_sede = models.CharField(max_length=250, null=True, blank=True, verbose_name="Dirección Sede")
+    contacto_prioritario = models.CharField(
+        max_length=20,
+        choices=CONTACTO_PRIORITARIO_CHOICES,
+        default='presidente',
+        verbose_name="Representante / Contacto Prioritario",
+    )
     # Directiva estructurada (Presidente, Tesorero, Secretario)
     presidente_nombre = models.CharField(max_length=150, null=True, blank=True, verbose_name="Presidente - Nombre y Apellido")
     presidente_rut = models.CharField(max_length=20, null=True, blank=True, verbose_name="Presidente - RUT")
     presidente_correo = models.EmailField(max_length=100, null=True, blank=True, verbose_name="Presidente - Correo")
+    presidente_telefono = models.CharField(max_length=20, null=True, blank=True, verbose_name="Presidente - Teléfono")
     tesorero_nombre = models.CharField(max_length=150, null=True, blank=True, verbose_name="Tesorero - Nombre y Apellido")
     tesorero_rut = models.CharField(max_length=20, null=True, blank=True, verbose_name="Tesorero - RUT")
     tesorero_correo = models.EmailField(max_length=100, null=True, blank=True, verbose_name="Tesorero - Correo")
+    tesorero_telefono = models.CharField(max_length=20, null=True, blank=True, verbose_name="Tesorero - Teléfono")
     secretario_nombre = models.CharField(max_length=150, null=True, blank=True, verbose_name="Secretario - Nombre y Apellido")
     secretario_rut = models.CharField(max_length=20, null=True, blank=True, verbose_name="Secretario - RUT")
     secretario_correo = models.EmailField(max_length=100, null=True, blank=True, verbose_name="Secretario - Correo")
+    secretario_telefono = models.CharField(max_length=20, null=True, blank=True, verbose_name="Secretario - Teléfono")
     directiva_actual = models.TextField(null=True, blank=True, verbose_name="Directiva Actual")
     observaciones = models.TextField(null=True, blank=True, verbose_name="Observaciones")
 

@@ -1863,7 +1863,7 @@ def _organizaciones_activas_para_delegacion(delegacion):
 
 
 def _extraer_y_validar_directiva(request, field_prefix=''):
-    """Valida y normaliza Presidente, Tesorero y Secretario (nombre, RUT y correo)."""
+    """Valida y normaliza Presidente, Tesorero y Secretario (nombre, RUT, correo y teléfono)."""
     directiva = {}
     for cargo, label in (
         ('presidente', 'Presidente'),
@@ -1873,6 +1873,7 @@ def _extraer_y_validar_directiva(request, field_prefix=''):
         nombre = request.POST.get(f'{field_prefix}{cargo}_nombre', '').strip()
         rut = request.POST.get(f'{field_prefix}{cargo}_rut', '').strip()
         correo = request.POST.get(f'{field_prefix}{cargo}_correo', '').strip()
+        telefono = request.POST.get(f'{field_prefix}{cargo}_telefono', '').strip()
 
         ok, err = validar_largo(nombre, 150, f"{label} - Nombre y Apellido")
         if not ok:
@@ -1896,10 +1897,40 @@ def _extraer_y_validar_directiva(request, field_prefix=''):
             except ValidationError:
                 return None, f"Correo de {label} inválido."
 
+        ok, err = validar_largo(telefono, 20, f"{label} - Teléfono")
+        if not ok:
+            return None, err
+        if telefono:
+            ok_tel, err_tel = validar_telefono_chileno(telefono)
+            if not ok_tel:
+                return None, f"Teléfono de {label} inválido: {err_tel}"
+            telefono = formatear_telefono_chileno(telefono)
+
         directiva[f'{cargo}_nombre'] = nombre or None
         directiva[f'{cargo}_rut'] = rut or None
         directiva[f'{cargo}_correo'] = correo or None
+        directiva[f'{cargo}_telefono'] = telefono or None
     return directiva, None
+
+
+def _resolver_contacto_prioritario_org(directiva_data, prioridad='presidente', fallback_rep='', fallback_tel='', fallback_email=''):
+    """Resuelve representante_legal, telefono_contacto y email_contacto según el cargo prioritario."""
+    cargos = ('presidente', 'tesorero', 'secretario')
+    prioridad_clean = (prioridad or 'presidente').strip().lower()
+    if prioridad_clean not in cargos:
+        prioridad_clean = 'presidente'
+    orden = [prioridad_clean] + [c for c in cargos if c != prioridad_clean]
+
+    rep_val = next((directiva_data.get(f'{c}_nombre') for c in orden if directiva_data.get(f'{c}_nombre')), None)
+    tel_val = next((directiva_data.get(f'{c}_telefono') for c in orden if directiva_data.get(f'{c}_telefono')), None)
+    email_val = next((directiva_data.get(f'{c}_correo') for c in orden if directiva_data.get(f'{c}_correo')), None)
+
+    return (
+        prioridad_clean,
+        rep_val or (fallback_rep or None),
+        tel_val or (fallback_tel or None),
+        (fallback_email or None) if fallback_email else email_val,
+    )
 
 
 _ALIAS_ESTADO_TUBO = {
@@ -2101,6 +2132,14 @@ def gestion_atenciones(request):
                     messages.error(request, err_dir_org)
                     return redirect('gestion_atenciones')
 
+                prioridad_org = request.POST.get('nueva_org_contacto_prioritario', 'presidente').strip()
+                prioridad_org, rep_org_val, tel_org_val, email_org_val = _resolver_contacto_prioritario_org(
+                    directiva_org,
+                    prioridad=prioridad_org,
+                    fallback_rep=nueva_org_rep,
+                    fallback_tel=nueva_org_tel,
+                )
+
                 sector_org = None
                 if nueva_org_sec_id and nueva_org_sec_id.isdigit():
                     sector_org = Sector.objects.filter(
@@ -2118,8 +2157,10 @@ def gestion_atenciones(request):
                         delegacion=del_activa,
                         sector=sector_org,
                         territorio=territorio_org,
-                        representante_legal=nueva_org_rep or directiva_org.get('presidente_nombre'),
-                        telefono_contacto=nueva_org_tel,
+                        contacto_prioritario=prioridad_org,
+                        representante_legal=rep_org_val,
+                        telefono_contacto=tel_org_val,
+                        email_contacto=email_org_val,
                         direccion_sede=nueva_org_dir,
                         estado='Activa',
                         **directiva_org,
@@ -4288,6 +4329,15 @@ def gestion_organizaciones(request):
         if not num_pj and personalidad_jur:
             num_pj = personalidad_jur
 
+        prioridad_raw = request.POST.get('contacto_prioritario', 'presidente').strip()
+        prioridad_val, rep_val, tel_val, email_val = _resolver_contacto_prioritario_org(
+            directiva_data,
+            prioridad=prioridad_raw,
+            fallback_rep=representante,
+            fallback_tel=tel_contacto,
+            fallback_email=email_contacto,
+        )
+
         nueva_org = OrganizacionComunitaria.objects.create(
             nombre=nombre,
             tipo_organizacion=tipo_org,
@@ -4303,9 +4353,10 @@ def gestion_organizaciones(request):
             estado=estado,
             rut=rut_org or None,
             personalidad_juridica=personalidad_jur or num_pj or None,
-            representante_legal=representante or directiva_data.get('presidente_nombre') or None,
-            telefono_contacto=tel_contacto or None,
-            email_contacto=email_contacto or None,
+            contacto_prioritario=prioridad_val,
+            representante_legal=rep_val,
+            telefono_contacto=tel_val,
+            email_contacto=email_val,
             direccion_sede=direccion_sede or domicilio or None,
             directiva_actual=directiva or None,
             observaciones=observaciones or None,
@@ -4386,14 +4437,14 @@ def gestion_organizaciones(request):
     # Exportación nativa a .xlsx (coherente con columnas de la tabla oficial JJVV)
     if request.GET.get('export') == 'excel':
         headers = [
-            'ORGANIZACIONES', 'DOMICILIO LEGAL', 'TERRIT. DELEG.',
-            'SOCIOS ACTIVOS', 'FECHA CONSTIT.', 'Nº REG. P.J.',
-            'FECHA INSCRIPC EN REG.', 'REG. DIR. Nº',
-            'TIPO ORGANIZACIÓN', 'RUT', 'REPRESENTANTE LEGAL',
-            'PRESIDENTE (NOMBRE / RUT / CORREO)',
-            'TESORERO (NOMBRE / RUT / CORREO)',
-            'SECRETARIO (NOMBRE / RUT / CORREO)',
-            'TELÉFONO CONTACTO', 'EMAIL CONTACTO', 'DIRECTIVA ACTUAL',
+            'ORGANIZACIONES', 'DOMICILIO LEGAL', 'DELEGACIÓN / TERRITORIO',
+            'SOCIOS ACTIVOS', 'FECHA DE CONSTITUCIÓN', 'N° REG. PERSONALIDAD JURÍDICA',
+            'FECHA DE INSCRIPCIÓN EN REGISTRO', 'REGISTRO DIRECTIVA N°',
+            'TIPO ORGANIZACIÓN', 'RUT', 'CONTACTO PRIORITARIO / REPRESENTANTE',
+            'PRESIDENTE (NOMBRE / RUT / TELÉFONO / CORREO)',
+            'TESORERO (NOMBRE / RUT / TELÉFONO / CORREO)',
+            'SECRETARIO (NOMBRE / RUT / TELÉFONO / CORREO)',
+            'TELÉFONO CONTACTO', 'CORREO CONTACTO', 'DIRECTIVA ACTUAL',
             'OBSERVACIONES', 'ESTADO'
         ]
         rows = []
@@ -4401,9 +4452,9 @@ def gestion_organizaciones(request):
             f_c = org.fecha_constitucion.strftime('%d/%m/%Y') if org.fecha_constitucion else '—'
             f_i = org.fecha_inscripcion_registro.strftime('%d/%m/%Y') if org.fecha_inscripcion_registro else '—'
             terr_del = org.territorio or (org.sector.nombre if org.sector else '') or (org.delegacion.nombre if org.delegacion else '—')
-            pres_txt = ' | '.join(filter(None, [org.presidente_nombre, org.presidente_rut, org.presidente_correo])) or '—'
-            tes_txt = ' | '.join(filter(None, [org.tesorero_nombre, org.tesorero_rut, org.tesorero_correo])) or '—'
-            sec_txt = ' | '.join(filter(None, [org.secretario_nombre, org.secretario_rut, org.secretario_correo])) or '—'
+            pres_txt = ' | '.join(filter(None, [org.presidente_nombre, org.presidente_rut, org.presidente_telefono, org.presidente_correo])) or '—'
+            tes_txt = ' | '.join(filter(None, [org.tesorero_nombre, org.tesorero_rut, org.tesorero_telefono, org.tesorero_correo])) or '—'
+            sec_txt = ' | '.join(filter(None, [org.secretario_nombre, org.secretario_rut, org.secretario_telefono, org.secretario_correo])) or '—'
             rows.append([
                 org.nombre,
                 org.domicilio_legal or org.direccion_sede or '—',
@@ -4415,7 +4466,7 @@ def gestion_organizaciones(request):
                 org.registro_directiva_numero or '—',
                 org.tipo_organizacion,
                 org.rut or '—',
-                org.representante_legal or '—',
+                f"{org.get_contacto_prioritario_display()} ({org.representante_legal})" if org.representante_legal else org.get_contacto_prioritario_display(),
                 pres_txt,
                 tes_txt,
                 sec_txt,
@@ -4490,7 +4541,14 @@ def gestion_organizaciones_editar(request, org_id):
         personalidad_jur = request.POST.get('personalidad_juridica', org.personalidad_juridica or '').strip()
         representante = request.POST.get('representante_legal', org.representante_legal or '').strip()
         tel_contacto = request.POST.get('telefono_contacto', org.telefono_contacto or '').strip()
-        email_contacto_e = request.POST.get('email_contacto', org.email_contacto or '').strip()
+        old_prio = (org.contacto_prioritario or 'presidente').strip().lower()
+        old_prio_email = (getattr(org, f'{old_prio}_correo', None) or '').strip() if old_prio in ('presidente', 'tesorero', 'secretario') else ''
+        if 'email_contacto' in request.POST:
+            email_contacto_e = request.POST.get('email_contacto', '').strip()
+            if email_contacto_e and email_contacto_e == old_prio_email:
+                email_contacto_e = ''
+        else:
+            email_contacto_e = '' if (org.email_contacto or '').strip() == old_prio_email else (org.email_contacto or '').strip()
         direccion_sede_e = request.POST.get('direccion_sede', org.direccion_sede or '').strip()
         directiva_e = request.POST.get('directiva_actual', org.directiva_actual or '').strip()
         observaciones_e = request.POST.get('observaciones', org.observaciones or '').strip()
@@ -4574,12 +4632,22 @@ def gestion_organizaciones_editar(request, org_id):
         org.numero_registro_pj = num_pj
         org.registro_directiva_numero = reg_dir
         org.estado = request.POST.get('estado', org.estado)
+        prioridad_raw = request.POST.get('contacto_prioritario', org.contacto_prioritario or 'presidente').strip()
+        prioridad_val, rep_val, tel_val, email_val = _resolver_contacto_prioritario_org(
+            directiva_data,
+            prioridad=prioridad_raw,
+            fallback_rep=representante,
+            fallback_tel=tel_contacto,
+            fallback_email=email_contacto_e,
+        )
+
         # Nuevos campos
         org.rut = rut_org or None
         org.personalidad_juridica = personalidad_jur or num_pj or None
-        org.representante_legal = representante or directiva_data.get('presidente_nombre') or None
-        org.telefono_contacto = tel_contacto or None
-        org.email_contacto = email_contacto_e or None
+        org.contacto_prioritario = prioridad_val
+        org.representante_legal = rep_val
+        org.telefono_contacto = tel_val
+        org.email_contacto = email_val
         org.direccion_sede = direccion_sede_e or nuevo_domicilio or None
         org.directiva_actual = directiva_e or None
         org.observaciones = observaciones_e or None
