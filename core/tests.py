@@ -2288,6 +2288,8 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
 
         # Verificar tarjetas interactivas en Portal Cliente (Total, Registradas, En Proceso, Resueltas)
         vec_user = User.objects.get(username='12.345.678-5')
+        vec_user.funcionario.debe_cambiar_contrasena = False
+        vec_user.funcionario.save()
         AtencionCiudadana.objects.create(
             solicitante='Rosa Dirigente (12.345.678-5)',
             vecino=at_vec.vecino,
