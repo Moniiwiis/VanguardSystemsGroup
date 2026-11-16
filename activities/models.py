@@ -156,6 +156,8 @@ class Actividad(BaseModel):
 
     class Meta:
         db_table = 'activities_activity'
+        verbose_name = "Activity"
+        verbose_name_plural = "Activities"
 
 class Evidencia(BaseModel):
     MOMENTO_CHOICES = [
@@ -172,6 +174,8 @@ class Evidencia(BaseModel):
 
     class Meta:
         db_table = 'activities_evidence'
+        verbose_name = "Evidence"
+        verbose_name_plural = "Evidences"
 
 class ValidacionEvidencia(BaseModel):
     actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE)
@@ -181,6 +185,8 @@ class ValidacionEvidencia(BaseModel):
 
     class Meta:
         db_table = 'activities_evidence_validation'
+        verbose_name = "Evidence Validation"
+        verbose_name_plural = "Evidence Validations"
 
 class AtencionSocialGestion(BaseModel):
     actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE)
@@ -190,6 +196,8 @@ class AtencionSocialGestion(BaseModel):
     resultado_gestion = models.TextField(null=True, blank=True)
     class Meta:
         db_table = 'activities_social_management'
+        verbose_name = "Social Management"
+        verbose_name_plural = "Social Managements"
         # Garantiza que una actividad no tenga dos veces la gestión número 1, 2 o 3
         unique_together = ('actividad', 'numero_gestion')
 
@@ -206,6 +214,8 @@ class TipoGestion(BaseModel):
 
     class Meta:
         db_table = 'activities_management_type'
+        verbose_name = "Management Type"
+        verbose_name_plural = "Management Types"
 
 class OrganizacionComunitaria(BaseModel):
     """
@@ -299,8 +309,8 @@ class OrganizacionComunitaria(BaseModel):
 
     class Meta:
         db_table = 'activities_community_organization'
-        verbose_name = "Organización Comunitaria / JJVV"
-        verbose_name_plural = "Organizaciones Comunitarias / JJVV"
+        verbose_name = "Community Organization"
+        verbose_name_plural = "Community Organizations"
         ordering = ['nombre']
 
 class Vecino(BaseModel):
@@ -371,6 +381,8 @@ class Vecino(BaseModel):
 
     class Meta:
         db_table = 'activities_neighbor'
+        verbose_name = "Neighbor"
+        verbose_name_plural = "Neighbors"
 
 class AtencionCiudadana(BaseModel):
     codigo_atencion = models.CharField(max_length=50, unique=True, blank=True)
@@ -444,6 +456,8 @@ class AtencionCiudadana(BaseModel):
 
     class Meta:
         db_table = 'activities_citizen_request'
+        verbose_name = "Citizen Request"
+        verbose_name_plural = "Citizen Requests"
 
 
 def get_or_create_actividad_para_atencion(atencion):

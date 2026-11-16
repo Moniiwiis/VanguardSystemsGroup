@@ -36,6 +36,8 @@ class CompromisoAgenda(BaseModel):
 
     class Meta:
         db_table = 'agenda_commitment'
+        verbose_name = "Commitment"
+        verbose_name_plural = "Commitments"
 
 class AjusteDesempenio(BaseModel):
     funcionario = models.ForeignKey("accounts.Funcionario", on_delete=models.RESTRICT, related_name='ajustes')
@@ -47,3 +49,5 @@ class AjusteDesempenio(BaseModel):
 
     class Meta:
         db_table = 'agenda_performance_adjustment'
+        verbose_name = "Performance Adjustment"
+        verbose_name_plural = "Performance Adjustments"

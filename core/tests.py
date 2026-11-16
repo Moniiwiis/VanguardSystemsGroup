@@ -2543,6 +2543,22 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             self.assertEqual(model._meta.db_table, table_name)
             self.assertIn(table_name, actual_tables)
 
+        admin = User.objects.create_superuser('admin_en', 'adminen@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        resp_admin = self.client.get('/admin/')
+        self.assertEqual(resp_admin.status_code, 200)
+        for en_label in (
+            'Delegations', 'Positions', 'Staff', 'Staff Roles', 'Roles',
+            'Sectors / Territories', 'Activities', 'Citizen Requests',
+            'Social Managements', 'Evidences', 'Management Types',
+            'Evidence Validations', 'Neighbors', 'Commitments',
+            'Performance Adjustments', 'Periods', 'Activity Catalogs',
+            'Measurement Items', 'Goal Configurations',
+        ):
+            self.assertContains(resp_admin, en_label)
+        for es_label in ('Delegacions', 'Actividads', 'Atencion ciudadanas', 'Cargos', 'Vecinos'):
+            self.assertNotContains(resp_admin, es_label)
+
 
 
 

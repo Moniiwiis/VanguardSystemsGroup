@@ -20,6 +20,8 @@ class Delegacion(BaseModel):
 
     class Meta:
         db_table = 'accounts_delegation'
+        verbose_name = "Delegation"
+        verbose_name_plural = "Delegations"
 
 class Sector(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
@@ -38,8 +40,8 @@ class Sector(BaseModel):
 
     class Meta:
         db_table = 'accounts_sector'
-        verbose_name = "Sector / Territorio"
-        verbose_name_plural = "Sectores / Territorios"
+        verbose_name = "Sector / Territory"
+        verbose_name_plural = "Sectors / Territories"
         ordering = ['delegacion', 'nombre']
 
 class Cargo(BaseModel):
@@ -51,6 +53,8 @@ class Cargo(BaseModel):
 
     class Meta:
         db_table = 'accounts_position'
+        verbose_name = "Position"
+        verbose_name_plural = "Positions"
 
 class Funcionario(BaseModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='funcionario')
@@ -110,6 +114,8 @@ class Funcionario(BaseModel):
 
     class Meta:
         db_table = 'accounts_staff'
+        verbose_name = "Staff Member"
+        verbose_name_plural = "Staff"
 
 class Rol(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
@@ -129,6 +135,8 @@ class Rol(BaseModel):
 
     class Meta:
         db_table = 'accounts_role'
+        verbose_name = "Role"
+        verbose_name_plural = "Roles"
 
 class FuncionarioRol(BaseModel):
     funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE)
@@ -136,4 +144,6 @@ class FuncionarioRol(BaseModel):
 
     class Meta:
         db_table = 'accounts_staff_role'
+        verbose_name = "Staff Role"
+        verbose_name_plural = "Staff Roles"
         unique_together = ('funcionario', 'rol')

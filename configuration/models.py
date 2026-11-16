@@ -39,6 +39,8 @@ class Periodo(BaseModel):
 
     class Meta:
         db_table = 'configuration_period'
+        verbose_name = "Period"
+        verbose_name_plural = "Periods"
 
 class TipoAtencion(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
@@ -56,6 +58,8 @@ class TipoAtencion(BaseModel):
 
     class Meta:
         db_table = 'configuration_request_type'
+        verbose_name = "Request Type"
+        verbose_name_plural = "Request Types"
 
 class SubAtencion(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
@@ -73,6 +77,8 @@ class SubAtencion(BaseModel):
 
     class Meta:
         db_table = 'configuration_request_subtype'
+        verbose_name = "Request Subtype"
+        verbose_name_plural = "Request Subtypes"
 
 class CatalogoActividad(BaseModel):
     tipo_actividad = models.CharField(max_length=100)
@@ -86,6 +92,8 @@ class CatalogoActividad(BaseModel):
 
     class Meta:
         db_table = 'configuration_activity_catalog'
+        verbose_name = "Activity Catalog"
+        verbose_name_plural = "Activity Catalogs"
 
 class ItemMedicion(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
@@ -106,6 +114,8 @@ class ItemMedicion(BaseModel):
 
     class Meta:
         db_table = 'configuration_measurement_item'
+        verbose_name = "Measurement Item"
+        verbose_name_plural = "Measurement Items"
 
 class ConfiguracionMeta(BaseModel):
     item = models.ForeignKey(ItemMedicion, on_delete=models.RESTRICT)
@@ -125,6 +135,8 @@ class ConfiguracionMeta(BaseModel):
 
     class Meta:
         db_table = 'configuration_goal_configuration'
+        verbose_name = "Goal Configuration"
+        verbose_name_plural = "Goal Configurations"
         # Asegura que no exista una meta duplicada para la misma combinación de ítem, período y funcionario
         unique_together = ('item', 'periodo', 'funcionario')
 
