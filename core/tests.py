@@ -2136,3 +2136,35 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             self.assertEqual(resp_slash.status_code, 301)
             self.assertTrue(resp_slash['Location'].endswith('/gestion/atenciones/'))
 
+    def test_custom_400_403_500_error_pages_render_with_debug_true(self):
+        from django.http import HttpResponse, JsonResponse
+        from django.test import Client, RequestFactory
+        from core.middleware import CustomErrorPagesMiddleware
+
+        rf = RequestFactory()
+        with self.settings(DEBUG=True):
+            # 400, 403 y 500 renderizan sus plantillas personalizadas
+            for code, expected_text in (
+                (400, 'Solicitud inválida'),
+                (403, 'Acceso denegado'),
+                (500, 'Error interno del servidor'),
+            ):
+                mw = CustomErrorPagesMiddleware(lambda req, c=code: HttpResponse('debug', status=c))
+                resp = mw(rf.get('/gestion/'))
+                self.assertEqual(resp.status_code, code)
+                self.assertIn(expected_text, resp.content.decode('utf-8'))
+
+            # Las respuestas JSON de error no se reemplazan por HTML
+            mw_json = CustomErrorPagesMiddleware(lambda req: JsonResponse({'ok': False}, status=403))
+            resp_json = mw_json(rf.post('/gestion/tubo/1/cambiar-estado/'))
+            self.assertEqual(resp_json.status_code, 403)
+            self.assertEqual(resp_json['Content-Type'], 'application/json')
+
+            # CSRF 403 real en cliente HTTP muestra plantilla personalizada 403
+            csrf_client = Client(enforce_csrf_checks=True)
+            resp_csrf = csrf_client.post('/login/', {'username': 'x', 'password': 'y'})
+            self.assertEqual(resp_csrf.status_code, 403)
+            self.assertContains(resp_csrf, 'Acceso denegado', status_code=403)
+            self.assertNotContains(resp_csrf, 'CSRF verification failed', status_code=403)
+
+
