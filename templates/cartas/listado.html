@@ -257,10 +257,10 @@
               <td class="py-2.5 px-3 whitespace-nowrap">{{ carta.encargado_seguimiento|default:'—' }}</td>
               <td class="py-2.5 px-3 whitespace-nowrap">
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold {% if carta.estado == 'FINALIZADA' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif carta.estado == 'APROBADA' %}bg-blue-50 text-blue-700 border border-blue-200{% elif carta.estado == 'NO APLICA' %}bg-slate-100 text-slate-600 border border-slate-200{% else %}bg-amber-50 text-amber-700 border border-amber-200{% endif %}">
-                  {{ carta.estado }}
+                  {{ carta.get_estado_display }}
                 </span>
               </td>
-              <td class="py-2.5 px-3 whitespace-nowrap text-[11px] font-semibold text-slate-700">{{ carta.pronunciamiento|default:'NO APLICA' }}</td>
+              <td class="py-2.5 px-3 whitespace-nowrap text-[11px] font-semibold text-slate-700">{{ carta.get_pronunciamiento_display|default:'No aplica' }}</td>
               <td class="py-2.5 px-3 whitespace-nowrap">{{ carta.derivada_a|default:'—' }}</td>
               <td class="py-2.5 px-3 text-center font-mono font-bold">{{ carta.unidad|default:'1' }}</td>
               <td class="py-2.5 px-3 whitespace-nowrap text-center sticky right-0 bg-white group-hover:bg-slate-50/95 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">

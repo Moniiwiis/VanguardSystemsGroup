@@ -59,19 +59,15 @@
       </div>
 
       {% if es_admin %}
-      <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs">
-        <i data-lucide="filter" class="w-4 h-4 text-[#C41230]"></i>
-        <label for="filtro-del" class="font-bold text-slate-600">Delegación:</label>
-        <select id="filtro-del" name="delegacion" onchange="this.form.submit()" 
-                class="max-w-[170px] truncate font-bold bg-transparent text-slate-900 focus:outline-none cursor-pointer">
-          <option value="" {% if not delegacion_seleccionada %}selected{% endif %}>Todas (Padrón Comunal)</option>
-          {% for d in todas_delegaciones %}
-            <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
-              {{ d.get_codigo }} — {{ d.nombre }}
-            </option>
-          {% endfor %}
-        </select>
-      </div>
+      <select id="filtro-del" name="delegacion" onchange="this.form.submit()"
+              class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
+        <option value="" {% if not delegacion_seleccionada %}selected{% endif %}>Filtrar Delegación: Todas</option>
+        {% for d in todas_delegaciones %}
+          <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
+            {{ d.get_codigo }} — {{ d.nombre }}
+          </option>
+        {% endfor %}
+      </select>
       {% endif %}
 
       <select name="estado" onchange="this.form.submit()"

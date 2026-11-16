@@ -11,10 +11,10 @@ class Carta(models.Model):
     """
 
     ESTADOS = [
-        ('EN PROCESO', 'EN PROCESO'),
-        ('APROBADA', 'APROBADA'),
-        ('FINALIZADA', 'FINALIZADA'),
-        ('NO APLICA', 'NO APLICA'),
+        ('EN PROCESO', 'En proceso'),
+        ('APROBADA', 'Aprobada'),
+        ('FINALIZADA', 'Finalizada'),
+        ('NO APLICA', 'No aplica'),
     ]
 
     PARA_CHOICES = [
@@ -24,10 +24,10 @@ class Carta(models.Model):
     ]
 
     PRONUNCIAMIENTO_CHOICES = [
-        ('NO APLICA', 'NO APLICA'),
-        ('DELEGADO', 'DELEGADO'),
-        ('ALCALDESA', 'ALCALDESA'),
-        ('GABINETE', 'GABINETE'),
+        ('NO APLICA', 'No aplica'),
+        ('DELEGADO', 'Delegado'),
+        ('ALCALDESA', 'Alcaldesa'),
+        ('GABINETE', 'Gabinete'),
     ]
 
     UNIDAD_CHOICES = [

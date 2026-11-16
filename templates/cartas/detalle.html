@@ -24,14 +24,14 @@
 
   <div class="bg-white border border-slate-200 shadow-sm rounded-3xl p-6 grid sm:grid-cols-2 gap-5 text-xs">
     <div><p class="text-[11px] font-bold text-slate-500 uppercase">Fecha ingreso</p><b class="text-sm text-slate-900 font-mono">{{ carta.fecha|date:'d/m/Y' }}</b></div>
-    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Estado</p><b class="text-sm text-slate-900">{{ carta.estado }}</b></div>
+    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Estado</p><b class="text-sm text-slate-900">{{ carta.get_estado_display }}</b></div>
     <div><p class="text-[11px] font-bold text-slate-500 uppercase">Para</p><b class="text-sm text-slate-900">{{ carta.para }}</b></div>
     <div><p class="text-[11px] font-bold text-slate-500 uppercase">Remite</p><b class="text-sm text-slate-900">{{ carta.remite }}</b></div>
     <div><p class="text-[11px] font-bold text-slate-500 uppercase">Fono contacto</p><b class="text-sm text-slate-900 font-mono">{{ carta.fono_contacto|default:'—' }}</b></div>
     <div><p class="text-[11px] font-bold text-slate-500 uppercase">Fecha de actividad</p><b class="text-sm text-slate-900">{{ carta.fecha_actividad|default:'—' }}</b></div>
     <div class="sm:col-span-2"><p class="text-[11px] font-bold text-slate-500 uppercase">Actividad o tema</p><p class="text-sm text-slate-800 whitespace-pre-line mt-1">{{ carta.actividad_tema }}</p></div>
     <div><p class="text-[11px] font-bold text-slate-500 uppercase">Encargado de seguimiento</p><b class="text-sm text-slate-900">{{ carta.encargado_seguimiento|default:'—' }}</b></div>
-    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Pronunciamiento</p><b class="text-sm text-slate-900">{{ carta.pronunciamiento|default:'NO APLICA' }}</b></div>
+    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Pronunciamiento</p><b class="text-sm text-slate-900">{{ carta.get_pronunciamiento_display|default:'No aplica' }}</b></div>
     <div><p class="text-[11px] font-bold text-slate-500 uppercase">Derivada a</p><b class="text-sm text-slate-900">{{ carta.derivada_a|default:'—' }}</b></div>
     <div><p class="text-[11px] font-bold text-slate-500 uppercase">Unidad</p><b class="text-sm text-slate-900 font-mono">{{ carta.unidad|default:'1' }}</b></div>
     <div class="sm:col-span-2"><p class="text-[11px] font-bold text-slate-500 uppercase">Observación</p><p class="text-sm text-slate-800 whitespace-pre-line mt-1">{{ carta.observacion|default:'—' }}</p></div>

@@ -31,7 +31,7 @@
 
       {% if permisos.es_admin %}
       <select name="delegacion" onchange="this.form.submit()" 
-              class="w-full max-w-[150px] px-2 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+              class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
         <option value="">Filtrar Delegación: Todas</option>
         {% for d in todas_delegaciones %}
           <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>

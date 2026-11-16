@@ -160,11 +160,11 @@
         {% if es_admin %}
         <div>
           <select name="delegacion" onchange="this.form.submit()"
-                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-[#C41230] focus:outline-none bg-white">
-            <option value="" {% if not delegacion_seleccionada %}selected{% endif %}>Delegación: Todas</option>
+                  class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
+            <option value="" {% if not delegacion_seleccionada %}selected{% endif %}>Filtrar Delegación: Todas</option>
             {% for d in todas_delegaciones %}
               <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
-                {{ d.nombre }}
+                {{ d.get_codigo }} — {{ d.nombre }}
               </option>
             {% endfor %}
           </select>

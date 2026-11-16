@@ -16,19 +16,19 @@ from .models import Carta
 
 
 EXCEL_UNIDADES_CARTAS = [
-    'ALCALDIA',
-    'ASESORIA JURIDICA',
-    'DELEGACIÓN AVENIDA DEL MAR',
-    'DELEGADO',
+    'Alcaldía',
+    'Asesoría Jurídica',
+    'Delegación Avenida del Mar',
+    'Delegado',
     'DISERCO',
     'DOM',
-    'FOMENTO',
-    'GABINETE',
-    'PATENTES',
-    'PATROCINIOS',
-    'SEGURIDAD CIUDADANA',
-    'TRANSITO',
-    'TURISMO',
+    'Fomento',
+    'Gabinete',
+    'Patentes',
+    'Patrocinios',
+    'Seguridad Ciudadana',
+    'Tránsito',
+    'Turismo',
 ]
 
 
@@ -161,8 +161,8 @@ def listado(request):
                 c.actividad_tema,
                 c.fecha_actividad or '',
                 c.encargado_seguimiento or '',
-                c.estado,
-                c.pronunciamiento or 'NO APLICA',
+                c.estado and c.get_estado_display() or '',
+                c.get_pronunciamiento_display() if c.pronunciamiento else 'No aplica',
                 c.derivada_a or '',
                 c.observacion or '',
                 c.unidad or '1',

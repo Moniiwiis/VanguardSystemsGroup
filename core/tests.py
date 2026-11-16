@@ -3240,6 +3240,26 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
 
         admin = User.objects.create_superuser('adm_cartas', 'admcartas@example.test', 'Admin123!')
         self.client.force_login(admin)
+        for view_name in (
+            'cartas_listado',
+            'gestion_atenciones',
+            'gestion_tubo',
+            'gestion_organizaciones',
+            'gestion_vecinos',
+            'gestion_sectores',
+            'gestion_reportes',
+            'gestion_usuarios',
+        ):
+            r_del = self.client.get(reverse(view_name))
+            self.assertEqual(r_del.status_code, 200)
+            self.assertContains(r_del, 'Filtrar Delegación: Todas')
+            self.assertContains(r_del, f'{self.delegacion.get_codigo()} — {self.delegacion.nombre}')
+
+        r_cartas_fmt = self.client.get(reverse('cartas_listado'))
+        self.assertContains(r_cartas_fmt, '>En proceso</option>')
+        self.assertContains(r_cartas_fmt, '>No aplica</option>')
+        self.assertContains(r_cartas_fmt, '>Delegado</option>')
+
         resp_del = self.client.post(reverse('cartas_eliminar', args=[carta.id]))
         self.assertRedirects(resp_del, reverse('cartas_listado'))
         self.assertFalse(Carta.objects.filter(id=carta.id).exists())
