@@ -1742,3 +1742,60 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.client.post(reverse('gestion_vecinos_eliminar', args=[vec_creado.id]))
         user_vec.refresh_from_db()
         self.assertFalse(user_vec.is_active)
+
+    def test_tubo_nueva_atencion_requiere_delegacion_activa_y_codigos_automaticos(self):
+        admin = User.objects.create_superuser('admin_cod_auto', 'aca@example.test', 'Admin123!')
+        self.client.force_login(admin)
+
+        # 1. Sin delegación activa: botón Nueva Atención al Tubo deshabilitado y abrir_tubo=False
+        resp_tubo_global = self.client.get(reverse('gestion_tubo'))
+        self.assertContains(resp_tubo_global, 'Nueva Atención al Tubo (Elige Delegación)')
+        self.assertNotContains(resp_tubo_global, 'href="/gestion/atenciones/?abrir_tubo=1"')
+        resp_atn_global = self.client.get(reverse('gestion_atenciones') + '?abrir_tubo=1')
+        self.assertFalse(resp_atn_global.context['abrir_tubo'])
+
+        # Con delegación activa: enlace habilitado y abrir_tubo=True
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+        resp_tubo_del = self.client.get(reverse('gestion_tubo'))
+        self.assertContains(resp_tubo_del, 'href="/gestion/atenciones/?abrir_tubo=1"')
+        resp_atn_del = self.client.get(reverse('gestion_atenciones') + '?abrir_tubo=1')
+        self.assertTrue(resp_atn_del.context['abrir_tubo'])
+
+        # 2. En los formularios de creación no existe campo de ingreso de código y se autogeneran
+        for url_name in (
+            'gestion_delegaciones',
+            'gestion_sectores',
+            'gestion_roles',
+            'gestion_tipo_atencion',
+            'gestion_sub_atencion',
+            'gestion_metas',
+        ):
+            html = self.client.get(reverse(url_name)).content.decode('utf-8')
+            self.assertNotIn('se genera automáticamente', html)
+            self.assertNotIn('placeholder="Autogenerado"', html)
+
+        self.client.post(reverse('gestion_delegaciones'), {'nombre': 'Delegación Auto', 'codigo': 'MANUAL', 'comuna': 'La Serena', 'estado': 'Activa'})
+        del_auto = Delegacion.objects.get(nombre='Delegación Auto')
+        self.assertTrue(del_auto.codigo.startswith('DEL'))
+
+        self.client.post(reverse('gestion_roles'), {'nombre_rol': 'Rol Auto', 'codigo': 'MANUAL', 'alcance': 'Delegación', 'estado': 'Activo'})
+        rol_auto = Rol.objects.get(nombre_rol='Rol Auto')
+        self.assertTrue(rol_auto.codigo.startswith('ROL'))
+
+        self.client.post(reverse('gestion_tipo_atencion'), {'nombre': 'Tipo Auto', 'codigo': 'MANUAL', 'estado': 'Activo'})
+        ta_auto = TipoAtencion.objects.get(nombre='Tipo Auto')
+        self.assertTrue(ta_auto.codigo.startswith('TA'))
+
+        self.client.post(reverse('gestion_sub_atencion'), {'nombre': 'Sub Auto', 'tipo_atencion_id': ta_auto.id, 'codigo': 'MANUAL', 'estado': 'Activa'})
+        sa_auto = SubAtencion.objects.get(nombre='Sub Auto')
+        self.assertTrue(sa_auto.codigo.startswith('SA'))
+
+        self.client.post(reverse('gestion_metas'), {'nombre_item': 'Ítem Auto', 'codigo': 'MANUAL', 'estado': 'Activo'})
+        it_auto = ItemMedicion.objects.get(nombre_item='Ítem Auto')
+        self.assertTrue(it_auto.codigo.startswith('IT'))
+
+        self.client.post(reverse('gestion_sectores'), {'nombre': 'Sector Auto', 'codigo': 'MANUAL', 'estado': 'Activo'})
+        sec_auto = Sector.objects.get(nombre='Sector Auto')
+        self.assertTrue(sec_auto.codigo.startswith('SEC'))

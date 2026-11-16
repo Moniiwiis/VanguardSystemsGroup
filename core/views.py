@@ -672,6 +672,21 @@ def gestion_inicio(request):
 
 # --- 1. CRUD DELEGACIONES (Wireframe C3) ---
 
+def _generar_codigo_siguiente(model_cls, prefix, pad=2, queryset=None):
+    """Genera el siguiente código secuencial único para catálogos al crear."""
+    qs = queryset if queryset is not None else model_cls.all_objects.all()
+    usados = {
+        (c or '').strip().upper()
+        for c in qs.values_list('codigo', flat=True)
+    }
+    n = qs.count() + 1
+    while True:
+        cand = f"{prefix}{n:0{pad}d}"
+        if cand.upper() not in usados:
+            return cand
+        n += 1
+
+
 @login_required
 def gestion_delegaciones(request):
     ctx = global_context(request)
@@ -680,7 +695,6 @@ def gestion_delegaciones(request):
         return redirect('gestion_inicio')
 
     if request.method == 'POST':
-        codigo = request.POST.get('codigo', '').strip().upper()
         nombre = request.POST.get('nombre', '').strip()
         direccion = request.POST.get('direccion', '').strip()
         comuna = request.POST.get('comuna', 'La Serena').strip()
@@ -693,9 +707,7 @@ def gestion_delegaciones(request):
             if not ok_dir:
                 messages.error(request, err_dir)
                 return redirect('gestion_delegaciones')
-            if not codigo:
-                count = Delegacion.all_objects.count() + 1
-                codigo = f"DEL{count:02d}"
+            codigo = _generar_codigo_siguiente(Delegacion, 'DEL', pad=2)
             Delegacion.objects.create(codigo=codigo, nombre=nombre, direccion=direccion, comuna=comuna, estado=estado)
             messages.success(request, f"Delegación '{nombre}' creada exitosamente.")
             return redirect('gestion_delegaciones')
@@ -798,7 +810,6 @@ def gestion_roles(request):
         return redirect('gestion_inicio')
 
     if request.method == 'POST':
-        codigo = request.POST.get('codigo', '').strip().upper()
         nombre = request.POST.get('nombre_rol', '').strip()
         alcance = request.POST.get('alcance', 'Delegación').strip()
         estado = request.POST.get('estado', 'Activo')
@@ -811,9 +822,7 @@ def gestion_roles(request):
             if not ok:
                 messages.error(request, err)
                 return redirect('gestion_roles')
-            if not codigo:
-                count = Rol.all_objects.count() + 1
-                codigo = f"ROL{count:02d}"
+            codigo = _generar_codigo_siguiente(Rol, 'ROL', pad=2)
             Rol.objects.create(codigo=codigo, nombre_rol=nombre, alcance=alcance, estado=estado, descripcion=descripcion)
             messages.success(request, f"Rol '{nombre}' registrado exitosamente.")
             return redirect('gestion_roles')
@@ -1419,7 +1428,6 @@ def gestion_metas(request):
                 messages.success(request, "Período de medición eliminado.")
             return redirect('gestion_metas')
 
-        codigo = request.POST.get('codigo', '').strip().upper()
         nombre = request.POST.get('nombre_item', '').strip()
         descripcion = request.POST.get('descripcion', '').strip()
         estado = request.POST.get('estado', 'Activo')
@@ -1431,9 +1439,7 @@ def gestion_metas(request):
             if not ok:
                 messages.error(request, err)
                 return redirect('gestion_metas')
-            if not codigo:
-                count = ItemMedicion.all_objects.count() + 1
-                codigo = f"IT{count:03d}"
+            codigo = _generar_codigo_siguiente(ItemMedicion, 'IT', pad=3)
             ItemMedicion.objects.create(codigo=codigo, nombre_item=nombre, descripcion=descripcion, estado=estado)
             messages.success(request, f"Ítem '{nombre}' registrado exitosamente.")
             return redirect('gestion_metas')
@@ -1530,7 +1536,6 @@ def gestion_tipo_atencion(request):
         return redirect('gestion_inicio')
 
     if request.method == 'POST':
-        codigo = request.POST.get('codigo', '').strip().upper()
         nombre = request.POST.get('nombre', '').strip()
         descripcion = request.POST.get('descripcion', '').strip()
         estado = request.POST.get('estado', 'Activo')
@@ -1542,9 +1547,7 @@ def gestion_tipo_atencion(request):
             if not ok:
                 messages.error(request, err)
                 return redirect('gestion_tipo_atencion')
-            if not codigo:
-                count = TipoAtencion.all_objects.count() + 1
-                codigo = f"TA{count:03d}"
+            codigo = _generar_codigo_siguiente(TipoAtencion, 'TA', pad=3)
             TipoAtencion.objects.create(codigo=codigo, nombre=nombre, descripcion=descripcion, estado=estado)
             messages.success(request, f"Tipo de Atención '{nombre}' registrado exitosamente.")
             return redirect('gestion_tipo_atencion')
@@ -1642,7 +1645,6 @@ def gestion_sub_atencion(request):
         return redirect('gestion_inicio')
 
     if request.method == 'POST':
-        codigo = request.POST.get('codigo', '').strip().upper()
         nombre = request.POST.get('nombre', '').strip()
         tipo_atencion_id = request.POST.get('tipo_atencion_id')
         estado = request.POST.get('estado', 'Activa')
@@ -1650,9 +1652,7 @@ def gestion_sub_atencion(request):
         if not nombre or not tipo_atencion_id:
             messages.error(request, "Nombre y Tipo de Atención asociado son campos obligatorios.")
         else:
-            if not codigo:
-                count = SubAtencion.all_objects.count() + 1
-                codigo = f"SA{count:03d}"
+            codigo = _generar_codigo_siguiente(SubAtencion, 'SA', pad=3)
             SubAtencion.objects.create(codigo=codigo, nombre=nombre, tipo_atencion_id=tipo_atencion_id, estado=estado)
             messages.success(request, f"Sub Atención '{nombre}' registrada exitosamente.")
             return redirect('gestion_sub_atencion')
@@ -2445,7 +2445,7 @@ def gestion_atenciones(request):
         'vecinos': vecinos_catalogo,
         'organizaciones': organizaciones_catalogo,
         'tipos_organizacion': OrganizacionComunitaria.TIPO_CHOICES,
-        'abrir_tubo': request.GET.get('abrir_tubo') == '1',
+        'abrir_tubo': request.GET.get('abrir_tubo') == '1' and bool(del_activa),
         'sectores': sectores_disponibles,
         'representantes_disponibles': representantes_disponibles,
         'todas_delegaciones': todas_delegaciones,
@@ -3310,7 +3310,6 @@ def gestion_sectores(request):
             messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para realizar esta acción.")
             return redirect('gestion_sectores')
         nombre = request.POST.get('nombre', '').strip()
-        codigo = request.POST.get('codigo', '').strip().upper()
         descripcion = request.POST.get('descripcion', '').strip()
         estado = request.POST.get('estado', 'Activo')
 
@@ -3331,9 +3330,9 @@ def gestion_sectores(request):
             if not ok:
                 messages.error(request, err)
                 return redirect('gestion_sectores')
-            if not codigo:
-                count = Sector.all_objects.filter(delegacion=del_obj).count() + 1
-                codigo = f"SEC{count:02d}"
+            codigo = _generar_codigo_siguiente(
+                Sector, 'SEC', pad=2, queryset=Sector.all_objects.filter(delegacion=del_obj)
+            )
             Sector.objects.create(
                 codigo=codigo,
                 nombre=nombre,

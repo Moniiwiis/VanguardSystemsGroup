@@ -1666,7 +1666,7 @@
     if (window.lucide) lucide.createIcons();
   }
 
-  {% if abrir_tubo %}
+  {% if abrir_tubo and delegacion_activa %}
   document.addEventListener('DOMContentLoaded', function() {
     abrirModalNuevaAtencion();
     const selTubo = document.getElementById('va_a_tubo_select');

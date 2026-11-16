@@ -51,11 +51,19 @@
         <span>Nuevo Compromiso Sectorial (Elige Delegación)</span>
       </button>
       {% endif %}
+      {% if delegacion_activa %}
       <a href="{% url 'gestion_atenciones' %}?abrir_tubo=1"
          class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white shadow-md border border-red-700/50 transition-all flex items-center gap-2">
         <i data-lucide="plus-circle" class="w-4 h-4"></i>
         <span>Nueva Atención al Tubo</span>
       </a>
+      {% else %}
+      <button type="button" disabled title="Selecciona una delegación activa para registrar una nueva atención al tubo"
+              class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed flex items-center gap-2">
+        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+        <span>Nueva Atención al Tubo (Elige Delegación)</span>
+      </button>
+      {% endif %}
       {% endif %}
     </div>
   </div>
