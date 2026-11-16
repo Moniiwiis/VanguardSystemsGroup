@@ -1,3 +1,4 @@
+from django.conf import settings
 from accounts.models import Delegacion, Funcionario, FuncionarioRol, Rol
 from core.utils import obtener_nombre_corto
 
@@ -9,7 +10,8 @@ def global_context(request):
             'delegacion_activa': None,
             'delegaciones_autorizadas': [],
             'can_switch_delegacion': False,
-            'permisos': {}
+            'permisos': {},
+            'aura_enabled': getattr(settings, 'AURA_ENABLED', False),
         }
 
     # Obtener funcionario asociado
@@ -103,4 +105,5 @@ def global_context(request):
         'delegaciones_autorizadas': delegaciones_autorizadas,
         'can_switch_delegacion': can_switch,
         'permisos': permisos,
+        'aura_enabled': getattr(settings, 'AURA_ENABLED', False),
     }

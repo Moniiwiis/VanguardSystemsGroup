@@ -203,6 +203,7 @@ class Command(BaseCommand):
         rol_coord    = mk_rol("Coordinador",       "ROL04", "Autorizado", "Supervisión de metas y reportes territoriales.")
         rol_delegado = mk_rol("Delegado Municipal","ROL05", "Delegación", "Gestión directiva de su delegación.")
         rol_cliente  = mk_rol("Cliente",           "ROL06", "Personal",   "Vecino ciudadano con acceso al portal.")
+        rol_global   = mk_rol("Delegación Global", "ROL07", "Global",     "Acceso global a las conversaciones privadas.")
 
         # ------------------------------------------------------------------
         # 4. CARGOS
@@ -493,6 +494,8 @@ class Command(BaseCommand):
             username='admin_sgr', password='Admin1234!',
             first_name='Administrador', last_name='General',
             email='admin@laserena.cl', identificador='ADM-001',
+            delegacion=None, cargo=cargo_coord, rol=rol_global,
+            is_staff=True, is_superuser=True
             delegacion=None, cargo=cargo_coord, rol=rol_admin,
             is_staff=True, is_superuser=True,
             rut=formatear_rut(14111005), telefono='+56 9 5100 0005'
