@@ -2603,13 +2603,19 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             estado='Activo',
         )
 
-        # GET Organizaciones verifica búsqueda de vecinos en directiva (Primer Nombre + Apellido Paterno) y sin texto Opcional en editar
+        # GET Organizaciones verifica búsqueda de vecinos en directiva, opción "Registrar nuevo vecino" con formulario completo
+        # de vecinos y sin texto Opcional en editar
         resp_org_get = self.client.get(reverse('gestion_organizaciones'))
         self.assertEqual(resp_org_get.status_code, 200)
         self.assertContains(resp_org_get, 'id="vecinos-directiva-list"')
         self.assertContains(resp_org_get, 'value="Raúl Gómez"')
         self.assertContains(resp_org_get, 'name="presidente_primer_nombre"')
         self.assertContains(resp_org_get, 'name="presidente_apellido_paterno"')
+        self.assertContains(resp_org_get, 'name="presidente_nuevo_vecino"')
+        self.assertContains(resp_org_get, 'name="presidente_vecino_primer_nombre"')
+        self.assertContains(resp_org_get, 'name="presidente_vecino_segundo_nombre"')
+        self.assertContains(resp_org_get, 'name="presidente_vecino_apellido_materno"')
+        self.assertContains(resp_org_get, 'name="presidente_vecino_direccion"')
         self.assertNotContains(resp_org_get, '(Opcional — si se deja vacío usa el del contacto prioritario)')
 
         # 1. Rechaza crear organización si no se ingresa correo institucional ni en directiva
@@ -2622,8 +2628,8 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertRedirects(resp_no_mail, reverse('gestion_organizaciones'))
         self.assertEqual(OrganizacionComunitaria.objects.count(), antes)
 
-        # 2. Al crear organización con correo y representantes (Primer Nombre + Apellido Paterno),
-        # crea usuario de la organización + envía provisoria + crea vecinos nuevos si no existen en padrón
+        # 2. Al crear organización usando el formulario completo de nuevo vecino para Presidente + Tesorero manual,
+        # crea usuario de la organización + envía provisoria + crea vecinos con datos completos en padrón
         mail.outbox.clear()
         resp_create = self.client.post(reverse('gestion_organizaciones'), {
             'nombre': 'JJVV Portal Las Compañías',
@@ -2635,11 +2641,17 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             'registro_directiva_numero': 'DIR-77',
             'sector_id': sec.id,
             'contacto_prioritario': 'presidente',
-            'presidente_primer_nombre': 'Carmen',
-            'presidente_apellido_paterno': 'Soto',
-            'presidente_rut': '11.111.111-1',
-            'presidente_telefono': '912345678',
-            'presidente_correo': 'contacto@jjvvcompanias.test',
+            'presidente_nuevo_vecino': '1',
+            'presidente_vecino_primer_nombre': 'Carmen',
+            'presidente_vecino_segundo_nombre': 'Elena',
+            'presidente_vecino_apellido_paterno': 'Soto',
+            'presidente_vecino_apellido_materno': 'Rivas',
+            'presidente_vecino_rut': '11.111.111-1',
+            'presidente_vecino_telefono': '912345678',
+            'presidente_vecino_correo': 'contacto@jjvvcompanias.test',
+            'presidente_vecino_direccion': 'Los Cipreses 400',
+            'presidente_vecino_sector_id': sec.id,
+            'presidente_vecino_estado': 'Activo',
             'tesorero_primer_nombre': 'Marta',
             'tesorero_apellido_paterno': 'Rojas',
             'tesorero_rut': '12.345.678-5',
@@ -2655,12 +2667,16 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(org.presidente_nombre, 'Carmen Soto')
         self.assertEqual(org.tesorero_nombre, 'Marta Rojas')
         self.assertEqual(org.secretario_nombre, 'Raúl Gómez')
+        self.assertEqual(org.telefono_contacto, '+56 9 1234 5678')
 
-        # Representantes que no existían fueron creados en Vecinos; el existente se reutilizó sin duplicar
+        # Representantes que no existían fueron creados en Vecinos con sus campos completos; el existente se reutilizó sin duplicar
         vec_pres = Vecino.objects.filter(rut='11.111.111-1').first()
         self.assertIsNotNone(vec_pres)
         self.assertEqual(vec_pres.primer_nombre, 'Carmen')
+        self.assertEqual(vec_pres.segundo_nombre, 'Elena')
         self.assertEqual(vec_pres.apellido_paterno, 'Soto')
+        self.assertEqual(vec_pres.apellido_materno, 'Rivas')
+        self.assertEqual(vec_pres.direccion, 'Los Cipreses 400')
         vec_tes = Vecino.objects.filter(rut='12.345.678-5').first()
         self.assertIsNotNone(vec_tes)
         self.assertEqual(vec_tes.primer_nombre, 'Marta')
@@ -2747,15 +2763,12 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         })
         self.assertRedirects(resp_change, reverse('portal_cliente'))
 
-        # 4. El portal muestra los datos de la organización (nombre completo, sin truncar) y sus registros propios
+        # 4. Mis Registros NO duplica la ficha de organización y muestra exclusivamente sus solicitudes y compromisos propios
         resp_portal = self.client.get(reverse('portal_cliente'))
         self.assertEqual(resp_portal.status_code, 200)
         self.assertContains(resp_portal, 'JJVV Portal Las Compañías')
-        self.assertContains(resp_portal, '65.987.654-K')
-        self.assertContains(resp_portal, 'Av. Viña del Mar 123')
-        self.assertContains(resp_portal, 'PJ-5544')
-        self.assertContains(resp_portal, 'Carmen Soto')
-        self.assertContains(resp_portal, 'Marta Rojas')
+        self.assertNotContains(resp_portal, 'data-realtime-card="portal-datos-organizacion"')
+        self.assertNotContains(resp_portal, 'PJ-5544')
         self.assertContains(resp_portal, 'Solicitud propia de sede comunitaria')
         self.assertContains(resp_portal, 'Compromiso territorial de luminarias')
         self.assertNotContains(resp_portal, 'Solicitud confidencial ajena')
@@ -2765,24 +2778,43 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(self.client.get(reverse('portal_cliente_detalle', args=[at_ajena.id])).status_code, 404)
         self.assertEqual(self.client.get(reverse('gestion_organizaciones')).status_code, 403)
 
-        # Mi Perfil (Mis Datos) muestra ficha completa de la organización igual al portal y permite editar correo/teléfono
+        # Mis Datos y Perfil muestra UNA sola tarjeta de organización con edición de correo y botón Editar por representante
         resp_perf = self.client.get(reverse('perfil_usuario'))
         self.assertContains(resp_perf, 'Directiva de la Organización')
         self.assertContains(resp_perf, 'Socios Activos')
         self.assertContains(resp_perf, 'PJ-5544')
         self.assertContains(resp_perf, 'Carmen Soto')
-        self.assertContains(resp_perf, 'Nombre de la Organización')
-        self.assertContains(resp_perf, 'JJVV Portal Las Compañías')
+        self.assertContains(resp_perf, 'Marta Rojas')
+        self.assertContains(resp_perf, 'abrirModalEditarRepPerfil')
+        self.assertNotContains(resp_perf, 'Editar Contacto de la Organización')
+
+        # Editar correo de la organización conserva automáticamente el teléfono del contacto prioritario
         self.client.post(reverse('perfil_usuario'), {
             'accion': 'actualizar_datos',
             'email': 'nuevo.correo@jjvvcompanias.test',
-            'telefono': '+56 9 8888 7777',
         })
         org.refresh_from_db()
         self.assertEqual(org.email_contacto, 'nuevo.correo@jjvvcompanias.test')
-        self.assertEqual(org.telefono_contacto, '+56 9 8888 7777')
+        self.assertEqual(org.telefono_contacto, '+56 9 1234 5678')
         self.assertEqual(org.presidente_correo, 'nuevo.correo@jjvvcompanias.test')
-        self.assertEqual(org.presidente_telefono, '+56 9 8888 7777')
+
+        # Editar representante prioritario (o cambiar prioridad a Tesorero) actualiza automáticamente el teléfono institucional
+        self.client.post(reverse('perfil_usuario'), {
+            'accion': 'editar_representante_org',
+            'cargo': 'tesorero',
+            'primer_nombre': 'Marta',
+            'apellido_paterno': 'Rojas',
+            'rut': '12.345.678-5',
+            'telefono': '988887777',
+            'correo': 'marta.tesorera@jjvvcompanias.test',
+            'establecer_prioritario': '1',
+        })
+        org.refresh_from_db()
+        func_org.refresh_from_db()
+        self.assertEqual(org.contacto_prioritario, 'tesorero')
+        self.assertEqual(org.representante_legal, 'Marta Rojas')
+        self.assertEqual(org.telefono_contacto, '+56 9 8888 7777')
+        self.assertEqual(func_org.telefono, '+56 9 8888 7777')
 
         # También puede ingresar al Portal usando su RUT de organización
         self.client.logout()

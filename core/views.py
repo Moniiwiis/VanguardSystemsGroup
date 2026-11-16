@@ -2391,31 +2391,59 @@ def _organizaciones_activas_para_delegacion(delegacion):
 
 
 def _extraer_y_validar_directiva(request, field_prefix=''):
-    """Valida y normaliza Presidente, Tesorero y Secretario (primer nombre + apellido paterno, RUT, correo y teléfono)."""
+    """
+    Valida y normaliza Presidente, Tesorero y Secretario (primer nombre + apellido paterno,
+    RUT, correo y teléfono). Si se marca '{cargo}_nuevo_vecino=1', extrae y valida desde el
+    formulario completo de Vecinos con prefijo '{field_prefix}{cargo}_vecino_'.
+    """
+    from core.utils import extraer_partes_persona_desde_post
+
     directiva = {}
     for cargo, label in (
         ('presidente', 'Presidente'),
         ('tesorero', 'Tesorero'),
         ('secretario', 'Secretario'),
     ):
-        pn = ' '.join(request.POST.get(f'{field_prefix}{cargo}_primer_nombre', '').split())
-        ap = ' '.join(request.POST.get(f'{field_prefix}{cargo}_apellido_paterno', '').split())
-        nombre_legacy = ' '.join(request.POST.get(f'{field_prefix}{cargo}_nombre', '').split())
-        if pn or ap:
-            if not pn or not ap:
-                return None, f"{label}: debes ingresar Primer Nombre y Apellido Paterno."
-            ok, err = validar_largo(pn, 50, f"{label} - Primer Nombre")
-            if not ok:
-                return None, err
-            ok, err = validar_largo(ap, 50, f"{label} - Apellido Paterno")
-            if not ok:
-                return None, err
-            nombre = f"{pn} {ap}".strip()
+        es_nuevo_vec = (request.POST.get(f'{field_prefix}{cargo}_nuevo_vecino', '').strip() == '1')
+        if es_nuevo_vec:
+            vec_pref = f'{field_prefix}{cargo}_vecino_'
+            nombre_full, partes_vec, err_nom = extraer_partes_persona_desde_post(
+                request.POST, prefix=vec_pref, exigir_estructurado=True
+            )
+            if err_nom:
+                return None, f"{label}: {err_nom}"
+            pn = partes_vec.get('primer_nombre', '')
+            ap = partes_vec.get('apellido_paterno', '')
+            nombre = ' '.join(p for p in (pn, ap) if p).strip() or nombre_full
+            rut = request.POST.get(f'{vec_pref}rut', '').strip()
+            correo = request.POST.get(f'{vec_pref}correo', '').strip()
+            telefono = request.POST.get(f'{vec_pref}telefono', '').strip()
+            direccion = request.POST.get(f'{vec_pref}direccion', '').strip()
+
+            if not rut or not correo:
+                return None, f"{label}: el RUT y correo electrónico del nuevo vecino son obligatorios."
+            ok_dir, err_dir = validar_direccion(direccion, f"{label} - Dirección", 200)
+            if not ok_dir:
+                return None, err_dir
         else:
-            nombre = nombre_legacy
-        rut = request.POST.get(f'{field_prefix}{cargo}_rut', '').strip()
-        correo = request.POST.get(f'{field_prefix}{cargo}_correo', '').strip()
-        telefono = request.POST.get(f'{field_prefix}{cargo}_telefono', '').strip()
+            pn = ' '.join(request.POST.get(f'{field_prefix}{cargo}_primer_nombre', '').split())
+            ap = ' '.join(request.POST.get(f'{field_prefix}{cargo}_apellido_paterno', '').split())
+            nombre_legacy = ' '.join(request.POST.get(f'{field_prefix}{cargo}_nombre', '').split())
+            if pn or ap:
+                if not pn or not ap:
+                    return None, f"{label}: debes ingresar Primer Nombre y Apellido Paterno."
+                ok, err = validar_largo(pn, 50, f"{label} - Primer Nombre")
+                if not ok:
+                    return None, err
+                ok, err = validar_largo(ap, 50, f"{label} - Apellido Paterno")
+                if not ok:
+                    return None, err
+                nombre = f"{pn} {ap}".strip()
+            else:
+                nombre = nombre_legacy
+            rut = request.POST.get(f'{field_prefix}{cargo}_rut', '').strip()
+            correo = request.POST.get(f'{field_prefix}{cargo}_correo', '').strip()
+            telefono = request.POST.get(f'{field_prefix}{cargo}_telefono', '').strip()
 
         ok, err = validar_largo(nombre, 150, f"{label} - Nombre")
         if not ok:
@@ -2484,13 +2512,74 @@ def _obtener_vecinos_directiva_catalogo(del_activa):
     return catalogo
 
 
+def _crear_o_asegurar_vecino_representante(
+    del_obj, sector_obj, territorio_val, org_email_lower,
+    nombre_completo, pn, sn, ap, am, rut, tel, correo, direccion='', estado='Activo'
+):
+    """Crea o reutiliza un registro Vecino para un representante de directiva y su usuario si aplica."""
+    if not nombre_completo or not rut:
+        return None
+    vec_existente = Vecino.objects.filter(rut=rut).first()
+    if vec_existente:
+        updated_fields = []
+        if tel and not vec_existente.telefono:
+            vec_existente.telefono = tel
+            updated_fields.append('telefono')
+        if direccion and not vec_existente.direccion:
+            vec_existente.direccion = direccion
+            updated_fields.append('direccion')
+        if updated_fields:
+            updated_fields.append('updated_at')
+            vec_existente.save(update_fields=updated_fields)
+        return vec_existente
+
+    if estado not in ('Activo', 'Inactivo'):
+        estado = 'Activo'
+
+    nuevo_v = Vecino.objects.create(
+        nombre=nombre_completo[:150],
+        primer_nombre=pn[:50],
+        segundo_nombre=sn[:50],
+        apellido_paterno=ap[:50],
+        apellido_materno=am[:50],
+        rut=rut,
+        direccion=direccion[:200],
+        telefono=tel,
+        delegacion=del_obj,
+        sector=sector_obj,
+        territorio=territorio_val,
+        estado=estado,
+    )
+
+    del_id_ws = del_obj.id if del_obj else "global"
+    def notificar_ws_vecino_dir(vec_id=nuevo_v.id, d_ws=del_id_ws):
+        publish_module_changed("vecinos", d_ws, "create", vec_id)
+    transaction.on_commit(notificar_ws_vecino_dir)
+
+    if correo and correo.lower() != org_email_lower and not User.objects.filter(email__iexact=correo).exists():
+        user_vec, prov_pwd, creado = _crear_o_sincronizar_usuario_vecino(
+            nuevo_v, correo=correo, crear=True, actualizar_correo=True
+        )
+        if creado and prov_pwd and user_vec:
+            try:
+                _send_welcome_provisional_password(
+                    user=user_vec,
+                    provisional_password=prov_pwd,
+                    rol_nombre='Cliente (Portal Ciudadano)',
+                    delegacion_nombre=del_obj.nombre if del_obj else 'Comuna',
+                )
+            except (OSError, SMTPException, BadHeaderError):
+                logger.exception("No se pudo enviar correo de bienvenida al vecino representante creado.")
+    return nuevo_v
+
+
 def _sincronizar_vecinos_directiva(request, org, del_activa, sector_obj=None, field_prefix=''):
     """
     Si algún representante (Presidente, Tesorero, Secretario) tiene RUT y nombre y no existe
     en Vecino, lo crea automáticamente en el padrón vecinal (y su cuenta ciudadana si posee
     un correo propio disponible distinto al institucional de la organización).
     """
-    from core.utils import separar_nombre_completo
+    from core.utils import extraer_partes_persona_desde_post, separar_nombre_completo
 
     del_obj = org.delegacion or del_activa
     sec_final = sector_obj or org.sector
@@ -2505,56 +2594,55 @@ def _sincronizar_vecinos_directiva(request, org, del_activa, sector_obj=None, fi
         if not nombre or not rut:
             continue
 
-        pn = ' '.join(request.POST.get(f'{field_prefix}{cargo}_primer_nombre', '').split())
-        ap = ' '.join(request.POST.get(f'{field_prefix}{cargo}_apellido_paterno', '').split())
-        if not pn and not ap:
-            pn, _sn, ap, _am = separar_nombre_completo(nombre)
-        nombre_corto = ' '.join(p for p in (pn, ap) if p).strip() or nombre
-
-        vec_existente = Vecino.objects.filter(rut=rut).first()
-        if vec_existente:
-            updated_fields = []
-            if tel and not vec_existente.telefono:
-                vec_existente.telefono = tel
-                updated_fields.append('telefono')
-            if updated_fields:
-                updated_fields.append('updated_at')
-                vec_existente.save(update_fields=updated_fields)
-            continue
-
-        nuevo_v = Vecino.objects.create(
-            nombre=nombre_corto,
-            primer_nombre=pn,
-            segundo_nombre='',
-            apellido_paterno=ap,
-            apellido_materno='',
-            rut=rut,
-            telefono=tel,
-            delegacion=del_obj,
-            sector=sec_final,
-            territorio=territorio_val,
-            estado='Activo',
-        )
-
-        del_id_ws = del_obj.id if del_obj else "global"
-        def notificar_ws_vecino_dir(vec_id=nuevo_v.id, d_ws=del_id_ws):
-            publish_module_changed("vecinos", d_ws, "create", vec_id)
-        transaction.on_commit(notificar_ws_vecino_dir)
-
-        if correo and correo.lower() != org_email_lower and not User.objects.filter(email__iexact=correo).exists():
-            user_vec, prov_pwd, creado = _crear_o_sincronizar_usuario_vecino(
-                nuevo_v, correo=correo, crear=True, actualizar_correo=True
+        es_nuevo_vec = (request.POST.get(f'{field_prefix}{cargo}_nuevo_vecino', '').strip() == '1')
+        sn = am = direccion = ''
+        estado_vec = 'Activo'
+        sec_rep = sec_final
+        terr_rep = territorio_val
+        if es_nuevo_vec:
+            vec_pref = f'{field_prefix}{cargo}_vecino_'
+            nombre_full, partes_vec, _ = extraer_partes_persona_desde_post(
+                request.POST, prefix=vec_pref, exigir_estructurado=False
             )
-            if creado and prov_pwd and user_vec:
-                try:
-                    _send_welcome_provisional_password(
-                        user=user_vec,
-                        provisional_password=prov_pwd,
-                        rol_nombre='Cliente (Portal Ciudadano)',
-                        delegacion_nombre=del_obj.nombre if del_obj else 'Comuna',
-                    )
-                except (OSError, SMTPException, BadHeaderError):
-                    logger.exception("No se pudo enviar correo de bienvenida al vecino representante creado.")
+            pn = partes_vec.get('primer_nombre', '')
+            sn = partes_vec.get('segundo_nombre', '')
+            ap = partes_vec.get('apellido_paterno', '')
+            am = partes_vec.get('apellido_materno', '')
+            nombre_completo = nombre_full or nombre
+            direccion = request.POST.get(f'{vec_pref}direccion', '').strip()
+            estado_vec = request.POST.get(f'{vec_pref}estado', 'Activo').strip()
+            sec_vec_id = request.POST.get(f'{vec_pref}sector_id', '').strip()
+            if sec_vec_id.isdigit():
+                sec_qs = Sector.objects.filter(id=int(sec_vec_id), estado='Activo')
+                if del_obj:
+                    sec_qs = sec_qs.filter(delegacion=del_obj)
+                sec_found = sec_qs.first()
+                if sec_found:
+                    sec_rep = sec_found
+                    terr_rep = sec_found.nombre
+        else:
+            pn = ' '.join(request.POST.get(f'{field_prefix}{cargo}_primer_nombre', '').split())
+            ap = ' '.join(request.POST.get(f'{field_prefix}{cargo}_apellido_paterno', '').split())
+            if not pn and not ap:
+                pn, sn, ap, am = separar_nombre_completo(nombre)
+            nombre_completo = ' '.join(p for p in (pn, ap) if p).strip() or nombre
+
+        _crear_o_asegurar_vecino_representante(
+            del_obj=del_obj,
+            sector_obj=sec_rep,
+            territorio_val=terr_rep,
+            org_email_lower=org_email_lower,
+            nombre_completo=nombre_completo,
+            pn=pn,
+            sn=sn,
+            ap=ap,
+            am=am,
+            rut=rut,
+            tel=tel,
+            correo=correo,
+            direccion=direccion,
+            estado=estado_vec,
+        )
 
 
 def _resolver_contacto_prioritario_org(directiva_data, prioridad='presidente', fallback_rep='', fallback_tel='', fallback_email=''):
@@ -5168,43 +5256,187 @@ def perfil_usuario(request):
                 messages.error(request, "Ese correo electrónico ya pertenece a otra cuenta.")
                 return redirect('perfil_usuario')
 
-            # Nombres, apellidos y RUT son solo lectura en Mi Perfil; solo se actualiza correo y teléfono.
+            # Nombres, apellidos y RUT son solo lectura en Mi Perfil; solo se actualiza correo (y teléfono para personas).
             user.email = email
             user.save(update_fields=['email'])
 
-            if funcionario:
-                funcionario.telefono = telefono
-                funcionario.save(update_fields=['telefono'])
-            vecino_cli = _obtener_vecino_de_cliente(user)
-            if vecino_cli and vecino_cli.telefono != telefono:
-                vecino_cli.telefono = telefono
-                vecino_cli.save(update_fields=['telefono', 'updated_at'])
             org_cli = _obtener_organizacion_de_cliente(user)
             if org_cli:
                 old_org_email = (org_cli.email_contacto or '').strip()
-                old_org_tel = (org_cli.telefono_contacto or '').strip()
+                prio_cargo = (org_cli.contacto_prioritario or 'presidente').strip().lower()
+                prio_tel = ''
+                if prio_cargo in ('presidente', 'tesorero', 'secretario'):
+                    prio_tel = (getattr(org_cli, f'{prio_cargo}_telefono') or '').strip()
+                if not prio_tel:
+                    for c_alt in ('presidente', 'tesorero', 'secretario'):
+                        alt_tel = (getattr(org_cli, f'{c_alt}_telefono') or '').strip()
+                        if alt_tel:
+                            prio_tel = alt_tel
+                            break
+                # El teléfono institucional de la organización sigue automáticamente al contacto prioritario
+                tel_auto = prio_tel or (org_cli.telefono_contacto or '').strip()
                 org_updates = []
                 if org_cli.email_contacto != email:
                     org_cli.email_contacto = email
                     org_updates.append('email_contacto')
-                if org_cli.telefono_contacto != (telefono or None):
-                    org_cli.telefono_contacto = telefono or None
+                if org_cli.telefono_contacto != (tel_auto or None):
+                    org_cli.telefono_contacto = tel_auto or None
                     org_updates.append('telefono_contacto')
-                prio_cargo = (org_cli.contacto_prioritario or 'presidente').strip().lower()
                 if prio_cargo in ('presidente', 'tesorero', 'secretario'):
                     prio_em = (getattr(org_cli, f'{prio_cargo}_correo') or '').strip()
                     if not prio_em or prio_em == old_org_email:
                         setattr(org_cli, f'{prio_cargo}_correo', email)
                         org_updates.append(f'{prio_cargo}_correo')
-                    prio_tl = (getattr(org_cli, f'{prio_cargo}_telefono') or '').strip()
-                    if telefono and (not prio_tl or prio_tl == old_org_tel):
-                        setattr(org_cli, f'{prio_cargo}_telefono', telefono)
-                        org_updates.append(f'{prio_cargo}_telefono')
                 if org_updates:
                     org_updates.append('updated_at')
                     org_cli.save(update_fields=org_updates)
+                if funcionario and funcionario.telefono != tel_auto:
+                    funcionario.telefono = tel_auto
+                    funcionario.save(update_fields=['telefono'])
+            else:
+                if funcionario:
+                    funcionario.telefono = telefono
+                    funcionario.save(update_fields=['telefono'])
+                vecino_cli = _obtener_vecino_de_cliente(user)
+                if vecino_cli and vecino_cli.telefono != telefono:
+                    vecino_cli.telefono = telefono
+                    vecino_cli.save(update_fields=['telefono', 'updated_at'])
 
-            messages.success(request, "Tus datos personales fueron actualizados correctamente.")
+            messages.success(request, "Tus datos fueron actualizados correctamente.")
+            return redirect('perfil_usuario')
+
+        elif action == 'editar_representante_org':
+            org_cli = _obtener_organizacion_de_cliente(user)
+            if not org_cli:
+                messages.error(request, "Acceso denegado: Solo cuentas de organizaciones pueden editar su directiva aquí.")
+                return redirect('perfil_usuario')
+
+            cargo = request.POST.get('cargo', '').strip().lower()
+            if cargo not in ('presidente', 'tesorero', 'secretario'):
+                messages.error(request, "Cargo de representante inválido.")
+                return redirect('perfil_usuario')
+
+            from core.utils import extraer_partes_persona_desde_post
+            es_nuevo_vec = (request.POST.get('rep_nuevo_vecino', '').strip() == '1')
+            sn = am = direccion_rep = ''
+            estado_rep = 'Activo'
+            sec_rep = org_cli.sector
+            if es_nuevo_vec:
+                nombre_full, partes_vec, err_nom = extraer_partes_persona_desde_post(
+                    request.POST, prefix='rep_vecino_', exigir_estructurado=True
+                )
+                if err_nom:
+                    messages.error(request, err_nom)
+                    return redirect('perfil_usuario')
+                pn = partes_vec.get('primer_nombre', '')
+                sn = partes_vec.get('segundo_nombre', '')
+                ap = partes_vec.get('apellido_paterno', '')
+                am = partes_vec.get('apellido_materno', '')
+                nombre_corto = ' '.join(p for p in (pn, ap) if p).strip() or nombre_full
+                nombre_completo_vec = nombre_full or nombre_corto
+                rut_rep = request.POST.get('rep_vecino_rut', '').strip()
+                correo_rep = request.POST.get('rep_vecino_correo', '').strip()
+                tel_rep = request.POST.get('rep_vecino_telefono', '').strip()
+                direccion_rep = request.POST.get('rep_vecino_direccion', '').strip()
+                estado_rep = request.POST.get('rep_vecino_estado', 'Activo').strip()
+                sec_id_rep = request.POST.get('rep_vecino_sector_id', '').strip()
+                if sec_id_rep.isdigit():
+                    sec_qs = Sector.objects.filter(id=int(sec_id_rep), estado='Activo')
+                    if org_cli.delegacion:
+                        sec_qs = sec_qs.filter(delegacion=org_cli.delegacion)
+                    sec_found = sec_qs.first()
+                    if sec_found:
+                        sec_rep = sec_found
+                if not rut_rep or not correo_rep:
+                    messages.error(request, "El RUT y correo electrónico del nuevo vecino representante son obligatorios.")
+                    return redirect('perfil_usuario')
+                ok_d, err_d = validar_direccion(direccion_rep, "Dirección", 200)
+                if not ok_d:
+                    messages.error(request, err_d)
+                    return redirect('perfil_usuario')
+            else:
+                pn = ' '.join(request.POST.get('primer_nombre', '').split())
+                ap = ' '.join(request.POST.get('apellido_paterno', '').split())
+                if not pn or not ap:
+                    messages.error(request, "El Primer Nombre y Apellido Paterno del representante son obligatorios.")
+                    return redirect('perfil_usuario')
+                ok, err = validar_largo(pn, 50, "Primer Nombre")
+                if not ok: messages.error(request, err); return redirect('perfil_usuario')
+                ok, err = validar_largo(ap, 50, "Apellido Paterno")
+                if not ok: messages.error(request, err); return redirect('perfil_usuario')
+                nombre_corto = f"{pn} {ap}".strip()
+                nombre_completo_vec = nombre_corto
+                rut_rep = request.POST.get('rut', '').strip()
+                correo_rep = request.POST.get('correo', '').strip()
+                tel_rep = request.POST.get('telefono', '').strip()
+
+            if rut_rep:
+                ok_r, res_r = validar_rut(rut_rep)
+                if not ok_r:
+                    messages.error(request, f"RUT de representante inválido: {res_r}")
+                    return redirect('perfil_usuario')
+                rut_rep = res_r
+            if correo_rep:
+                ok_c, err_c = validar_largo(correo_rep, 100, "Correo Electrónico")
+                if not ok_c: messages.error(request, err_c); return redirect('perfil_usuario')
+                try:
+                    validate_email(correo_rep)
+                except ValidationError:
+                    messages.error(request, "El correo electrónico del representante no es válido.")
+                    return redirect('perfil_usuario')
+            if tel_rep:
+                ok_t, err_t = validar_telefono_chileno(tel_rep)
+                if not ok_t: messages.error(request, err_t); return redirect('perfil_usuario')
+                tel_rep = formatear_telefono_chileno(tel_rep)
+
+            setattr(org_cli, f'{cargo}_nombre', nombre_corto)
+            setattr(org_cli, f'{cargo}_rut', rut_rep or None)
+            setattr(org_cli, f'{cargo}_telefono', tel_rep or None)
+            setattr(org_cli, f'{cargo}_correo', correo_rep or None)
+
+            if request.POST.get('establecer_prioritario') == '1':
+                org_cli.contacto_prioritario = cargo
+
+            directiva_snapshot = {}
+            for c_dir in ('presidente', 'tesorero', 'secretario'):
+                directiva_snapshot[f'{c_dir}_nombre'] = getattr(org_cli, f'{c_dir}_nombre')
+                directiva_snapshot[f'{c_dir}_telefono'] = getattr(org_cli, f'{c_dir}_telefono')
+                directiva_snapshot[f'{c_dir}_correo'] = getattr(org_cli, f'{c_dir}_correo')
+
+            prio_val, rep_val, tel_auto_val, _ = _resolver_contacto_prioritario_org(
+                directiva_snapshot,
+                prioridad=org_cli.contacto_prioritario or 'presidente',
+                fallback_rep=org_cli.representante_legal or '',
+                fallback_tel='',
+                fallback_email=org_cli.email_contacto or '',
+            )
+            org_cli.contacto_prioritario = prio_val
+            org_cli.representante_legal = rep_val
+            org_cli.telefono_contacto = tel_auto_val
+            org_cli.save()
+
+            if funcionario:
+                funcionario.telefono = (tel_auto_val or '')[:20]
+                funcionario.save(update_fields=['telefono'])
+
+            _crear_o_asegurar_vecino_representante(
+                del_obj=org_cli.delegacion,
+                sector_obj=sec_rep,
+                territorio_val=(sec_rep.nombre if sec_rep else (org_cli.territorio or (org_cli.delegacion.nombre if org_cli.delegacion else ''))),
+                org_email_lower=(org_cli.email_contacto or '').strip().lower(),
+                nombre_completo=nombre_completo_vec,
+                pn=pn,
+                sn=sn,
+                ap=ap,
+                am=am,
+                rut=rut_rep,
+                tel=tel_rep,
+                correo=correo_rep,
+                direccion=direccion_rep,
+                estado=estado_rep,
+            )
+
+            messages.success(request, f"Representante ({cargo.capitalize()}) actualizado correctamente.")
             return redirect('perfil_usuario')
 
         elif action in ('password', 'cambiar_clave'):
@@ -5291,9 +5523,30 @@ def perfil_usuario(request):
 
     org_perfil = _obtener_organizacion_de_cliente(user)
     vecino_perfil = None if org_perfil else _obtener_vecino_de_cliente(user)
+    rep_cards_perfil = []
+    vecinos_directiva_perfil = []
+    sectores_perfil = Sector.objects.none()
     if org_perfil:
+        from core.utils import separar_nombre_completo
         pn = sn = ap = am = ''
         perfil_rut = org_perfil.rut or ''
+        for c_key, c_title in (('presidente', 'Presidente'), ('tesorero', 'Tesorero'), ('secretario', 'Secretario')):
+            raw_n = (getattr(org_perfil, f'{c_key}_nombre') or '').strip()
+            r_pn, _r_sn, r_ap, _r_am = separar_nombre_completo(raw_n)
+            rep_cards_perfil.append({
+                'cargo': c_key,
+                'titulo': c_title,
+                'nombre_corto': ' '.join(p for p in (r_pn, r_ap) if p).strip() or raw_n,
+                'pn': r_pn,
+                'ap': r_ap,
+                'rut': getattr(org_perfil, f'{c_key}_rut') or '',
+                'telefono': getattr(org_perfil, f'{c_key}_telefono') or '',
+                'correo': getattr(org_perfil, f'{c_key}_correo') or '',
+                'es_prioritario': ((org_perfil.contacto_prioritario or 'presidente').lower() == c_key),
+            })
+        vecinos_directiva_perfil = _obtener_vecinos_directiva_catalogo(org_perfil.delegacion)
+        if org_perfil.delegacion:
+            sectores_perfil = Sector.objects.filter(delegacion=org_perfil.delegacion, estado='Activo').order_by('nombre')
     elif vecino_perfil:
         pn, sn, ap, am = vecino_perfil.get_partes_nombre()
         perfil_rut = vecino_perfil.rut
@@ -5309,6 +5562,9 @@ def perfil_usuario(request):
         'funcionario': funcionario,
         'user': user,
         'org_perfil': org_perfil,
+        'rep_cards_perfil': rep_cards_perfil,
+        'vecinos_directiva': vecinos_directiva_perfil,
+        'sectores': sectores_perfil,
         'perfil_primer_nombre': pn,
         'perfil_segundo_nombre': sn,
         'perfil_apellido_paterno': ap,

@@ -36,10 +36,7 @@
     </div>
   </div>
 
-  <!-- Ficha Exclusiva de Datos (Organización o Persona) -->
-  {% if organizacion %}
-    {% include "portal/includes/org_datos_card.html" with organizacion=organizacion %}
-  {% else %}
+  {% if not organizacion %}
   <div data-realtime-card="portal-datos-personales" class="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
     <div class="flex items-center gap-4 min-w-0">
       {% if funcionario and funcionario.foto %}
