@@ -72,10 +72,17 @@
       margin-top: 0 !important;
       margin-bottom: 0 !important;
     }
+    .chat-widget-mode { overflow: hidden; }
+    .chat-widget-mode > header,
+    .chat-widget-mode > footer { display: none; }
+    .chat-widget-mode > div.flex-1 { height: 100vh; padding: 0; }
+    .chat-widget-mode > div.flex-1 > aside { display: none; }
+    .chat-widget-mode > div.flex-1 > main { padding: .5rem; }
+    .chat-widget-mode .chat-layout { height: calc(100vh - 1rem); min-height: 0; }
   </style>
   {% block extra_head %}{% endblock %}
 </head>
-<body class="min-h-full flex flex-col bg-[#FDF6F6]">
+<body class="min-h-full flex flex-col bg-[#FDF6F6]{% if chat_widget_mode %} chat-widget-mode{% endif %}">
 
   <!-- TopBar Oficial de la Ilustre Municipalidad de La Serena (Wireframes C3-C6) -->
   <header class="sticky top-0 z-40 shadow-md text-white" style="background: linear-gradient(90deg, #8B1D19 0%, #C41230 60%, #DB3334 100%);">
@@ -396,8 +403,485 @@
     </div>
   </footer>
 
+  {% if request.user.is_authenticated and not permisos.es_cliente and not chat_widget_mode %}
+  <button id="chat-bubble" type="button" aria-label="Abrir o minimizar chat en vivo"
+     class="fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full bg-[#C41230] hover:bg-[#8B1D19] text-white shadow-xl flex items-center justify-center transition-transform hover:scale-105 touch-none cursor-grab active:cursor-grabbing">
+    <i data-lucide="message-circle" class="w-6 h-6"></i>
+    <span id="chat-unread-badge" class="hidden absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-amber-400 text-red-950 text-[10px] font-extrabold items-center justify-center border-2 border-white">0</span>
+  </button>
+  <section id="chat-widget-panel" class="hidden fixed bottom-24 right-5 z-50 w-[min(430px,calc(100vw-2.5rem))] h-[min(650px,calc(100vh-8rem))] overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200" aria-label="Ventana de chat">
+    <header class="h-12 px-4 flex items-center justify-between bg-[#C41230] text-white">
+      <span class="text-xs font-extrabold">Chat privado</span>
+      <div class="flex items-center gap-2">
+        <a href="{% url 'websocket:chat_index' %}" target="_blank" rel="noopener" class="text-[10px] font-semibold underline underline-offset-2">Abrir completo</a>
+        <button id="chat-widget-minimize" type="button" aria-label="Minimizar chat" class="w-7 h-7 rounded-lg hover:bg-white/15 flex items-center justify-center">
+          <i data-lucide="minus" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </header>
+    <iframe title="Chat privado" src="{% url 'websocket:chat_index' %}?widget=1" class="w-full h-[calc(100%-3rem)] border-0"></iframe>
+  </section>
+  <div id="chat-notice-region" class="fixed bottom-24 right-5 z-50 w-[min(360px,calc(100vw-2.5rem))] space-y-2" aria-live="polite" aria-atomic="false"></div>
+  {% if aura_enabled %}
+  <button id="aura-launcher" type="button" aria-label="Abrir AURA, asistente virtual"
+          aria-controls="aura-panel" aria-expanded="false"
+          class="fixed bottom-5 right-24 z-[60] w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-xl flex items-center justify-center transition-transform hover:scale-105">
+    <i data-lucide="sparkles" class="w-6 h-6"></i>
+  </button>
+  <section id="aura-panel" role="dialog" aria-labelledby="aura-title" aria-modal="false"
+           data-user-id="{{ request.user.id }}"
+           data-user-name="{{ request.user.get_full_name|default:request.user.username }}"
+           data-treatment="{{ request.user.funcionario.tratamiento|default:'neutral' }}"
+           class="hidden fixed bottom-24 right-24 z-[60] flex w-[min(400px,calc(100vw-2rem))] h-[min(620px,calc(100vh-8rem))] min-h-[360px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-indigo-200">
+    <header id="aura-drag-handle" class="flex shrink-0 touch-none cursor-move select-none items-center justify-between bg-gradient-to-r from-indigo-700 to-violet-700 px-4 py-3 text-white">
+      <div class="flex min-w-0 items-center gap-3">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+          <i data-lucide="sparkles" class="h-5 w-5"></i>
+        </span>
+        <span class="min-w-0">
+          <strong id="aura-title" class="block text-sm font-extrabold tracking-wide">AURA</strong>
+          <span class="block truncate text-[10px] text-indigo-100">Asistente virtual de apoyo</span>
+        </span>
+      </div>
+      <button id="aura-minimize" type="button" aria-label="Minimizar AURA" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl hover:bg-white/15">
+        <i data-lucide="minus" class="h-4 w-4"></i>
+      </button>
+    </header>
+    <div class="shrink-0 border-b border-slate-100 bg-white px-3 py-2">
+      <label for="aura-search" class="relative block">
+        <i data-lucide="search" class="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"></i>
+        <input id="aura-search" type="search" placeholder="Buscar en respuestas anteriores…"
+               class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-[11px] text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-50">
+      </label>
+    </div>
+    <div id="aura-messages" class="min-h-0 flex-1 space-y-3 overflow-y-auto bg-slate-50/80 px-3 py-4" aria-live="polite"></div>
+    <div id="aura-status" class="hidden shrink-0 px-4 pb-2 text-[10px] text-rose-700" role="status" aria-live="polite"></div>
+    <div class="shrink-0 border-t border-slate-100 bg-white px-3 pt-2">
+      <div class="mb-2 flex flex-wrap gap-1.5">
+        <button type="button" data-aura-prompt="Ayúdame a resumir este texto: " class="rounded-full bg-indigo-50 px-2.5 py-1 text-[9px] font-semibold text-indigo-700 hover:bg-indigo-100">Resumir texto</button>
+        <button type="button" data-aura-prompt="Explícame cómo usar esta página de la plataforma." class="rounded-full bg-indigo-50 px-2.5 py-1 text-[9px] font-semibold text-indigo-700 hover:bg-indigo-100">Cómo usar esta página</button>
+        <button type="button" data-aura-prompt="Ayúdame a localizar información interna sobre: " class="rounded-full bg-indigo-50 px-2.5 py-1 text-[9px] font-semibold text-indigo-700 hover:bg-indigo-100">Buscar información</button>
+      </div>
+      <form id="aura-form" class="flex items-end gap-2 pb-2">
+        <textarea id="aura-input" rows="2" maxlength="4000" required
+                  placeholder="Escribe tu consulta…"
+                  class="max-h-24 min-h-10 flex-1 resize-y rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-50"></textarea>
+        <button type="submit" aria-label="Enviar consulta a AURA"
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-md transition hover:bg-indigo-700 disabled:opacity-50">
+          <i data-lucide="arrow-up" class="h-4 w-4"></i>
+        </button>
+      </form>
+      <p class="pb-2 text-center text-[9px] text-slate-400">Historial privado: solo se guarda en este navegador para tu cuenta.</p>
+    </div>
+  </section>
+  {% endif %}
+  {% endif %}
+
   <script>
     lucide.createIcons();
+
+    {% if request.user.is_authenticated and not permisos.es_cliente and not chat_widget_mode %}
+    document.addEventListener('DOMContentLoaded', function() {
+      const badge = document.getElementById('chat-unread-badge');
+      if (!badge) return;
+      const bubble = document.getElementById('chat-bubble');
+      const panel = document.getElementById('chat-widget-panel');
+      const positionKey = 'chat-bubble-position-{{ request.user.id }}';
+      let wasDragged = false;
+      try {
+        const savedPosition = JSON.parse(localStorage.getItem(positionKey) || 'null');
+        if (savedPosition && Number.isFinite(savedPosition.left) && Number.isFinite(savedPosition.top)) {
+          bubble.style.left = Math.min(savedPosition.left, window.innerWidth - 64) + 'px';
+          bubble.style.top = Math.min(savedPosition.top, window.innerHeight - 64) + 'px';
+          bubble.style.right = 'auto';
+          bubble.style.bottom = 'auto';
+        }
+      } catch (error) {
+        console.error('No se pudo restaurar la posición del chat.', error);
+      }
+      bubble.addEventListener('pointerdown', function(event) {
+        if (event.button !== 0 && event.pointerType === 'mouse') return;
+        const startX = event.clientX;
+        const startY = event.clientY;
+        const rect = bubble.getBoundingClientRect();
+        const offsetX = startX - rect.left;
+        const offsetY = startY - rect.top;
+        let moved = false;
+        bubble.setPointerCapture(event.pointerId);
+        function move(moveEvent) {
+          if (Math.abs(moveEvent.clientX - startX) + Math.abs(moveEvent.clientY - startY) > 5) moved = true;
+          if (!moved) return;
+          wasDragged = true;
+          const left = Math.max(0, Math.min(window.innerWidth - rect.width, moveEvent.clientX - offsetX));
+          const top = Math.max(0, Math.min(window.innerHeight - rect.height, moveEvent.clientY - offsetY));
+          bubble.style.left = left + 'px';
+          bubble.style.top = top + 'px';
+          bubble.style.right = 'auto';
+          bubble.style.bottom = 'auto';
+        }
+        function finish() {
+          bubble.removeEventListener('pointermove', move);
+          bubble.removeEventListener('pointerup', finish);
+          bubble.removeEventListener('pointercancel', finish);
+          if (moved) {
+            const rectNow = bubble.getBoundingClientRect();
+            localStorage.setItem(positionKey, JSON.stringify({left: rectNow.left, top: rectNow.top}));
+            window.setTimeout(function() { wasDragged = false; }, 250);
+          }
+        }
+        bubble.addEventListener('pointermove', move);
+        bubble.addEventListener('pointerup', finish);
+        bubble.addEventListener('pointercancel', finish);
+      });
+      bubble.addEventListener('click', function(event) {
+        if (wasDragged) {
+          event.preventDefault();
+          wasDragged = false;
+          return;
+        }
+        document.getElementById('chat-widget-panel').classList.toggle('hidden');
+      });
+      document.getElementById('chat-widget-minimize').addEventListener('click', function() {
+        panel.classList.add('hidden');
+      });
+      window.addEventListener('resize', function() {
+        const rect = bubble.getBoundingClientRect();
+        bubble.style.left = Math.min(rect.left, window.innerWidth - rect.width) + 'px';
+        bubble.style.top = Math.min(rect.top, window.innerHeight - rect.height) + 'px';
+      });
+
+      {% if aura_enabled %}
+      const auraPanel = document.getElementById('aura-panel');
+      const auraLauncher = document.getElementById('aura-launcher');
+      const auraMessages = document.getElementById('aura-messages');
+      const auraStatus = document.getElementById('aura-status');
+      const auraInput = document.getElementById('aura-input');
+      const auraSearch = document.getElementById('aura-search');
+      const auraForm = document.getElementById('aura-form');
+      const auraUserId = auraPanel.dataset.userId;
+      const auraUserName = auraPanel.dataset.userName || 'Usuario';
+      const auraTreatment = auraPanel.dataset.treatment;
+      const auraHistoryKey = 'aura-history-v1-' + auraUserId;
+      const auraPositionKey = 'aura-position-v1-' + auraUserId;
+      let auraHistory = null;
+
+      async function enviarPromptIA(mensaje) {
+        const endpoint = window.AURA_API_ENDPOINT;
+        if (!endpoint) {
+          throw new Error('El proveedor de IA de AURA aún no está configurado. Tu consulta quedó guardada solo en este navegador.');
+        }
+        // API credentials belong on the server; this hook targets a same-origin endpoint.
+        const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+        const csrfCookie = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+        const headers = {'Content-Type': 'application/json'};
+        if (csrfInput) headers['X-CSRFToken'] = csrfInput.value;
+        else if (csrfCookie) headers['X-CSRFToken'] = decodeURIComponent(csrfCookie[1]);
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify({mensaje: mensaje})
+        });
+        if (!response.ok) throw new Error('AURA no pudo completar la consulta (' + response.status + ').');
+        const result = await response.json();
+        const answer = result.respuesta || result.reply;
+        if (typeof answer !== 'string' || !answer.trim()) {
+          throw new Error('La respuesta del servicio de AURA no tiene el formato esperado.');
+        }
+        return answer.trim();
+      }
+      window.enviarPromptIA = enviarPromptIA;
+
+      function setAuraStatus(message) {
+        auraStatus.textContent = message;
+        auraStatus.classList.toggle('hidden', !message);
+      }
+
+      function saveAuraHistory() {
+        try {
+          localStorage.setItem(auraHistoryKey, JSON.stringify(auraHistory));
+          return true;
+        } catch (error) {
+          setAuraStatus('No se pudo guardar el historial privado en este navegador.');
+          console.error(error);
+          return false;
+        }
+      }
+
+      function formatAuraTime(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        return new Intl.DateTimeFormat('es-CL', {hour: '2-digit', minute: '2-digit'}).format(date);
+      }
+
+      function renderAuraHistory() {
+        auraMessages.replaceChildren();
+        const query = auraSearch.value.trim().toLocaleLowerCase('es-CL');
+        auraHistory.forEach(function(entry) {
+          const row = document.createElement('article');
+          row.dataset.auraEntry = '';
+          row.className = 'flex ' + (entry.role === 'user' ? 'justify-end' : 'justify-start');
+          const bubbleContent = document.createElement('div');
+          bubbleContent.className = 'max-w-[90%] rounded-2xl px-3.5 py-2.5 shadow-sm ' +
+            (entry.role === 'user'
+              ? 'rounded-br-sm bg-indigo-600 text-white'
+              : 'rounded-bl-sm border border-slate-200 bg-white text-slate-800');
+          const label = document.createElement('span');
+          label.className = 'mb-1 block text-[9px] font-extrabold ' +
+            (entry.role === 'user' ? 'text-indigo-100' : 'text-violet-700');
+          label.textContent = entry.role === 'user' ? 'Tú' : 'AURA';
+          const text = document.createElement('p');
+          text.className = 'whitespace-pre-wrap break-words text-[11px] leading-relaxed';
+          text.textContent = entry.text;
+          const time = document.createElement('time');
+          time.className = 'mt-1 block text-right text-[9px] opacity-60';
+          time.textContent = formatAuraTime(entry.createdAt);
+          bubbleContent.append(label, text, time);
+          row.appendChild(bubbleContent);
+          row.hidden = query && !entry.text.toLocaleLowerCase('es-CL').includes(query);
+          auraMessages.appendChild(row);
+        });
+        auraMessages.scrollTop = auraMessages.scrollHeight;
+      }
+
+      function ensureAuraHistory() {
+        if (auraHistory !== null) return true;
+        try {
+          const saved = localStorage.getItem(auraHistoryKey);
+          auraHistory = saved ? JSON.parse(saved) : [];
+          if (!Array.isArray(auraHistory) || auraHistory.some(function(entry) {
+            return !entry || !['user', 'assistant'].includes(entry.role) ||
+              typeof entry.text !== 'string' || typeof entry.createdAt !== 'string';
+          })) {
+            throw new Error('El historial guardado tiene un formato inválido.');
+          }
+        } catch (error) {
+          auraHistory = null;
+          setAuraStatus('No se pudo leer el historial privado de AURA.');
+          console.error(error);
+          return false;
+        }
+        if (auraHistory.length === 0) {
+          const honorific = auraTreatment === 'masculino'
+            ? 'Estimado'
+            : auraTreatment === 'femenino' ? 'Estimada' : 'Estimado/a';
+          auraHistory.push({
+            role: 'assistant',
+            text: honorific + ' ' + auraUserName +
+              ', es un gusto saludarle. Soy AURA, su asistente virtual de apoyo. ' +
+              'Estoy a su entera disposición para ayudarle a resumir documentos, ' +
+              'localizar información en la plataforma o resolver cualquier duda operativa. ' +
+              '¿En qué puedo asistirle el día de hoy?',
+            createdAt: new Date().toISOString()
+          });
+          if (!saveAuraHistory()) return false;
+        }
+        renderAuraHistory();
+        return true;
+      }
+
+      auraLauncher.addEventListener('click', function() {
+        const opening = auraPanel.classList.contains('hidden');
+        auraPanel.classList.toggle('hidden', !opening);
+        auraLauncher.setAttribute('aria-expanded', String(opening));
+        if (opening) {
+          restoreAuraPosition();
+          ensureAuraHistory();
+        }
+      });
+      document.getElementById('aura-minimize').addEventListener('click', function() {
+        auraPanel.classList.add('hidden');
+        auraLauncher.setAttribute('aria-expanded', 'false');
+      });
+
+      function restoreAuraPosition() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(auraPositionKey) || 'null');
+          if (!saved || !Number.isFinite(saved.left) || !Number.isFinite(saved.top)) return;
+          const rect = auraPanel.getBoundingClientRect();
+          auraPanel.style.left = Math.max(0, Math.min(saved.left, window.innerWidth - rect.width)) + 'px';
+          auraPanel.style.top = Math.max(0, Math.min(saved.top, window.innerHeight - rect.height)) + 'px';
+          auraPanel.style.right = 'auto';
+          auraPanel.style.bottom = 'auto';
+        } catch (error) {
+          setAuraStatus('No se pudo recuperar la posición guardada de AURA.');
+          console.error(error);
+        }
+      }
+
+      const auraDragHandle = document.getElementById('aura-drag-handle');
+      auraDragHandle.addEventListener('pointerdown', function(event) {
+        if (event.target.closest('button') || (event.button !== 0 && event.pointerType === 'mouse')) return;
+        const rect = auraPanel.getBoundingClientRect();
+        const offsetX = event.clientX - rect.left;
+        const offsetY = event.clientY - rect.top;
+        auraDragHandle.setPointerCapture(event.pointerId);
+        function move(moveEvent) {
+          auraPanel.style.left = Math.max(0, Math.min(window.innerWidth - rect.width, moveEvent.clientX - offsetX)) + 'px';
+          auraPanel.style.top = Math.max(0, Math.min(window.innerHeight - rect.height, moveEvent.clientY - offsetY)) + 'px';
+          auraPanel.style.right = 'auto';
+          auraPanel.style.bottom = 'auto';
+        }
+        function finish() {
+          auraDragHandle.removeEventListener('pointermove', move);
+          auraDragHandle.removeEventListener('pointerup', finish);
+          auraDragHandle.removeEventListener('pointercancel', finish);
+          const position = auraPanel.getBoundingClientRect();
+          try {
+            localStorage.setItem(auraPositionKey, JSON.stringify({left: position.left, top: position.top}));
+          } catch (error) {
+            setAuraStatus('No se pudo guardar la posición de AURA.');
+            console.error(error);
+          }
+        }
+        auraDragHandle.addEventListener('pointermove', move);
+        auraDragHandle.addEventListener('pointerup', finish);
+        auraDragHandle.addEventListener('pointercancel', finish);
+      });
+
+      auraSearch.addEventListener('input', function() {
+        if (ensureAuraHistory()) renderAuraHistory();
+      });
+      document.querySelectorAll('[data-aura-prompt]').forEach(function(button) {
+        button.addEventListener('click', function() {
+          auraInput.value = button.dataset.auraPrompt;
+          auraInput.focus();
+        });
+      });
+      auraForm.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        const prompt = auraInput.value.trim();
+        if (!prompt || prompt.length > 4000 || !ensureAuraHistory()) return;
+        const submit = auraForm.querySelector('button[type=submit]');
+        submit.disabled = true;
+        setAuraStatus('');
+        auraHistory.push({
+          role: 'user',
+          text: prompt,
+          createdAt: new Date().toISOString()
+        });
+        if (!saveAuraHistory()) {
+          auraHistory.pop();
+          submit.disabled = false;
+          return;
+        }
+        auraInput.value = '';
+        renderAuraHistory();
+        try {
+          const answer = await window.enviarPromptIA(prompt);
+          auraHistory.push({
+            role: 'assistant',
+            text: answer,
+            createdAt: new Date().toISOString()
+          });
+          if (saveAuraHistory()) renderAuraHistory();
+        } catch (error) {
+          setAuraStatus(error.message || 'No se pudo consultar AURA.');
+        } finally {
+          submit.disabled = false;
+          auraInput.focus();
+        }
+      });
+      {% endif %}
+
+      const notifiedKey = 'chat-notified-through-{{ request.user.id }}';
+      const now = new Date().toISOString();
+      if (!localStorage.getItem(notifiedKey)) localStorage.setItem(notifiedKey, now);
+      const noticeRegion = document.getElementById('chat-notice-region');
+      const notificationQueue = [];
+      let showingNotification = false;
+      let notificationSocket = null;
+      let reconnectTimer = null;
+
+      function showNextNotification() {
+        if (showingNotification || notificationQueue.length === 0) return;
+        showingNotification = true;
+        const notification = notificationQueue.shift();
+        const link = document.createElement('a');
+        link.href = notification.url;
+        link.className = 'block rounded-2xl bg-white p-4 text-slate-800 shadow-xl ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:ring-red-200';
+        const sender = document.createElement('span');
+        sender.className = 'block text-xs font-extrabold text-[#C41230]';
+        sender.textContent = notification.sender || 'Nuevo mensaje';
+        const message = document.createElement('span');
+        message.className = 'mt-1 block line-clamp-2 text-xs text-slate-600';
+        message.textContent = notification.message || '';
+        link.append(sender, message);
+        noticeRegion.replaceChildren(link);
+        window.setTimeout(function() {
+          link.remove();
+          showingNotification = false;
+          showNextNotification();
+        }, 6000);
+      }
+
+      async function refreshChatBadge() {
+        const params = new URLSearchParams({
+          notified_after: localStorage.getItem(notifiedKey) || now
+        });
+        try {
+          const response = await fetch('/chat/unread/?' + params.toString(), {
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+          });
+          if (!response.ok) throw new Error('No fue posible consultar los avisos del chat.');
+          const payload = await response.json();
+          badge.textContent = payload.unread > 99 ? '99+' : String(payload.unread);
+          badge.classList.toggle('hidden', payload.unread < 1);
+          badge.classList.toggle('inline-flex', payload.unread > 0);
+          payload.notifications.forEach(function(notification) {
+            notificationQueue.push(notification);
+          });
+          localStorage.setItem(notifiedKey, payload.notifications_through);
+          showNextNotification();
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      function connectChatNotifications() {
+        if (notificationSocket && (
+          notificationSocket.readyState === WebSocket.OPEN ||
+          notificationSocket.readyState === WebSocket.CONNECTING
+        )) return;
+        const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        notificationSocket = new WebSocket(scheme + '//' + location.host + '/ws/chat/notifications/');
+        notificationSocket.onmessage = function(event) {
+          try {
+            const payload = JSON.parse(event.data);
+            window.dispatchEvent(new CustomEvent('chat-notification', {detail: payload}));
+            refreshChatBadge();
+          } catch (error) {
+            console.error('Notificación de chat inválida.', error);
+          }
+        };
+        notificationSocket.onclose = function() {
+          reconnectTimer = window.setTimeout(connectChatNotifications, 5000);
+        };
+        notificationSocket.onerror = function() {
+          notificationSocket.close();
+        };
+      }
+
+      const chatFrame = document.querySelector('#chat-widget-panel iframe');
+      window.addEventListener('message', function(event) {
+        if (
+          event.origin === window.location.origin &&
+          chatFrame &&
+          event.source === chatFrame.contentWindow &&
+          event.data &&
+          event.data.type === 'chat-read'
+        ) {
+          refreshChatBadge();
+        }
+      });
+      refreshChatBadge();
+      connectChatNotifications();
+      window.setInterval(refreshChatBadge, 15000);
+      window.addEventListener('beforeunload', function() {
+        window.clearTimeout(reconnectTimer);
+        if (notificationSocket) notificationSocket.close();
+      });
+    });
+    {% endif %}
 
     // SweetAlert2 helper para confirmación de eliminación (A3 / Pág 3)
     function confirmDelete(form, itemName) {

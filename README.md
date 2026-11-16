@@ -104,7 +104,16 @@ const ws = new WebSocket(`ws://${location.host}/ws/crud/vecinos/`);
 
 - URL: `/chat/`
 - Namespaced: `websocket:chat_index`
-- Requiere Daphne/ASGI (no funciona con `runserver` estándar)
+- Usa Django Channels sobre ASGI; los mensajes se envían en conversaciones estrictamente 1 a 1.
+- Cada mensaje registra emisor, receptor y `leido`. Los participantes solo pueden consultar mensajes dirigidos a ellos o enviados por ellos. Delegación Global puede revisar todas las conversaciones activas; las conversaciones ajenas son de solo lectura.
+- Delegación Global puede iniciar un chat privado con cualquier funcionario; delegados pueden contactar a administración y los demás usuarios solo a personas autorizadas de su delegación.
+- Los mensajes entrantes actualizan las burbujas de no leídos por contacto. Abrir la conversación marca como leídos los mensajes recibidos. WebSockets notifican los mensajes nuevos en tiempo real.
+- El directorio permite filtrar contactos por RUT/ID, nombre, apellido, cargo, sección y delegación. Administración gestiona los contactos desde **Usuarios**.
+- El `chat_id` persistido se calcula como `direct_<menor user_id>_<mayor user_id>`; así es estable, no depende de quién inicia y distingue dos pares de usuarios incluso dentro de las mismas delegaciones. Mensajes, consultas y WebSockets usan exclusivamente ese identificador.
+- La migración `websocket.0002_private_messages` conserva el historial de salas compartidas en un archivo separado no expuesto por el chat, y `websocket.0003_chat_id` agrega y rellena el ID único de cada pareja privada.
+- Después de actualizar, ejecutar `python manage.py migrate`.
+- El directorio permite filtrar contactos por RUT/ID, nombre, apellido, cargo, sección y delegación. Administración gestiona los contactos desde **Usuarios**.
+- Después de actualizar, ejecutar `python manage.py migrate` para crear el historial de mensajes y asignación de sección a funcionarios.
 
 ---
 

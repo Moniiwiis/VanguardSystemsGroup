@@ -907,6 +907,9 @@ def gestion_usuarios(request):
         rol_id = request.POST.get('rol_id')
         cargo_id = request.POST.get('cargo_id')
         delegacion_id = request.POST.get('delegacion_id')
+        identificador = request.POST.get('identificador_contacto', '').strip()
+        sector_id = request.POST.get('sector_id', '').strip()
+        tratamiento = request.POST.get('tratamiento', 'neutral').strip()
         estado = request.POST.get('estado', 'Activo')
 
         # Restricción de seguridad del Delegado Municipal
@@ -915,8 +918,14 @@ def gestion_usuarios(request):
 
         rol_obj = Rol.objects.filter(id=rol_id, estado='Activo').first()
         cargo_obj = Cargo.objects.filter(id=cargo_id).first()
-        if not nombre or not correo or not username or not rol_obj or not cargo_obj:
+        if tratamiento not in dict(Funcionario.TRATAMIENTO_CHOICES):
+            messages.error(request, "Selecciona un tratamiento de saludo válido.")
+        elif not nombre or not correo or not username or not rol_obj or not cargo_obj:
             messages.error(request, "Nombre, usuario, correo, rol y cargo son obligatorios.")
+        elif identificador and Funcionario.objects.filter(
+            identificador_institucional__iexact=identificador,
+        ).exists():
+            messages.error(request, "Ese RUT o identificador institucional ya está registrado.")
         elif (
             not ctx['permisos']['es_admin']
             and rol_obj.nombre_rol.strip().casefold()
@@ -945,6 +954,16 @@ def gestion_usuarios(request):
                 if not del_obj:
                     messages.error(request, "Selecciona una delegación activa válida.")
                     return redirect('gestion_usuarios')
+            sector_obj = None
+            if sector_id:
+                sector_obj = Sector.objects.filter(
+                    id=sector_id,
+                    delegacion=del_obj,
+                    estado='Activo',
+                ).first()
+                if not sector_obj:
+                    messages.error(request, "Selecciona una sección válida para la delegación del usuario.")
+                    return redirect('gestion_usuarios')
 
             provisional_password = _generate_provisional_password()
 
@@ -961,14 +980,20 @@ def gestion_usuarios(request):
             func = Funcionario.all_objects.get_or_create(
                 user=user,
                 defaults={
-                    'identificador_institucional': f"USR-{user.id:03d}",
+                    'identificador_institucional': identificador or f"USR-{user.id:03d}",
                     'delegacion': del_obj,
+                    'sector': sector_obj,
                     'cargo': cargo_obj,
+                    'tratamiento': tratamiento,
                     'estado': estado
                 }
             )[0]
+            if identificador:
+                func.identificador_institucional = identificador
             func.delegacion = del_obj
+            func.sector = sector_obj
             func.cargo = cargo_obj
+            func.tratamiento = tratamiento
             func.estado = estado
             func.debe_cambiar_contrasena = True
             func.deleted_at = None
@@ -1071,13 +1096,20 @@ def gestion_usuarios(request):
     roles = Rol.objects.filter(estado='Activo')
     cargos = Cargo.objects.all().order_by('nombre_cargo')
     delegaciones = ctx['delegaciones_autorizadas']
+    sectores_contactos = Sector.objects.filter(estado='Activo').select_related(
+        'delegacion',
+    ).order_by('delegacion__nombre', 'nombre')
+    if not ctx['permisos']['es_admin'] and del_activa:
+        sectores_contactos = sectores_contactos.filter(delegacion=del_activa)
 
     return render(request, 'gestion/usuarios.html', {
         'page_obj': page_obj,
         'funcionarios': page_obj.object_list,
         'roles': roles,
         'cargos': cargos,
+        'funcionario_tratamientos': Funcionario.TRATAMIENTO_CHOICES,
         'delegaciones': delegaciones,
+        'sectores_contactos': sectores_contactos,
         'todas_delegaciones': todas_delegaciones,
         'delegacion_seleccionada': delegacion_seleccionada,
         'q': q,
@@ -1145,24 +1177,68 @@ def gestion_usuarios_editar(request, user_id):
                 return redirect('gestion_usuarios')
 
         estado = request.POST.get('estado', funcionario.estado)
+        identificador = request.POST.get(
+            'identificador_contacto',
+            funcionario.identificador_institucional,
+        ).strip()
+        sector_id = request.POST.get('sector_id', '').strip()
+        tratamiento = request.POST.get(
+            'tratamiento',
+            funcionario.tratamiento,
+        ).strip()
+        if tratamiento not in dict(Funcionario.TRATAMIENTO_CHOICES):
+            messages.error(request, "Selecciona un tratamiento de saludo válido.")
+            return redirect('gestion_usuarios')
+        if not identificador:
+            messages.error(request, "El RUT o identificador institucional es obligatorio.")
+            return redirect('gestion_usuarios')
+        if Funcionario.objects.filter(
+            identificador_institucional__iexact=identificador,
+        ).exclude(id=funcionario.id).exists():
+            messages.error(request, "Ese RUT o identificador institucional ya está registrado.")
+            return redirect('gestion_usuarios')
+
+        target_delegacion = funcionario.delegacion
+        if ctx['permisos']['es_admin']:
+            requested_delegacion_id = request.POST.get('delegacion_id', '').strip()
+            if rol_obj and rol_obj.nombre_rol.strip().casefold() in {
+                'administrador',
+                'superadministrador',
+            }:
+                target_delegacion = None
+            elif requested_delegacion_id:
+                target_delegacion = Delegacion.objects.filter(
+                    id=requested_delegacion_id,
+                    estado='Activa',
+                ).first()
+            else:
+                target_delegacion = None
+        elif ctx['permisos']['es_delegado']:
+            target_delegacion = ctx['delegacion_activa']
+
+        sector_obj = None
+        if sector_id:
+            sector_obj = Sector.objects.filter(
+                id=sector_id,
+                delegacion=target_delegacion,
+                estado='Activo',
+            ).first()
+            if not sector_obj:
+                messages.error(request, "Selecciona una sección válida para la delegación del usuario.")
+                return redirect('gestion_usuarios')
+
         funcionario.user.first_name = request.POST.get('nombre', funcionario.user.first_name).strip()
         funcionario.user.email = request.POST.get('correo', funcionario.user.email).strip()
         funcionario.user.is_active = (estado == 'Activo')
         funcionario.user.save()
 
         funcionario.cargo = cargo_obj
+        funcionario.identificador_institucional = identificador
+        funcionario.sector = sector_obj
+        funcionario.tratamiento = tratamiento
 
         if ctx['permisos']['es_admin']:
-            del_id = request.POST.get('delegacion_id')
-            if rol_obj and rol_obj.nombre_rol.strip().casefold() in {
-                'administrador',
-                'superadministrador',
-            }:
-                funcionario.delegacion = None
-            elif del_id:
-                funcionario.delegacion_id = del_id
-            else:
-                funcionario.delegacion = None
+            funcionario.delegacion = target_delegacion
         elif ctx['permisos']['es_delegado'] and ctx['delegacion_activa']:
             funcionario.delegacion = ctx['delegacion_activa']
 

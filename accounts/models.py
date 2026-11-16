@@ -46,14 +46,27 @@ class Cargo(BaseModel):
         return self.nombre_cargo
 
 class Funcionario(BaseModel):
+    TRATAMIENTO_CHOICES = [
+        ('masculino', 'Estimado'),
+        ('femenino', 'Estimada'),
+        ('neutral', 'Estimado/a'),
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='funcionario')
     identificador_institucional = models.CharField(max_length=20, unique=True)
     delegacion = models.ForeignKey(Delegacion, on_delete=models.RESTRICT, null=True, blank=True)
+    sector = models.ForeignKey(Sector, on_delete=models.SET_NULL, null=True, blank=True, related_name='funcionarios')
     cargo = models.ForeignKey(Cargo, on_delete=models.RESTRICT)
     estado = models.CharField(max_length=20, default='Activo')
     debe_cambiar_contrasena = models.BooleanField(default=False)
     foto = models.ImageField(upload_to='perfiles/', null=True, blank=True)
     telefono = models.CharField(max_length=20, null=True, blank=True, verbose_name='Teléfono de contacto')
+    tratamiento = models.CharField(
+        max_length=10,
+        choices=TRATAMIENTO_CHOICES,
+        default='neutral',
+        verbose_name='Tratamiento del saludo',
+    )
 
     def get_foto_url(self):
         if self.foto and hasattr(self.foto, 'url'):
