@@ -6,6 +6,7 @@ venv/
 # Archivos de base de datos local y temporales
 db.sqlite3
 media/
+staticfiles/
 *.log
 *.tmp
 __pycache__/

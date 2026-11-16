@@ -3298,6 +3298,16 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(creadas_2, 0)
         self.assertEqual(Carta.objects.count(), total_1)
 
+    def test_static_root_and_admin_assets_resolvable(self):
+        from django.conf import settings
+        from django.contrib.staticfiles import finders
+
+        self.assertEqual(settings.STATIC_URL, '/static/')
+        self.assertEqual(settings.STATIC_ROOT, settings.BASE_DIR / 'staticfiles')
+        self.assertNotIn(settings.BASE_DIR, settings.STATICFILES_DIRS)
+        self.assertIsNotNone(finders.find('horizontal-blanco.svg'))
+        self.assertIsNotNone(finders.find('admin/css/base.css'))
+
 
 
 
