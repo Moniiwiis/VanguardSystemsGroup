@@ -734,7 +734,7 @@ def gestion_delegaciones(request):
     if request.GET.get('export') == 'excel':
         headers = ['Código', 'Nombre', 'Dirección', 'Comuna', 'Estado']
         rows = [[d.get_codigo(), d.nombre, d.direccion or '', d.comuna or '', d.estado] for d in qs]
-        return export_to_excel_csv("delegaciones_municipales", headers, rows)
+        return export_to_excel_csv("Delegaciones", headers, rows)
 
     page_size = _get_page_size(request)
     paginator = Paginator(qs, page_size)
@@ -848,7 +848,7 @@ def gestion_roles(request):
     if request.GET.get('export') == 'excel':
         headers = ['Código', 'Rol', 'Alcance', 'Estado', 'Descripción']
         rows = [[r.get_codigo(), r.nombre_rol, r.alcance, r.estado, r.descripcion or ''] for r in qs]
-        return export_to_excel_csv("roles_sistema", headers, rows)
+        return export_to_excel_csv("Roles", headers, rows)
 
     page_size = _get_page_size(request)
     paginator = Paginator(qs, page_size)
@@ -1186,7 +1186,7 @@ def gestion_usuarios(request):
                 del_txt,
                 f.estado,
             ])
-        return export_to_excel_csv("usuarios_sistema", headers, rows)
+        return export_to_excel_csv("Usuarios", headers, rows)
 
     page_size = _get_page_size(request)
     paginator = Paginator(qs, page_size)
@@ -1527,10 +1527,10 @@ def gestion_metas(request):
                 ]
                 for p in periodos_list
             ]
-            return export_to_excel_csv("fechas_periodos_medicion", headers, rows)
+            return export_to_excel_csv("Periodos", headers, rows)
         headers = ['Código', 'Nombre', 'Descripción', 'Estado']
         rows = [[it.get_codigo(), it.nombre_item, it.descripcion or '', it.estado] for it in qs]
-        return export_to_excel_csv("items_metas", headers, rows)
+        return export_to_excel_csv("Items", headers, rows)
 
     paginator = Paginator(qs, page_size)
     page_number = request.GET.get('page', 1)
@@ -1661,7 +1661,7 @@ def gestion_tipo_atencion(request):
     if request.GET.get('export') == 'excel':
         headers = ['Código', 'Nombre', 'Descripción', 'Estado']
         rows = [[ta.get_codigo(), ta.nombre, ta.descripcion or '', ta.estado] for ta in qs]
-        return export_to_excel_csv("tipos_de_atencion", headers, rows)
+        return export_to_excel_csv("TiposAtencion", headers, rows)
 
     page_size = _get_page_size(request)
     paginator = Paginator(qs, page_size)
@@ -1767,7 +1767,7 @@ def gestion_sub_atencion(request):
     if request.GET.get('export') == 'excel':
         headers = ['Código', 'Nombre', 'Tipo de Atención Asociado', 'Estado']
         rows = [[sa.get_codigo(), sa.nombre, sa.tipo_atencion.nombre, sa.estado] for sa in qs]
-        return export_to_excel_csv("sub_atenciones", headers, rows)
+        return export_to_excel_csv("SubAtenciones", headers, rows)
 
     page_size = _get_page_size(request)
     paginator = Paginator(qs, page_size)
@@ -2434,7 +2434,7 @@ def gestion_atenciones(request):
                 a.get_evidencia_codigo(),
                 a.estado_evidencia()
             ])
-        return export_to_excel_xlsx("atenciones_ciudadanas_SGR", "Tubo de Trabajo", headers, rows)
+        return export_to_excel_xlsx("Atenciones", "Atenciones SGR", headers, rows)
 
     page_size = _get_page_size(request)
     paginator = Paginator(qs, page_size)
@@ -3185,7 +3185,7 @@ def gestion_vecinos(request):
                 v.tipo_gestion.nombre if v.tipo_gestion else 'Solicitud',
                 v.estado
             ])
-        return export_to_excel_xlsx("padron_vecinos", "Padrón Vecinal", headers, rows)
+        return export_to_excel_xlsx("Vecinos", "Padrón Vecinal", headers, rows)
 
     tipos_gestion = TipoGestion.objects.all()
     page_size = _get_page_size(request)
@@ -3474,7 +3474,7 @@ def gestion_sectores(request):
     if request.GET.get('export') == 'excel':
         headers = ['Código', 'Sector / Territorio', 'Delegación', 'Descripción', 'Estado']
         rows = [[s.get_codigo(), s.nombre, s.delegacion.nombre, s.descripcion or '', s.estado] for s in qs]
-        return export_to_excel_xlsx("sectores_territoriales", "Sectores", headers, rows)
+        return export_to_excel_xlsx("Sectores", "Sectores", headers, rows)
 
     page_size = _get_page_size(request)
     paginator = Paginator(qs, page_size)
@@ -3986,8 +3986,8 @@ def gestion_reportes(request):
                 f"{m.cumplimiento_ponderado()}%",
                 m.estado_semaforo()
             ])
-        nom_del = delegacion_seleccionada.codigo if delegacion_seleccionada else ('todas' if es_admin else (del_activa.codigo if del_activa else 'delegacion'))
-        return export_to_excel_csv(f"reportes_analiticos_{nom_del}", headers, rows)
+        nom_del = delegacion_seleccionada.get_codigo() if delegacion_seleccionada else ('Todas' if es_admin else (del_activa.get_codigo() if del_activa else 'Delegacion'))
+        return export_to_excel_csv(f"Reportes_{nom_del}", headers, rows)
 
     # Métricas y semáforos territoriales
     metas_list = list(metas_qs)
@@ -4426,7 +4426,7 @@ def gestion_organizaciones(request):
                 org.observaciones or '—',
                 org.estado
             ])
-        return export_to_excel_xlsx("organizaciones_comunitarias_JJVV", "Organizaciones Comunitarias", headers, rows)
+        return export_to_excel_xlsx("Organizaciones", "Organizaciones Comunitarias", headers, rows)
 
     tipos_organizaciones = [c[0] for c in OrganizacionComunitaria.TIPO_CHOICES]
     page_size = _get_page_size(request)
@@ -5332,8 +5332,8 @@ def gestion_tubo(request):
                 it['avance_observaciones'],
                 it['estado'],
             ])
-        nom_del = delegacion_seleccionada.codigo if delegacion_seleccionada else ('todas' if es_admin else 'tubo')
-        return export_to_excel_csv(f"tubo_compromiso_{nom_del}", headers, rows)
+        nom_del = delegacion_seleccionada.get_codigo() if delegacion_seleccionada else ('Todas' if es_admin else 'Delegacion')
+        return export_to_excel_csv(f"Tubo_{nom_del}", headers, rows)
 
     page_size = _get_page_size(request)
     page_obj = Paginator(items_filtrados, page_size).get_page(request.GET.get('page', 1))

@@ -4,6 +4,7 @@ import itertools
 import re
 from django.db.models import Q
 from django.http import HttpResponse
+from django.utils import timezone
 
 # Mapeo bidireccional de vocales y caracteres especiales para búsquedas en español
 VOWEL_MAP = {
@@ -263,6 +264,17 @@ def validar_imagen_subida(archivo, max_mb=2):
 # EXPORTACIÓN GENUINA A MICROSOFT EXCEL (.XLSX)
 # =====================================================================
 
+def _build_dated_filename(filename, ext):
+    """Agrega la fecha actual en formato DD-MM-YYYY al nombre del archivo exportado."""
+    base = str(filename).strip()
+    if base.lower().endswith(f".{ext}"):
+        base = base[:-len(ext) - 1]
+    fecha_str = timezone.localdate().strftime('%d-%m-%Y')
+    if not re.search(r'\d{2}-\d{2}-\d{4}$', base):
+        base = f"{base}_{fecha_str}"
+    return f"{base}.{ext}"
+
+
 def export_to_excel_xlsx(filename, sheet_title, headers, rows):
     """
     Genera un archivo binario nativo de Microsoft Excel (.xlsx) usando openpyxl.
@@ -328,7 +340,7 @@ def export_to_excel_xlsx(filename, sheet_title, headers, rows):
     wb.save(output)
     output.seek(0)
 
-    clean_filename = f"{filename}.xlsx" if not filename.endswith('.xlsx') else filename
+    clean_filename = _build_dated_filename(filename, 'xlsx')
     response = HttpResponse(
         output.getvalue(),
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -338,8 +350,9 @@ def export_to_excel_xlsx(filename, sheet_title, headers, rows):
 
 def export_to_excel_csv(filename, headers, rows):
     """Fallback a CSV en caso de ser necesario."""
+    clean_filename = _build_dated_filename(filename, 'csv')
     response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
-    response['Content-Disposition'] = f'attachment; filename="{filename}.csv"'
+    response['Content-Disposition'] = f'attachment; filename="{clean_filename}"'
     response.write('\ufeff')
     writer = csv.writer(response, delimiter=';', dialect='excel')
     writer.writerow(headers)

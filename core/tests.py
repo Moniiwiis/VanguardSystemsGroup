@@ -1874,6 +1874,18 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
 
         resp_excel = self.client.get(url_periodos + '&export=excel')
         self.assertEqual(resp_excel.status_code, 200)
+        hoy_str = hoy.strftime('%d-%m-%Y')
+        self.assertEqual(
+            resp_excel['Content-Disposition'],
+            f'attachment; filename="Periodos_{hoy_str}.csv"',
+        )
         csv_txt = resp_excel.content.decode('utf-8-sig')
         self.assertIn('Fecha de Inicio', csv_txt)
         self.assertIn(futuro.strftime('%d-%m-%Y'), csv_txt)
+
+        resp_xlsx = self.client.get(reverse('gestion_vecinos') + '?export=excel')
+        self.assertEqual(resp_xlsx.status_code, 200)
+        self.assertEqual(
+            resp_xlsx['Content-Disposition'],
+            f'attachment; filename="Vecinos_{hoy_str}.xlsx"',
+        )
