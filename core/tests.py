@@ -1810,6 +1810,8 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         futuro = hoy + datetime.timedelta(days=10)
         futuro_fin = hoy + datetime.timedelta(days=20)
 
+        url_periodos = reverse('gestion_metas') + '?tab=periodos'
+
         # Rechazar creación de período con fecha pasada
         resp_pasado = self.client.post(reverse('gestion_metas'), {
             'accion': 'crear_periodo',
@@ -1818,7 +1820,7 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             'dias_computables': '12',
             'estado': 'Abierto',
         })
-        self.assertRedirects(resp_pasado, reverse('gestion_metas'))
+        self.assertRedirects(resp_pasado, url_periodos)
         self.assertFalse(Periodo.objects.filter(fecha_inicio=ayer).exists())
 
         # Permitir creación desde hoy en adelante y verificar formato DD-MM-YYYY y mini-calendario
@@ -1829,12 +1831,12 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             'dias_computables': '11',
             'estado': 'Abierto',
         })
-        self.assertRedirects(resp_ok, reverse('gestion_metas'))
+        self.assertRedirects(resp_ok, url_periodos)
         p_creado = Periodo.objects.get(fecha_inicio=futuro, fecha_termino=futuro_fin)
         texto_esperado = f"Período {futuro.strftime('%d-%m-%Y')} a {futuro_fin.strftime('%d-%m-%Y')}"
         self.assertEqual(str(p_creado), texto_esperado)
 
-        resp_get = self.client.get(reverse('gestion_metas'))
+        resp_get = self.client.get(url_periodos)
         self.assertContains(resp_get, texto_esperado)
         self.assertContains(resp_get, 'mini-cal-new-dias')
         self.assertContains(resp_get, 'mini-cal-edit-dias')
@@ -1849,6 +1851,29 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             'dias_computables': '15',
             'estado': 'Abierto',
         })
-        self.assertRedirects(resp_edit_bad, reverse('gestion_metas'))
+        self.assertRedirects(resp_edit_bad, url_periodos)
         p_creado.refresh_from_db()
         self.assertEqual(p_creado.fecha_inicio, futuro)
+
+        # Verificar orden por fecha, paginación y exportación Excel en pestaña Fechas / Períodos
+        for idx in range(1, 6):
+            Periodo.objects.create(
+                fecha_inicio=hoy + datetime.timedelta(days=30 + idx * 10),
+                fecha_termino=hoy + datetime.timedelta(days=35 + idx * 10),
+                dias_computables=6,
+                estado='Abierto',
+            )
+        resp_ord_asc = self.client.get(url_periodos + '&orden_per=fecha_inicio&page_size=5&page_per=1')
+        inicios_asc = [p.fecha_inicio for p in resp_ord_asc.context['periodos']]
+        self.assertEqual(inicios_asc, sorted(inicios_asc))
+        self.assertEqual(len(inicios_asc), 5)
+        self.assertTrue(resp_ord_asc.context['page_obj_per'].has_next())
+
+        resp_ord_p2 = self.client.get(url_periodos + '&orden_per=fecha_inicio&page_size=5&page_per=2')
+        self.assertGreaterEqual(len(resp_ord_p2.context['periodos']), 1)
+
+        resp_excel = self.client.get(url_periodos + '&export=excel')
+        self.assertEqual(resp_excel.status_code, 200)
+        csv_txt = resp_excel.content.decode('utf-8-sig')
+        self.assertIn('Fecha de Inicio', csv_txt)
+        self.assertIn(futuro.strftime('%d-%m-%Y'), csv_txt)

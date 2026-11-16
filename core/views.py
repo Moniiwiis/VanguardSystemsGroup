@@ -1398,7 +1398,7 @@ def gestion_metas(request):
                         request,
                         f"Fecha / Período de medición ({f_inicio.strftime('%d-%m-%Y')} a {f_termino.strftime('%d-%m-%Y')}) creado exitosamente.",
                     )
-            return redirect('gestion_metas')
+            return redirect(f"{reverse('gestion_metas')}?tab=periodos")
 
         elif accion_post == 'editar_periodo':
             per_id = request.POST.get('periodo_id', '').strip()
@@ -1428,7 +1428,7 @@ def gestion_metas(request):
                     request,
                     f"Período de medición ({f_inicio.strftime('%d-%m-%Y')} a {f_termino.strftime('%d-%m-%Y')}) actualizado.",
                 )
-            return redirect('gestion_metas')
+            return redirect(f"{reverse('gestion_metas')}?tab=periodos")
 
         elif accion_post == 'eliminar_periodo':
             per_id = request.POST.get('periodo_id', '').strip()
@@ -1438,7 +1438,7 @@ def gestion_metas(request):
             else:
                 periodo_obj.delete()
                 messages.success(request, "Período de medición eliminado.")
-            return redirect('gestion_metas')
+            return redirect(f"{reverse('gestion_metas')}?tab=periodos")
 
         nombre = request.POST.get('nombre_item', '').strip()
         descripcion = request.POST.get('descripcion', '').strip()
@@ -1455,6 +1455,12 @@ def gestion_metas(request):
             ItemMedicion.objects.create(codigo=codigo, nombre_item=nombre, descripcion=descripcion, estado=estado)
             messages.success(request, f"Ítem '{nombre}' registrado exitosamente.")
             return redirect('gestion_metas')
+
+    tab = request.GET.get('tab', 'items').strip().lower()
+    if tab not in ('items', 'periodos'):
+        tab = 'items'
+
+    page_size = _get_page_size(request)
 
     q = request.GET.get('q', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
@@ -1474,27 +1480,96 @@ def gestion_metas(request):
     ]
     qs, orden = _apply_list_ordering(qs, request, orden_opciones, '-id')
 
+    q_per = request.GET.get('q_per', '').strip()
+    filtro_estado_per = request.GET.get('estado_per', '').strip()
+    orden_per_opciones = [
+        ('-fecha_inicio', 'Fecha inicio: más recientes'),
+        ('fecha_inicio', 'Fecha inicio: más antiguas'),
+        ('-fecha_termino', 'Fecha término: más lejanas'),
+        ('fecha_termino', 'Fecha término: más próximas'),
+        ('-dias_computables', 'Más días computables'),
+        ('dias_computables', 'Menos días computables'),
+        ('estado', 'Estado'),
+    ]
+    orden_per = request.GET.get('orden_per', '-fecha_inicio').strip()
+    if orden_per not in {opt[0] for opt in orden_per_opciones}:
+        orden_per = '-fecha_inicio'
+
+    qs_per = Periodo.objects.all().order_by(orden_per, '-id')
+    if filtro_estado_per:
+        qs_per = qs_per.filter(estado__iexact=filtro_estado_per)
+    periodos_list = list(qs_per)
+    if q_per:
+        q_per_low = q_per.lower()
+        periodos_list = [
+            p for p in periodos_list
+            if (
+                q_per_low in str(p).lower()
+                or q_per_low in p.fecha_inicio.strftime('%d-%m-%Y').lower()
+                or q_per_low in p.fecha_termino.strftime('%d-%m-%Y').lower()
+                or q_per_low in p.fecha_inicio.isoformat()
+                or q_per_low in p.fecha_termino.isoformat()
+                or q_per_low in str(p.dias_computables)
+                or q_per_low in (p.estado or '').lower()
+            )
+        ]
+
     if request.GET.get('export') == 'excel':
+        if tab == 'periodos':
+            headers = ['Período', 'Fecha de Inicio', 'Fecha de Término', 'Días Computables', 'Estado']
+            rows = [
+                [
+                    str(p),
+                    p.fecha_inicio.strftime('%d-%m-%Y'),
+                    p.fecha_termino.strftime('%d-%m-%Y'),
+                    p.dias_computables,
+                    p.estado,
+                ]
+                for p in periodos_list
+            ]
+            return export_to_excel_csv("fechas_periodos_medicion", headers, rows)
         headers = ['Código', 'Nombre', 'Descripción', 'Estado']
         rows = [[it.get_codigo(), it.nombre_item, it.descripcion or '', it.estado] for it in qs]
         return export_to_excel_csv("items_metas", headers, rows)
 
-    page_size = _get_page_size(request)
     paginator = Paginator(qs, page_size)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
+    paginator_per = Paginator(periodos_list, page_size)
+    page_per_number = request.GET.get('page_per', 1)
+    page_obj_per = paginator_per.get_page(page_per_number)
+
+    from urllib.parse import urlencode
+    query_params_items = urlencode({
+        'tab': 'items',
+        **({'q': q} if q else {}),
+        **({'estado': filtro_estado} if filtro_estado else {}),
+        'orden': orden,
+        'page_size': page_size,
+    })
+
     return render(request, 'gestion/metas.html', {
+        'tab': tab,
         'page_obj': page_obj,
         'items': page_obj.object_list,
-        'periodos': Periodo.objects.all().order_by('-fecha_inicio'),
+        'page_obj_per': page_obj_per,
+        'periodos': page_obj_per.object_list,
+        'total_periodos': len(periodos_list),
+        'total_items_badge': ItemMedicion.objects.count(),
+        'total_periodos_badge': Periodo.objects.count(),
         'hoy_iso': timezone.localdate().isoformat(),
         'q': q,
         'filtro_estado': filtro_estado,
         'orden': orden,
         'orden_opciones': orden_opciones,
+        'query_params_items': query_params_items,
+        'q_per': q_per,
+        'filtro_estado_per': filtro_estado_per,
+        'orden_per': orden_per,
+        'orden_per_opciones': orden_per_opciones,
         'page_size': page_size,
-        'total_registros': qs.count()
+        'total_registros': qs.count(),
     })
 
 
