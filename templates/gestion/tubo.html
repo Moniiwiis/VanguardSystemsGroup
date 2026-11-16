@@ -1289,13 +1289,13 @@
           <label for="at-edit-responsable-input" class="block text-slate-700">Encargado del trabajo <span class="text-[#C41230]">*</span></label>
           <div class="relative">
             <input type="text" id="at-edit-responsable-input" name="responsable_input" list="encargados-edicion-list" oninput="sincronizarEncargadoEdicion(this.value)"
-                   placeholder="Buscar encargado por nombre o usuario..." required
+                   placeholder="Buscar encargado por nombre o cargo..." required
                    class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
             <input type="hidden" id="at-edit-responsable" name="responsable_id" value="" required>
             <datalist id="encargados-edicion-list">
               {% for encargado in encargados_edicion %}
                 <option value="{{ encargado.label }}" data-id="{{ encargado.id }}"
-                        data-search="{{ encargado.nombre }} {{ encargado.username|default:'' }} {{ encargado.cargo|default:'' }} {{ encargado.identificador|default:'' }} {{ encargado.delegacion_nombre|default:'' }}">
+                        data-search="{{ encargado.nombre }} {{ encargado.cargo|default:'' }} {{ encargado.identificador|default:'' }} {{ encargado.delegacion_nombre|default:'' }}">
                   {% if encargado.cargo %}{{ encargado.cargo }} · {% endif %}{{ encargado.delegacion_nombre|default:'Funcionario Municipal' }}
                 </option>
               {% endfor %}
@@ -1535,13 +1535,13 @@
 
         <div class="space-y-1">
           <label class="block text-xs font-extrabold text-slate-700">Responsable Territorial</label>
-          <select name="responsable_id" data-search-select="true" data-search-placeholder="Buscar por nombre, cargo o usuario..."
+          <select name="responsable_id" data-search-select="true" data-search-placeholder="Buscar por nombre o cargo..."
                   class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-medium text-slate-800 bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-            <option value="">Asignar a mi usuario (actual)</option>
+            <option value="">Asignar a mi cuenta (actual)</option>
             {% for enc in encargados_modal_tubo %}
               <option value="{{ enc.id }}"
-                      data-search="{{ enc.nombre }} {{ enc.username|default:'' }} {{ enc.cargo|default:'' }} {{ enc.identificador|default:'' }} {{ enc.delegacion_nombre|default:'' }}"
-                      data-meta="{% if enc.cargo %}{{ enc.cargo }} · {% endif %}{{ enc.delegacion_nombre|default:'Delegación Activa' }}">{{ enc.nombre }}{% if enc.cargo %} · {{ enc.cargo }}{% endif %}</option>
+                      data-search="{{ enc.nombre }} {{ enc.cargo|default:'' }} {{ enc.identificador|default:'' }} {{ enc.delegacion_nombre|default:'' }}"
+                      data-meta="{% if enc.cargo %}{{ enc.cargo }} · {% endif %}{{ enc.delegacion_nombre|default:'Delegación Activa' }}">{{ enc.nombre }}</option>
             {% endfor %}
           </select>
         </div>

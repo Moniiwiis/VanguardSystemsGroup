@@ -2791,7 +2791,7 @@ def gestion_atenciones(request):
             'identificador': funcionario.identificador_institucional or '',
             'delegacion_id': funcionario.delegacion_id,
             'delegacion_nombre': funcionario.delegacion.nombre if funcionario.delegacion else '',
-            'label': f"{nombre} · {roles}",
+            'label': nombre,
         })
 
     tipos_activos = TipoAtencion.objects.filter(estado='Activo')
@@ -2831,11 +2831,7 @@ def gestion_atenciones(request):
             if u.funcionario.delegacion:
                 del_nom = u.funcionario.delegacion.nombre
         nombre_completo = obtener_nombre_corto(u)
-        label = f"{nombre_completo} ({u.username})"
-        if cargo_nom:
-            label += f" · {cargo_nom}"
-        if del_nom:
-            label += f" [{del_nom}]"
+        label = nombre_completo
         representantes_disponibles.append({
             'id': u.id,
             'nombre': nombre_completo,
@@ -4384,10 +4380,16 @@ def gestion_ajuste_desempenio(request):
         elif funcionario_busqueda:
             busq_low = funcionario_busqueda.lower()
             for f in func_qs:
+                nombre_corto = f.get_nombre_corto().strip()
                 nombre_full = (f.user.get_full_name() or f.user.username).strip()
                 cargo_nom = f.cargo.nombre_cargo if f.cargo else ''
                 etiqueta = f"{nombre_full} ({cargo_nom})".strip()
-                if etiqueta.lower() == busq_low or busq_low in etiqueta.lower():
+                if (
+                    nombre_corto.lower() == busq_low
+                    or etiqueta.lower() == busq_low
+                    or busq_low in nombre_corto.lower()
+                    or busq_low in etiqueta.lower()
+                ):
                     func_obj = f
                     break
 
@@ -5564,7 +5566,7 @@ def gestion_tubo(request):
             'identificador': funcionario.identificador_institucional or '',
             'delegacion_id': funcionario.delegacion_id,
             'delegacion_nombre': funcionario.delegacion.nombre if funcionario.delegacion else '',
-            'label': f"{nombre} · {roles}",
+            'label': nombre,
         })
 
     # Sectores, organizaciones y encargados disponibles para "Nuevo Compromiso Sectorial" (solo si hay delegación activa)

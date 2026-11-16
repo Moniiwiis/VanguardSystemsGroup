@@ -424,8 +424,8 @@
           <input type="hidden" id="funcionario_id" name="funcionario_id" value="">
           <datalist id="funcionarios-ajuste-list">
             {% for f in funcionarios_ajuste %}
-              <option value="{{ f.user.get_full_name|default:f.user.username }} ({{ f.cargo.nombre_cargo }})" data-id="{{ f.id }}"
-                      data-search="{{ f.user.get_full_name|default:f.user.username }} {{ f.user.username }} {{ f.cargo.nombre_cargo }} {{ f.identificador_institucional|default:'' }} {{ f.delegacion.nombre|default:'' }}">{{ f.cargo.nombre_cargo }} · {% if f.delegacion %}{{ f.delegacion.nombre }}{% else %}Delegación Activa{% endif %}</option>
+              <option value="{{ f|nombre_corto }}" data-id="{{ f.id }}"
+                      data-search="{{ f|nombre_corto }} {{ f.cargo.nombre_cargo }} {{ f.identificador_institucional|default:'' }} {{ f.delegacion.nombre|default:'' }}">{{ f.cargo.nombre_cargo }} · {% if f.delegacion %}{{ f.delegacion.nombre }}{% else %}Delegación Activa{% endif %}</option>
             {% endfor %}
           </datalist>
         </div>
