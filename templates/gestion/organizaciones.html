@@ -201,12 +201,12 @@
           <tr>
             <th class="py-3 px-3.5 min-w-[200px]">Organizaciones</th>
             <th class="py-3 px-3.5 min-w-[170px]">Domicilio Legal</th>
-            <th class="py-3 px-3.5 whitespace-nowrap">Territ. Deleg.</th>
+            <th class="py-3 px-3.5 whitespace-nowrap">Delegación</th>
             <th class="py-3 px-3.5 text-center whitespace-nowrap">Socios Activos</th>
-            <th class="py-3 px-3.5 text-center whitespace-nowrap">Fecha Constit.</th>
-            <th class="py-3 px-3.5 text-center whitespace-nowrap">Nº Reg. P.J.</th>
-            <th class="py-3 px-3.5 text-center whitespace-nowrap">Fecha Inscripc en Reg.</th>
-            <th class="py-3 px-3.5 text-center whitespace-nowrap">Reg. Dir. Nº</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap">Fecha de Constitución</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap">N° Registro Personalidad Jurídica</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap">Fecha de Inscripción en Registro</th>
+            <th class="py-3 px-3.5 text-center whitespace-nowrap">Registro de Directiva N°</th>
             <th class="py-3 px-3.5 text-center whitespace-nowrap">Estado</th>
             <th class="py-3 px-3.5 text-center whitespace-nowrap w-24 sticky right-0 bg-slate-50 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acciones</th>
           </tr>
@@ -499,7 +499,7 @@
         </div>
 
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Territ. Deleg. (Delegación Activa)</label>
+          <label class="block text-xs font-bold text-slate-700">Delegación</label>
           <input type="text" readonly disabled
                  value="{% if delegacion_activa %}{{ delegacion_activa.nombre }}{% else %}Sin delegación activa{% endif %}"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 text-xs font-bold cursor-not-allowed" />
@@ -515,23 +515,23 @@
           </select>
         </div>
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Fecha Constit.</label>
+          <label class="block text-xs font-bold text-slate-700">Fecha de Constitución</label>
           <input type="date" name="fecha_constitucion"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
 
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Nº Reg. P.J.</label>
+          <label class="block text-xs font-bold text-slate-700">N° Registro Personalidad Jurídica</label>
           <input type="text" name="numero_registro_pj" maxlength="50" placeholder="Ej: 1244 / PJ-1244"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Fecha Inscripc en Reg.</label>
+          <label class="block text-xs font-bold text-slate-700">Fecha de Inscripción en Registro</label>
           <input type="date" name="fecha_inscripcion_registro" min="{{ hoy_iso }}"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Reg. Dir. Nº</label>
+          <label class="block text-xs font-bold text-slate-700">Registro de Directiva N°</label>
           <input type="text" name="registro_directiva_numero" maxlength="50" placeholder="Ej: DIR-089"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
@@ -548,14 +548,14 @@
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Teléfono Contacto</label>
+          <label class="block text-xs font-bold text-slate-700">Teléfono de Contacto</label>
           <input type="text" name="telefono_contacto" maxlength="15" placeholder="+56 9 8765 4321"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
           <div class="tel-feedback"></div>
         </div>
 
         <div class="sm:col-span-2 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Email Contacto</label>
+          <label class="block text-xs font-bold text-slate-700">Correo Electrónico de Contacto</label>
           <input type="email" name="email_contacto" maxlength="100" placeholder="contacto@jjvv.cl"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
@@ -689,7 +689,7 @@
         </div>
 
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Territ. Deleg. (Delegación)</label>
+          <label class="block text-xs font-bold text-slate-700">Delegación</label>
           <input type="text" id="edit-org-del-nombre" readonly disabled
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 text-xs font-bold cursor-not-allowed" />
           <input type="hidden" id="edit-org-del" name="delegacion_id" value="" />
@@ -704,23 +704,23 @@
           </select>
         </div>
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Fecha Constit.</label>
+          <label class="block text-xs font-bold text-slate-700">Fecha de Constitución</label>
           <input type="date" id="edit-org-fconst" name="fecha_constitucion"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
 
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Nº Reg. P.J.</label>
+          <label class="block text-xs font-bold text-slate-700">N° Registro Personalidad Jurídica</label>
           <input type="text" id="edit-org-numpj" name="numero_registro_pj" maxlength="50"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Fecha Inscripc en Reg.</label>
+          <label class="block text-xs font-bold text-slate-700">Fecha de Inscripción en Registro</label>
           <input type="date" id="edit-org-finsc" name="fecha_inscripcion_registro"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Reg. Dir. Nº</label>
+          <label class="block text-xs font-bold text-slate-700">Registro de Directiva N°</label>
           <input type="text" id="edit-org-regdir" name="registro_directiva_numero" maxlength="50"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
@@ -737,14 +737,14 @@
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Teléfono Contacto</label>
+          <label class="block text-xs font-bold text-slate-700">Teléfono de Contacto</label>
           <input type="text" id="edit-org-tel" name="telefono_contacto" maxlength="15" placeholder="+56 9 8765 4321"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
           <div class="tel-feedback"></div>
         </div>
 
         <div class="sm:col-span-2 space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Email Contacto</label>
+          <label class="block text-xs font-bold text-slate-700">Correo Electrónico de Contacto</label>
           <input type="email" id="edit-org-email" name="email_contacto" maxlength="100"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
@@ -946,12 +946,12 @@
             <p><strong>Tipo:</strong> ${esc(d.tipo)}</p>
             <p><strong>Estado:</strong> ${esc(d.estado)}</p>
             <p><strong>Domicilio Legal:</strong> ${esc(d.domicilio)}</p>
-            <p><strong>Territ. Deleg.:</strong> ${esc(d.delegacion)}${d.territorio ? ' (' + esc(d.territorio) + ')' : ''}</p>
+            <p><strong>Delegación:</strong> ${esc(d.delegacion)}${d.territorio ? ' (' + esc(d.territorio) + ')' : ''}</p>
             <p><strong>Socios Activos:</strong> ${esc(d.socios || '0')}</p>
-            <p><strong>Fecha Constit.:</strong> ${esc(d.fconstDisp)}</p>
-            <p><strong>Nº Reg. P.J.:</strong> ${esc(d.numpj)}</p>
-            <p><strong>Fecha Inscripc en Reg.:</strong> ${esc(d.finscDisp)}</p>
-            <p><strong>Reg. Dir. Nº:</strong> ${esc(d.regdir)}</p>
+            <p><strong>Fecha de Constitución:</strong> ${esc(d.fconstDisp)}</p>
+            <p><strong>N° Registro Personalidad Jurídica:</strong> ${esc(d.numpj)}</p>
+            <p><strong>Fecha de Inscripción en Registro:</strong> ${esc(d.finscDisp)}</p>
+            <p><strong>Registro de Directiva N°:</strong> ${esc(d.regdir)}</p>
             <p><strong>RUT Organización:</strong> ${esc(d.rut)}</p>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
