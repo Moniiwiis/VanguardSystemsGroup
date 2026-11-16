@@ -352,54 +352,6 @@
     }
   }
 
-  function sincronizarVecinoPerfilRep(inp) {
-    if (!inp) return;
-    const dl = document.getElementById('vecinos-directiva-list');
-    const panel = document.getElementById('rep-perfil-existente-panel');
-    const hint = document.getElementById('rep-perfil-no-encontrado');
-    const val = (inp.value || '').trim();
-    if (!dl || !panel) return;
-    let matched = null;
-    if (val) {
-      for (const opt of dl.querySelectorAll('option')) {
-        if (opt.value === val) {
-          matched = opt;
-          break;
-        }
-      }
-    }
-    if (hint) hint.classList.toggle('hidden', !val || !!matched);
-    if (!matched) return;
-    document.getElementById('rep-perfil-pn').value = matched.dataset.primerNombre || '';
-    document.getElementById('rep-perfil-ap').value = matched.dataset.apellidoPaterno || '';
-    document.getElementById('rep-perfil-rut').value = matched.dataset.rut || '';
-    document.getElementById('rep-perfil-tel').value = matched.dataset.telefono || '';
-    document.getElementById('rep-perfil-correo').value = matched.dataset.correo || '';
-    panel.querySelectorAll('input').forEach((el) => el.dispatchEvent(new Event('input', { bubbles: true })));
-  }
-
-  function toggleNuevoVecinoPerfil(isNuevo) {
-    const pExistente = document.getElementById('rep-perfil-existente-panel');
-    const pNuevo = document.getElementById('rep-perfil-nuevo-panel');
-    const hint = document.getElementById('rep-perfil-no-encontrado');
-    if (pExistente) {
-      pExistente.classList.toggle('hidden', !!isNuevo);
-      pExistente.querySelectorAll('input').forEach((el) => { el.disabled = !!isNuevo; });
-    }
-    if (pNuevo) {
-      pNuevo.classList.toggle('hidden', !isNuevo);
-      pNuevo.querySelectorAll('input, select').forEach((el) => {
-        el.disabled = !isNuevo;
-        if (isNuevo && ['rep_vecino_primer_nombre', 'rep_vecino_apellido_paterno', 'rep_vecino_rut', 'rep_vecino_correo'].includes(el.name)) {
-          el.setAttribute('required', 'required');
-        } else {
-          el.removeAttribute('required');
-        }
-      });
-    }
-    if (isNuevo && hint) hint.classList.add('hidden');
-  }
-
   function abrirModalEditarRepPerfil(btn) {
     const d = btn.dataset;
     const modal = document.getElementById('modal-editar-rep-org');
@@ -412,17 +364,6 @@
     document.getElementById('rep-perfil-tel').value = d.tel || '';
     document.getElementById('rep-perfil-correo').value = d.correo || '';
     document.getElementById('rep-perfil-prioritario').checked = (d.prioritario === '1');
-    const chkNuevo = document.getElementById('rep-perfil-nuevo-chk');
-    if (chkNuevo) {
-      chkNuevo.checked = false;
-      toggleNuevoVecinoPerfil(false);
-    }
-    modal.querySelectorAll('[list="vecinos-directiva-list"], [data-source-list="vecinos-directiva-list"]').forEach((el) => {
-      el.value = '';
-      if (el._sgrSyncUI) el._sgrSyncUI();
-    });
-    const hint = document.getElementById('rep-perfil-no-encontrado');
-    if (hint) hint.classList.add('hidden');
     modal.classList.remove('hidden');
   }
   {% endif %}
@@ -430,11 +371,11 @@
 
 {% if org_perfil %}
 <div id="modal-editar-rep-org" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[92vh] overflow-y-auto space-y-4">
+  <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-xl max-h-[92vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
       <div>
         <h3 id="rep-perfil-titulo" class="text-base font-extrabold text-slate-900">Editar Representante</h3>
-        <p class="text-[11px] text-slate-400">Busca en Vecinos o registra un nuevo vecino si no existe</p>
+        <p class="text-[11px] text-slate-400">Actualiza teléfono, correo o define el contacto prioritario (sin alterar identidad ni RUT)</p>
       </div>
       <button type="button" onclick="document.getElementById('modal-editar-rep-org').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
     </div>
@@ -444,93 +385,52 @@
       <input type="hidden" name="accion" value="editar_representante_org">
       <input type="hidden" id="rep-perfil-cargo" name="cargo" value="">
 
-      <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+      <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200">
         <label class="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
           <input type="checkbox" id="rep-perfil-prioritario" name="establecer_prioritario" value="1"
                  class="rounded border-slate-300 text-[#C41230] focus:ring-[#C41230]">
-          <span>Establecer como contacto prioritario (su teléfono será el de la organización)</span>
-        </label>
-        <label class="inline-flex items-center gap-1.5 text-xs font-bold text-[#C41230] cursor-pointer">
-          <input type="checkbox" id="rep-perfil-nuevo-chk" name="rep_nuevo_vecino" value="1"
-                 onchange="toggleNuevoVecinoPerfil(this.checked)"
-                 class="rounded border-slate-300 text-[#C41230] focus:ring-[#C41230]">
-          <span>Registrar nuevo vecino</span>
+          <span>Establecer como contacto prioritario (su teléfono será automáticamente el de la organización)</span>
         </label>
       </div>
 
-      <div id="rep-perfil-existente-panel" class="space-y-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Buscar en Vecinos</label>
-          <input type="text" list="vecinos-directiva-list" autocomplete="off"
-                 oninput="sincronizarVecinoPerfilRep(this)" onchange="sincronizarVecinoPerfilRep(this)"
-                 placeholder="Escribe nombre o RUT para buscar en el padrón..."
-                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-slate-50 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-          <div id="rep-perfil-no-encontrado" class="hidden pt-1">
-            <button type="button" onclick="const c=document.getElementById('rep-perfil-nuevo-chk'); c.checked=true; toggleNuevoVecinoPerfil(true);"
-                    class="text-[11px] font-bold text-[#C41230] hover:underline">
-              ¿No aparece en Vecinos? Haz clic aquí para abrir el formulario de nuevo vecino
-            </button>
-          </div>
+          <label class="block text-xs font-bold text-slate-700">Primer Nombre</label>
+          <input type="text" id="rep-perfil-pn" readonly tabindex="-1"
+                 class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
         </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div class="space-y-1">
-            <label class="block text-xs font-bold text-slate-700">Primer Nombre <span class="text-[#C41230]">*</span></label>
-            <input type="text" id="rep-perfil-pn" name="primer_nombre" maxlength="50"
-                   class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-          </div>
-          <div class="space-y-1">
-            <label class="block text-xs font-bold text-slate-700">Apellido Paterno <span class="text-[#C41230]">*</span></label>
-            <input type="text" id="rep-perfil-ap" name="apellido_paterno" maxlength="50"
-                   class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-          </div>
-          <div class="space-y-1">
-            <label class="block text-xs font-bold text-slate-700">RUT</label>
-            <input type="text" id="rep-perfil-rut" name="rut" data-rut="true" maxlength="12"
-                   class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-            <div class="rut-feedback"></div>
-          </div>
-          <div class="space-y-1">
-            <label class="block text-xs font-bold text-slate-700">Teléfono Móvil</label>
-            <input type="text" id="rep-perfil-tel" name="telefono" maxlength="15" placeholder="+56 9 8765 4321"
-                   class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-            <div class="tel-feedback"></div>
-          </div>
-          <div class="sm:col-span-2 space-y-1">
-            <label class="block text-xs font-bold text-slate-700">Correo Electrónico</label>
-            <input type="email" id="rep-perfil-correo" name="correo" maxlength="100"
-                   class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-          </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Apellido Paterno</label>
+          <input type="text" id="rep-perfil-ap" readonly tabindex="-1"
+                 class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
         </div>
-      </div>
-
-      <div id="rep-perfil-nuevo-panel" class="hidden p-3.5 rounded-2xl bg-red-50/40 border border-red-100 space-y-2">
-        <div class="text-xs font-extrabold text-[#C41230]">Registrar Nuevo Vecino como Representante</div>
-        {% include 'gestion/includes/vecino_form_fields.html' with p='rep_vecino_' idp='rep-vec-' req='' es_admin=False incluir_delegacion_hidden=False %}
+        <div class="space-y-1 sm:col-span-2">
+          <label class="block text-xs font-bold text-slate-700">RUT</label>
+          <input type="text" id="rep-perfil-rut" readonly tabindex="-1"
+                 class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-mono font-bold text-slate-800 focus:outline-none select-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Teléfono Móvil</label>
+          <input type="text" id="rep-perfil-tel" name="telefono" maxlength="15" placeholder="+56 9 8765 4321"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <div class="tel-feedback"></div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Correo Electrónico</label>
+          <input type="email" id="rep-perfil-correo" name="correo" maxlength="100"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
       </div>
 
       <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
         <button type="button" onclick="document.getElementById('modal-editar-rep-org').classList.add('hidden')"
                 class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cancelar</button>
         <button type="submit" class="px-5 py-2 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-md transition-all">
-          Guardar Representante
+          Guardar Cambios
         </button>
       </div>
     </form>
   </div>
 </div>
-
-<datalist id="vecinos-directiva-list">
-  {% for vd in vecinos_directiva %}
-    <option value="{{ vd.nombre_corto }}"
-            data-id="{{ vd.id }}"
-            data-primer-nombre="{{ vd.primer_nombre }}"
-            data-apellido-paterno="{{ vd.apellido_paterno }}"
-            data-rut="{{ vd.rut }}"
-            data-telefono="{{ vd.telefono }}"
-            data-correo="{{ vd.email }}"
-            data-search="{{ vd.nombre_corto }} {{ vd.nombre }} {{ vd.rut }} {{ vd.telefono }} {{ vd.email }}">RUT: {{ vd.rut }}{% if vd.telefono %} · {{ vd.telefono }}{% endif %}{% if vd.email %} · {{ vd.email }}{% endif %}</option>
-  {% endfor %}
-</datalist>
 {% endif %}
 {% endblock %}

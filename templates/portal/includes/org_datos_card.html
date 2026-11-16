@@ -105,6 +105,7 @@
             <div class="space-y-0.5">
               <div class="flex items-center justify-between gap-1">
                 <span class="text-[10px] font-extrabold uppercase text-[#C41230]">{{ rep.titulo }}</span>
+                {% if rep.nombre_corto or rep.rut %}
                 <button type="button"
                         data-cargo="{{ rep.cargo }}"
                         data-titulo="{{ rep.titulo }}"
@@ -119,6 +120,7 @@
                   <i data-lucide="edit-3" class="w-3 h-3"></i>
                   <span>Editar</span>
                 </button>
+                {% endif %}
               </div>
               <p class="font-bold text-slate-900 mt-0.5">{{ rep.nombre_corto|default:"—" }}</p>
               {% if rep.rut %}<p class="font-mono text-[11px] text-slate-500">RUT: {{ rep.rut }}</p>{% endif %}

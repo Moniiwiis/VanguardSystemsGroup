@@ -2609,8 +2609,9 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(resp_org_get.status_code, 200)
         self.assertContains(resp_org_get, 'id="vecinos-directiva-list"')
         self.assertContains(resp_org_get, 'value="Raúl Gómez"')
-        self.assertContains(resp_org_get, 'name="presidente_primer_nombre"')
-        self.assertContains(resp_org_get, 'name="presidente_apellido_paterno"')
+        self.assertContains(resp_org_get, 'name="presidente_vecino_id"')
+        self.assertContains(resp_org_get, 'name="presidente_primer_nombre" data-rep-field="primer_nombre" readonly')
+        self.assertContains(resp_org_get, 'name="presidente_rut" data-rep-field="rut" readonly')
         self.assertContains(resp_org_get, 'name="presidente_nuevo_vecino"')
         self.assertContains(resp_org_get, 'name="presidente_vecino_primer_nombre"')
         self.assertContains(resp_org_get, 'name="presidente_vecino_segundo_nombre"')
@@ -2778,7 +2779,7 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(self.client.get(reverse('portal_cliente_detalle', args=[at_ajena.id])).status_code, 404)
         self.assertEqual(self.client.get(reverse('gestion_organizaciones')).status_code, 403)
 
-        # Mis Datos y Perfil muestra UNA sola tarjeta de organización con edición de correo y botón Editar por representante
+        # Mis Datos y Perfil muestra UNA sola tarjeta, sin crear nuevos vecinos, solo prioridad y teléfono/correo
         resp_perf = self.client.get(reverse('perfil_usuario'))
         self.assertContains(resp_perf, 'Directiva de la Organización')
         self.assertContains(resp_perf, 'Socios Activos')
@@ -2787,6 +2788,21 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertContains(resp_perf, 'Marta Rojas')
         self.assertContains(resp_perf, 'abrirModalEditarRepPerfil')
         self.assertNotContains(resp_perf, 'Editar Contacto de la Organización')
+        self.assertNotContains(resp_perf, 'Registrar nuevo vecino')
+        self.assertNotContains(resp_perf, 'vecinos-directiva-list')
+
+        # El cliente NO puede crear un nuevo vecino desde Mi Perfil
+        antes_vec_cli = Vecino.objects.count()
+        self.client.post(reverse('perfil_usuario'), {
+            'accion': 'editar_representante_org',
+            'cargo': 'tesorero',
+            'rep_nuevo_vecino': '1',
+            'rep_vecino_primer_nombre': 'Intruso',
+            'rep_vecino_apellido_paterno': 'Falso',
+            'rep_vecino_rut': '19.111.222-4',
+            'rep_vecino_correo': 'intruso@test.cl',
+        })
+        self.assertEqual(Vecino.objects.count(), antes_vec_cli)
 
         # Editar correo de la organización conserva automáticamente el teléfono del contacto prioritario
         self.client.post(reverse('perfil_usuario'), {
@@ -2798,23 +2814,49 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(org.telefono_contacto, '+56 9 1234 5678')
         self.assertEqual(org.presidente_correo, 'nuevo.correo@jjvvcompanias.test')
 
-        # Editar representante prioritario (o cambiar prioridad a Tesorero) actualiza automáticamente el teléfono institucional
+        # Editar representante (cambio de teléfono, correo y prioridad) actualiza org y también la tabla Vecinos
+        # e ignora cualquier intento de alterar nombre/apellido/RUT
         self.client.post(reverse('perfil_usuario'), {
             'accion': 'editar_representante_org',
             'cargo': 'tesorero',
-            'primer_nombre': 'Marta',
-            'apellido_paterno': 'Rojas',
-            'rut': '12.345.678-5',
+            'primer_nombre': 'NombreAlterado',
+            'apellido_paterno': 'ApellidoAlterado',
+            'rut': '9.999.999-9',
             'telefono': '988887777',
-            'correo': 'marta.tesorera@jjvvcompanias.test',
+            'correo': 'marta.nueva@jjvvcompanias.test',
             'establecer_prioritario': '1',
         })
         org.refresh_from_db()
         func_org.refresh_from_db()
+        vec_tes = Vecino.objects.get(rut='12.345.678-5')
+        func_tes = Funcionario.objects.get(identificador_institucional='VEC-123456785')
+        self.assertEqual(org.tesorero_nombre, 'Marta Rojas')
+        self.assertEqual(org.tesorero_rut, '12.345.678-5')
         self.assertEqual(org.contacto_prioritario, 'tesorero')
         self.assertEqual(org.representante_legal, 'Marta Rojas')
         self.assertEqual(org.telefono_contacto, '+56 9 8888 7777')
         self.assertEqual(func_org.telefono, '+56 9 8888 7777')
+        # Impacto reflejado directamente en la tabla y ficha de Vecinos
+        self.assertEqual(vec_tes.telefono, '+56 9 8888 7777')
+        self.assertEqual(func_tes.telefono, '+56 9 8888 7777')
+        self.assertEqual(func_tes.user.email, 'marta.nueva@jjvvcompanias.test')
+
+        # Verificar que en la vista /gestion/vecinos/ aparecen el teléfono y correo actualizados
+        self.client.force_login(admin)
+        session_adm = self.client.session
+        session_adm['delegacion_activa_id'] = self.delegacion.id
+        session_adm.save()
+        resp_vec_list = self.client.get(reverse('gestion_vecinos'))
+        self.assertContains(resp_vec_list, '+56 9 8888 7777')
+        self.assertContains(resp_vec_list, 'marta.nueva@jjvvcompanias.test')
+
+        # Volver a sesión de organización para validar login por RUT
+        self.client.logout()
+        resp_login_re = self.client.post(reverse('login'), {
+            'username': 'nuevo.correo@jjvvcompanias.test',
+            'password': 'NuevaClaveOrg!99',
+        })
+        self.assertRedirects(resp_login_re, reverse('portal_cliente'))
 
         # También puede ingresar al Portal usando su RUT de organización
         self.client.logout()

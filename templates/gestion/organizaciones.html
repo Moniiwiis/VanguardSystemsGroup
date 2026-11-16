@@ -694,6 +694,10 @@
       el.value = '';
       if (el._sgrSyncUI) el._sgrSyncUI();
     });
+    ['edit-org-pres-vec-id', 'edit-org-tes-vec-id', 'edit-org-sec-vec-id'].forEach((hid) => {
+      const el = document.getElementById(hid);
+      if (el) el.value = '';
+    });
     document.getElementById('edit-org-pres-pn').value = d.presPn || '';
     document.getElementById('edit-org-pres-ap').value = d.presAp || '';
     document.getElementById('edit-org-pres-rut').value = d.presRut || '';
