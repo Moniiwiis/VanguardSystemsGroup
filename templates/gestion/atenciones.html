@@ -62,17 +62,17 @@
         <!-- Solicitante / Vecino y JJVV u Organización en formulario único -->
         <div class="space-y-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <label for="solicitante" class="block text-xs font-bold text-slate-800">
-              Vecino o solicitante <span id="asterisco-vecino-req" class="text-[#C41230]">*</span>
+            <label for="solicitante" id="lbl-solicitante-principal" class="block text-xs font-bold text-slate-800">
+              <span id="lbl-solicitante-texto">Vecino o solicitante</span> <span id="asterisco-vecino-req" class="text-[#C41230]">*</span>
             </label>
             <div class="flex flex-wrap items-center gap-3">
               <label class="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-700 cursor-pointer">
-                <input type="checkbox" id="chk_nuevo_vecino" name="chk_nuevo_vecino" value="1" onchange="actualizarModoSolicitante()"
+                <input type="checkbox" id="chk_nuevo_vecino" name="chk_nuevo_vecino" value="1" onchange="actualizarModoSolicitante('nuevo')"
                        class="rounded border-slate-300 text-[#C41230] focus:ring-[#C41230]">
                 <span>Registrar nuevo vecino</span>
               </label>
               <label class="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-800 cursor-pointer">
-                <input type="checkbox" id="chk_representa_org" name="chk_representa_org" value="1" onchange="actualizarModoSolicitante()"
+                <input type="checkbox" id="chk_representa_org" name="chk_representa_org" value="1" onchange="actualizarModoSolicitante('org')"
                        class="rounded border-slate-300 text-[#C41230] focus:ring-[#C41230]">
                 <span>Representa JJVV o Organización</span>
               </label>
@@ -1007,7 +1007,7 @@
   }
 
   // Actualizar formulario único según checkboxes: Registrar nuevo vecino / Representa JJVV o Organización
-  function actualizarModoSolicitante() {
+  function actualizarModoSolicitante(origen) {
     const modoInput = document.getElementById('modo_vecino');
     const chkNuevo = document.getElementById('chk_nuevo_vecino');
     const chkOrg = document.getElementById('chk_representa_org');
@@ -1015,9 +1015,17 @@
     const secOrg = document.getElementById('seccion-organizacion');
     const secNuevo = document.getElementById('seccion-vecino-nuevo');
     const astVecino = document.getElementById('asterisco-vecino-req');
+    const lblTexto = document.getElementById('lbl-solicitante-texto');
     const ayudaVecino = document.getElementById('ayuda-vecino-existente');
 
+    if (origen === 'org' && chkOrg && chkOrg.checked && chkNuevo) {
+      chkNuevo.checked = false;
+    } else if (origen === 'nuevo' && chkNuevo && chkNuevo.checked && chkOrg) {
+      chkOrg.checked = false;
+    }
+
     const inputSolicitante = document.getElementById('solicitante');
+    const hiddenVecinoId = document.getElementById('vecino_id');
     const inputNuevoNombre = document.getElementById('nuevo_vecino_nombre');
     const inputNuevoRut = document.getElementById('nuevo_vecino_rut');
     const inputNuevoCorreo = document.getElementById('nuevo_vecino_correo');
@@ -1026,26 +1034,31 @@
     const chkNuevaOrg = document.getElementById('crear_nueva_org_chk');
     const inputNuevaOrgNom = document.getElementById('nueva_org_nombre');
 
-    const esNuevoVec = !!(chkNuevo && chkNuevo.checked);
     const esOrg = !!(chkOrg && chkOrg.checked);
+    const esNuevoVec = !esOrg && !!(chkNuevo && chkNuevo.checked);
 
     if (modoInput) {
       modoInput.value = esOrg ? 'organizacion' : (esNuevoVec ? 'nuevo' : 'existente');
     }
 
-    if (secExistente) secExistente.classList.toggle('hidden', esNuevoVec);
-    if (secNuevo) secNuevo.classList.toggle('hidden', !esNuevoVec);
+    // Si representa JJVV/Organización, ocultar completamente la selección y creación de vecino
+    if (secExistente) secExistente.classList.toggle('hidden', esOrg || esNuevoVec);
+    if (secNuevo) secNuevo.classList.toggle('hidden', esOrg || !esNuevoVec);
     if (secOrg) secOrg.classList.toggle('hidden', !esOrg);
 
-    // El vecino existente es obligatorio solo si no registra nuevo vecino ni representa organización
-    const vecinoExistenteObligatorio = !esNuevoVec && !esOrg;
-    if (astVecino) astVecino.classList.toggle('hidden', !esNuevoVec && esOrg);
-    if (ayudaVecino) {
-      ayudaVecino.textContent = esOrg
-        ? 'Opcional al representar una JJVV u organización (puedes asociar además al vecino/dirigente)'
-        : 'Selecciona del padrón vecinal o escribe su RUT / Nombre';
+    if (esOrg && hiddenVecinoId) {
+      hiddenVecinoId.value = '';
     }
 
+    if (lblTexto) {
+      lblTexto.textContent = esOrg ? 'JJVV u Organización solicitante' : 'Vecino o solicitante';
+    }
+    if (astVecino) astVecino.classList.remove('hidden');
+    if (ayudaVecino) {
+      ayudaVecino.textContent = 'Selecciona del padrón vecinal o escribe su RUT / Nombre';
+    }
+
+    const vecinoExistenteObligatorio = !esOrg && !esNuevoVec;
     if (inputSolicitante) {
       if (vecinoExistenteObligatorio) inputSolicitante.setAttribute('required', 'required');
       else inputSolicitante.removeAttribute('required');

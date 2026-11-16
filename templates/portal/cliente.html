@@ -72,42 +72,46 @@
 
   <!-- Tarjetas de Resumen de Registros Propios -->
   <div data-realtime-card="portal-kpis" class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+    <a href="?{% if q %}q={{ q|urlencode }}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if not filtro_estado %}border-[#C41230] ring-2 ring-red-100{% else %}border-slate-200 hover:border-red-300{% endif %} shadow-sm hover:shadow-md transition-all flex items-center justify-between group cursor-pointer">
       <div>
         <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Total Propios</span>
         <span class="text-2xl font-black text-slate-900">{{ total_propias }}</span>
       </div>
-      <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+      <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
         <i data-lucide="layers" class="w-5 h-5"></i>
       </div>
-    </div>
-    <div class="bg-white rounded-2xl p-4 border border-blue-200/80 shadow-sm flex items-center justify-between">
+    </a>
+    <a href="{% if filtro_estado == 'Registrada' %}?{% if q %}q={{ q|urlencode }}{% endif %}{% else %}?estado=Registrada{% if q %}&q={{ q|urlencode }}{% endif %}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'Registrada' %}border-blue-500 ring-2 ring-blue-100{% else %}border-blue-200/80 hover:border-blue-400{% endif %} shadow-sm hover:shadow-md transition-all flex items-center justify-between group cursor-pointer">
       <div>
         <span class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 block">Registradas</span>
         <span class="text-2xl font-black text-blue-700">{{ registradas }}</span>
       </div>
-      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
         <i data-lucide="clock" class="w-5 h-5"></i>
       </div>
-    </div>
-    <div class="bg-white rounded-2xl p-4 border border-amber-200/80 shadow-sm flex items-center justify-between">
+    </a>
+    <a href="{% if filtro_estado == 'En proceso' %}?{% if q %}q={{ q|urlencode }}{% endif %}{% else %}?estado=En+proceso{% if q %}&q={{ q|urlencode }}{% endif %}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'En proceso' %}border-amber-500 ring-2 ring-amber-100{% else %}border-amber-200/80 hover:border-amber-400{% endif %} shadow-sm hover:shadow-md transition-all flex items-center justify-between group cursor-pointer">
       <div>
         <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 block">En Proceso</span>
         <span class="text-2xl font-black text-amber-700">{{ en_proceso }}</span>
       </div>
-      <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+      <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
         <i data-lucide="loader" class="w-5 h-5"></i>
       </div>
-    </div>
-    <div class="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-sm flex items-center justify-between">
+    </a>
+    <a href="{% if filtro_estado == 'Resuelta' %}?{% if q %}q={{ q|urlencode }}{% endif %}{% else %}?estado=Resuelta{% if q %}&q={{ q|urlencode }}{% endif %}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'Resuelta' %}border-emerald-500 ring-2 ring-emerald-100{% else %}border-emerald-200/80 hover:border-emerald-400{% endif %} shadow-sm hover:shadow-md transition-all flex items-center justify-between group cursor-pointer">
       <div>
         <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 block">Resueltas</span>
         <span class="text-2xl font-black text-emerald-700">{{ resueltas }}</span>
       </div>
-      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
         <i data-lucide="check-circle-2" class="w-5 h-5"></i>
       </div>
-    </div>
+    </a>
   </div>
 
   <!-- Buscador y Filtro de Registros Propios -->

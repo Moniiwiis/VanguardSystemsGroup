@@ -2227,15 +2227,36 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertRedirects(resp_vec_no_email, reverse('gestion_vecinos'))
         self.assertFalse(Vecino.objects.filter(rut='19.111.222-4').exists())
 
-        # POST combinando ambos checkboxes: nuevo vecino (con correo obligatorio) + nueva JJVV completa vinculada
-        resp_post = self.client.post(reverse('gestion_atenciones'), {
+        # Lógica JS para ocultar vecino al marcar JJVV y exigir exclusividad mutua
+        self.assertContains(resp_get, 'JJVV u Organización solicitante')
+        self.assertContains(resp_get, "actualizarModoSolicitante('org')")
+
+        # POST 1: Registrar nuevo vecino con correo obligatorio mediante chk_nuevo_vecino
+        resp_post_vec = self.client.post(reverse('gestion_atenciones'), {
             'chk_nuevo_vecino': '1',
-            'chk_representa_org': '1',
-            'crear_nueva_org': '1',
             'nuevo_vecino_nombre': 'Rosa Dirigente',
             'nuevo_vecino_rut': '12.345.678-5',
             'nuevo_vecino_correo': 'rosa.dirigente@example.test',
             'nuevo_vecino_sector_id': org_sector.id,
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Solicitud de vecino nuevo en formulario único',
+            'origen': 'EXT',
+            'responsable_id': admin.id,
+        })
+        self.assertRedirects(resp_post_vec, reverse('gestion_atenciones'))
+        at_vec = AtencionCiudadana.objects.filter(descripcion__icontains='Solicitud de vecino nuevo').first()
+        self.assertIsNotNone(at_vec)
+        self.assertIsNotNone(at_vec.vecino)
+        self.assertIsNone(at_vec.organizacion)
+        self.assertEqual(at_vec.vecino.nombre, 'Rosa Dirigente')
+        self.assertTrue(User.objects.filter(username='12.345.678-5', email='rosa.dirigente@example.test').exists())
+
+        # POST 2: Al marcar Representa JJVV o Organización se ignora/elimina cualquier vecino previo y solo vincula la JJVV
+        resp_post_org = self.client.post(reverse('gestion_atenciones'), {
+            'chk_representa_org': '1',
+            'crear_nueva_org': '1',
+            'vecino_id': at_vec.vecino.id,  # Residual que debe ser ignorado
             'nueva_org_nombre': 'JJVV Unificada',
             'nueva_org_tipo_organizacion': 'Junta de Vecinos',
             'nueva_org_domicilio_legal': 'Calle Central 100',
@@ -2245,20 +2266,63 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             'nueva_org_sector_id': org_sector.id,
             'tipo_atencion_id': self.tipo.id,
             'sub_atencion_id': self.sub.id,
-            'descripcion': 'Solicitud combinada vecino + JJVV en formulario único',
+            'descripcion': 'Solicitud exclusiva de JJVV en formulario único',
             'origen': 'EXT',
             'responsable_id': admin.id,
         })
-        self.assertRedirects(resp_post, reverse('gestion_atenciones'))
-        at = AtencionCiudadana.objects.filter(descripcion__icontains='Solicitud combinada').first()
-        self.assertIsNotNone(at)
-        self.assertIsNotNone(at.vecino)
-        self.assertIsNotNone(at.organizacion)
-        self.assertEqual(at.vecino.nombre, 'Rosa Dirigente')
-        self.assertEqual(at.organizacion.nombre, 'JJVV Unificada')
-        self.assertEqual(at.organizacion.socios_activos, 42)
-        self.assertEqual(at.organizacion.numero_registro_pj, 'PJ-7788')
-        self.assertTrue(User.objects.filter(username='12.345.678-5', email='rosa.dirigente@example.test').exists())
+        self.assertRedirects(resp_post_org, reverse('gestion_atenciones'))
+        at_org = AtencionCiudadana.objects.filter(descripcion__icontains='Solicitud exclusiva de JJVV').first()
+        self.assertIsNotNone(at_org)
+        self.assertIsNone(at_org.vecino)
+        self.assertIsNotNone(at_org.organizacion)
+        self.assertEqual(at_org.organizacion.nombre, 'JJVV Unificada')
+        self.assertEqual(at_org.organizacion.socios_activos, 42)
+        self.assertEqual(at_org.organizacion.numero_registro_pj, 'PJ-7788')
+
+        # Verificar tarjetas interactivas en inicio y reportes (todos los perfiles internos)
+        resp_inicio = self.client.get(reverse('gestion_inicio'))
+        self.assertContains(resp_inicio, f'href="{reverse("gestion_atenciones")}?estado=Resuelta"')
+        resp_rep = self.client.get(reverse('gestion_reportes'))
+        self.assertContains(resp_rep, f'href="{reverse("gestion_atenciones")}?estado=Resuelta')
+        self.assertContains(resp_rep, f'href="{reverse("gestion_atenciones")}?estado=En+proceso')
+
+        # Verificar tarjetas interactivas en Portal Cliente (Total, Registradas, En Proceso, Resueltas)
+        vec_user = User.objects.get(username='12.345.678-5')
+        AtencionCiudadana.objects.create(
+            solicitante='Rosa Dirigente (12.345.678-5)',
+            vecino=at_vec.vecino,
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Atención en proceso del cliente',
+            estado='En proceso',
+            creado_por=admin,
+            usuario_responsable=admin,
+        )
+        AtencionCiudadana.objects.create(
+            solicitante='Rosa Dirigente (12.345.678-5)',
+            vecino=at_vec.vecino,
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Atención resuelta del cliente',
+            estado='Resuelta',
+            creado_por=admin,
+            usuario_responsable=admin,
+        )
+        self.client.force_login(vec_user)
+        resp_cli = self.client.get(reverse('portal_cliente'))
+        self.assertContains(resp_cli, 'href="?estado=Registrada"')
+        self.assertContains(resp_cli, 'href="?estado=En+proceso"')
+        self.assertContains(resp_cli, 'href="?estado=Resuelta"')
+
+        resp_cli_proc = self.client.get(reverse('portal_cliente') + '?estado=En+proceso')
+        self.assertContains(resp_cli_proc, 'Atención en proceso del cliente')
+        self.assertNotContains(resp_cli_proc, 'Atención resuelta del cliente')
+
+        resp_cli_res = self.client.get(reverse('portal_cliente') + '?estado=Resuelta')
+        self.assertContains(resp_cli_res, 'Atención resuelta del cliente')
+        self.assertNotContains(resp_cli_res, 'Atención en proceso del cliente')
 
 
 

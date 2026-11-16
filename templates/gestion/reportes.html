@@ -132,17 +132,17 @@
       </div>
     </div>
 
-    <!-- Tarjeta 3: Atenciones Ciudadanas Territoriales -->
-    <div class="bg-white p-6 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm space-y-4">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+    <!-- Tarjeta 3: Atenciones Ciudadanas Territoriales (interactiva) -->
+    <div class="bg-white p-6 rounded-3xl border border-[rgba(196,18,48,0.18)] hover:border-indigo-300 hover:shadow-md transition-all shadow-sm space-y-4">
+      <a href="{% url 'gestion_atenciones' %}{% if delegacion_seleccionada and es_admin %}?delegacion={{ delegacion_seleccionada.id }}{% endif %}" class="flex items-center gap-3 group">
+        <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold group-hover:scale-110 transition-transform">
           <i data-lucide="clipboard-list" class="w-5 h-5"></i>
         </div>
         <div>
-          <h3 class="font-extrabold text-slate-900 text-sm">Atenciones Ciudadanas</h3>
+          <h3 class="font-extrabold text-slate-900 group-hover:text-indigo-700 text-sm transition-colors">Atenciones Ciudadanas</h3>
           <p class="text-[11px] text-slate-500">{{ total_atenciones }} requerimientos en el ámbito</p>
         </div>
-      </div>
+      </a>
       <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/90 space-y-2.5 text-xs">
         <div class="flex justify-between items-center">
           <span class="text-slate-700 font-bold">Tasa de Resolución</span>
@@ -151,9 +151,17 @@
         <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
           <div class="bg-indigo-500 h-full rounded-full transition-all" style="width: {{ pct_resueltas }}%;"></div>
         </div>
-        <div class="flex justify-between items-center pt-1 text-[11px]">
-          <span class="text-slate-600 font-semibold">Resueltas / En Proceso</span>
-          <span class="font-mono font-bold text-slate-700">{{ atenciones_resueltas }} / {{ atenciones_proceso }}</span>
+        <div class="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+          <a href="{% url 'gestion_atenciones' %}?estado=Resuelta{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+             class="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold flex items-center justify-between transition-colors">
+            <span>Resueltas</span>
+            <span class="font-mono font-black">{{ atenciones_resueltas }}</span>
+          </a>
+          <a href="{% url 'gestion_atenciones' %}?estado=En+proceso{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+             class="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-bold flex items-center justify-between transition-colors">
+            <span>En Proceso</span>
+            <span class="font-mono font-black">{{ atenciones_proceso }}</span>
+          </a>
         </div>
       </div>
     </div>

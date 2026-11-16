@@ -2402,7 +2402,9 @@ def gestion_atenciones(request):
         chk_nuevo_vecino = request.POST.get('chk_nuevo_vecino', '').strip() == '1'
         chk_representa_org = request.POST.get('chk_representa_org', '').strip() == '1'
         es_modo_org = chk_representa_org or (modo_vecino == 'organizacion')
-        es_modo_nuevo_vec = chk_nuevo_vecino or (modo_vecino == 'nuevo') or bool(nuevo_nombre and nuevo_rut)
+        es_modo_nuevo_vec = (not es_modo_org) and (
+            chk_nuevo_vecino or (modo_vecino == 'nuevo') or bool(nuevo_nombre and nuevo_rut)
+        )
 
         vecino_obj = None
         organizacion_obj = None
@@ -2435,7 +2437,7 @@ def gestion_atenciones(request):
                 messages.error(request, err_vec)
                 return redirect('gestion_atenciones')
             solicitante = f"{vecino_obj.nombre} ({vecino_obj.rut})"
-        elif vecino_id and vecino_id.isdigit():
+        elif (not es_modo_org) and vecino_id and vecino_id.isdigit():
             vecino_obj = _vecinos_activos_para_delegacion(del_activa).filter(
                 id=int(vecino_id)
             ).first()
@@ -2445,9 +2447,7 @@ def gestion_atenciones(request):
             if not solicitante:
                 solicitante = f"{vecino_obj.nombre} ({vecino_obj.rut})"
 
-        if organizacion_obj and vecino_obj:
-            solicitante = f"{vecino_obj.nombre} ({vecino_obj.rut}) · {organizacion_obj.nombre}"[:150]
-        elif organizacion_obj and not solicitante:
+        if organizacion_obj:
             solicitante = f"{organizacion_obj.nombre} ({organizacion_obj.tipo_organizacion})"[:150]
 
         # Determinar representante asignado para la atención (acotado exclusivamente a la delegación activa)

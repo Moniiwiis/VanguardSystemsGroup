@@ -70,27 +70,45 @@
       {% endif %}
     </div>
 
-    <!-- 4 Tarjetas de la Delegación Activa -->
+    <!-- 4 Tarjetas de la Delegación Activa (interactivas según permisos del perfil) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
       <!-- 1. Atenciones Ciudadanas (Delegación Activa) -->
-      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:border-[#C41230]/40 hover:shadow-md transition-all group">
         <div>
           <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
             {% if es_admin_global %}Atenciones en todas las delegaciones{% else %}Atenciones en Sede{% endif %}
           </p>
-          <h3 class="text-2xl font-black text-slate-900 mt-1 font-display">{{ total_atenciones_del }}</h3>
-          <span class="text-xs text-emerald-600 font-bold flex items-center gap-1 mt-1">
-            <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> {{ atenciones_resueltas_del }} resueltas ({{ pct_resueltas_del }}%)
-          </span>
+          {% if permisos.ver_atenciones %}
+            <a href="{% url 'gestion_atenciones' %}" class="text-2xl font-black text-slate-900 mt-1 font-display block hover:text-[#C41230] transition-colors">{{ total_atenciones_del }}</a>
+            <a href="{% url 'gestion_atenciones' %}?estado=Resuelta" class="text-xs text-emerald-600 hover:text-emerald-700 hover:underline font-bold flex items-center gap-1 mt-1">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> {{ atenciones_resueltas_del }} resueltas ({{ pct_resueltas_del }}%)
+            </a>
+          {% else %}
+            <h3 class="text-2xl font-black text-slate-900 mt-1 font-display">{{ total_atenciones_del }}</h3>
+            <span class="text-xs text-emerald-600 font-bold flex items-center gap-1 mt-1">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> {{ atenciones_resueltas_del }} resueltas ({{ pct_resueltas_del }}%)
+            </span>
+          {% endif %}
         </div>
-        <div class="w-12 h-12 rounded-xl bg-red-50 text-[#C41230] flex items-center justify-center shrink-0">
-          <i data-lucide="clipboard-list" class="w-6 h-6"></i>
-        </div>
+        {% if permisos.ver_atenciones %}
+          <a href="{% url 'gestion_atenciones' %}" title="Ir a Atenciones Ciudadanas" class="w-12 h-12 rounded-xl bg-red-50 text-[#C41230] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+            <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+          </a>
+        {% else %}
+          <div class="w-12 h-12 rounded-xl bg-red-50 text-[#C41230] flex items-center justify-center shrink-0">
+            <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+          </div>
+        {% endif %}
       </div>
 
       <!-- 2. Cumplimiento de Metas SGR (Delegación Activa) -->
+      {% if permisos.ver_reportes or permisos.ver_metas or permisos.ver_atenciones %}
+      <a href="{% if permisos.ver_reportes %}{% url 'gestion_reportes' %}{% elif permisos.ver_metas %}{% url 'gestion_metas' %}{% else %}{% url 'gestion_tubo' %}{% endif %}"
+         class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:border-amber-400 hover:shadow-md transition-all group block">
+      {% else %}
       <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
+      {% endif %}
         <div>
           <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Metas y Cumplimiento</p>
           <h3 class="text-2xl font-black text-slate-900 mt-1 font-display">{{ promedio_meta_del }}%</h3>
@@ -101,13 +119,18 @@
             <span class="text-slate-400 font-medium">({{ total_metas_del }} metas)</span>
           </div>
         </div>
-        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
           <i data-lucide="award" class="w-6 h-6"></i>
         </div>
-      </div>
+      {% if permisos.ver_reportes or permisos.ver_metas or permisos.ver_atenciones %}</a>{% else %}</div>{% endif %}
 
       <!-- 3. Dotación Territorial (Delegación Activa) -->
+      {% if permisos.ver_usuarios or permisos.ver_reportes %}
+      <a href="{% if permisos.ver_usuarios %}{% url 'gestion_usuarios' %}{% else %}{% url 'gestion_reportes' %}{% endif %}"
+         class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:border-slate-400 hover:shadow-md transition-all group block">
+      {% else %}
       <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
+      {% endif %}
         <div>
           <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
             {% if es_admin_global %}Dotación de todas las delegaciones{% else %}Dotación en Sede{% endif %}
@@ -117,13 +140,18 @@
             <i data-lucide="users" class="w-3.5 h-3.5"></i> Funcionarios asignados
           </span>
         </div>
-        <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+        <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
           <i data-lucide="users" class="w-6 h-6"></i>
         </div>
-      </div>
+      {% if permisos.ver_usuarios or permisos.ver_reportes %}</a>{% else %}</div>{% endif %}
 
       <!-- 4. Auditoría y Evidencias (Delegación Activa) -->
+      {% if permisos.ver_reportes or permisos.ver_atenciones %}
+      <a href="{% if permisos.ver_reportes %}{% url 'gestion_reportes' %}{% else %}{% url 'gestion_atenciones' %}{% endif %}"
+         class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:border-blue-400 hover:shadow-md transition-all group block">
+      {% else %}
       <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
+      {% endif %}
         <div>
           <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Evidencias Auditadas</p>
           <h3 class="text-2xl font-black text-slate-900 mt-1 font-display">{{ pct_aprobadas_del }}%</h3>
@@ -131,10 +159,10 @@
             <i data-lucide="file-check" class="w-3.5 h-3.5"></i> {{ total_val_del }} evidencias validadas
           </span>
         </div>
-        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
           <i data-lucide="file-check" class="w-6 h-6"></i>
         </div>
-      </div>
+      {% if permisos.ver_reportes or permisos.ver_atenciones %}</a>{% else %}</div>{% endif %}
 
     </div>
   </div>
