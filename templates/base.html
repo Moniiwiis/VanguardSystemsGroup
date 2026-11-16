@@ -1555,6 +1555,13 @@
         let activeIdx = -1;
         let currentFiltered = [];
         let showAllOnOpen = false;
+        let inEditSession = false;
+        let prevLabel = '';
+        let dirtyTyped = false;
+        let confirmedChoice = false;
+        let explicitlyCleared = false;
+        let isRestoring = false;
+        let skipMouseUp = false;
 
         const syncClearBtn = () => {
           clearBtn.classList.toggle('hidden', !input.value);
@@ -1565,6 +1572,39 @@
           isOpen = false;
           activeIdx = -1;
           if (openComboCloser === closeMenu) openComboCloser = null;
+        };
+
+        const beginEditSession = () => {
+          inEditSession = true;
+          prevLabel = input.value || '';
+          dirtyTyped = false;
+          confirmedChoice = false;
+          explicitlyCleared = false;
+          if (onSelect) onSelect({ snapshotStart: true });
+          if (prevLabel) {
+            try { input.select(); } catch (e) {}
+          }
+        };
+
+        const restorePreviousValue = () => {
+          isRestoring = true;
+          input.value = prevLabel;
+          onSelect({ label: prevLabel, value: prevLabel, restored: true });
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          isRestoring = false;
+          dirtyTyped = false;
+          syncClearBtn();
+        };
+
+        const stripPrevFromIME = (rawVal) => {
+          if (!prevLabel || rawVal === prevLabel) return rawVal;
+          if (rawVal.startsWith(prevLabel) && rawVal.length > prevLabel.length) {
+            return rawVal.slice(prevLabel.length);
+          }
+          if (rawVal.endsWith(prevLabel) && rawVal.length > prevLabel.length) {
+            return rawVal.slice(0, rawVal.length - prevLabel.length);
+          }
+          return rawVal;
         };
 
         const renderMenu = (forceAll = false) => {
@@ -1610,6 +1650,10 @@
               btn.addEventListener('mousedown', (ev) => {
                 ev.preventDefault();
                 showAllOnOpen = false;
+                confirmedChoice = true;
+                explicitlyCleared = false;
+                dirtyTyped = false;
+                prevLabel = it.label || '';
                 onSelect(it);
                 closeMenu();
                 syncClearBtn();
@@ -1642,40 +1686,98 @@
         };
 
         input.addEventListener('focus', () => {
+          skipMouseUp = true;
+          beginEditSession();
           showAllOnOpen = true;
           renderMenu(true);
+        });
+        input.addEventListener('mouseup', (ev) => {
+          if (skipMouseUp) {
+            skipMouseUp = false;
+            if (prevLabel) {
+              ev.preventDefault();
+              try { input.select(); } catch (e) {}
+            }
+          }
         });
         input.addEventListener('click', () => {
+          if (!inEditSession || !isOpen) {
+            beginEditSession();
+          }
           showAllOnOpen = true;
           renderMenu(true);
-        });
-        input.addEventListener('input', () => {
-          showAllOnOpen = false;
-          syncClearBtn();
-          renderMenu(false);
         });
         input.addEventListener('keydown', (ev) => {
           if (ev.key === 'ArrowDown') {
             ev.preventDefault();
             if (!isOpen) renderMenu(true);
             else highlightItem(activeIdx + 1);
-          } else if (ev.key === 'ArrowUp') {
+            return;
+          }
+          if (ev.key === 'ArrowUp') {
             ev.preventDefault();
             if (isOpen) highlightItem(activeIdx - 1);
-          } else if (ev.key === 'Enter' && isOpen && activeIdx >= 0 && currentFiltered[activeIdx]) {
+            return;
+          }
+          if (ev.key === 'Enter' && isOpen && activeIdx >= 0 && currentFiltered[activeIdx]) {
             ev.preventDefault();
+            const chosen = currentFiltered[activeIdx];
             showAllOnOpen = false;
-            onSelect(currentFiltered[activeIdx]);
+            confirmedChoice = true;
+            explicitlyCleared = false;
+            dirtyTyped = false;
+            prevLabel = chosen.label || '';
+            onSelect(chosen);
             closeMenu();
             syncClearBtn();
-          } else if (ev.key === 'Escape' && isOpen) {
-            closeMenu();
+            return;
           }
+          if (ev.key === 'Escape') {
+            if (inEditSession && !confirmedChoice && !explicitlyCleared && input.value !== prevLabel) {
+              restorePreviousValue();
+            }
+            if (isOpen) closeMenu();
+            return;
+          }
+          const isTypingKey = (ev.key.length === 1 && !ev.ctrlKey && !ev.metaKey && !ev.altKey)
+            || ev.key === 'Backspace' || ev.key === 'Delete';
+          if (isTypingKey && inEditSession && !dirtyTyped && prevLabel) {
+            const selStart = input.selectionStart;
+            const selEnd = input.selectionEnd;
+            const allSelected = (selStart === 0 && selEnd === input.value.length);
+            if (!allSelected) {
+              input.value = '';
+            }
+            dirtyTyped = true;
+          }
+        });
+        input.addEventListener('input', () => {
+          if (isRestoring) return;
+          if (inEditSession && !dirtyTyped && prevLabel && input.value !== prevLabel) {
+            input.value = stripPrevFromIME(input.value);
+            dirtyTyped = true;
+          }
+          confirmedChoice = false;
+          showAllOnOpen = false;
+          syncClearBtn();
+          renderMenu(false);
+        });
+        input.addEventListener('blur', () => {
+          skipMouseUp = false;
+          if (inEditSession && !confirmedChoice && !explicitlyCleared && input.value !== prevLabel) {
+            restorePreviousValue();
+          }
+          inEditSession = false;
+          closeMenu();
+          syncClearBtn();
         });
 
         toggleBtn.addEventListener('mousedown', (ev) => {
           ev.preventDefault();
           if (isOpen) {
+            if (inEditSession && !confirmedChoice && !explicitlyCleared && input.value !== prevLabel) {
+              restorePreviousValue();
+            }
             closeMenu();
           } else {
             showAllOnOpen = true;
@@ -1686,6 +1788,10 @@
 
         clearBtn.addEventListener('mousedown', (ev) => {
           ev.preventDefault();
+          explicitlyCleared = true;
+          confirmedChoice = false;
+          dirtyTyped = false;
+          prevLabel = '';
           input.value = '';
           showAllOnOpen = true;
           onSelect({ label: '', value: '', cleared: true });
@@ -1717,9 +1823,12 @@
             search: opt.dataset.search || '',
           })),
           (it) => {
+            if (!it || it.snapshotStart) return;
             inp.value = it.label || '';
             inp.dispatchEvent(new Event('input', { bubbles: true }));
-            inp.dispatchEvent(new Event('change', { bubbles: true }));
+            if (!it.restored) {
+              inp.dispatchEvent(new Event('change', { bubbles: true }));
+            }
           }
         );
       });
@@ -1751,6 +1860,7 @@
         syncInputFromSelect();
         sel.addEventListener('change', syncInputFromSelect);
 
+        let prevSelectVal = sel.value;
         attachSearchCombo(
           inp,
           () => Array.from(sel.options)
@@ -1762,12 +1872,24 @@
               search: opt.dataset.search || '',
             })),
           (it) => {
+            if (!it) return;
+            if (it.snapshotStart) {
+              prevSelectVal = sel.value;
+              return;
+            }
+            if (it.restored) {
+              sel.value = prevSelectVal;
+              syncInputFromSelect();
+              return;
+            }
             if (it.cleared) {
               sel.value = '';
               inp.value = '';
+              prevSelectVal = '';
             } else {
               sel.value = it.value;
               inp.value = it.label;
+              prevSelectVal = it.value;
             }
             sel.dispatchEvent(new Event('change', { bubbles: true }));
           }

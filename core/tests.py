@@ -2167,4 +2167,60 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             self.assertContains(resp_csrf, 'Acceso denegado', status_code=403)
             self.assertNotContains(resp_csrf, 'CSRF verification failed', status_code=403)
 
+    def test_formulario_unico_atencion_checkboxes_y_combobox_autorestaurable(self):
+        admin = User.objects.create_superuser('admin_uniq_at', 'uniq@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        resp_get = self.client.get(reverse('gestion_atenciones'))
+        self.assertEqual(resp_get.status_code, 200)
+        # No deben existir las 3 pestañas anteriores
+        self.assertNotContains(resp_get, 'id="tab-vecino-existente"')
+        self.assertNotContains(resp_get, 'id="tab-vecino-organizacion"')
+        self.assertNotContains(resp_get, 'id="tab-vecino-nuevo"')
+        # Deben existir las dos opciones pequeñas en el formulario único + opción anidada de nueva organización
+        self.assertContains(resp_get, 'id="chk_nuevo_vecino"')
+        self.assertContains(resp_get, 'Registrar nuevo vecino')
+        self.assertContains(resp_get, 'id="chk_representa_org"')
+        self.assertContains(resp_get, 'Representa JJVV o Organización')
+        self.assertContains(resp_get, 'id="crear_nueva_org_chk"')
+        self.assertContains(resp_get, 'Registrar nueva organización')
+        # Lógica JS para limpiar al empezar a escribir y restaurar al salir sin cambio
+        self.assertContains(resp_get, 'beginEditSession')
+        self.assertContains(resp_get, 'restorePreviousValue')
+        self.assertContains(resp_get, 'stripPrevFromIME')
+
+        # POST combinando ambos checkboxes: nuevo vecino + nueva JJVV vinculada
+        org_sector = Sector.objects.create(
+            nombre='Sector Unificado',
+            delegacion=self.delegacion,
+            estado='Activo',
+        )
+        resp_post = self.client.post(reverse('gestion_atenciones'), {
+            'chk_nuevo_vecino': '1',
+            'chk_representa_org': '1',
+            'crear_nueva_org': '1',
+            'nuevo_vecino_nombre': 'Rosa Dirigente',
+            'nuevo_vecino_rut': '12.345.678-5',
+            'nuevo_vecino_sector_id': org_sector.id,
+            'nueva_org_nombre': 'JJVV Unificada',
+            'nueva_org_tipo': 'Junta de Vecinos',
+            'nueva_org_sector_id': org_sector.id,
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Solicitud combinada vecino + JJVV en formulario único',
+            'origen': 'EXT',
+            'responsable_id': admin.id,
+        })
+        self.assertRedirects(resp_post, reverse('gestion_atenciones'))
+        at = AtencionCiudadana.objects.filter(descripcion__icontains='Solicitud combinada').first()
+        self.assertIsNotNone(at)
+        self.assertIsNotNone(at.vecino)
+        self.assertIsNotNone(at.organizacion)
+        self.assertEqual(at.vecino.nombre, 'Rosa Dirigente')
+        self.assertEqual(at.organizacion.nombre, 'JJVV Unificada')
+
+
 

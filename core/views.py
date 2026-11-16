@@ -2095,9 +2095,14 @@ def gestion_atenciones(request):
         nuevo_dir = request.POST.get('nuevo_vecino_direccion', '').strip()
         nuevo_sec_id = request.POST.get('nuevo_vecino_sector_id')
 
+        chk_nuevo_vecino = request.POST.get('chk_nuevo_vecino', '').strip() == '1'
+        chk_representa_org = request.POST.get('chk_representa_org', '').strip() == '1'
+        es_modo_org = chk_representa_org or (modo_vecino == 'organizacion')
+        es_modo_nuevo_vec = chk_nuevo_vecino or (modo_vecino == 'nuevo') or bool(nuevo_nombre and nuevo_rut)
+
         vecino_obj = None
         organizacion_obj = None
-        if modo_vecino == 'organizacion':
+        if es_modo_org:
             organizacion_id = request.POST.get('organizacion_id', '').strip()
             crear_nueva_org = request.POST.get('crear_nueva_org', '').strip() == '1'
             if crear_nueva_org:
@@ -2176,9 +2181,7 @@ def gestion_atenciones(request):
                 messages.error(request, "Debe seleccionar una JJVV / organización existente o ingresar una nueva.")
                 return redirect('gestion_atenciones')
 
-            if not solicitante:
-                solicitante = f"{organizacion_obj.nombre} ({organizacion_obj.tipo_organizacion})"[:150]
-        elif modo_vecino == 'nuevo' or (nuevo_nombre and nuevo_rut):
+        if es_modo_nuevo_vec:
             if not nuevo_nombre or not nuevo_rut:
                 messages.error(request, "Para registrar un nuevo vecino debe ingresar al menos el Nombre completo y el RUT.")
                 return redirect('gestion_atenciones')
@@ -2254,6 +2257,11 @@ def gestion_atenciones(request):
                 return redirect('gestion_atenciones')
             if not solicitante:
                 solicitante = f"{vecino_obj.nombre} ({vecino_obj.rut})"
+
+        if organizacion_obj and vecino_obj:
+            solicitante = f"{vecino_obj.nombre} ({vecino_obj.rut}) · {organizacion_obj.nombre}"[:150]
+        elif organizacion_obj and not solicitante:
+            solicitante = f"{organizacion_obj.nombre} ({organizacion_obj.tipo_organizacion})"[:150]
 
         # Determinar representante asignado para la atención (acotado exclusivamente a la delegación activa)
         responsable_user = request.user
