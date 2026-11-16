@@ -207,6 +207,7 @@ class UserManagementTests(TestCase):
             'segundo_nombre': 'Isabel',
             'apellido_paterno': 'González',
             'apellido_materno': 'Rojas',
+            'rut': '12.345.678-5',
             'correo': 'usuario@example.test',
             'cargo_id': str(self.cargo.id),
             'rol_id': str(self.admin_role.id),
@@ -222,6 +223,7 @@ class UserManagementTests(TestCase):
         created_user = User.objects.get(username='mgonzalez')
         self.assertEqual(created_user.first_name, 'María Isabel González Rojas')
         funcionario = Funcionario.objects.get(user=created_user)
+        self.assertEqual(funcionario.rut, '12.345.678-5')
         self.assertEqual(funcionario.primer_nombre, 'María')
         self.assertEqual(funcionario.segundo_nombre, 'Isabel')
         self.assertEqual(funcionario.apellido_paterno, 'González')
@@ -243,15 +245,31 @@ class UserManagementTests(TestCase):
         )
         self.assertContains(list_response, 'mgonzalez')
         self.assertContains(list_response, 'Funcionarios del sistema')
+        self.assertContains(list_response, 'name="rut"')
+        self.assertNotContains(list_response, 'Se generará como inicial + apellido paterno')
+        self.assertContains(list_response, 'id="ver-usuario"')
+        self.assertContains(list_response, 'id="ver-rut"')
         self.assertEqual(
             list_response.context['page_obj'].paginator.per_page,
             30,
         )
 
+        # Rechazar creación de funcionario sin RUT o con RUT duplicado
+        self.client.post(reverse('gestion_usuarios'), {
+            'primer_nombre': 'Sin',
+            'apellido_paterno': 'Rut',
+            'correo': 'sinrut@example.test',
+            'cargo_id': str(self.cargo.id),
+            'rol_id': str(self.admin_role.id),
+            'estado': 'Activo',
+        })
+        self.assertFalse(User.objects.filter(username='srut').exists())
+
         # Colisión de inicial + apellido paterno genera sufijo numérico automático (mgonzalez2)
         self.client.post(reverse('gestion_usuarios'), {
             'primer_nombre': 'Marcos',
             'apellido_paterno': 'González',
+            'rut': '15.444.333-9',
             'correo': 'mgonzalez2@example.test',
             'cargo_id': str(self.cargo.id),
             'rol_id': str(self.admin_role.id),
@@ -2409,6 +2427,30 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             })
             self.assertRedirects(resp_in, reverse('portal_cliente'), fetch_redirect_response=False)
             self.client.post(reverse('logout'))
+
+        # En Mi Perfil los 4 campos de nombre/apellido y RUT son solo lectura y no mutan por POST
+        self.client.force_login(user_vec)
+        resp_perfil_get = self.client.get(reverse('perfil_usuario'))
+        self.assertContains(resp_perfil_get, 'value="Camila"')
+        self.assertContains(resp_perfil_get, 'value="Andrea"')
+        self.assertContains(resp_perfil_get, 'value="Pérez"')
+        self.assertContains(resp_perfil_get, 'value="Muñoz"')
+        self.assertContains(resp_perfil_get, 'value="17.654.321-3"')
+        self.assertNotContains(resp_perfil_get, 'name="first_name"')
+        self.assertNotContains(resp_perfil_get, 'name="last_name"')
+
+        resp_perfil_post = self.client.post(reverse('perfil_usuario'), {
+            'accion': 'actualizar_datos',
+            'first_name': 'Hackeado',
+            'email': 'camila.nuevo@example.test',
+            'telefono': '+56 9 9988 7766',
+        })
+        self.assertRedirects(resp_perfil_post, reverse('perfil_usuario'))
+        user_vec.refresh_from_db()
+        vec.refresh_from_db()
+        self.assertEqual(user_vec.first_name, 'Camila Andrea Pérez Muñoz')
+        self.assertEqual(user_vec.email, 'camila.nuevo@example.test')
+        self.assertEqual(vec.telefono, '+56 9 9988 7766')
 
 
 

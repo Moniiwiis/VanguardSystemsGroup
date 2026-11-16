@@ -967,6 +967,7 @@ def _crear_o_sincronizar_usuario_vecino(vecino, correo='', anterior_rut='', crea
         ).exclude(id=func_vec.id).exists():
             func_vec.identificador_institucional = ident_vec
         func_vec.delegacion = vecino.delegacion
+        func_vec.rut = vecino.rut
         func_vec.telefono = (vecino.telefono or '')[:20]
         func_vec.estado = vecino.estado
         func_vec.deleted_at = None
@@ -1012,6 +1013,7 @@ def _crear_o_sincronizar_usuario_vecino(vecino, correo='', anterior_rut='', crea
     func_vec = Funcionario.all_objects.create(
         user=user_vec,
         identificador_institucional=ident_vec,
+        rut=vecino.rut,
         delegacion=vecino.delegacion,
         cargo=cargo_vecino,
         telefono=(vecino.telefono or '')[:20],
@@ -1357,6 +1359,7 @@ def gestion_usuarios(request):
         nombre, partes_nombre, err_nombre = extraer_partes_persona_desde_post(
             request.POST, prefix='', exigir_estructurado=True
         )
+        rut_raw = request.POST.get('rut', '').strip()
         correo = request.POST.get('correo', '').strip()
         rol_id = request.POST.get('rol_id')
         cargo_id = request.POST.get('cargo_id')
@@ -1369,10 +1372,15 @@ def gestion_usuarios(request):
 
         rol_obj = Rol.objects.filter(id=rol_id, estado='Activo').first()
         cargo_obj = Cargo.objects.filter(id=cargo_id).first()
+        rut_ok, rut_fmt = validar_rut(rut_raw) if rut_raw else (False, "El RUT del funcionario es obligatorio.")
         if err_nombre:
             messages.error(request, err_nombre)
-        elif not nombre or not correo or not rol_obj or not cargo_obj:
-            messages.error(request, "Primer nombre, apellido paterno, correo, rol y cargo son obligatorios.")
+        elif not nombre or not rut_raw or not correo or not rol_obj or not cargo_obj:
+            messages.error(request, "Primer nombre, apellido paterno, RUT, correo, rol y cargo son obligatorios.")
+        elif not rut_ok:
+            messages.error(request, f"RUT de funcionario inválido: {rut_fmt}")
+        elif _funcionarios_municipales_qs(Funcionario.all_objects).filter(rut=rut_fmt).exists():
+            messages.error(request, f"El RUT {rut_fmt} ya se encuentra registrado en otro funcionario.")
         elif (
             not ctx['permisos']['es_admin']
             and rol_obj.nombre_rol.strip().casefold()
@@ -1420,6 +1428,7 @@ def gestion_usuarios(request):
                 user=user,
                 defaults={
                     'identificador_institucional': f"USR-{user.id:03d}",
+                    'rut': rut_fmt,
                     'primer_nombre': partes_nombre.get('primer_nombre', ''),
                     'segundo_nombre': partes_nombre.get('segundo_nombre', ''),
                     'apellido_paterno': partes_nombre.get('apellido_paterno', ''),
@@ -1429,6 +1438,7 @@ def gestion_usuarios(request):
                     'estado': estado
                 }
             )[0]
+            func.rut = rut_fmt
             func.primer_nombre = partes_nombre.get('primer_nombre', '')
             func.segundo_nombre = partes_nombre.get('segundo_nombre', '')
             func.apellido_paterno = partes_nombre.get('apellido_paterno', '')
@@ -1497,7 +1507,7 @@ def gestion_usuarios(request):
 
     if q:
         qs = qs.filter(build_accent_query([
-            'user__first_name', 'user__email', 'user__username', 'delegacion__nombre',
+            'user__first_name', 'user__email', 'user__username', 'delegacion__nombre', 'rut',
             'primer_nombre', 'segundo_nombre', 'apellido_paterno', 'apellido_materno',
         ], q))
     if filtro_estado:
@@ -1515,7 +1525,7 @@ def gestion_usuarios(request):
 
     # Exportar a Excel (sin claves, tokens ni datos sensibles)
     if request.GET.get('export') == 'excel':
-        headers = ['Usuario', 'Nombre', 'Correo Electrónico', 'Cargo', 'Rol Principal', 'Delegación', 'Estado']
+        headers = ['Usuario', 'Nombre', 'RUT', 'Correo Electrónico', 'Cargo', 'Rol Principal', 'Delegación', 'Estado']
         rows = []
         for f in qs:
             rol_p = f.funcionariorol_set.first()
@@ -1524,6 +1534,7 @@ def gestion_usuarios(request):
             rows.append([
                 f.user.username,
                 f.user.first_name or f.user.username,
+                f.get_rut() or '—',
                 f.user.email,
                 f.cargo.nombre_cargo,
                 rol_txt,
@@ -1620,6 +1631,19 @@ def gestion_usuarios_editar(request, user_id):
         if err_nombre_edit:
             messages.error(request, err_nombre_edit)
             return redirect('gestion_usuarios')
+        rut_edit = request.POST.get('rut', '').strip()
+        if 'rut' in request.POST:
+            if not rut_edit:
+                messages.error(request, "El RUT del funcionario es obligatorio.")
+                return redirect('gestion_usuarios')
+            rut_ok, rut_fmt = validar_rut(rut_edit)
+            if not rut_ok:
+                messages.error(request, f"RUT de funcionario inválido: {rut_fmt}")
+                return redirect('gestion_usuarios')
+            if _funcionarios_municipales_qs(Funcionario.all_objects).filter(rut=rut_fmt).exclude(id=funcionario.id).exists():
+                messages.error(request, f"El RUT {rut_fmt} ya pertenece a otro funcionario.")
+                return redirect('gestion_usuarios')
+            funcionario.rut = rut_fmt
         funcionario.user.first_name = nombre_edit or funcionario.user.first_name
         funcionario.user.email = request.POST.get('correo', funcionario.user.email).strip()
         funcionario.user.is_active = (estado == 'Activo')
@@ -4773,15 +4797,9 @@ def perfil_usuario(request):
         action = request.POST.get('action') or request.POST.get('accion', '')
 
         if action in ('datos', 'actualizar_datos'):
-            first_name = request.POST.get('first_name', '').strip()
-            last_name = request.POST.get('last_name', '').strip()
             email = request.POST.get('email', '').strip()
             telefono = request.POST.get('telefono', '').strip()
 
-            ok, err = validar_largo(first_name, 150, "Nombres")
-            if not ok: messages.error(request, err); return redirect('perfil_usuario')
-            ok, err = validar_largo(last_name, 150, "Apellidos")
-            if not ok: messages.error(request, err); return redirect('perfil_usuario')
             ok, err = validar_largo(telefono, 20, "Teléfono")
             if not ok: messages.error(request, err); return redirect('perfil_usuario')
             if telefono:
@@ -4789,21 +4807,31 @@ def perfil_usuario(request):
                 if not ok: messages.error(request, err); return redirect('perfil_usuario')
                 telefono = formatear_telefono_chileno(telefono)
 
-            if email:
-                try:
-                    validate_email(email)
-                except ValidationError:
-                    messages.error(request, "El correo electrónico no tiene un formato válido.")
-                    return redirect('perfil_usuario')
+            if not email:
+                messages.error(request, "El correo electrónico es obligatorio.")
+                return redirect('perfil_usuario')
+            ok, err = validar_largo(email, 100, "Correo Electrónico")
+            if not ok: messages.error(request, err); return redirect('perfil_usuario')
+            try:
+                validate_email(email)
+            except ValidationError:
+                messages.error(request, "El correo electrónico no tiene un formato válido.")
+                return redirect('perfil_usuario')
+            if User.objects.filter(email__iexact=email).exclude(id=user.id).exists():
+                messages.error(request, "Ese correo electrónico ya pertenece a otra cuenta.")
+                return redirect('perfil_usuario')
 
-            user.first_name = first_name
-            user.last_name = last_name
+            # Nombres, apellidos y RUT son solo lectura en Mi Perfil; solo se actualiza correo y teléfono.
             user.email = email
-            user.save()
+            user.save(update_fields=['email'])
 
-            if funcionario and telefono:
+            if funcionario:
                 funcionario.telefono = telefono
                 funcionario.save(update_fields=['telefono'])
+            vecino_cli = _obtener_vecino_de_cliente(user)
+            if vecino_cli and vecino_cli.telefono != telefono:
+                vecino_cli.telefono = telefono
+                vecino_cli.save(update_fields=['telefono', 'updated_at'])
 
             messages.success(request, "Tus datos personales fueron actualizados correctamente.")
             return redirect('perfil_usuario')
@@ -4890,9 +4918,26 @@ def perfil_usuario(request):
                 messages.warning(request, "No se seleccionó ninguna imagen para guardar.")
             return redirect('perfil_usuario')
 
+    vecino_perfil = _obtener_vecino_de_cliente(user)
+    if vecino_perfil:
+        pn, sn, ap, am = vecino_perfil.get_partes_nombre()
+        perfil_rut = vecino_perfil.rut
+    elif funcionario:
+        pn, sn, ap, am = funcionario.get_partes_nombre()
+        perfil_rut = funcionario.get_rut()
+    else:
+        from core.utils import separar_nombre_completo
+        pn, sn, ap, am = separar_nombre_completo(user.get_full_name() or user.first_name)
+        perfil_rut = ''
+
     return render(request, 'auth/perfil.html', {
         'funcionario': funcionario,
         'user': user,
+        'perfil_primer_nombre': pn,
+        'perfil_segundo_nombre': sn,
+        'perfil_apellido_paterno': ap,
+        'perfil_apellido_materno': am,
+        'perfil_rut': perfil_rut,
     })
 
 

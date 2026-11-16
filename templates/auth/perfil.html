@@ -97,17 +97,33 @@
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="space-y-1">
-              <label class="block text-xs font-bold text-slate-700">Nombre <span class="text-[#C41230]">*</span></label>
-              <input type="text" name="first_name" required maxlength="150" value="{{ request.user.first_name }}"
-                     placeholder="Tu nombre (máx 150 caracteres)"
-                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              <label class="block text-xs font-bold text-slate-700">Primer Nombre</label>
+              <input type="text" readonly value="{{ perfil_primer_nombre|default:'' }}"
+                     class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
             </div>
 
             <div class="space-y-1">
-              <label class="block text-xs font-bold text-slate-700">Apellidos</label>
-              <input type="text" name="last_name" maxlength="150" value="{{ request.user.last_name }}"
-                     placeholder="Tus apellidos (máx 150 caracteres)"
-                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              <label class="block text-xs font-bold text-slate-700">Segundo Nombre</label>
+              <input type="text" readonly value="{{ perfil_segundo_nombre|default:'' }}"
+                     class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-700">Apellido Paterno</label>
+              <input type="text" readonly value="{{ perfil_apellido_paterno|default:'' }}"
+                     class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-700">Apellido Materno</label>
+              <input type="text" readonly value="{{ perfil_apellido_materno|default:'' }}"
+                     class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
+            </div>
+
+            <div class="space-y-1 sm:col-span-2">
+              <label class="block text-xs font-bold text-slate-700">RUT</label>
+              <input type="text" readonly value="{{ perfil_rut|default:'Sin RUT registrado' }}"
+                     class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-mono font-bold text-slate-800 focus:outline-none select-none" />
             </div>
 
             <div class="space-y-1">

@@ -48,6 +48,7 @@ class Cargo(BaseModel):
 class Funcionario(BaseModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='funcionario')
     identificador_institucional = models.CharField(max_length=20, unique=True)
+    rut = models.CharField(max_length=20, null=True, blank=True)
     primer_nombre = models.CharField(max_length=50, blank=True, default='')
     segundo_nombre = models.CharField(max_length=50, blank=True, default='')
     apellido_paterno = models.CharField(max_length=50, blank=True, default='')
@@ -74,6 +75,19 @@ class Funcionario(BaseModel):
         if self.foto and hasattr(self.foto, 'url'):
             return self.foto.url
         return None
+
+    def get_rut(self):
+        if self.rut:
+            return self.rut
+        from activities.models import Vecino
+        from core.utils import validar_rut
+        if self.identificador_institucional and self.identificador_institucional.startswith('VEC-'):
+            raw = self.identificador_institucional[4:]
+            ok, fmt = validar_rut(raw)
+            if ok:
+                return fmt
+        vec = Vecino.objects.filter(rut=self.user.username).first()
+        return vec.rut if vec else ''
 
     def __str__(self):
         return f"{self.user.username} - {self.identificador_institucional}"
