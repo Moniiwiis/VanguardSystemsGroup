@@ -227,26 +227,43 @@ def login_view(request):
         identifier = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
 
-        # Buscar por username (funcionario/vecino), correo electrónico o RUT normalizado (vecino)
-        user_candidate = None
+        # Buscar por username (funcionario/vecino/org), correo electrónico o RUT normalizado
+        auth_candidates = []
         if identifier:
-            user_candidate = User.objects.filter(
+            for u_cand in User.objects.filter(
                 Q(username__iexact=identifier) | Q(email__iexact=identifier)
-            ).first()
-            if not user_candidate:
-                rut_ok, rut_fmt = validar_rut(identifier)
-                if rut_ok:
-                    user_candidate = User.objects.filter(username__iexact=rut_fmt).first()
-                    if not user_candidate:
-                        func_cli = Funcionario.all_objects.filter(
-                            Q(identificador_institucional=_identificador_vecino(rut_fmt))
-                            | (Q(identificador_institucional__startswith='ORG-') & Q(rut__iexact=rut_fmt))
-                        ).select_related('user').first()
-                        if func_cli:
-                            user_candidate = func_cli.user
-        username_to_auth = user_candidate.username if user_candidate else identifier
+            ).order_by('-is_active', 'id'):
+                if u_cand not in auth_candidates:
+                    auth_candidates.append(u_cand)
+            rut_ok, rut_fmt = validar_rut(identifier)
+            if rut_ok:
+                for u_r in User.objects.filter(username__iexact=rut_fmt).order_by('-is_active', 'id'):
+                    if u_r not in auth_candidates:
+                        auth_candidates.append(u_r)
+                for func_cli in Funcionario.all_objects.filter(
+                    Q(identificador_institucional=_identificador_vecino(rut_fmt))
+                    | (Q(identificador_institucional__startswith='ORG-') & Q(rut__iexact=rut_fmt))
+                ).select_related('user').order_by('-user__is_active', 'user_id'):
+                    if func_cli.user not in auth_candidates:
+                        auth_candidates.append(func_cli.user)
 
-        user = authenticate(request, username=username_to_auth, password=password)
+        user = None
+        user_candidate = auth_candidates[0] if auth_candidates else None
+        inactive_user_matched = None
+        for cand in auth_candidates:
+            if not cand.is_active:
+                if cand.check_password(password):
+                    inactive_user_matched = cand
+                continue
+            auth_u = authenticate(request, username=cand.username, password=password)
+            if auth_u is not None:
+                user = auth_u
+                user_candidate = cand
+                break
+
+        if user is None and not auth_candidates:
+            user = authenticate(request, username=identifier, password=password)
+
         if user is not None:
             if not user.is_active:
                 messages.error(request, "La cuenta de usuario se encuentra inactiva en el sistema. Contacte al administrador.")
@@ -285,7 +302,7 @@ def login_view(request):
                 return redirect('gestion_atenciones')
             return redirect('gestion_inicio')
         else:
-            if user_candidate and not user_candidate.is_active:
+            if inactive_user_matched is not None or (user_candidate and not user_candidate.is_active and len(auth_candidates) == 1):
                 messages.error(request, "La cuenta de usuario se encuentra inactiva en el sistema. Contacte al administrador.")
             else:
                 messages.error(request, "Credenciales incorrectas. Verifique usuario o correo y contraseña.")
@@ -937,6 +954,33 @@ def _funcionarios_municipales_qs(qs=None):
     ).distinct()
 
 
+def _correo_en_uso_por_otra_cuenta(email, exclude_user_id=None, tipo_cuenta='staff'):
+    """
+    Valida disponibilidad de correo según tipo de cuenta:
+    - 'organizacion': permite compartir correo con cuentas ciudadanas/vecinos u otras organizaciones (Cliente),
+      bloqueando solo colisiones con cuentas internas de funcionarios municipales.
+    - 'vecino': permite compartir correo con organizaciones comunitarias (ORG-) que el vecino represente,
+      bloqueando colisiones con otro vecino distinto o funcionario interno.
+    - 'staff': exige unicidad total en User.
+    """
+    if not email:
+        return False
+    qs = User.objects.filter(email__iexact=email)
+    if exclude_user_id:
+        qs = qs.exclude(id=exclude_user_id)
+    if tipo_cuenta == 'organizacion':
+        return qs.exclude(
+            Q(funcionario__identificador_institucional__startswith='VEC-')
+            | Q(funcionario__identificador_institucional__startswith='ORG-')
+            | Q(funcionario__funcionariorol__rol__nombre_rol__icontains='cliente')
+        ).exists()
+    if tipo_cuenta == 'vecino':
+        return qs.exclude(
+            Q(funcionario__identificador_institucional__startswith='ORG-')
+        ).exists()
+    return qs.exists()
+
+
 def _identificador_vecino(rut_str):
     clean = ''.join(c for c in (rut_str or '').upper() if c.isalnum())
     return f"VEC-{clean}"[:20]
@@ -1190,7 +1234,7 @@ def _validar_y_crear_vecino_desde_post(request, del_activa, prefix='', allow_exi
 
         func_actual = _buscar_func_vecino(vecino_existente.rut)
         uid_actual = func_actual.user_id if func_actual else None
-        if User.objects.filter(email__iexact=correo).exclude(id=uid_actual).exists():
+        if _correo_en_uso_por_otra_cuenta(correo, exclude_user_id=uid_actual, tipo_cuenta='vecino'):
             return None, None, None, False, "Ese correo electrónico ya se encuentra asociado a otra cuenta."
 
         actualizado = False
@@ -1238,7 +1282,7 @@ def _validar_y_crear_vecino_desde_post(request, del_activa, prefix='', allow_exi
                 logger.exception("No se pudo enviar correo de bienvenida al vecino existente sincronizado.")
         return vecino_existente, user_vec, prov_pwd, correo_enviado, None
 
-    if User.objects.filter(email__iexact=correo).exists():
+    if _correo_en_uso_por_otra_cuenta(correo, tipo_cuenta='vecino'):
         return None, None, None, False, "Ese correo electrónico ya se encuentra asociado a otra cuenta."
 
     nuevo_v = Vecino.objects.create(
@@ -1414,7 +1458,7 @@ def _validar_y_crear_organizacion_desde_post(request, del_activa, prefix='', all
             correo_sync = email_val or (org_existente.email_contacto or '').strip()
             func_actual = _buscar_func_organizacion(org_existente)
             uid_actual = func_actual.user_id if func_actual else None
-            if correo_sync and User.objects.filter(email__iexact=correo_sync).exclude(id=uid_actual).exists():
+            if correo_sync and _correo_en_uso_por_otra_cuenta(correo_sync, exclude_user_id=uid_actual, tipo_cuenta='organizacion'):
                 return None, None, None, False, "Ese correo electrónico ya se encuentra asociado a otra cuenta."
             user_org, prov_pwd, creado = _crear_o_sincronizar_usuario_organizacion(
                 org_existente, correo=correo_sync, crear=bool(correo_sync), actualizar_correo=bool(email_val)
@@ -1436,7 +1480,7 @@ def _validar_y_crear_organizacion_desde_post(request, del_activa, prefix='', all
     if not email_val:
         return None, None, None, False, "Debe ingresar un correo electrónico institucional o del contacto en la directiva para crear la cuenta de acceso de la organización."
 
-    if User.objects.filter(email__iexact=email_val).exists():
+    if _correo_en_uso_por_otra_cuenta(email_val, tipo_cuenta='organizacion'):
         return None, None, None, False, "Ese correo electrónico ya se encuentra asociado a otra cuenta."
 
     nueva_org = OrganizacionComunitaria.objects.create(
@@ -2570,10 +2614,10 @@ def _crear_o_asegurar_vecino_representante(
                 func_vec.telefono = (vec_existente.telefono or '')[:20]
                 func_vec.save(update_fields=['telefono'])
             if correo and func_vec.user.email != correo:
-                if not User.objects.filter(email__iexact=correo).exclude(id=func_vec.user_id).exists():
+                if not _correo_en_uso_por_otra_cuenta(correo, exclude_user_id=func_vec.user_id, tipo_cuenta='vecino'):
                     func_vec.user.email = correo
                     func_vec.user.save(update_fields=['email'])
-        elif correo and correo.lower() != org_email_lower and not User.objects.filter(email__iexact=correo).exists():
+        elif correo and correo.lower() != org_email_lower and not _correo_en_uso_por_otra_cuenta(correo, tipo_cuenta='vecino'):
             user_vec, prov_pwd, creado = _crear_o_sincronizar_usuario_vecino(
                 vec_existente, correo=correo, crear=True, actualizar_correo=True
             )
@@ -2617,7 +2661,7 @@ def _crear_o_asegurar_vecino_representante(
         publish_module_changed("vecinos", d_ws, "create", vec_id)
     transaction.on_commit(notificar_ws_vecino_dir)
 
-    if correo and correo.lower() != org_email_lower and not User.objects.filter(email__iexact=correo).exists():
+    if correo and correo.lower() != org_email_lower and not _correo_en_uso_por_otra_cuenta(correo, tipo_cuenta='vecino'):
         user_vec, prov_pwd, creado = _crear_o_sincronizar_usuario_vecino(
             nuevo_v, correo=correo, crear=True, actualizar_correo=True
         )
@@ -4011,7 +4055,7 @@ def gestion_vecinos_editar(request, vecino_id):
                 return redirect('gestion_vecinos')
             func_actual = _buscar_func_vecino(anterior_rut)
             uid_actual = func_actual.user_id if func_actual else None
-            if User.objects.filter(email__iexact=nuevo_correo).exclude(id=uid_actual).exists():
+            if _correo_en_uso_por_otra_cuenta(nuevo_correo, exclude_user_id=uid_actual, tipo_cuenta='vecino'):
                 messages.error(request, "Ese correo electrónico ya pertenece a otro usuario.")
                 return redirect('gestion_vecinos')
         ok, err = validar_direccion(nueva_dir, "Dirección", 200)
@@ -5241,7 +5285,7 @@ def gestion_organizaciones_editar(request, org_id):
                 return redirect('gestion_organizaciones')
         func_actual = _buscar_func_organizacion(org)
         uid_actual = func_actual.user_id if func_actual else None
-        if email_val and User.objects.filter(email__iexact=email_val).exclude(id=uid_actual).exists():
+        if email_val and _correo_en_uso_por_otra_cuenta(email_val, exclude_user_id=uid_actual, tipo_cuenta='organizacion'):
             messages.error(request, "Ese correo electrónico ya pertenece a otra cuenta.")
             return redirect('gestion_organizaciones')
 
@@ -5363,15 +5407,15 @@ def perfil_usuario(request):
             except ValidationError:
                 messages.error(request, "El correo electrónico no tiene un formato válido.")
                 return redirect('perfil_usuario')
-            if User.objects.filter(email__iexact=email).exclude(id=user.id).exists():
+            org_cli = _obtener_organizacion_de_cliente(user)
+            tipo_cuenta_perf = 'organizacion' if org_cli else ('vecino' if _obtener_vecino_de_cliente(user) else 'staff')
+            if _correo_en_uso_por_otra_cuenta(email, exclude_user_id=user.id, tipo_cuenta=tipo_cuenta_perf):
                 messages.error(request, "Ese correo electrónico ya pertenece a otra cuenta.")
                 return redirect('perfil_usuario')
 
             # Nombres, apellidos y RUT son solo lectura en Mi Perfil; solo se actualiza correo (y teléfono para personas).
             user.email = email
             user.save(update_fields=['email'])
-
-            org_cli = _obtener_organizacion_de_cliente(user)
             if org_cli:
                 old_org_email = (org_cli.email_contacto or '').strip()
                 prio_cargo = (org_cli.contacto_prioritario or 'presidente').strip().lower()
@@ -5402,7 +5446,7 @@ def perfil_usuario(request):
                         if prio_rut_val:
                             func_pv = _buscar_func_vecino(prio_rut_val)
                             if func_pv and func_pv.user.email != email:
-                                if not User.objects.filter(email__iexact=email).exclude(id=func_pv.user_id).exists():
+                                if not _correo_en_uso_por_otra_cuenta(email, exclude_user_id=func_pv.user_id, tipo_cuenta='vecino'):
                                     func_pv.user.email = email
                                     func_pv.user.save(update_fields=['email'])
                 if org_updates:

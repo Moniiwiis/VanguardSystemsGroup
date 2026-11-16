@@ -2866,7 +2866,78 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         })
         self.assertRedirects(resp_login_rut, reverse('portal_cliente'))
 
-        # 5. El editar a Inactiva o eliminar la organización desactiva su cuenta de acceso
+        # 5. Reutilizar el correo de un vecino existente al crear/editar una JJVV (mismos vecinos)
+        #    y viceversa (crear vecino con correo ya usado por una JJVV) funciona y autentica por clave
+        self.client.force_login(admin)
+        session_adm2 = self.client.session
+        session_adm2['delegacion_activa_id'] = self.delegacion.id
+        session_adm2.save()
+
+        mail.outbox.clear()
+        resp_vec_share = self.client.post(reverse('gestion_vecinos'), {
+            'primer_nombre': 'Camila',
+            'apellido_paterno': 'Fuentes',
+            'rut': '16.543.210-K',
+            'correo': 'camila.shared@example.test',
+            'sector_id': sec.id,
+            'estado': 'Activo',
+        })
+        self.assertRedirects(resp_vec_share, reverse('gestion_vecinos'))
+        vec_camila = Vecino.objects.get(rut='16.543.210-K')
+        u_camila = User.objects.get(username='16.543.210-K')
+        u_camila.set_password('ClaveCamila!22')
+        u_camila.save()
+        func_camila = Funcionario.objects.get(user=u_camila)
+        func_camila.debe_cambiar_contrasena = False
+        func_camila.save(update_fields=['debe_cambiar_contrasena'])
+
+        mail.outbox.clear()
+        resp_org_share = self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV Camila Compartida',
+            'tipo_organizacion': 'Junta de Vecinos',
+            'sector_id': sec.id,
+            'contacto_prioritario': 'presidente',
+            'presidente_vecino_id': vec_camila.id,
+            'presidente_correo': 'camila.shared@example.test',
+            'estado': 'Activa',
+        })
+        self.assertRedirects(resp_org_share, reverse('gestion_organizaciones'))
+        org_camila = OrganizacionComunitaria.objects.get(nombre='JJVV Camila Compartida')
+        self.assertEqual(org_camila.presidente_nombre, 'Camila Fuentes')
+        self.assertEqual(org_camila.email_contacto, 'camila.shared@example.test')
+        m_org_cam = re.search(r'Contraseña provisoria:\s*(\S+)', mail.outbox[0].body)
+        self.assertIsNotNone(m_org_cam)
+        pwd_org_cam = m_org_cam.group(1)
+
+        # Ambas cuentas (vecino y organización) con el mismo correo pueden iniciar sesión usando su respectiva clave
+        self.client.logout()
+        self.assertRedirects(
+            self.client.post(reverse('login'), {'username': 'camila.shared@example.test', 'password': 'ClaveCamila!22'}),
+            reverse('portal_cliente'),
+        )
+        self.client.logout()
+        self.assertRedirects(
+            self.client.post(reverse('login'), {'username': 'camila.shared@example.test', 'password': pwd_org_cam}),
+            reverse('cambiar_contrasena_inicial'),
+        )
+
+        # Y al crear el vecino después usando el correo ya asignado a una JJVV tampoco bloquea
+        self.client.force_login(admin)
+        session_adm3 = self.client.session
+        session_adm3['delegacion_activa_id'] = self.delegacion.id
+        session_adm3.save()
+        resp_vec_after = self.client.post(reverse('gestion_vecinos'), {
+            'primer_nombre': 'Diego',
+            'apellido_paterno': 'Muñoz',
+            'rut': '18.222.333-6',
+            'correo': 'nuevo.correo@jjvvcompanias.test',
+            'sector_id': sec.id,
+            'estado': 'Activo',
+        })
+        self.assertRedirects(resp_vec_after, reverse('gestion_vecinos'))
+        self.assertTrue(Vecino.objects.filter(rut='18.222.333-6').exists())
+
+        # 6. El editar a Inactiva o eliminar la organización desactiva su cuenta de acceso
         self.client.force_login(admin)
         self.client.post(reverse('gestion_organizaciones_eliminar', args=[org.id]))
         user_org.refresh_from_db()
