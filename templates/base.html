@@ -1672,6 +1672,8 @@
                 explicitlyCleared = false;
                 dirtyTyped = false;
                 prevLabel = it.label || '';
+                const modalForm = input.closest('[id^="modal-"] form, dialog form');
+                if (modalForm) modalForm.dataset.sgrDirty = '1';
                 onSelect(it);
                 closeMenu();
                 syncClearBtn();
@@ -1745,6 +1747,8 @@
             explicitlyCleared = false;
             dirtyTyped = false;
             prevLabel = chosen.label || '';
+            const modalForm = input.closest('[id^="modal-"] form, dialog form');
+            if (modalForm) modalForm.dataset.sgrDirty = '1';
             onSelect(chosen);
             closeMenu();
             syncClearBtn();
@@ -1851,9 +1855,10 @@
         );
       });
 
-      // 2) Mejorar todos los <select> (excepto [data-native-select] / multiple) con buscador + lista visible como Vecinos/Responsable
-      document.querySelectorAll('select:not([data-native-select="true"]):not([multiple])').forEach((sel) => {
+      // 2) Mejorar todos los <select> (excepto [data-native-select] / multiple / SweetAlert2) con buscador + lista visible
+      document.querySelectorAll('select:not([data-native-select="true"]):not([multiple]):not(.swal2-select)').forEach((sel) => {
         if (sel.dataset.sgrSelectInit === '1') return;
+        if (sel.closest('.swal2-container') || sel.classList.contains('swal2-select') || sel.style.display === 'none') return;
         sel.dataset.sgrSelectInit = '1';
 
         const isFullWidth = sel.classList.contains('w-full');
@@ -1938,6 +1943,71 @@
           }
         });
       });
+
+      // 3) Alerta universal de confirmación al presionar Cancelar tras modificar algún formulario en modal en cualquier módulo
+      document.addEventListener('input', (ev) => {
+        if (!ev.isTrusted) return;
+        const form = ev.target && ev.target.closest ? ev.target.closest('[id^="modal-"] form, dialog form') : null;
+        if (form) form.dataset.sgrDirty = '1';
+      }, true);
+      document.addEventListener('change', (ev) => {
+        if (!ev.isTrusted) return;
+        const form = ev.target && ev.target.closest ? ev.target.closest('[id^="modal-"] form, dialog form') : null;
+        if (form) form.dataset.sgrDirty = '1';
+      }, true);
+      document.addEventListener('reset', (ev) => {
+        if (ev.target && ev.target.tagName === 'FORM') ev.target.dataset.sgrDirty = '';
+      }, true);
+      document.addEventListener('submit', (ev) => {
+        if (ev.target && ev.target.tagName === 'FORM') ev.target.dataset.sgrDirty = '';
+      }, true);
+
+      document.addEventListener('click', (ev) => {
+        const btn = ev.target && ev.target.closest ? ev.target.closest('button, a[data-confirm-cancel]') : null;
+        if (!btn) return;
+        if (btn.dataset.sgrConfirmedCancel === '1') {
+          delete btn.dataset.sgrConfirmedCancel;
+          return;
+        }
+        const label = (btn.textContent || '').trim();
+        if (label !== 'Cancelar' && !btn.hasAttribute('data-confirm-cancel')) return;
+
+        const onclickAttr = btn.getAttribute('onclick') || '';
+        if (onclickAttr.includes('cancelarAtencion') || onclickAttr.includes('cerrarModalNuevaAtencion')) return;
+
+        const modalEl = btn.closest('[id^="modal-"], dialog');
+        if (!modalEl) return;
+        if (modalEl.id && (modalEl.id.startsWith('modal-del-') || modalEl.id.startsWith('modal-ver-'))) return;
+
+        const form = btn.closest('form') || modalEl.querySelector('form:not(.hidden)');
+        if (!form || form.dataset.sgrDirty !== '1') return;
+
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+
+        Swal.fire({
+          title: '¿Descartar cambios?',
+          text: 'Se cancelará el ingreso o edición y no se guardarán los cambios realizados.',
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonColor: '#C41230',
+          cancelButtonColor: '#64748b',
+          confirmButtonText: 'Sí, descartar',
+          cancelButtonText: 'Continuar editando',
+          customClass: { popup: 'rounded-3xl font-sans' }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            form.dataset.sgrDirty = '';
+            const modalId = modalEl.id || '';
+            const formId = form.id || '';
+            if (!modalId.includes('editar') && !formId.includes('editar')) {
+              form.reset();
+            }
+            btn.dataset.sgrConfirmedCancel = '1';
+            btn.click();
+          }
+        });
+      }, true);
     });
   </script>
   {% block extra_js %}{% endblock %}

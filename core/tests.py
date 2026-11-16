@@ -3308,6 +3308,41 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertIsNotNone(finders.find('horizontal-blanco.svg'))
         self.assertIsNotNone(finders.find('admin/css/base.css'))
 
+    def test_modal_cartas_en_misma_pagina_alerta_cancelar_y_buscador_atenciones(self):
+        from cartas.models import Carta
+
+        # 1. Funcionario: Nueva Carta se abre en modal en la misma página + exclusión de .swal2-select + alerta global Cancelar
+        self.client.force_login(self.user)
+        r_cartas = self.client.get(reverse('cartas_listado'))
+        self.assertEqual(r_cartas.status_code, 200)
+        self.assertContains(r_cartas, 'id="modal-carta"')
+        self.assertContains(r_cartas, 'onclick="abrirModalNuevaCarta()"')
+        self.assertContains(r_cartas, ':not(.swal2-select)')
+        self.assertContains(r_cartas, "btn.dataset.sgrConfirmedCancel = '1'")
+
+        # 2. Atenciones: barra de búsqueda con flex-wrap y min-w-[240px] para no comprimirse
+        r_at = self.client.get(reverse('gestion_atenciones'))
+        self.assertEqual(r_at.status_code, 200)
+        self.assertContains(r_at, 'relative flex-1 min-w-[240px]')
+
+        # 3. Admin global puede crear carta desde el modal enviando delegacion_id
+        admin = User.objects.create_superuser('adm_modal_carta', 'admmodal@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        resp_post = self.client.post(reverse('cartas_nueva'), {
+            'delegacion_id': str(self.delegacion.id),
+            'fecha': '2026-08-01',
+            'numero': 'MODAL-01',
+            'para': 'Alcaldesa',
+            'remite': 'JJVV Modal Test',
+            'fono_contacto': '912345678',
+            'actividad_tema': 'Prueba creación desde modal',
+            'estado': 'EN PROCESO',
+            'pronunciamiento': 'NO APLICA',
+            'unidad': '1',
+        })
+        self.assertRedirects(resp_post, reverse('cartas_listado'))
+        self.assertTrue(Carta.objects.filter(numero='MODAL-01', delegacion=self.delegacion).exists())
+
 
 
 

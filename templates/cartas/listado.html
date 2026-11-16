@@ -28,11 +28,11 @@
       </div>
 
       {% if puede_editar_cartas %}
-        <a href="{% url 'cartas_nueva' %}"
-           class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2 shrink-0">
+        <button type="button" onclick="abrirModalNuevaCarta()"
+                class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2 shrink-0">
           <i data-lucide="plus-circle" class="w-4 h-4"></i>
           <span>Nueva Carta</span>
-        </a>
+        </button>
       {% endif %}
     </div>
   </div>
@@ -265,15 +265,47 @@
               <td class="py-2.5 px-3 text-center font-mono font-bold">{{ carta.unidad|default:'1' }}</td>
               <td class="py-2.5 px-3 whitespace-nowrap text-center sticky right-0 bg-white group-hover:bg-slate-50/95 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
                 <div class="inline-flex items-center justify-center gap-1">
-                  <a href="{% url 'cartas_detalle' carta.pk %}" title="Ver detalle de carta" aria-label="Ver carta Nº {{ carta.numero }}"
-                     class="p-1.5 rounded-lg text-slate-500 hover:text-[#C41230] hover:bg-red-50 transition-all inline-flex items-center justify-center">
+                  <button type="button" onclick="abrirModalVerCarta(this)"
+                          title="Ver detalle de carta" aria-label="Ver carta Nº {{ carta.numero }}"
+                          data-numero="{{ carta.numero|default:'S/N' }}"
+                          data-fecha="{{ carta.fecha|date:'d/m/Y' }}"
+                          data-para="{{ carta.para }}"
+                          data-remite="{{ carta.remite }}"
+                          data-fono="{{ carta.fono_contacto|default:'—' }}"
+                          data-actividad="{{ carta.actividad_tema }}"
+                          data-fecha-actividad="{{ carta.fecha_actividad|default:'—' }}"
+                          data-encargado="{{ carta.encargado_seguimiento|default:'—' }}"
+                          data-estado="{{ carta.get_estado_display }}"
+                          data-pronunciamiento="{{ carta.get_pronunciamiento_display|default:'No aplica' }}"
+                          data-derivada="{{ carta.derivada_a|default:'—' }}"
+                          data-unidad="{{ carta.unidad|default:'1' }}"
+                          data-observacion="{{ carta.observacion|default:'—' }}"
+                          data-delegacion="{{ carta.delegacion.nombre|default:'—' }}"
+                          data-creador="{% if carta.creado_por %}{{ carta.creado_por.get_full_name|default:carta.creado_por.username }}{% else %}—{% endif %}"
+                          data-detalle-url="{% url 'cartas_detalle' carta.pk %}"
+                          class="p-1.5 rounded-lg text-slate-500 hover:text-[#C41230] hover:bg-red-50 transition-all inline-flex items-center justify-center">
                     <i data-lucide="eye" class="w-4 h-4"></i>
-                  </a>
+                  </button>
                   {% if puede_editar_cartas %}
-                  <a href="{% url 'cartas_editar' carta.pk %}" title="Editar carta" aria-label="Editar carta Nº {{ carta.numero }}"
-                     class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all inline-flex items-center justify-center">
+                  <button type="button" onclick="abrirModalEditarCarta(this)"
+                          title="Editar carta" aria-label="Editar carta Nº {{ carta.numero }}"
+                          data-action="{% url 'cartas_editar' carta.pk %}"
+                          data-fecha="{{ carta.fecha|date:'Y-m-d' }}"
+                          data-numero="{{ carta.numero|default:'' }}"
+                          data-para="{{ carta.para }}"
+                          data-remite="{{ carta.remite }}"
+                          data-fono="{{ carta.fono_contacto|default:'' }}"
+                          data-actividad="{{ carta.actividad_tema }}"
+                          data-fecha-actividad="{{ carta.fecha_actividad|default:'' }}"
+                          data-encargado="{{ carta.encargado_seguimiento|default:'' }}"
+                          data-estado="{{ carta.estado }}"
+                          data-pronunciamiento="{{ carta.pronunciamiento|default:'NO APLICA' }}"
+                          data-derivada="{{ carta.derivada_a|default:'' }}"
+                          data-observacion="{{ carta.observacion|default:'' }}"
+                          data-unidad="{{ carta.unidad|default:'1' }}"
+                          class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all inline-flex items-center justify-center">
                     <i data-lucide="edit-3" class="w-4 h-4"></i>
-                  </a>
+                  </button>
                   {% endif %}
                   {% if puede_eliminar_cartas %}
                   <a href="{% url 'cartas_eliminar' carta.pk %}" title="Eliminar carta" aria-label="Eliminar carta Nº {{ carta.numero }}"
@@ -297,4 +329,170 @@
     </div>
   </div>
 </div>
+
+{% if puede_editar_cartas %}
+<!-- Modal Nueva / Editar Carta en la misma página -->
+<div id="modal-carta" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto">
+    <div class="sticky top-0 z-10 bg-white/95 backdrop-blur px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+      <div>
+        <p class="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Oficina de Partes / Seguimiento Documental</p>
+        <h3 id="modal-carta-titulo" class="text-lg font-extrabold text-slate-900">Nueva Carta</h3>
+      </div>
+      <button type="button" onclick="cerrarModalCarta()" class="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all" aria-label="Cerrar">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <form id="form-modal-carta" method="POST" action="{% url 'cartas_nueva' %}" class="p-6 space-y-5">
+      {% csrf_token %}
+      {% include "cartas/includes/carta_form_fields.html" %}
+
+      <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div class="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i>
+          <span>Creado por: <strong class="text-slate-800">{{ usuario_nombre_corto|default:request.user.username }}</strong>{% if not permisos.es_cliente %} <span class="text-slate-400 font-semibold">({% if funcionario_actual and funcionario_actual.cargo %}{{ funcionario_actual.cargo.nombre_cargo }}{% else %}{{ user_rol_name }}{% endif %})</span>{% endif %}</span>
+        </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <button type="button" onclick="cerrarModalCarta()"
+                  class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
+            Cancelar
+          </button>
+          <button type="submit" id="btn-guardar-carta"
+                  class="px-5 py-2 bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center gap-2">
+            <i data-lucide="save" class="w-4 h-4"></i>
+            <span id="btn-guardar-carta-txt">Guardar carta</span>
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<!-- Modal Ver Detalle Carta en la misma página -->
+<div id="modal-ver-carta" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto p-6 space-y-4">
+    <div class="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
+      <div>
+        <p class="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Detalle documental · <span id="ver-carta-delegacion"></span></p>
+        <h3 class="text-xl font-extrabold text-[#8B1D19]">Carta Nº <span id="ver-carta-numero"></span></h3>
+      </div>
+      <button type="button" onclick="document.getElementById('modal-ver-carta').classList.add('hidden')"
+              class="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <div class="grid sm:grid-cols-2 gap-3 text-xs">
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-100"><span class="text-slate-400 font-bold block">Fecha ingreso</span><strong id="ver-carta-fecha" class="text-slate-800"></strong></div>
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-100"><span class="text-slate-400 font-bold block">Para</span><strong id="ver-carta-para" class="text-slate-800"></strong></div>
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-100"><span class="text-slate-400 font-bold block">Remite</span><strong id="ver-carta-remite" class="text-slate-800 break-words"></strong></div>
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-100"><span class="text-slate-400 font-bold block">Fono contacto</span><strong id="ver-carta-fono" class="text-slate-800 font-mono"></strong></div>
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-100"><span class="text-slate-400 font-bold block">Estado</span><strong id="ver-carta-estado" class="text-slate-800"></strong></div>
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-100"><span class="text-slate-400 font-bold block">Pronunciamiento</span><strong id="ver-carta-pron" class="text-slate-800"></strong></div>
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-100"><span class="text-slate-400 font-bold block">Encargado seguimiento</span><strong id="ver-carta-encargado" class="text-slate-800"></strong></div>
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-100"><span class="text-slate-400 font-bold block">Derivada a</span><strong id="ver-carta-derivada" class="text-slate-800"></strong></div>
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-100"><span class="text-slate-400 font-bold block">Fecha de actividad</span><strong id="ver-carta-fecha-act" class="text-slate-800"></strong></div>
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-100"><span class="text-slate-400 font-bold block">Unidad / Creado por</span><strong class="text-slate-800"><span id="ver-carta-unidad"></span> · <span id="ver-carta-creador"></span></strong></div>
+      <div class="sm:col-span-2 p-3 rounded-xl bg-slate-50 border border-slate-100"><span class="text-slate-400 font-bold block mb-1">Actividad o tema</span><p id="ver-carta-actividad" class="text-slate-800 whitespace-pre-line break-words"></p></div>
+      <div class="sm:col-span-2 p-3 rounded-xl bg-slate-50 border border-slate-100"><span class="text-slate-400 font-bold block mb-1">Observación</span><p id="ver-carta-observacion" class="text-slate-800 whitespace-pre-line break-words"></p></div>
+    </div>
+
+    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+      <button type="button" onclick="document.getElementById('modal-ver-carta').classList.add('hidden')"
+              class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all">
+        Cerrar
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const CARTA_NUEVA_URL = "{% url 'cartas_nueva' %}";
+  const CARTA_FECHA_HOY = "{% now 'Y-m-d' %}";
+
+  function _setFormFieldVal(form, name, val) {
+    const el = form.querySelector(`[name="${name}"]`);
+    if (!el) return;
+    el.value = val ?? '';
+    el.dispatchEvent(new Event('change', { bubbles: false }));
+  }
+
+  function abrirModalNuevaCarta() {
+    const modal = document.getElementById('modal-carta');
+    const form = document.getElementById('form-modal-carta');
+    if (!modal || !form) return;
+    form.action = CARTA_NUEVA_URL;
+    form.dataset.sgrDirty = '';
+    form.reset();
+    _setFormFieldVal(form, 'fecha', CARTA_FECHA_HOY);
+    _setFormFieldVal(form, 'para', 'Alcaldesa');
+    _setFormFieldVal(form, 'estado', 'EN PROCESO');
+    _setFormFieldVal(form, 'pronunciamiento', 'NO APLICA');
+    _setFormFieldVal(form, 'unidad', '1');
+    const tit = document.getElementById('modal-carta-titulo');
+    const btnTxt = document.getElementById('btn-guardar-carta-txt');
+    if (tit) tit.textContent = 'Nueva Carta';
+    if (btnTxt) btnTxt.textContent = 'Guardar carta';
+    modal.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+  }
+
+  function abrirModalEditarCarta(btn) {
+    const modal = document.getElementById('modal-carta');
+    const form = document.getElementById('form-modal-carta');
+    if (!modal || !form || !btn) return;
+    const d = btn.dataset;
+    form.action = d.action || CARTA_NUEVA_URL;
+    form.dataset.sgrDirty = '';
+    _setFormFieldVal(form, 'fecha', d.fecha);
+    _setFormFieldVal(form, 'numero', d.numero);
+    _setFormFieldVal(form, 'para', d.para);
+    _setFormFieldVal(form, 'remite', d.remite);
+    _setFormFieldVal(form, 'fono_contacto', d.fono);
+    _setFormFieldVal(form, 'actividad_tema', d.actividad);
+    _setFormFieldVal(form, 'fecha_actividad', d.fechaActividad);
+    _setFormFieldVal(form, 'encargado_seguimiento', d.encargado);
+    _setFormFieldVal(form, 'estado', d.estado);
+    _setFormFieldVal(form, 'pronunciamiento', d.pronunciamiento);
+    _setFormFieldVal(form, 'derivada_a', d.derivada);
+    _setFormFieldVal(form, 'observacion', d.observacion);
+    _setFormFieldVal(form, 'unidad', d.unidad);
+    const tit = document.getElementById('modal-carta-titulo');
+    const btnTxt = document.getElementById('btn-guardar-carta-txt');
+    if (tit) tit.textContent = `Editar Carta ${d.numero || 'S/N'}`;
+    if (btnTxt) btnTxt.textContent = 'Guardar cambios';
+    modal.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+  }
+
+  function cerrarModalCarta() {
+    const modal = document.getElementById('modal-carta');
+    const form = document.getElementById('form-modal-carta');
+    if (form) form.dataset.sgrDirty = '';
+    if (modal) modal.classList.add('hidden');
+  }
+
+  function abrirModalVerCarta(btn) {
+    const d = btn.dataset;
+    document.getElementById('ver-carta-delegacion').textContent = d.delegacion || '';
+    document.getElementById('ver-carta-numero').textContent = d.numero || 'S/N';
+    document.getElementById('ver-carta-fecha').textContent = d.fecha || '—';
+    document.getElementById('ver-carta-para').textContent = d.para || '—';
+    document.getElementById('ver-carta-remite').textContent = d.remite || '—';
+    document.getElementById('ver-carta-fono').textContent = d.fono || '—';
+    document.getElementById('ver-carta-estado').textContent = d.estado || '—';
+    document.getElementById('ver-carta-pron').textContent = d.pronunciamiento || '—';
+    document.getElementById('ver-carta-encargado').textContent = d.encargado || '—';
+    document.getElementById('ver-carta-derivada').textContent = d.derivada || '—';
+    document.getElementById('ver-carta-fecha-act').textContent = d.fechaActividad || '—';
+    document.getElementById('ver-carta-unidad').textContent = d.unidad || '1';
+    document.getElementById('ver-carta-creador').textContent = d.creador || '—';
+    document.getElementById('ver-carta-actividad').textContent = d.actividad || '—';
+    document.getElementById('ver-carta-observacion').textContent = d.observacion || '—';
+    document.getElementById('modal-ver-carta').classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+  }
+</script>
 {% endblock %}

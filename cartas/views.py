@@ -186,6 +186,14 @@ def listado(request):
     params.pop('page', None)
     params.pop('export', None)
 
+    delegacion_form_ref = ctx.get('delegacion_activa') or delegacion_seleccionada
+    delegaciones_activas = (
+        Delegacion.objects.filter(estado='Activa').order_by('id')
+        if ctx['permisos'].get('es_admin')
+        else []
+    )
+    catalogo_personas_unidades = _catalogos_cartas(delegacion_form_ref)
+
     ctx.update({
         'page_obj': page_obj,
         'q_cartas': q,
@@ -203,7 +211,8 @@ def listado(request):
         'estados_cartas': Carta.ESTADOS,
         'para_choices': Carta.PARA_CHOICES,
         'pron_choices': Carta.PRONUNCIAMIENTO_CHOICES,
-        'delegaciones_cartas': Delegacion.objects.filter(estado='Activa').order_by('id') if ctx['permisos'].get('es_admin') else [],
+        'delegaciones_cartas': delegaciones_activas,
+        'delegaciones_form_cartas': delegaciones_activas,
         'delegacion_filtro': delegacion_filtro,
         'delegacion_seleccionada': delegacion_seleccionada,
         'orden': orden,
@@ -213,6 +222,8 @@ def listado(request):
         'query_export': params.urlencode(),
         'puede_editar_cartas': ctx['permisos'].get('puede_editar', False),
         'puede_eliminar_cartas': ctx['permisos'].get('es_admin', False),
+        'form_carta': CartaForm(initial={'fecha': timezone.localdate()}),
+        'catalogo_cartas_items': catalogo_personas_unidades,
     })
     return render(request, 'cartas/listado.html', ctx)
 
@@ -225,6 +236,10 @@ def formulario(request, pk=None):
         return redirect('cartas_listado')
     carta = _registro(request, ctx, pk) if pk is not None else None
     delegacion_ref = carta.delegacion if carta else ctx.get('delegacion_activa')
+    if not delegacion_ref and request.method == 'POST' and ctx['permisos'].get('es_admin'):
+        del_post_id = (request.POST.get('delegacion_id') or '').strip()
+        if del_post_id.isdigit():
+            delegacion_ref = Delegacion.objects.filter(id=int(del_post_id), estado='Activa').first()
     if request.method == 'POST':
         form = CartaForm(request.POST, instance=carta)
         if form.is_valid():
@@ -246,6 +261,7 @@ def formulario(request, pk=None):
         'form_carta': form,
         'carta': carta,
         'catalogo_cartas_items': catalogo_personas_unidades,
+        'delegaciones_form_cartas': Delegacion.objects.filter(estado='Activa').order_by('id') if ctx['permisos'].get('es_admin') else [],
     })
     return render(request, 'cartas/formulario.html', ctx)
 

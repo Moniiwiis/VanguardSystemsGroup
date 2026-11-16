@@ -1,0 +1,46 @@
+{% if form_carta.non_field_errors %}
+  <div class="rounded-xl bg-red-50 border border-red-200 p-3 text-xs font-bold text-red-700">{{ form_carta.non_field_errors }}</div>
+{% endif %}
+
+{% if not carta and not delegacion_activa and permisos.es_admin %}
+  <div class="space-y-1">
+    <label for="id_delegacion_carta_modal" class="block text-xs font-extrabold text-slate-700">
+      Delegación <span class="text-[#C41230]">*</span>
+    </label>
+    <select id="id_delegacion_carta_modal" name="delegacion_id" required
+            class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+      <option value="">Selecciona una delegación...</option>
+      {% for d in delegaciones_form_cartas|default:delegaciones_cartas %}
+        <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
+          {{ d.get_codigo }} — {{ d.nombre }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+{% endif %}
+
+<div class="grid sm:grid-cols-2 gap-4">
+  {% for campo in form_carta %}
+  <div class="{% if campo.name == 'actividad_tema' or campo.name == 'observacion' %}sm:col-span-2{% endif %} space-y-1">
+    <label for="{{ campo.id_for_label }}" class="block text-xs font-extrabold text-slate-700">
+      {{ campo.label }}{% if campo.field.required %} <span class="text-[#C41230]">*</span>{% endif %}
+    </label>
+    {{ campo }}
+    {% if campo.errors %}
+      <div class="text-red-700 text-xs font-bold mt-1">{{ campo.errors }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<datalist id="cartas-encargados-list">
+  {% for it in catalogo_cartas_items %}
+    <option value="{{ it.label }}" data-search="{{ it.search }}">{{ it.meta }}</option>
+  {% endfor %}
+</datalist>
+
+<datalist id="cartas-derivada-list">
+  {% for it in catalogo_cartas_items %}
+    <option value="{{ it.label }}" data-search="{{ it.search }}">{{ it.meta }}</option>
+  {% endfor %}
+</datalist>
