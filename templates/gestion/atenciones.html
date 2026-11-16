@@ -120,13 +120,13 @@
             <div id="bloque-org-existente" class="space-y-1">
               <label class="block text-[11px] font-bold text-slate-700">Seleccionar JJVV u Organización <span class="text-[#C41230]">*</span></label>
               <input type="text" id="organizacion_input" list="organizaciones-list" oninput="sincronizarOrganizacionExistente(this.value)"
-                     placeholder="Escribe para buscar por nombre o sector de la JJVV..."
+                     placeholder="Buscar por nombre, RUT, N° P.J., Reg. Dir. o sector..."
                      class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium" />
               <input type="hidden" id="organizacion_id" name="organizacion_id" value="">
               <datalist id="organizaciones-list">
                 {% for o in organizaciones %}
                   <option value="{{ o.nombre }} ({{ o.tipo_organizacion }})" data-id="{{ o.id }}" data-tel="{{ o.telefono_contacto|default:'' }}"
-                          data-search="{{ o.nombre }} {{ o.rut|default:'' }} {{ o.tipo_organizacion }} {{ o.sector__nombre|default:o.territorio|default:'' }} {{ o.representante_legal|default:'' }} {{ o.presidente_nombre|default:'' }} {{ o.tesorero_nombre|default:'' }} {{ o.secretario_nombre|default:'' }} {{ o.telefono_contacto|default:'' }}">{{ o.sector__nombre|default:o.territorio|default:'Organización Activa' }}{% if o.rut %} · RUT: {{ o.rut }}{% endif %}{% if o.representante_legal %} · Dir: {{ o.representante_legal }}{% endif %}</option>
+                          data-search="{{ o.nombre }} {{ o.rut|default:'' }} {{ o.numero_registro_pj|default:'' }} {{ o.personalidad_juridica|default:'' }} {{ o.registro_directiva_numero|default:'' }} {{ o.tipo_organizacion }} {{ o.sector__nombre|default:o.territorio|default:'' }} {{ o.representante_legal|default:'' }} {{ o.presidente_nombre|default:'' }} {{ o.tesorero_nombre|default:'' }} {{ o.secretario_nombre|default:'' }} {{ o.telefono_contacto|default:'' }}">{{ o.sector__nombre|default:o.territorio|default:'Organización Activa' }}{% if o.rut %} · RUT: {{ o.rut }}{% endif %}{% if o.numero_registro_pj or o.personalidad_juridica %} · P.J.: {{ o.numero_registro_pj|default:o.personalidad_juridica }}{% endif %}{% if o.registro_directiva_numero %} · Dir. N°: {{ o.registro_directiva_numero }}{% endif %}{% if o.representante_legal %} · {{ o.representante_legal }}{% endif %}</option>
                 {% endfor %}
               </datalist>
               {% if not organizaciones %}

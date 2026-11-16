@@ -2091,7 +2091,9 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             nombre='Vecina Lista', rut='11.111.111-1', delegacion=self.delegacion, sector=sector, estado='Activo'
         )
         OrganizacionComunitaria.objects.create(
-            nombre='JJVV Lista Buscable', rut='65.123.456-7', delegacion=self.delegacion, sector=sector,
+            nombre='JJVV Lista Buscable', rut='65.123.456-7',
+            numero_registro_pj='PJ-9081', registro_directiva_numero='DIR-314',
+            delegacion=self.delegacion, sector=sector,
             representante_legal='Laura Dirigente', estado='Activa',
         )
 
@@ -2103,12 +2105,13 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         resp_atn = self.client.get(reverse('gestion_atenciones'))
         self.assertContains(resp_atn, 'sgr-combo-menu')
         self.assertContains(resp_atn, 'data-search="Vecina Lista 11.111.111-1')
-        self.assertContains(resp_atn, 'data-search="JJVV Lista Buscable 65.123.456-7')
+        self.assertContains(resp_atn, 'data-search="JJVV Lista Buscable 65.123.456-7 PJ-9081')
+        self.assertContains(resp_atn, 'DIR-314')
         self.assertContains(resp_atn, 'Gestor Social Senior')
 
         resp_tubo = self.client.get(reverse('gestion_tubo'))
         self.assertContains(resp_tubo, 'data-search-select="true"')
-        self.assertContains(resp_tubo, 'JJVV Lista Buscable 65.123.456-7')
+        self.assertContains(resp_tubo, 'JJVV Lista Buscable 65.123.456-7 PJ-9081')
 
         resp_rep = self.client.get(reverse('gestion_reportes'))
         self.assertContains(resp_rep, '12.345.678-5')

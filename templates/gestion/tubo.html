@@ -1522,13 +1522,13 @@
 
         <div class="space-y-1">
           <label class="block text-xs font-extrabold text-slate-700">JJVV u Organización Asociada</label>
-          <select name="organizacion_id" data-search-select="true" data-search-placeholder="Buscar por nombre, RUT, sector o dirigente..."
+          <select name="organizacion_id" data-search-select="true" data-search-placeholder="Buscar por nombre, RUT, N° P.J., Reg. Dir. o sector..."
                   class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-medium text-slate-800 bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
             <option value="">Compromiso general del sector...</option>
             {% for o in organizaciones_tubo %}
               <option value="{{ o.id }}"
-                      data-search="{{ o.nombre }} {{ o.rut|default:'' }} {{ o.tipo_organizacion }} {{ o.sector__nombre|default:o.territorio|default:'' }} {{ o.representante_legal|default:'' }}"
-                      data-meta="{{ o.sector__nombre|default:o.territorio|default:'General' }}{% if o.rut %} · RUT: {{ o.rut }}{% endif %}{% if o.representante_legal %} · Dir: {{ o.representante_legal }}{% endif %}">{{ o.nombre }} ({{ o.tipo_organizacion }})</option>
+                      data-search="{{ o.nombre }} {{ o.rut|default:'' }} {{ o.numero_registro_pj|default:'' }} {{ o.personalidad_juridica|default:'' }} {{ o.registro_directiva_numero|default:'' }} {{ o.tipo_organizacion }} {{ o.sector__nombre|default:o.territorio|default:'' }} {{ o.representante_legal|default:'' }}"
+                      data-meta="{{ o.sector__nombre|default:o.territorio|default:'General' }}{% if o.rut %} · RUT: {{ o.rut }}{% endif %}{% if o.numero_registro_pj or o.personalidad_juridica %} · P.J.: {{ o.numero_registro_pj|default:o.personalidad_juridica }}{% endif %}{% if o.registro_directiva_numero %} · Dir. N°: {{ o.registro_directiva_numero }}{% endif %}">{{ o.nombre }} ({{ o.tipo_organizacion }})</option>
             {% endfor %}
           </select>
         </div>

@@ -2532,7 +2532,8 @@ def gestion_atenciones(request):
         .order_by('nombre')
         .values(
             'id', 'nombre', 'tipo_organizacion', 'territorio', 'sector__nombre',
-            'rut', 'telefono_contacto', 'representante_legal',
+            'rut', 'numero_registro_pj', 'personalidad_juridica', 'registro_directiva_numero',
+            'telefono_contacto', 'representante_legal',
             'presidente_nombre', 'tesorero_nombre', 'secretario_nombre',
         )
     )
@@ -5482,7 +5483,11 @@ def gestion_tubo(request):
         organizaciones_tubo = list(
             _organizaciones_activas_para_delegacion(del_activa)
             .order_by('nombre')
-            .values('id', 'nombre', 'tipo_organizacion', 'territorio', 'sector__nombre', 'rut', 'representante_legal')
+            .values(
+                'id', 'nombre', 'tipo_organizacion', 'territorio', 'sector__nombre',
+                'rut', 'numero_registro_pj', 'personalidad_juridica', 'registro_directiva_numero',
+                'representante_legal',
+            )
         )
         encargados_modal_tubo = [
             enc for enc in encargados_edicion if enc['delegacion_id'] == del_activa.id
