@@ -1851,20 +1851,29 @@
         );
       });
 
-      // 2) Mejorar <select data-search-select="true"> con buscador + lista visible
-      document.querySelectorAll('select[data-search-select="true"]').forEach((sel) => {
+      // 2) Mejorar todos los <select> (excepto [data-native-select] / multiple) con buscador + lista visible como Vecinos/Responsable
+      document.querySelectorAll('select:not([data-native-select="true"]):not([multiple])').forEach((sel) => {
         if (sel.dataset.sgrSelectInit === '1') return;
         sel.dataset.sgrSelectInit = '1';
 
+        const isFullWidth = sel.classList.contains('w-full');
         const wrap = document.createElement('div');
-        wrap.className = 'relative w-full';
+        wrap.className = isFullWidth ? 'relative w-full' : 'relative w-full sm:w-auto min-w-[165px]';
         sel.parentNode.insertBefore(wrap, sel);
+
+        const emptyOpt = Array.from(sel.options).find((o) => o.value === '');
+        const defaultPlaceholder = sel.dataset.searchPlaceholder
+          || (emptyOpt ? emptyOpt.textContent.trim() : '')
+          || 'Escribe o haz clic para buscar...';
 
         const inp = document.createElement('input');
         inp.type = 'text';
-        inp.className = sel.className.replace('font-bold', 'font-semibold') || 'w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none';
-        inp.placeholder = sel.dataset.searchPlaceholder || 'Escribe o haz clic para buscar...';
+        const baseCls = (sel.className || 'w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none')
+          .replace('font-bold', 'font-semibold');
+        inp.className = isFullWidth ? baseCls : `${baseCls} w-full`;
+        inp.placeholder = defaultPlaceholder;
         if (sel.required) inp.required = true;
+        if (sel.disabled) inp.disabled = true;
 
         sel.classList.add('hidden');
         wrap.appendChild(inp);
@@ -1873,10 +1882,20 @@
         const syncInputFromSelect = () => {
           const cur = sel.options[sel.selectedIndex];
           inp.value = (cur && cur.value !== '') ? cur.textContent.trim() : '';
+          inp.disabled = !!sel.disabled;
           if (inp._sgrSyncUI) inp._sgrSyncUI();
         };
         syncInputFromSelect();
         sel.addEventListener('change', syncInputFromSelect);
+        if (sel.form) {
+          sel.form.addEventListener('reset', () => setTimeout(syncInputFromSelect, 0));
+        }
+
+        // Mantener sincronizado si otro script rellena dinámicamente las opciones o cambia disabled
+        if (window.MutationObserver) {
+          const obs = new MutationObserver(() => syncInputFromSelect());
+          obs.observe(sel, { childList: true, attributes: true, attributeFilter: ['disabled'] });
+        }
 
         let prevSelectVal = sel.value;
         attachSearchCombo(
@@ -1901,7 +1920,7 @@
               return;
             }
             if (it.cleared) {
-              sel.value = '';
+              sel.value = emptyOpt ? '' : '';
               inp.value = '';
               prevSelectVal = '';
             } else {

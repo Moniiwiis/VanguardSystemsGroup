@@ -3157,6 +3157,93 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertNotContains(resp_cli, '<span>Ciudadano</span>')
         self.assertNotContains(resp_cli, '<span>Cliente</span>')
 
+    def test_selects_universales_modal_tubo_y_tubo_cartas_excel(self):
+        import re
+        from cartas.models import Carta
+
+        # 1. Cliente no puede acceder a Tubo de Cartas (404)
+        cli_user = User.objects.create_user('cli_cartas_check', 'clicartas@example.test', 'Pass123!')
+        cargo_cli = Cargo.objects.create(nombre_cargo='Ciudadano')
+        rol_cli = Rol.objects.create(nombre_rol='Cliente', alcance='Personal', estado='Activo')
+        func_cli = Funcionario.objects.create(
+            user=cli_user,
+            cargo=cargo_cli,
+            delegacion=self.delegacion,
+            identificador_institucional='CLI-CARTA-01',
+            rut='17.654.321-7',
+            estado='Activo',
+        )
+        FuncionarioRol.objects.create(funcionario=func_cli, rol=rol_cli)
+        Vecino.objects.create(nombre='Vecino Carta', rut='17.654.321-7', delegacion=self.delegacion, estado='Activo')
+        self.client.force_login(cli_user)
+        self.assertIn(self.client.get(reverse('cartas_listado')).status_code, (403, 404))
+
+        # 2. Funcionario accede a selects buscables universales y modal Tubo sin recortes ni badge extra
+        self.client.force_login(self.user)
+        resp_tubo = self.client.get(reverse('gestion_tubo'))
+        self.assertEqual(resp_tubo.status_code, 200)
+        self.assertContains(resp_tubo, 'select:not([data-native-select="true"]):not([multiple])')
+        self.assertContains(resp_tubo, 'max-h-[92vh] overflow-y-auto')
+        self.assertNotContains(
+            resp_tubo,
+            '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 mt-0.5 rounded text-[9px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200">\n                  Compromiso Sectorial',
+        )
+
+        # 3. Tubo de Cartas según Excel TUBO CARTAS / CARTAS (PARA, PRONUNCIAMIENTO, UNIDAD, teléfono, Excel xlsx, sin SGR)
+        resp_new = self.client.post(reverse('cartas_nueva'), {
+            'fecha': '2026-07-02',
+            'numero': '10093',
+            'para': 'Otro',
+            'remite': 'ALICIA PADILLA',
+            'fono_contacto': '952316534',
+            'actividad_tema': 'AGUAS DEL VALLE INFORMA CORTE PROGRAMADO',
+            'fecha_actividad': '03/07/2026',
+            'encargado_seguimiento': 'JAVIER ROJAS',
+            'estado': 'FINALIZADA',
+            'pronunciamiento': 'DELEGADO',
+            'derivada_a': 'DORIS ÁLVAREZ',
+            'observacion': 'Socializada con vecinos',
+            'unidad': '1',
+        })
+        self.assertRedirects(resp_new, reverse('cartas_listado'))
+        carta = Carta.objects.get(numero='10093', remite='ALICIA PADILLA')
+        self.assertEqual(carta.delegacion, self.delegacion)
+        self.assertEqual(carta.fono_contacto, '+56 9 5231 6534')
+        self.assertEqual(carta.pronunciamiento, 'DELEGADO')
+        self.assertEqual(carta.unidad, '1')
+
+        # Listado, filtros y detalle sin SGR visible
+        for url in (
+            reverse('cartas_listado') + '?para=Otro&estado=FINALIZADA&pronunciamiento=DELEGADO',
+            reverse('cartas_nueva'),
+            reverse('cartas_detalle', args=[carta.id]),
+        ):
+            r = self.client.get(url)
+            self.assertEqual(r.status_code, 200)
+            html = r.content.decode('utf-8')
+            m = re.search(r'(?<![_-])\bSGR\b(?![_-])', html, flags=re.IGNORECASE)
+            self.assertIsNone(m, f'Se encontró SGR en {url}: {html[max(0, m.start()-60):m.end()+60] if m else ""}')
+
+        # Exportación Excel (.xlsx) sin SGR
+        resp_xlsx = self.client.get(reverse('cartas_listado') + '?export=excel')
+        self.assertEqual(resp_xlsx.status_code, 200)
+        self.assertEqual(
+            resp_xlsx['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        self.assertNotIn('sgr', resp_xlsx['Content-Disposition'].lower())
+
+        # Solo admin puede eliminar
+        resp_no_del = self.client.post(reverse('cartas_eliminar', args=[carta.id]))
+        self.assertRedirects(resp_no_del, reverse('cartas_listado'))
+        self.assertTrue(Carta.objects.filter(id=carta.id).exists())
+
+        admin = User.objects.create_superuser('adm_cartas', 'admcartas@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        resp_del = self.client.post(reverse('cartas_eliminar', args=[carta.id]))
+        self.assertRedirects(resp_del, reverse('cartas_listado'))
+        self.assertFalse(Carta.objects.filter(id=carta.id).exists())
+
 
 
 

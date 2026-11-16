@@ -37,6 +37,11 @@ try:
 except ImportError:
     TipoAtencion = SubAtencion = Periodo = CatalogoActividad = ItemMedicion = ConfiguracionMeta = AreaApoyo = None
 
+try:
+    from cartas.models import Carta
+except ImportError:
+    Carta = None
+
 # ---------------------------------------------------------------------------
 # Utilidades RUT Módulo 11
 # ---------------------------------------------------------------------------
@@ -1160,6 +1165,110 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(
                 f"  ✓ Total atenciones en DB: {AtencionCiudadana.objects.count()}"
             ))
+
+        # ------------------------------------------------------------------
+        # 12. TUBO DE CARTAS desde hojas 'TUBO CARTAS' y 'CARTAS ' de matriz_sgr.xlsx
+        # ------------------------------------------------------------------
+        if Carta and os.path.exists(xlsx_sgr):
+            self.stdout.write("▶ Importando Tubo de Cartas desde hojas oficiales xlsx...")
+            try:
+                wb_cartas = openpyxl.load_workbook(xlsx_sgr, data_only=True, read_only=True)
+                cartas_creadas = 0
+                estados_carta_ok = {c[0] for c in Carta.ESTADOS}
+                para_carta_ok = {c[0] for c in Carta.PARA_CHOICES}
+                pron_carta_ok = {c[0] for c in Carta.PRONUNCIAMIENTO_CHOICES}
+
+                def _fmt_num_carta(v):
+                    if v is None:
+                        return ''
+                    if isinstance(v, (int, float)):
+                        return str(int(v)) if float(v).is_integer() else str(v)
+                    return str(v).strip()
+
+                def _fmt_fecha_act(v):
+                    if v is None:
+                        return ''
+                    if isinstance(v, (datetime.datetime, datetime.date)):
+                        return v.strftime('%d/%m/%Y')
+                    return str(v).strip()[:100]
+
+                def _fmt_fono_carta(v):
+                    if v is None:
+                        return ''
+                    if isinstance(v, (int, float)):
+                        s = str(int(v)) if float(v).is_integer() else str(v)
+                    else:
+                        s = str(v).strip()
+                    if '@' in s:
+                        return s[:60]
+                    digs = ''.join(ch for ch in s if ch.isdigit())
+                    if len(digs) == 9 and digs.startswith('9'):
+                        return f"+56 9 {digs[1:5]} {digs[5:]}"
+                    return s[:60]
+
+                for sheet_name, deleg_target in (('TUBO CARTAS', del_norte), ('CARTAS ', del_centro)):
+                    if sheet_name not in wb_cartas.sheetnames:
+                        continue
+                    for idx_row, r in enumerate(wb_cartas[sheet_name].iter_rows(values_only=True)):
+                        if idx_row < 2:
+                            continue
+                        fecha_raw = r[2] if len(r) > 2 else None
+                        numero_raw = r[3] if len(r) > 3 else None
+                        para_raw = r[4] if len(r) > 4 else None
+                        remite_raw = r[5] if len(r) > 5 else None
+                        fono_raw = r[6] if len(r) > 6 else None
+                        act_raw = r[7] if len(r) > 7 else None
+                        if not (fecha_raw and remite_raw and act_raw):
+                            continue
+
+                        if isinstance(fecha_raw, datetime.datetime):
+                            fecha_dt = fecha_raw.date()
+                        elif isinstance(fecha_raw, datetime.date):
+                            fecha_dt = fecha_raw
+                        else:
+                            continue
+
+                        numero_str = _fmt_num_carta(numero_raw)[:60]
+                        para_val = str(para_raw or 'Alcaldesa').strip()
+                        if para_val not in para_carta_ok:
+                            para_val = 'Otro'
+                        remite_val = str(remite_raw).strip()[:180]
+                        act_val = str(act_raw).strip()[:1000]
+                        est_raw = str(r[10] if len(r) > 10 and r[10] else 'EN PROCESO').strip().upper()
+                        est_val = est_raw if est_raw in estados_carta_ok else 'EN PROCESO'
+                        pron_raw = str(r[11] if len(r) > 11 and r[11] else 'NO APLICA').strip().upper()
+                        pron_val = pron_raw if pron_raw in pron_carta_ok else 'NO APLICA'
+                        unid_raw = r[14] if len(r) > 14 else 1
+                        unid_val = '0' if str(unid_raw).strip() in {'0', '0.0'} else '1'
+
+                        _, created = Carta.objects.get_or_create(
+                            delegacion=deleg_target,
+                            fecha=fecha_dt,
+                            numero=numero_str,
+                            remite=remite_val,
+                            defaults={
+                                'para': para_val,
+                                'fono_contacto': _fmt_fono_carta(fono_raw),
+                                'actividad_tema': act_val,
+                                'fecha_actividad': _fmt_fecha_act(r[8] if len(r) > 8 else ''),
+                                'encargado_seguimiento': str(r[9] or '').strip()[:160],
+                                'estado': est_val,
+                                'pronunciamiento': pron_val,
+                                'derivada_a': str(r[12] or '').strip()[:180],
+                                'observacion': str(r[13] or '').strip()[:1000],
+                                'unidad': unid_val,
+                                'creado_por': u_editor or u_admin_sys,
+                            }
+                        )
+                        if created:
+                            cartas_creadas += 1
+
+                wb_cartas.close()
+                self.stdout.write(self.style.SUCCESS(
+                    f"  ✓ Tubo de Cartas: {cartas_creadas} creadas (total en DB: {Carta.objects.count()})"
+                ))
+            except Exception as exc:
+                self.stdout.write(self.style.WARNING(f"  ⚠ Error importando Tubo de Cartas xlsx: {exc}"))
 
         # ------------------------------------------------------------------
         # RESUMEN FINAL

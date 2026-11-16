@@ -39,6 +39,7 @@ from configuration.models import (
     ConfiguracionMeta, Periodo, ItemMedicion, CatalogoActividad,
     TipoAtencion, SubAtencion, AreaApoyo
 )
+from cartas.models import Carta
 from accounts.models import Funcionario, Cargo, Delegacion, Sector, Rol, FuncionarioRol
 
 logger = logging.getLogger(__name__)
@@ -669,6 +670,7 @@ def gestion_inicio(request):
     total_tipos_atencion = TipoAtencion.objects.count()
     total_subatenciones = SubAtencion.objects.count()
     total_areas_apoyo = AreaApoyo.objects.count()
+    total_cartas_del = Carta.objects.filter(delegacion=del_activa).count() if del_activa else (Carta.objects.count() if es_admin else 0)
     total_roles = Rol.objects.count()
 
     context = {
@@ -697,6 +699,7 @@ def gestion_inicio(request):
         'total_tipos_atencion': total_tipos_atencion,
         'total_subatenciones': total_subatenciones,
         'total_areas_apoyo': total_areas_apoyo,
+        'total_cartas_del': total_cartas_del,
         'total_roles': total_roles,
         'es_admin': es_admin,
         'es_admin_global': es_admin and not del_activa,

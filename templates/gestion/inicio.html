@@ -244,6 +244,19 @@
         </a>
         {% endif %}
 
+        {% if permisos.ver_atenciones or permisos.es_admin %}
+        <a href="{% url 'cartas_listado' %}" class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-[#C41230]/40 hover:shadow-md transition-all group">
+          <div class="flex items-start justify-between">
+            <div class="w-10 h-10 rounded-xl bg-red-50 text-[#C41230] flex items-center justify-center transition-colors">
+              <i data-lucide="mail" class="w-5 h-5"></i>
+            </div>
+            <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">{{ total_cartas_del }} cartas</span>
+          </div>
+          <h4 class="font-extrabold text-slate-900 text-sm mt-3 group-hover:text-[#C41230] transition-colors">Tubo de Cartas</h4>
+          <p class="text-xs text-slate-500 mt-1 leading-relaxed">Seguimiento de correspondencia de Oficina de Partes, pronunciamientos y derivaciones.</p>
+        </a>
+        {% endif %}
+
         {% if permisos.ver_reportes %}
         <a href="{% url 'gestion_reportes' %}" class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-[#C41230]/40 hover:shadow-md transition-all group">
           <div class="flex items-start justify-between">
