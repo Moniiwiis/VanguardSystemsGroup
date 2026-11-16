@@ -48,7 +48,7 @@ def _send_recovery_code(email, code):
         subject='Código de Recuperación — Sistema Municipal La Serena',
         message=(
             "Estimado/a funcionario/a:\n\n"
-            "Has solicitado restablecer tu contraseña en el Sistema Municipal SGR.\n"
+            "Has solicitado restablecer tu contraseña en el Sistema Municipal La Serena.\n"
             f"Tu código de verificación de 6 dígitos es: {code}\n\n"
             "Este código es válido por 10 minutos.\n"
             "Si no solicitaste este cambio, ignora este mensaje.\n\n"
@@ -64,14 +64,12 @@ def _send_recovery_code(email, code):
 
 def _send_welcome_provisional_password(user, provisional_password, rol_nombre='', delegacion_nombre=''):
     nombre_display = user.first_name or user.username
-    contexto_linea = f"• Rol asignado: {rol_nombre}\n" if rol_nombre else ""
-    if delegacion_nombre:
-        contexto_linea += f"• Delegación: {delegacion_nombre}\n"
+    contexto_linea = f"• Delegación: {delegacion_nombre}\n" if delegacion_nombre else ""
     sent_count = send_mail(
         subject='Credenciales de Acceso y Contraseña Provisoria — Sistema Municipal La Serena',
         message=(
             f"Estimado/a {nombre_display}:\n\n"
-            "Se ha creado tu cuenta de acceso en el Sistema de Gestión Territorial (SGR) "
+            "Se ha creado tu cuenta de acceso en el Sistema de Gestión Territorial "
             "de la Ilustre Municipalidad de La Serena.\n\n"
             "Tus credenciales de acceso son:\n"
             f"• Usuario: {user.username}\n"
@@ -3245,7 +3243,7 @@ def gestion_atenciones(request):
                 a.get_evidencia_codigo(),
                 a.estado_evidencia()
             ])
-        return export_to_excel_xlsx("Atenciones", "Atenciones SGR", headers, rows)
+        return export_to_excel_xlsx("Atenciones", "Atenciones Ciudadanas", headers, rows)
 
     page_size = _get_page_size(request)
     paginator = Paginator(qs, page_size)
@@ -3686,7 +3684,7 @@ def gestion_atenciones_validar_evidencia(request, atencion_id):
         publish_module_changed("atenciones", del_id_ws, "update", atencion.id)
         publish_module_changed("tubo", del_id_ws, "update", atencion.id)
 
-        messages.success(request, f"¡Evidencia {actividad.codigo_evidencia_unico} de atención {atencion.codigo_atencion} validada como '{resultado}'! El Semáforo SGR se ha actualizado.")
+        messages.success(request, f"¡Evidencia {actividad.codigo_evidencia_unico} de atención {atencion.codigo_atencion} validada como '{resultado}'! El Semáforo se ha actualizado.")
 
     return redirect(request.META.get('HTTP_REFERER') or 'gestion_atenciones')
 
@@ -4589,7 +4587,7 @@ def gestion_configuracion_eliminar(request, meta_id):
 def gestion_evidencias_validar(request, actividad_id):
     ctx = global_context(request)
     if not (ctx['permisos']['es_admin'] or ctx['permisos']['es_coordinador']):
-        messages.error(request, "Acceso denegado: Solo Administrador y Coordinador pueden validar evidencias SGR.")
+        messages.error(request, "Acceso denegado: Solo Administrador y Coordinador pueden validar evidencias.")
         return redirect('gestion_reportes')
 
     actividad = get_object_or_404(Actividad, id=actividad_id)
@@ -4599,7 +4597,7 @@ def gestion_evidencias_validar(request, actividad_id):
 
     if request.method == 'POST':
         resultado = request.POST.get('resultado', 'Aprobado').strip()
-        observaciones = request.POST.get('observaciones', 'Validado desde panel de auditoría SGR').strip()
+        observaciones = request.POST.get('observaciones', 'Validado desde panel de auditoría').strip()
 
         evidence_files = actividad.evidencias.filter(
             Q(imagen__gt='') | Q(archivo__gt='')
@@ -4627,7 +4625,7 @@ def gestion_evidencias_validar(request, actividad_id):
         val.observaciones = observaciones
         val.save()
 
-        messages.success(request, f"¡Evidencia {actividad.codigo_evidencia_unico} actualizada como '{resultado}'! El Semáforo SGR se ha recalculado.")
+        messages.success(request, f"¡Evidencia {actividad.codigo_evidencia_unico} actualizada como '{resultado}'! El Semáforo se ha recalculado.")
 
     referer = request.META.get('HTTP_REFERER')
     return redirect(referer if referer else 'gestion_reportes')
@@ -4666,7 +4664,7 @@ def gestion_metas_simular_evidencia(request, meta_id):
             actividad=act,
             verificador=funcionario_actual or func_destino,
             resultado='Aprobado',
-            observaciones='Evidencia validada y aprobada para cumplimiento SGR.'
+            observaciones='Evidencia validada y aprobada para cumplimiento.'
         )
         messages.success(request, f"¡Nueva evidencia aprobada para '{meta.item.nombre_item}'! Avance: {meta.calcular_avance()} de {meta.valor_objetivo} ({meta.porcentaje_cumplimiento()}% — Semáforo: {meta.estado_semaforo()}).")
 

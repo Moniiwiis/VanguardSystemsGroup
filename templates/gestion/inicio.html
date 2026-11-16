@@ -14,7 +14,7 @@
         <span class="text-[#C41230]">Panel de Control</span>
       </div>
       <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-        Panel de Gestión Territorial SGR
+        Panel de Gestión Territorial
       </h1>
       <p class="text-sm text-slate-600 max-w-2xl leading-relaxed">
         Plataforma oficial de seguimiento de atenciones ciudadanas, mantenedores de gestión y administración de delegaciones de la Ilustre Municipalidad de La Serena.
@@ -102,7 +102,7 @@
         {% endif %}
       </div>
 
-      <!-- 2. Cumplimiento de Metas SGR (Delegación Activa) -->
+      <!-- 2. Cumplimiento de Metas (Delegación Activa) -->
       {% if permisos.ver_reportes or permisos.ver_metas or permisos.ver_atenciones %}
       <a href="{% if permisos.ver_reportes %}{% url 'gestion_reportes' %}{% elif permisos.ver_metas %}{% url 'gestion_metas' %}{% else %}{% url 'gestion_tubo' %}{% endif %}"
          class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between hover:border-amber-400 hover:shadow-md transition-all group block">
@@ -239,7 +239,7 @@
             </div>
             <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-50 text-[#C41230]">Tabla &amp; Canvas</span>
           </div>
-          <h4 class="font-extrabold text-slate-900 text-sm mt-3 group-hover:text-[#C41230] transition-colors">Tubo de Compromiso SGR</h4>
+          <h4 class="font-extrabold text-slate-900 text-sm mt-3 group-hover:text-[#C41230] transition-colors">Tubo de Compromiso</h4>
           <p class="text-xs text-slate-500 mt-1 leading-relaxed">Tablero y matriz de compromisos derivados y compromisos sectoriales.</p>
         </a>
         {% endif %}
@@ -253,7 +253,7 @@
             <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">{{ total_metas_del }} metas</span>
           </div>
           <h4 class="font-extrabold text-slate-900 text-sm mt-3 group-hover:text-[#C41230] transition-colors">Reportes e Indicadores</h4>
-          <p class="text-xs text-slate-500 mt-1 leading-relaxed">Semáforos SGR, validaciones de evidencia y cumplimiento territorial.</p>
+          <p class="text-xs text-slate-500 mt-1 leading-relaxed">Semáforos de cumplimiento, validaciones de evidencia y avance territorial.</p>
         </a>
         {% endif %}
       </div>
@@ -333,7 +333,7 @@
             <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">{{ total_items_metas }} registros</span>
           </div>
           <h4 class="font-extrabold text-slate-900 text-sm mt-3 group-hover:text-[#C41230] transition-colors">CRUD Ítems y Períodos</h4>
-          <p class="text-xs text-slate-500 mt-1 leading-relaxed">Mantenedor de ítems de medición y fechas o períodos evaluativos SGR.</p>
+          <p class="text-xs text-slate-500 mt-1 leading-relaxed">Mantenedor de ítems de medición y fechas o períodos evaluativos.</p>
         </a>
         {% endif %}
 

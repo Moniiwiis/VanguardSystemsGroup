@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}Municipalidad de La Serena — Sistema Municipal SGR{% endblock %}</title>
+  <title>{% block title %}Municipalidad de La Serena — Sistema de Gestión Territorial{% endblock %}</title>
   
   <!-- Google Fonts (Public Sans + Fraunces) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -289,9 +289,6 @@
             <div class="font-bold text-white text-xs leading-tight group-hover:underline truncate">
               {{ usuario_nombre_corto|default:request.user.username }}
             </div>
-            <div class="text-[11px] text-white/80 leading-tight truncate">
-              <span>{{ user_rol_name }}</span>
-            </div>
           </div>
         </a>
 
@@ -354,7 +351,7 @@
             <a href="{% url 'gestion_tubo' %}" 
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_tubo' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
               <i data-lucide="git-pull-request" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
-              <span>Tubo de Compromiso SGR</span>
+              <span>Tubo de Compromiso</span>
             </a>
           {% endif %}
 
@@ -528,7 +525,7 @@
              alt="Escudo Municipal" 
              class="h-8 w-auto opacity-80"
              onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
-        <span>Ilustre Municipalidad de La Serena · Sistema Integrado SGR</span>
+        <span>Ilustre Municipalidad de La Serena · Sistema de Gestión Territorial</span>
       </div>
       <div>
         <span>Vanguard Systems Group © 2026</span>

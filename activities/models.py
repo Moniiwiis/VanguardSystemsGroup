@@ -523,7 +523,7 @@ def get_or_create_actividad_para_atencion(atencion):
     if not item:
         item = ItemMedicion.objects.create(
             nombre_item="Atención Ciudadana y Requerimientos Territoriales",
-            descripcion="Ítem base para requerimientos territoriales y evidencias SGR",
+            descripcion="Ítem base para requerimientos territoriales y evidencias",
             estado="Activo",
         )
 

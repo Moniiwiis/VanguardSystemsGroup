@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Tubo de Compromiso SGR — Ilustre Municipalidad de La Serena{% endblock %}
+{% block title %}Tubo de Compromiso — Ilustre Municipalidad de La Serena{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -11,11 +11,11 @@
       <div class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
         <span>Gestión Territorial</span>
         <span class="text-slate-300">/</span>
-        <span class="text-[#C41230]">Tubo de Compromiso SGR</span>
+        <span class="text-[#C41230]">Tubo de Compromiso</span>
       </div>
       <h1 class="font-display text-xl sm:text-2xl font-extrabold text-[#8B1D19] flex items-center gap-2.5">
         <i data-lucide="git-pull-request" class="w-6 h-6 text-[#C41230]"></i>
-        <span>Tubo de Compromiso SGR</span>
+        <span>Tubo de Compromiso</span>
       </h1>
       <p class="text-xs text-slate-500 max-w-2xl leading-relaxed">
         Seguimiento de compromisos territoriales originados desde <strong>Atenciones Ciudadanas</strong> o directamente como <strong>Compromisos Sectoriales</strong>. <em>"En el tubo va todo compromiso a futuro".</em>
@@ -666,7 +666,7 @@
             <th class="py-2.5 px-2 whitespace-nowrap">Solicitante</th>
             <th class="py-2.5 px-2 whitespace-nowrap">Territorio</th>
             <th class="py-2.5 px-2 leading-tight">Tipo / Sub Atención</th>
-            <th class="py-2.5 px-2 whitespace-nowrap">Evidencia SGR</th>
+            <th class="py-2.5 px-2 whitespace-nowrap">Evidencia</th>
             <th class="py-2.5 px-2 whitespace-nowrap">Responsable</th>
             <th class="py-2.5 px-2 leading-tight w-[94px]">Fecha Compromiso</th>
             <th class="py-2.5 px-2 leading-tight">Área de Apoyo</th>
@@ -718,7 +718,7 @@
               <span class="text-slate-400 block text-[10px] mt-0.5 leading-snug">{{ at.sub_nombre }}</span>
             </td>
 
-            <!-- Evidencia SGR -->
+            <!-- Evidencia -->
             <td class="py-2.5 px-2 whitespace-nowrap">
               {% if at.es_atencion %}
                 <span class="font-mono font-bold text-slate-800 text-[11px] block leading-tight">{{ at.evidencia_codigo }}</span>
@@ -774,7 +774,6 @@
                 <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#C41230] shrink-0 mt-0.5"></i>
                 <span class="min-w-0 break-words [overflow-wrap:anywhere]">{{ at.responsable_nombre }}</span>
               </div>
-              <div class="text-[10px] text-slate-400">{{ at.responsable_rol }}</div>
             </td>
 
             <!-- Fecha Compromiso -->
@@ -909,7 +908,7 @@
           <tr>
             <td colspan="12" class="p-10 text-center text-slate-400">
               <i data-lucide="inbox" class="w-10 h-10 mx-auto mb-2 text-slate-300"></i>
-              <p class="font-extrabold text-slate-700 text-sm">No hay requerimientos en el Tubo SGR</p>
+              <p class="font-extrabold text-slate-700 text-sm">No hay requerimientos en el Tubo de Compromiso</p>
               <p class="text-xs text-slate-400 mt-1">Los requerimientos con compromisos territoriales a futuro se visualizan en este tablero.</p>
             </td>
           </tr>
@@ -1058,7 +1057,7 @@
         <thead class="bg-slate-50 text-slate-700 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200">
           <tr>
             <th class="py-3 px-3.5">Colaborador / Funcionario</th>
-            <th class="py-3 px-3.5">Cargo / Rol</th>
+            <th class="py-3 px-3.5">Cargo</th>
             <th class="py-3 px-3.5 whitespace-nowrap">Territorio</th>
             <th class="py-3 px-3.5 text-center whitespace-nowrap">Total Tubo</th>
             <th class="py-3 px-3.5 text-center text-blue-700 whitespace-nowrap">Ingresados</th>
@@ -1164,7 +1163,7 @@
 
 </div>
 
-<!-- Modal Ver Detalle de Atención y Edición Bidireccional con Tubo SGR (Idéntico a Atenciones) -->
+<!-- Modal Ver Detalle de Atención y Edición Bidireccional con Tubo de Compromiso (Idéntico a Atenciones) -->
 <div id="modal-detalle-atencion" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
   <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] overflow-y-auto space-y-4">
     <!-- Encabezado Modal -->
@@ -1235,12 +1234,12 @@
         </div>
       </div>
 
-      <!-- Conexión Tubo SGR (Modo Lectura) -->
+      <!-- Conexión Tubo de Compromiso (Modo Lectura) -->
       <div id="at-seccion-lectura-tubo" class="p-3.5 rounded-2xl bg-red-50/40 border border-red-100 space-y-2 overflow-hidden">
         <div class="flex items-center justify-between border-b border-red-100 pb-1.5">
           <div class="flex items-center gap-1.5">
             <i data-lucide="git-pull-request" class="w-3.5 h-3.5 text-[#C41230]"></i>
-            <span class="font-extrabold text-[#8B1D19] uppercase tracking-wider text-[11px]">Seguimiento Tubo de Compromiso SGR</span>
+            <span class="font-extrabold text-[#8B1D19] uppercase tracking-wider text-[11px]">Seguimiento Tubo de Compromiso</span>
           </div>
           <span id="at-tubo-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold"></span>
         </div>
@@ -1263,7 +1262,7 @@
       </div>
     </div>
 
-    <!-- Formulario de Edición Bidireccional (Atención <-> Tubo SGR) -->
+    <!-- Formulario de Edición Bidireccional (Atención <-> Tubo de Compromiso) -->
     {% if not permisos.es_consultor %}
     <form id="form-editar-atencion" method="POST" enctype="multipart/form-data" action="" onsubmit="return prepararEnvioEdicionAtencion()" class="hidden space-y-4 rounded-3xl border border-blue-200 bg-blue-50/40 p-5 text-xs font-bold">
       {% csrf_token %}
@@ -1273,7 +1272,7 @@
       <div class="flex items-center justify-between border-b border-blue-200 pb-2">
         <div class="flex items-center gap-2 text-blue-900">
           <i data-lucide="edit" class="w-4 h-4 text-blue-600"></i>
-          <span class="font-extrabold text-sm">Modificar Atención y Sincronizar con Tubo SGR</span>
+          <span class="font-extrabold text-sm">Modificar Atención y Sincronizar con Tubo</span>
         </div>
         <span class="text-[10px] text-blue-700 font-medium">Los cambios se sincronizan en ambos módulos</span>
       </div>
@@ -1319,7 +1318,7 @@
       <div class="p-3.5 rounded-2xl bg-white border border-blue-200 space-y-3">
         <div class="flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-1.5">
           <i data-lucide="git-pull-request" class="w-4 h-4 text-[#C41230]"></i>
-          <span class="font-extrabold text-xs">Parámetros del Tubo de Compromiso SGR</span>
+          <span class="font-extrabold text-xs">Parámetros del Tubo de Compromiso</span>
         </div>
         <div id="at-edit-vatubo-wrapper" class="space-y-1">
           <label for="at-edit-vatubo" class="block text-slate-700 text-[11px]">¿Gestionar en Tubo de Compromiso?</label>
@@ -1366,12 +1365,12 @@
     </form>
     {% endif %}
 
-    <!-- Evidencia Territorial SGR Disponible para Revisar / Aprobar -->
+    <!-- Evidencia Territorial Disponible para Revisar / Aprobar -->
     <div id="at-seccion-evidencias" class="p-4 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-2.5 text-xs">
       <div class="flex items-center justify-between">
         <span class="font-extrabold text-slate-900 flex items-center gap-1.5">
           <i data-lucide="file-check" class="w-4 h-4 text-[#C41230]"></i>
-          Evidencia de Respaldo Territorial (SGR)
+          Evidencia de Respaldo Territorial
         </span>
         <span id="at-evi-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800"></span>
       </div>
@@ -1422,7 +1421,7 @@
       </form>
 
       <div class="pt-2.5 border-t border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <span class="text-[11px] text-slate-600 font-bold">Validación Territorial SGR:</span>
+        <span class="text-[11px] text-slate-600 font-bold">Validación Territorial:</span>
         <div class="flex items-center gap-2">
           <form id="form-aprobar-evidencia" method="POST" action="" class="inline">
             {% csrf_token %}
@@ -1698,7 +1697,7 @@
     const descReadonly = document.getElementById('at-desc-lectura');
     if (descReadonly) descReadonly.textContent = desc || 'Sin descripción registrada';
     const respEl = document.getElementById('at-resp');
-    if (respEl) respEl.textContent = responsableRol ? `${resp} · ${responsableRol}` : resp;
+    if (respEl) respEl.textContent = resp;
     const creadorEl = document.getElementById('at-creador');
     if (creadorEl) creadorEl.textContent = creador || 'No registrado';
     const fechaEl = document.getElementById('at-fecha');
@@ -1707,7 +1706,7 @@
     const estadoEl = document.getElementById('at-estado-actual');
     if (estadoEl) estadoEl.textContent = estado;
 
-    // Datos Tubo SGR en Modo Lectura
+    // Datos Tubo de Compromiso en Modo Lectura
     const isTubo = (vaTubo === '1' || vaTubo === 'true' || vaTubo === true);
     const seccionLecturaTubo = document.getElementById('at-seccion-lectura-tubo');
     if (seccionLecturaTubo) {
@@ -1791,7 +1790,7 @@
       }
     }
 
-    // Evidencias SGR (solo aplica a Atenciones Ciudadanas con Actividad)
+    // Evidencias de respaldo (solo aplica a Atenciones Ciudadanas con Actividad)
     const seccionEvidencias = document.getElementById('at-seccion-evidencias');
     if (seccionEvidencias) {
       seccionEvidencias.classList.toggle('hidden', !esAtencion);

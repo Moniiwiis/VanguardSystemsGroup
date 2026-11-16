@@ -1,4 +1,4 @@
-# Sistema Municipal SGR — Municipalidad de La Serena
+# Sistema de Gestión Territorial — Municipalidad de La Serena
 **VanguardSystemsGroup · Proyecto Integrado y Programación BackEnd - INACAP La Serena 2026**
 
 ---
@@ -171,7 +171,7 @@ Los usuarios con rol **Cliente** ven exclusivamente:
 | Atenciones Ciudadanas | `/atenciones/` | Operador |
 | Vecinos | `/vecinos/` | Operador |
 | Organizaciones / JJVV | `/organizaciones/` | Operador |
-| Metas SGR | `/metas/` | Coordinador |
+| Metas | `/metas/` | Coordinador |
 | Tipos de Atención | `/tipo-atencion/` | Coordinador |
 | Delegaciones | `/delegaciones/` | Administrador |
 | Roles | `/roles/` | Administrador |
@@ -186,7 +186,7 @@ Los usuarios con rol **Cliente** ven exclusivamente:
 ## 📤 Exportación a Excel (.xlsx)
 
 Disponible en los módulos:
-- **Atenciones** → botón "Exportar Excel" → columnas SGR Matrix
+- **Atenciones** → botón "Exportar Excel" → columnas Matriz Territorial
 - **Organizaciones** → botón "Exportar Excel" → coherente con `base_datos_JJVV.xlsx`
 - **Vecinos** → botón "Exportar Excel"
 
@@ -263,7 +263,7 @@ VanguardSystemsGroup/
 │   └── portal/        # Portal ciudadano cliente
 ├── fixtures/
 │   ├── base_datos_JJVV.xlsx   # 2.708 organizaciones comunitarias
-│   └── matriz_sgr.xlsx         # Atenciones SGR
+│   └── matriz_sgr.xlsx         # Atenciones territoriales
 └── media/perfiles/    # Fotos de perfil (Croppr.js)
 ```
 

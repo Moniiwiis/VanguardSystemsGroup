@@ -1,5 +1,5 @@
 """
-Comando de población de datos para el Sistema Municipal SGR - Municipalidad de La Serena.
+Comando de población de datos para el Sistema Municipal - Municipalidad de La Serena.
 Evaluación 3 - Proyecto Integrado 4to Semestre INACAP.
 
 Genera:
@@ -82,14 +82,14 @@ def gen_rut():
 # ---------------------------------------------------------------------------
 
 class Command(BaseCommand):
-    help = ('Puebla la base de datos SGR con datos de evaluación:\n'
+    help = ('Puebla la base de datos con datos de evaluación:\n'
             '  - 6 cuentas de evaluación\n'
             '  - >2.000 organizaciones desde base_datos_JJVV.xlsx\n'
             '  - Atenciones desde matriz_sgr.xlsx')
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.MIGRATE_HEADING(
-            "=== Iniciando seed de datos SGR (Evaluación 3) ==="))
+            "=== Iniciando seed de datos municipales (Evaluación 3) ==="))
 
         # Pre-cargar números base de RUT ya usados para garantizar idempotencia
         for r_ex in list(Vecino.all_objects.values_list('rut', flat=True)) + list(
@@ -208,7 +208,7 @@ class Command(BaseCommand):
             )
             return c
 
-        cargo_admin     = mk_cargo("Administrador Sistema", "Administración del sistema SGR.")
+        cargo_admin     = mk_cargo("Administrador Sistema", "Administración del sistema municipal.")
         cargo_gestor    = mk_cargo("Gestor Social", "Atención y derivación de requerimientos sociales.")
         cargo_coord     = mk_cargo("Coordinador Territorial", "Supervisión de compromisos comunitarios.")
         cargo_inspector = mk_cargo("Inspector Municipal", "Fiscalización y respuesta a denuncias.")
@@ -455,7 +455,7 @@ class Command(BaseCommand):
         self.stdout.write("▶ Creando cuentas adicionales de operación...")
         mk_user_funcionario(
             username='admin_sgr', password='Admin1234!',
-            first_name='Administrador', last_name='General SGR',
+            first_name='Administrador', last_name='General',
             email='admin@laserena.cl', identificador='ADM-001',
             delegacion=None, cargo=cargo_coord, rol=rol_admin,
             is_staff=True, is_superuser=True,
@@ -948,7 +948,7 @@ class Command(BaseCommand):
         # ------------------------------------------------------------------
         # 10. ATENCIONES CIUDADANAS desde matriz_sgr.xlsx
         # ------------------------------------------------------------------
-        self.stdout.write("▶ Importando Atenciones desde matriz SGR xlsx...")
+        self.stdout.write("▶ Importando Atenciones desde matriz territorial xlsx...")
 
         xlsx_sgr = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
             os.path.dirname(__file__)))), 'fixtures', 'matriz_sgr.xlsx')
@@ -1026,7 +1026,7 @@ class Command(BaseCommand):
 
                 # Código correlativo
                 at_contador += 1
-                codigo = f"AT-SGR-{at_contador:05d}"
+                codigo = f"AT-LS-{at_contador:05d}"
 
                 # Vecino aleatorio o cliente_1
                 vec_obj = random.choice(vecinos_all) if vecinos_all and random.random() > 0.3 else v_cliente1
@@ -1057,11 +1057,11 @@ class Command(BaseCommand):
 
             wb_sgr.close()
             self.stdout.write(self.style.SUCCESS(
-                f"  ✓ Atenciones SGR: {at_creadas} creadas, {at_errores} errores "
+                f"  ✓ Atenciones: {at_creadas} creadas, {at_errores} errores "
                 f"(total en DB: {AtencionCiudadana.objects.count()})"
             ))
         except Exception as exc:
-            self.stdout.write(self.style.WARNING(f"  ⚠ Error importando SGR xlsx: {exc}"))
+            self.stdout.write(self.style.WARNING(f"  ⚠ Error importando atenciones xlsx: {exc}"))
 
         # ------------------------------------------------------------------
         # 11. ATENCIONES ADICIONALES MASIVAS (para garantizar ≥ 2000 total)

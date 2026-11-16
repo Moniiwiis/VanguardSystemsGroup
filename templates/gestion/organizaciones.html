@@ -52,7 +52,7 @@
     </div>
   </div>
 
-  <!-- Tarjetas de Resumen Clicables (Idénticas a Atenciones y Tubo SGR) -->
+  <!-- Tarjetas de Resumen Clicables (Idénticas a Atenciones y Tubo) -->
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
     <a href="?{% if q %}q={{ q }}&{% endif %}{% if filtro_tipo %}tipo={{ filtro_tipo }}&{% endif %}{% if delegacion_seleccionada and es_admin %}delegacion={{ delegacion_seleccionada.id }}{% endif %}"
        class="bg-white rounded-2xl p-4 border {% if not filtro_estado %}border-[#C41230] ring-2 ring-red-100{% else %}border-slate-200/80 hover:border-red-300{% endif %} shadow-sm transition-all hover:shadow group block">

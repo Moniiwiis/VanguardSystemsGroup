@@ -1339,7 +1339,8 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         resp_tabla = self.client.get(reverse('gestion_tubo') + '?vista=tabla')
         self.assertEqual(resp_tabla.status_code, 200)
         self.assertEqual(resp_tabla.context['vista'], 'tabla')
-        self.assertContains(resp_tabla, 'Tubo de Compromiso SGR')
+        self.assertContains(resp_tabla, 'Tubo de Compromiso')
+        self.assertNotContains(resp_tabla, 'Tubo de Compromiso SGR')
         self.assertContains(resp_tabla, at_ing.get_codigo_tubo())
 
         # Vista Canvas (Kanban 4 columnas + mismas 6 tarjetas KPI que Tabla)
@@ -2942,6 +2943,75 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.client.post(reverse('gestion_organizaciones_eliminar', args=[org.id]))
         user_org.refresh_from_db()
         self.assertFalse(user_org.is_active)
+
+    def test_no_visible_sgr_and_no_visible_role_badges(self):
+        import re
+
+        admin = User.objects.create_user(
+            username='admin_sin_sgr_test',
+            password='Password123!',
+            first_name='Carla',
+            last_name='Torres',
+            email='carla.torres@example.test',
+            is_staff=True,
+            is_superuser=True,
+        )
+        rol_especial = Rol.objects.create(
+            nombre_rol='RolOcultoVisualCheck',
+            alcance='Global',
+            estado='Activo',
+        )
+        func = Funcionario.objects.create(
+            user=admin,
+            cargo=self.cargo,
+            delegacion=self.delegacion,
+            identificador_institucional='FUNC-VISUAL-01',
+            estado='Activo',
+        )
+        FuncionarioRol.objects.create(funcionario=func, rol=rol_especial)
+
+        at = AtencionCiudadana.objects.create(
+            codigo_atencion='AT-VIS-001',
+            solicitante='Juan Pérez',
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Revisión territorial sin siglas visibles',
+            usuario_responsable=admin,
+            estado='Registrada',
+            va_a_tubo=True,
+            fecha_compromiso=datetime.date(2026, 12, 1),
+        )
+
+        self.client.force_login(admin)
+        for url_name in (
+            'gestion_inicio',
+            'perfil_usuario',
+            'gestion_atenciones',
+            'gestion_tubo',
+            'gestion_reportes',
+            'gestion_metas',
+            'gestion_configuracion',
+        ):
+            resp = self.client.get(reverse(url_name))
+            self.assertEqual(resp.status_code, 200)
+            html = resp.content.decode('utf-8')
+            m = re.search(r'(?<![_-])\bSGR\b(?![_-])', html, flags=re.IGNORECASE)
+            self.assertIsNone(
+                m,
+                f'Se encontró SGR visible en {url_name}: {html[max(0, m.start()-80):m.end()+80] if m else ""}',
+            )
+            if url_name in ('gestion_inicio', 'perfil_usuario'):
+                self.assertNotIn('RolOcultoVisualCheck', html)
+                self.assertNotIn('Rol: <strong>', html)
+
+        # Tampoco aparece el rol del responsable en la columna de Atenciones ni Tubo
+        resp_at = self.client.get(reverse('gestion_atenciones'))
+        self.assertNotContains(resp_at, '<div class="text-[10px] text-slate-500">RolOcultoVisualCheck</div>')
+        resp_tubo = self.client.get(reverse('gestion_tubo') + '?vista=tabla')
+        self.assertNotContains(resp_tubo, '<div class="text-[10px] text-slate-400">RolOcultoVisualCheck</div>')
+        self.assertTrue(at.id)
+
 
 
 
