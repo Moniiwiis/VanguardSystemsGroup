@@ -1572,23 +1572,21 @@ def gestion_usuarios(request):
 
         rol_obj = Rol.objects.filter(id=rol_id, estado='Activo').first()
         cargo_obj = Cargo.objects.filter(id=cargo_id).first()
-        if tratamiento not in dict(Funcionario.TRATAMIENTO_CHOICES):
-            messages.error(request, "Selecciona un tratamiento de saludo válido.")
-        elif not nombre or not correo or not username or not rol_obj or not cargo_obj:
-            messages.error(request, "Nombre, usuario, correo, rol y cargo son obligatorios.")
-        elif identificador and Funcionario.objects.filter(
-            identificador_institucional__iexact=identificador,
-        ).exists():
-            messages.error(request, "Ese RUT o identificador institucional ya está registrado.")
         rut_ok, rut_fmt = validar_rut(rut_raw) if rut_raw else (False, "El RUT del funcionario es obligatorio.")
         if err_nombre:
             messages.error(request, err_nombre)
+        elif tratamiento not in dict(Funcionario.TRATAMIENTO_CHOICES):
+            messages.error(request, "Selecciona un tratamiento de saludo válido.")
         elif not nombre or not rut_raw or not correo or not rol_obj or not cargo_obj:
             messages.error(request, "Primer nombre, apellido paterno, RUT, correo, rol y cargo son obligatorios.")
         elif not rut_ok:
             messages.error(request, f"RUT de funcionario inválido: {rut_fmt}")
         elif _funcionarios_municipales_qs(Funcionario.all_objects).filter(rut=rut_fmt).exists():
             messages.error(request, f"El RUT {rut_fmt} ya se encuentra registrado en otro funcionario.")
+        elif identificador and Funcionario.objects.filter(
+            identificador_institucional__iexact=identificador,
+        ).exists():
+            messages.error(request, "Ese RUT o identificador institucional ya está registrado.")
         elif (
             not ctx['permisos']['es_admin']
             and rol_obj.nombre_rol.strip().casefold()
@@ -1646,7 +1644,6 @@ def gestion_usuarios(request):
                 user=user,
                 defaults={
                     'identificador_institucional': identificador or f"USR-{user.id:03d}",
-                    'identificador_institucional': f"USR-{user.id:03d}",
                     'rut': rut_fmt,
                     'primer_nombre': partes_nombre.get('primer_nombre', ''),
                     'segundo_nombre': partes_nombre.get('segundo_nombre', ''),
@@ -1907,7 +1904,6 @@ def gestion_usuarios_editar(request, user_id):
                 messages.error(request, "Selecciona una sección válida para la delegación del usuario.")
                 return redirect('gestion_usuarios')
 
-        funcionario.user.first_name = request.POST.get('nombre', funcionario.user.first_name).strip()
         nombre_edit, partes_edit, err_nombre_edit = extraer_partes_persona_desde_post(
             request.POST, prefix='', exigir_estructurado=False
         )

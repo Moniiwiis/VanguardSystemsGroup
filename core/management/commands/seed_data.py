@@ -495,8 +495,6 @@ class Command(BaseCommand):
             first_name='Administrador', last_name='General',
             email='admin@laserena.cl', identificador='ADM-001',
             delegacion=None, cargo=cargo_coord, rol=rol_global,
-            is_staff=True, is_superuser=True
-            delegacion=None, cargo=cargo_coord, rol=rol_admin,
             is_staff=True, is_superuser=True,
             rut=formatear_rut(14111005), telefono='+56 9 5100 0005'
         )

@@ -88,9 +88,7 @@
                 {% endif %}
               </div>
             </td>
-            <td class="py-3.5 px-6 font-mono text-slate-700">{{ f.identificador_institucional }}</td>
-            <td class="py-3.5 px-6 font-mono text-slate-700">{{ f.user.username }}</td>
-            <td class="py-3.5 px-6 text-slate-600">{{ f.user.email|default:"—" }}</td>
+            <td class="py-3.5 px-6 font-mono text-slate-700 whitespace-nowrap">{{ f.identificador_institucional }}</td>
             <td class="py-3.5 px-6 font-mono text-slate-700 min-w-[130px] max-w-[160px] [overflow-wrap:anywhere]">{{ f.user.username }}</td>
             <td class="py-3.5 px-6 text-slate-600 min-w-[160px] max-w-[200px] [overflow-wrap:anywhere]">{{ f.user.email|default:"—" }}</td>
             <td class="py-3.5 px-6 text-slate-700">{{ f.cargo.nombre_cargo|default:"—" }}</td>
@@ -113,8 +111,7 @@
               <div class="flex items-center justify-center gap-1.5">
                 <!-- Ver Detalle -->
                 <button type="button" 
-                        onclick="verDetalle('{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.cargo.nombre_cargo|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.nombre_rol|default:'Funcionario'|escapejs }}', '{{ f.delegacion.nombre|default:'Global'|escapejs }}', '{{ f.estado|escapejs }}', '{{ f.identificador_institucional|escapejs }}', '{{ f.sector.nombre|default:''|escapejs }}')"
-                        onclick="verDetalle('{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.cargo.nombre_cargo|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.nombre_rol|default:'Funcionario'|escapejs }}', '{{ f.delegacion.nombre|default:'Global'|escapejs }}', '{{ f.estado|escapejs }}', '{{ f.identificador_institucional|escapejs }}', '{{ f.debe_cambiar_contrasena|yesno:"1,0" }}', '{{ f.get_rut|default:''|escapejs }}')"
+                        onclick="verDetalle('{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.cargo.nombre_cargo|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.nombre_rol|default:'Funcionario'|escapejs }}', '{{ f.delegacion.nombre|default:'Global'|escapejs }}', '{{ f.estado|escapejs }}', '{{ f.identificador_institucional|escapejs }}', '{{ f.debe_cambiar_contrasena|yesno:"1,0" }}', '{{ f.get_rut|default:''|escapejs }}', '{{ f.sector.nombre|default:''|escapejs }}')"
                         title="Ver detalle"
                         class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all">
                   <i data-lucide="eye" class="w-4 h-4"></i>
@@ -122,9 +119,7 @@
                 <!-- Editar -->
                 {% with f.get_partes_nombre as f_partes %}
                 <button type="button" 
-                        onclick="editarRegistro('{{ f.id }}', '{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.id|default:'' }}', '{{ f.delegacion.id|default:'' }}', '{{ f.estado|escapejs }}', '{{ f.cargo_id }}', '{{ f.identificador_institucional|escapejs }}', '{{ f.sector_id|default:'' }}', '{{ f.tratamiento }}')"
-                        title="Editar usuario"
-                        onclick="editarRegistro('{{ f.id }}', '{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.id|default:'' }}', '{{ f.delegacion.id|default:'' }}', '{{ f.estado|escapejs }}', '{{ f.cargo_id }}', '{{ f.user.username|escapejs }}', '{{ f_partes.0|escapejs }}', '{{ f_partes.1|escapejs }}', '{{ f_partes.2|escapejs }}', '{{ f_partes.3|escapejs }}', '{{ f.get_rut|default:''|escapejs }}')"
+                        onclick="editarRegistro('{{ f.id }}', '{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.id|default:'' }}', '{{ f.delegacion.id|default:'' }}', '{{ f.estado|escapejs }}', '{{ f.cargo_id }}', '{{ f.user.username|escapejs }}', '{{ f_partes.0|escapejs }}', '{{ f_partes.1|escapejs }}', '{{ f_partes.2|escapejs }}', '{{ f_partes.3|escapejs }}', '{{ f.get_rut|default:''|escapejs }}', '{{ f.identificador_institucional|escapejs }}', '{{ f.sector_id|default:'' }}', '{{ f.tratamiento }}')"
                         title="Editar funcionario"
                         class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all">
                   <i data-lucide="edit-3" class="w-4 h-4"></i>
@@ -283,12 +278,11 @@
         </select>
       </div>
       <div>
-        <label class="block text-xs font-bold text-slate-700 mb-1">RUT / ID institucional</label>
-        <input type="text" name="identificador_contacto" maxlength="20" placeholder="Ej: 12.345.678-5"
+        <label class="block text-xs font-bold text-slate-700 mb-1">ID Institucional (opcional)</label>
+        <input type="text" name="identificador_contacto" maxlength="20" placeholder="Se autogenera si se deja vacío"
                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
       </div>
       <div>
-        <label class="block text-xs font-bold text-slate-700 mb-1">Correo Electrónico *</label>
         <label class="block text-xs font-bold text-slate-700 mb-1">Correo Electrónico <span class="text-[#C41230]">*</span></label>
         <input type="email" name="correo" required placeholder="correo@dominio.cl"
                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
@@ -476,7 +470,6 @@
 
 {% block extra_js %}
 <script>
-  function verDetalle(nombre, usuario, correo, cargo, rol, delegacion, estado, idInst, seccion) {
   function mostrarTooltipClave(el) {
     const tip = document.getElementById('usuario-pw-tooltip');
     if (!tip || !el) return;
@@ -496,7 +489,7 @@
     if (tip) tip.classList.add('hidden');
   }
 
-  function verDetalle(nombre, usuario, correo, cargo, rol, delegacion, estado, idInst, debeCambiarPw, rut) {
+  function verDetalle(nombre, usuario, correo, cargo, rol, delegacion, estado, idInst, debeCambiarPw, rut, seccion) {
     document.getElementById('ver-id').textContent = idInst || '—';
     document.getElementById('ver-seccion').textContent = seccion || '—';
     document.getElementById('ver-nombre').textContent = nombre;
@@ -522,8 +515,7 @@
     document.getElementById('modal-ver').classList.remove('hidden');
   }
 
-  function editarRegistro(id, nombre, correo, rolId, delId, estado, cargoId, identificador, sectorId, tratamiento) {
-  function editarRegistro(id, nombre, correo, rolId, delId, estado, cargoId, username, primerNombre, segundoNombre, apellidoPaterno, apellidoMaterno, rut) {
+  function editarRegistro(id, nombre, correo, rolId, delId, estado, cargoId, username, primerNombre, segundoNombre, apellidoPaterno, apellidoMaterno, rut, identificador, sectorId, tratamiento) {
     document.getElementById('form-editar').action = `/gestion/usuarios/${id}/editar/`;
     if (document.getElementById('edit-username-readonly')) {
       document.getElementById('edit-username-readonly').value = username || '';
@@ -536,7 +528,7 @@
       document.getElementById('edit-func-rut').value = rut || '';
     }
     document.getElementById('edit-correo').value = correo;
-    document.getElementById('edit-identificador').value = identificador;
+    document.getElementById('edit-identificador').value = identificador || '';
     document.getElementById('edit-tratamiento').value = tratamiento || 'neutral';
     if (rolId && document.getElementById('edit-rol')) {
       document.getElementById('edit-rol').value = rolId;
@@ -545,7 +537,7 @@
       document.getElementById('edit-del').value = delId;
     }
     if (document.getElementById('edit-sector')) {
-      document.getElementById('edit-sector').value = sectorId;
+      document.getElementById('edit-sector').value = sectorId || '';
       filtrarSectoresContacto(document.getElementById('edit-sector'), delId);
     }
     if (cargoId && document.getElementById('edit-cargo')) {
