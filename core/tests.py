@@ -1443,9 +1443,11 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         })
         self.assertRedirects(resp_edit, reverse('gestion_tubo'))
         comp.refresh_from_db()
+        self.assertIsNone(comp.organizacion)
         self.assertEqual(comp.observacion, 'Operativo ampliado con áreas verdes')
         self.assertEqual(comp.estado, 'Pendiente')
         self.assertEqual(comp.area_apoyo, 'Parques y Jardines')
+        self.assertIsNotNone(comp.actividad_origen)
 
         # Eliminación lógica por usuario con permiso de eliminación (superuser/admin)
         admin = User.objects.create_superuser('admin_tubo_del', 'admin_t@example.test', 'Admin123!')
@@ -1453,6 +1455,108 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         resp_del = self.client.post(reverse('gestion_tubo_sector_eliminar', args=[comp.id]))
         self.assertRedirects(resp_del, reverse('gestion_tubo'))
         self.assertFalse(CompromisoAgenda.objects.filter(id=comp.id).exists())
+
+    def test_compromiso_sectorial_solo_delegacion_evidencia_y_modulo_areas_apoyo(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from configuration.models import AreaApoyo
+
+        admin = User.objects.create_superuser('admin_aa', 'admin_aa@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        sess = self.client.session
+        sess['delegacion_activa_id'] = self.delegacion.id
+        sess.save()
+
+        # 1. Módulo CRUD Áreas / Personas / Cuadrillas de Apoyo
+        resp_create_aa = self.client.post(reverse('gestion_areas_apoyo'), {
+            'nombre': 'Cuadrilla Hidrolavado Sur',
+            'tipo': 'Cuadrilla',
+            'descripcion': 'Limpieza de espacios públicos',
+            'estado': 'Activo',
+        })
+        self.assertRedirects(resp_create_aa, reverse('gestion_areas_apoyo'))
+        aa = AreaApoyo.objects.get(nombre='Cuadrilla Hidrolavado Sur')
+        self.assertEqual(aa.tipo, 'Cuadrilla')
+
+        # Editar área de apoyo
+        resp_edit_aa = self.client.post(reverse('gestion_areas_apoyo_editar', args=[aa.id]), {
+            'codigo': aa.get_codigo(),
+            'nombre': 'Cuadrilla Hidrolavado Centro',
+            'tipo': 'Cuadrilla',
+            'descripcion': 'Actualizada',
+            'estado': 'Activo',
+        })
+        self.assertRedirects(resp_edit_aa, reverse('gestion_areas_apoyo'))
+        aa.refresh_from_db()
+        self.assertEqual(aa.nombre, 'Cuadrilla Hidrolavado Centro')
+
+        # Aparece como opción en Atenciones y Tubo
+        resp_at = self.client.get(reverse('gestion_atenciones'))
+        self.assertContains(resp_at, '<option value="Cuadrilla Hidrolavado Centro"')
+        resp_tubo_get = self.client.get(reverse('gestion_tubo'))
+        self.assertContains(resp_tubo_get, '<option value="Cuadrilla Hidrolavado Centro"')
+        # En el modal de Compromiso Sectorial no se vincula a Vecino ni Organización
+        self.assertContains(resp_tubo_get, 'vinculado directamente a tu delegación activa, sin vecino ni organización')
+
+        # Operador no puede gestionar el catálogo de áreas de apoyo
+        self.client.force_login(self.user)
+        resp_op_aa = self.client.get(reverse('gestion_areas_apoyo'))
+        self.assertRedirects(resp_op_aa, reverse('gestion_inicio'))
+
+        # 2. Compromiso Sectorial vinculado directamente a la Delegación (sin sector ni organización) + evidencia Antes/Después
+        self.client.force_login(self.user)
+        archivo_antes = SimpleUploadedFile('antes_sector.txt', b'Antes del operativo', content_type='text/plain')
+        resp_comp = self.client.post(reverse('gestion_tubo'), {
+            'organizacion_id': self.org_local.id,
+            'fecha_compromiso': '2026-12-22',
+            'origen': 'INT',
+            'area_apoyo': aa.nombre,
+            'descripcion': 'Mejoramiento directo en delegación sin organización',
+            'momento_evidencia': 'antes',
+            'archivos_evidencia': archivo_antes,
+        })
+        self.assertRedirects(resp_comp, reverse('gestion_tubo'))
+
+        comp = CompromisoAgenda.objects.filter(observacion='Mejoramiento directo en delegación sin organización').first()
+        self.assertIsNotNone(comp)
+        self.assertEqual(comp.delegacion, self.delegacion)
+        self.assertIsNone(comp.organizacion)
+        self.assertIsNone(comp.sector)
+        self.assertEqual(comp.area_apoyo, aa.nombre)
+        self.assertIsNotNone(comp.actividad_origen)
+        self.assertEqual(comp.actividad_origen.evidencias.filter(momento='antes').count(), 1)
+
+        # No permite aprobar solo con evidencia Antes
+        resp_val_fail = self.client.post(
+            reverse('gestion_tubo_sector_validar_evidencia', args=[comp.id]),
+            {'resultado_evidencia': 'Aprobado'},
+        )
+        self.assertRedirects(resp_val_fail, reverse('gestion_tubo'))
+        comp.refresh_from_db()
+        self.assertEqual(comp.estado, 'Registrada')
+
+        # Subir evidencia Después y aprobar
+        archivo_despues = SimpleUploadedFile('despues_sector.txt', b'Trabajo terminado', content_type='text/plain')
+        resp_subir_despues = self.client.post(
+            reverse('gestion_tubo_sector_subir_evidencia', args=[comp.id]),
+            {'momento': 'despues', 'archivos': archivo_despues},
+        )
+        self.assertRedirects(resp_subir_despues, reverse('gestion_tubo'))
+        self.assertEqual(comp.actividad_origen.evidencias.filter(momento='despues').count(), 1)
+
+        resp_val_ok = self.client.post(
+            reverse('gestion_tubo_sector_validar_evidencia', args=[comp.id]),
+            {'resultado_evidencia': 'Aprobado'},
+        )
+        self.assertRedirects(resp_val_ok, reverse('gestion_tubo'))
+        comp.refresh_from_db()
+        self.assertEqual(comp.estado, 'Resuelta')
+        self.assertEqual(comp.actividad_origen.estado_validacion(), 'Aprobado')
+
+        # Eliminar área de apoyo desde admin
+        self.client.force_login(admin)
+        resp_del_aa = self.client.post(reverse('gestion_areas_apoyo_eliminar', args=[aa.id]))
+        self.assertRedirects(resp_del_aa, reverse('gestion_areas_apoyo'))
+        self.assertFalse(AreaApoyo.objects.filter(id=aa.id).exists())
 
     def test_directiva_jjvv_presidente_tesorero_secretario_crud_y_atencion(self):
         self.client.force_login(self.user)
@@ -2172,7 +2276,8 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
 
         resp_tubo = self.client.get(reverse('gestion_tubo'))
         self.assertContains(resp_tubo, 'data-search-select="true"')
-        self.assertContains(resp_tubo, 'JJVV Lista Buscable 65.123.456-7 PJ-9081')
+        self.assertContains(resp_tubo, 'Sector Combo')
+        self.assertNotContains(resp_tubo, 'JJVV Lista Buscable 65.123.456-7 PJ-9081')
         self.assertNotContains(resp_tubo, 'op_combo')
         self.assertNotContains(resp_tubo, 'Mateo Ríos · Gestor Social Senior')
 

@@ -83,6 +83,7 @@ def global_context(request):
         'ver_metas': es_admin or es_coordinador,
         'ver_tipo_atencion': es_admin or es_coordinador,
         'ver_sub_atencion': es_admin or es_coordinador,
+        'ver_area_apoyo': es_admin or es_coordinador,
         'ver_atenciones': not es_cliente,
         'ver_organizaciones': not es_cliente,
         'ver_tipo_gestion': es_admin or es_coordinador,

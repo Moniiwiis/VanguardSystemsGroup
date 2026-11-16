@@ -31,9 +31,11 @@ from agenda.models import CompromisoAgenda
 from core.utils import separar_nombre_completo, separar_nombre_usuario
 
 try:
-    from configuration.models import TipoAtencion, SubAtencion, Periodo, CatalogoActividad, ItemMedicion, ConfiguracionMeta
+    from configuration.models import (
+        TipoAtencion, SubAtencion, Periodo, CatalogoActividad, ItemMedicion, ConfiguracionMeta, AreaApoyo
+    )
 except ImportError:
-    TipoAtencion = SubAtencion = Periodo = CatalogoActividad = ItemMedicion = ConfiguracionMeta = None
+    TipoAtencion = SubAtencion = Periodo = CatalogoActividad = ItemMedicion = ConfiguracionMeta = AreaApoyo = None
 
 # ---------------------------------------------------------------------------
 # Utilidades RUT Módulo 11
@@ -269,6 +271,34 @@ class Command(BaseCommand):
 
         ta_default = tipos_map.get('SOCIAL')
         sa_default = subatenciones_map.get('AYUDA SOCIAL')
+
+        # ------------------------------------------------------------------
+        # 5b. ÁREAS / PERSONAS / CUADRILLAS DE APOYO
+        # ------------------------------------------------------------------
+        if AreaApoyo:
+            areas_apoyo_seed = [
+                ("AA001", "Obras Municipales", "Área Municipal", "Dirección de Obras Municipales y bacheo."),
+                ("AA002", "Parques y Jardines", "Área Municipal", "Mantención de áreas verdes y arbolado."),
+                ("AA003", "DISERCO", "Área Municipal", "Dirección de Desarrollo Comunitario."),
+                ("AA004", "OROC", "Área Municipal", "Organizaciones Comunitarias."),
+                ("AA005", "Dirección de Tránsito", "Área Municipal", "Señalética y seguridad vial."),
+                ("AA006", "Alumbrado Público", "Área Municipal", "Reposición y mantención de luminarias."),
+                ("AA007", "Aseo y Ornato", "Área Municipal", "Retiro de microbasurales y limpieza."),
+                ("AA008", "Cuadrilla Territorial Centro", "Cuadrilla", "Cuadrilla operativa Delegación Centro."),
+                ("AA009", "Cuadrilla Territorial Norte", "Cuadrilla", "Cuadrilla operativa Las Compañías."),
+                ("AA010", "Inspector de Turno", "Persona", "Apoyo en terreno para fiscalización."),
+            ]
+            for cod_aa, nom_aa, tipo_aa, desc_aa in areas_apoyo_seed:
+                aa, _ = AreaApoyo.all_objects.get_or_create(
+                    nombre=nom_aa,
+                    defaults={'codigo': cod_aa, 'tipo': tipo_aa, 'descripcion': desc_aa, 'estado': 'Activo'}
+                )
+                aa.codigo = cod_aa
+                aa.tipo = tipo_aa
+                aa.descripcion = desc_aa
+                aa.estado = 'Activo'
+                aa.deleted_at = None
+                aa.save()
 
         # ------------------------------------------------------------------
         # 6. TIPO DE GESTIÓN (para vecinos)

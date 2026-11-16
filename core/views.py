@@ -30,13 +30,14 @@ from core.utils import (
 )
 from activities.models import (
     Actividad, Evidencia, ValidacionEvidencia, TipoGestion, Vecino,
-    AtencionCiudadana, OrganizacionComunitaria, get_or_create_actividad_para_atencion
+    AtencionCiudadana, OrganizacionComunitaria,
+    get_or_create_actividad_para_atencion, get_or_create_actividad_para_compromiso
 )
 from websocket.services import publish_module_changed
 from agenda.models import CompromisoAgenda
 from configuration.models import (
     ConfiguracionMeta, Periodo, ItemMedicion, CatalogoActividad,
-    TipoAtencion, SubAtencion
+    TipoAtencion, SubAtencion, AreaApoyo
 )
 from accounts.models import Funcionario, Cargo, Delegacion, Sector, Rol, FuncionarioRol
 
@@ -667,6 +668,7 @@ def gestion_inicio(request):
     total_items_metas = ItemMedicion.objects.count()
     total_tipos_atencion = TipoAtencion.objects.count()
     total_subatenciones = SubAtencion.objects.count()
+    total_areas_apoyo = AreaApoyo.objects.count()
     total_roles = Rol.objects.count()
 
     context = {
@@ -694,6 +696,7 @@ def gestion_inicio(request):
         'total_items_metas': total_items_metas,
         'total_tipos_atencion': total_tipos_atencion,
         'total_subatenciones': total_subatenciones,
+        'total_areas_apoyo': total_areas_apoyo,
         'total_roles': total_roles,
         'es_admin': es_admin,
         'es_admin_global': es_admin and not del_activa,
@@ -2293,6 +2296,150 @@ def gestion_tipo_atencion_eliminar(request, tipo_id):
     return redirect('gestion_tipo_atencion')
 
 
+# --- 6b. ÁREAS / PERSONAS / CUADRILLAS DE APOYO ---
+
+@login_required
+def gestion_areas_apoyo(request):
+    ctx = global_context(request)
+    if not ctx['permisos'].get('ver_area_apoyo'):
+        messages.error(request, "Acceso denegado: Se requiere perfil de Administrador o Coordinador.")
+        return redirect('gestion_inicio')
+
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        tipo = request.POST.get('tipo', 'Área Municipal').strip()
+        descripcion = request.POST.get('descripcion', '').strip()
+        estado = request.POST.get('estado', 'Activo').strip()
+
+        tipos_validos = {choice[0] for choice in AreaApoyo.TIPO_CHOICES}
+        if tipo not in tipos_validos:
+            tipo = 'Área Municipal'
+
+        if not nombre:
+            messages.error(request, "El nombre del Área / Persona / Cuadrilla de Apoyo es obligatorio.")
+            return redirect('gestion_areas_apoyo')
+        ok, err = validar_largo(nombre, 100, "Nombre")
+        if not ok:
+            messages.error(request, err)
+            return redirect('gestion_areas_apoyo')
+        ok, err = validar_largo(descripcion, 1000, "Descripción")
+        if not ok:
+            messages.error(request, err)
+            return redirect('gestion_areas_apoyo')
+        if AreaApoyo.objects.filter(nombre__iexact=nombre).exists():
+            messages.error(request, f"Ya existe un registro activo llamado '{nombre}'.")
+            return redirect('gestion_areas_apoyo')
+
+        codigo = _generar_codigo_siguiente(AreaApoyo, 'AA', pad=3)
+        AreaApoyo.objects.create(
+            codigo=codigo,
+            nombre=nombre,
+            tipo=tipo,
+            descripcion=descripcion,
+            estado='Inactivo' if estado == 'Inactivo' else 'Activo',
+        )
+        messages.success(request, f"'{nombre}' agregado a la lista de áreas/cuadrillas de apoyo.")
+        return redirect('gestion_areas_apoyo')
+
+    q = request.GET.get('q', '').strip()
+    filtro_estado = request.GET.get('estado', '').strip()
+    filtro_tipo = request.GET.get('tipo', '').strip()
+
+    qs = AreaApoyo.objects.all().order_by('nombre')
+    if q:
+        qs = qs.filter(build_accent_query(['codigo', 'nombre', 'tipo', 'descripcion'], q))
+    if filtro_estado:
+        qs = qs.filter(estado__iexact=filtro_estado)
+    if filtro_tipo:
+        qs = qs.filter(tipo__iexact=filtro_tipo)
+
+    orden_opciones = [
+        ('nombre', 'Nombre A-Z'),
+        ('-nombre', 'Nombre Z-A'),
+        ('-id', 'Más recientes'),
+        ('id', 'Más antiguos'),
+        ('tipo', 'Tipo'),
+        ('estado', 'Estado'),
+    ]
+    qs, orden = _apply_list_ordering(qs, request, orden_opciones, 'nombre')
+
+    if request.GET.get('export') == 'excel':
+        headers = ['Código', 'Nombre', 'Tipo', 'Descripción', 'Estado']
+        rows = [[a.get_codigo(), a.nombre, a.tipo, a.descripcion or '', a.estado] for a in qs]
+        return export_to_excel_csv("AreasApoyo", headers, rows)
+
+    page_size = _get_page_size(request)
+    paginator = Paginator(qs, page_size)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    return render(request, 'gestion/areas_apoyo.html', {
+        'page_obj': page_obj,
+        'areas': page_obj.object_list,
+        'tipo_choices': AreaApoyo.TIPO_CHOICES,
+        'q': q,
+        'filtro_estado': filtro_estado,
+        'filtro_tipo': filtro_tipo,
+        'orden': orden,
+        'orden_opciones': orden_opciones,
+        'page_size': page_size,
+        'total_registros': qs.count(),
+    })
+
+
+@login_required
+def gestion_areas_apoyo_editar(request, area_id):
+    ctx = global_context(request)
+    if not ctx['permisos'].get('ver_area_apoyo'):
+        messages.error(request, "Acceso denegado.")
+        return redirect('gestion_inicio')
+
+    area = get_object_or_404(AreaApoyo, id=area_id)
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', area.nombre).strip()
+        tipo = request.POST.get('tipo', area.tipo).strip()
+        descripcion = request.POST.get('descripcion', area.descripcion or '').strip()
+        if not nombre:
+            messages.error(request, "El nombre es obligatorio.")
+            return redirect('gestion_areas_apoyo')
+        ok, err = validar_largo(nombre, 100, "Nombre")
+        if not ok:
+            messages.error(request, err)
+            return redirect('gestion_areas_apoyo')
+        ok, err = validar_largo(descripcion, 1000, "Descripción")
+        if not ok:
+            messages.error(request, err)
+            return redirect('gestion_areas_apoyo')
+        if AreaApoyo.objects.filter(nombre__iexact=nombre).exclude(id=area.id).exists():
+            messages.error(request, f"Ya existe otro registro llamado '{nombre}'.")
+            return redirect('gestion_areas_apoyo')
+
+        tipos_validos = {choice[0] for choice in AreaApoyo.TIPO_CHOICES}
+        area.codigo = request.POST.get('codigo', area.codigo or area.get_codigo()).strip().upper()
+        area.nombre = nombre
+        area.tipo = tipo if tipo in tipos_validos else area.tipo
+        area.descripcion = descripcion
+        estado_post = request.POST.get('estado', area.estado).strip()
+        area.estado = 'Inactivo' if estado_post == 'Inactivo' else 'Activo'
+        area.save()
+        messages.success(request, f"'{area.nombre}' actualizado.")
+    return redirect('gestion_areas_apoyo')
+
+
+@login_required
+def gestion_areas_apoyo_eliminar(request, area_id):
+    ctx = global_context(request)
+    if not ctx['permisos'].get('ver_area_apoyo'):
+        messages.error(request, "Acceso denegado.")
+        return redirect('gestion_inicio')
+
+    area = get_object_or_404(AreaApoyo, id=area_id)
+    if request.method == 'POST':
+        nombre = area.nombre
+        area.delete()
+        messages.success(request, f"'{nombre}' eliminado de áreas/cuadrillas de apoyo.")
+    return redirect('gestion_areas_apoyo')
+
+
 # --- 6. CRUD SUB ATENCIÓN (Wireframe C5) ---
 
 @login_required
@@ -2856,16 +3003,14 @@ def _adjuntar_roles_atenciones(atenciones):
     return atenciones
 
 
-def _guardar_evidencias_atencion(atencion, momento, imagenes, archivos):
-    """Persiste imágenes y archivos adjuntos como Evidencia SGR y marca validación pendiente."""
-    if not atencion or momento not in {'antes', 'despues'}:
+def _guardar_evidencias_para_actividad(actividad, momento, imagenes, archivos):
+    """Persiste imágenes y archivos adjuntos sobre una Actividad y deja la validación en estado Pendiente."""
+    if momento not in {'antes', 'despues'}:
         return False, 0, "Selecciona si la evidencia corresponde al antes o después del trabajo."
     if not imagenes and not archivos:
         return True, 0, None
-
-    actividad = get_or_create_actividad_para_atencion(atencion)
     if not actividad:
-        return False, 0, "No se pudo asociar la actividad a esta atención. Por favor, intente nuevamente."
+        return False, 0, "No se pudo asociar la actividad para las evidencias. Por favor, intente nuevamente."
     if actividad.estado_validacion() == 'Aprobado':
         return False, 0, "La evidencia ya fue aprobada y no se puede modificar."
 
@@ -2919,6 +3064,30 @@ def _guardar_evidencias_atencion(atencion, momento, imagenes, archivos):
         validacion.save(update_fields=['resultado', 'observaciones', 'updated_at'])
 
     return True, archivos_guardados, None
+
+
+def _guardar_evidencias_atencion(atencion, momento, imagenes, archivos):
+    if not atencion:
+        return False, 0, "No se pudo asociar la actividad a esta atención."
+    if momento not in {'antes', 'despues'}:
+        return False, 0, "Selecciona si la evidencia corresponde al antes o después del trabajo."
+    if not imagenes and not archivos:
+        return True, 0, None
+    return _guardar_evidencias_para_actividad(
+        get_or_create_actividad_para_atencion(atencion), momento, imagenes, archivos
+    )
+
+
+def _guardar_evidencias_compromiso(compromiso, momento, imagenes, archivos):
+    if not compromiso:
+        return False, 0, "No se pudo asociar la actividad a este compromiso."
+    if momento not in {'antes', 'despues'}:
+        return False, 0, "Selecciona si la evidencia corresponde al antes o después del trabajo."
+    if not imagenes and not archivos:
+        return True, 0, None
+    return _guardar_evidencias_para_actividad(
+        get_or_create_actividad_para_compromiso(compromiso), momento, imagenes, archivos
+    )
 
 
 @login_required
@@ -3359,6 +3528,7 @@ def gestion_atenciones(request):
         'tipos_organizacion': OrganizacionComunitaria.TIPO_CHOICES,
         'tipos_organizaciones': [t[0] for t in OrganizacionComunitaria.TIPO_CHOICES],
         'tipos_gestion': TipoGestion.objects.all(),
+        'areas_apoyo_catalogo': AreaApoyo.objects.filter(estado='Activo').order_by('nombre'),
         'hoy_iso': timezone.localdate().isoformat(),
         'abrir_tubo': request.GET.get('abrir_tubo') == '1' and bool(del_activa),
         'sectores': sectores_disponibles,
@@ -3616,43 +3786,39 @@ def gestion_atenciones_estado(request, atencion_id):
     return redirect('gestion_atenciones')
 
 
-@login_required
-def gestion_atenciones_validar_evidencia(request, atencion_id):
-    ctx = global_context(request)
+def _procesar_validacion_evidencia_objeto(
+    request, ctx, *, obj, actividad_getter, codigo_ref, delegacion_id, default_redirect
+):
+    """Audita evidencias antes/después compartida para Atención Ciudadana y Compromiso Sectorial."""
     if not (ctx['permisos']['es_admin'] or ctx['permisos']['es_coordinador'] or ctx['permisos']['es_delegado']):
         messages.error(request, "Acceso denegado: No tienes autorización para auditar o validar evidencias.")
-        return redirect('gestion_atenciones')
+        return redirect(default_redirect)
 
-    atencion = get_object_or_404(AtencionCiudadana, id=atencion_id)
     es_admin = ctx['permisos']['es_admin'] or ctx['permisos'].get('es_coordinador', False)
     del_activa = ctx['delegacion_activa']
+    if not es_admin and del_activa and delegacion_id != del_activa.id:
+        messages.error(request, "Acceso denegado: No puedes validar evidencias de otra delegación.")
+        return redirect(default_redirect)
 
-    # Scoping territorial
-    if not es_admin:
-        if del_activa and atencion.delegacion_id != del_activa.id:
-            messages.error(request, "Acceso denegado: No puedes validar evidencias de otra delegación.")
-            return redirect('gestion_atenciones')
-
-    actividad = get_or_create_actividad_para_atencion(atencion)
+    actividad = actividad_getter(obj)
     if not actividad:
-        messages.error(request, "No fue posible acceder a la actividad asociada a esta atención. Por favor, intente nuevamente.")
-        return redirect('gestion_atenciones')
+        messages.error(request, "No fue posible acceder a la actividad asociada a este registro. Por favor, intente nuevamente.")
+        return redirect(default_redirect)
 
     funcionario_actual = ctx['funcionario_actual']
     if not funcionario_actual:
         messages.error(request, "No se encontró un perfil de funcionario para registrar la validación.")
-        return redirect('gestion_atenciones')
+        return redirect(default_redirect)
 
+    redirect_target = request.META.get('HTTP_REFERER') or default_redirect
     if request.method == 'POST':
         resultado = request.POST.get('resultado_evidencia', 'Aprobado').strip()
-        observaciones = request.POST.get('observaciones', f'Validación de evidencia para atención {atencion.codigo_atencion}').strip()
+        observaciones = request.POST.get('observaciones', f'Validación de evidencia para {codigo_ref}').strip()
         if resultado not in {'Aprobado', 'Rechazado'}:
             messages.error(request, "El resultado de validación no es válido.")
-            return redirect(request.META.get('HTTP_REFERER') or 'gestion_atenciones')
+            return redirect(redirect_target)
 
-        evidence_files = actividad.evidencias.filter(
-            Q(imagen__gt='') | Q(archivo__gt='')
-        )
+        evidence_files = actividad.evidencias.filter(Q(imagen__gt='') | Q(archivo__gt=''))
         has_before = evidence_files.filter(momento='antes').exists()
         has_after = evidence_files.filter(momento='despues').exists()
         if not has_before or not has_after:
@@ -3660,57 +3826,53 @@ def gestion_atenciones_validar_evidencia(request, atencion_id):
                 request,
                 "Para recién ser aprobada o rechazada, se debe contar obligatoriamente con una evidencia de antes y otra de después del trabajo.",
             )
-            return redirect(request.META.get('HTTP_REFERER') or 'gestion_atenciones')
+            return redirect(redirect_target)
 
         val, _ = ValidacionEvidencia.objects.get_or_create(
             actividad=actividad,
             defaults={
                 'verificador': funcionario_actual,
                 'resultado': resultado,
-                'observaciones': observaciones
-            }
+                'observaciones': observaciones,
+            },
         )
         val.resultado = resultado
         val.verificador = funcionario_actual
         val.observaciones = observaciones
         val.save()
 
-        # Si se aprueba la evidencia, pasar la atención a Resuelta si estaba Registrada
-        if resultado == 'Aprobado' and atencion.estado in ['Registrada', 'En proceso']:
-            atencion.estado = 'Resuelta'
-            atencion.save(update_fields=['estado'])
+        if resultado == 'Aprobado' and obj.estado in ['Registrada', 'En proceso']:
+            obj.estado = 'Resuelta'
+            obj.save(update_fields=['estado'])
 
-        del_id_ws = atencion.delegacion_id if atencion.delegacion_id else "global"
-        publish_module_changed("atenciones", del_id_ws, "update", atencion.id)
-        publish_module_changed("tubo", del_id_ws, "update", atencion.id)
+        del_id_ws = delegacion_id if delegacion_id else "global"
+        publish_module_changed("atenciones", del_id_ws, "update", obj.id)
+        publish_module_changed("tubo", del_id_ws, "update", obj.id)
 
-        messages.success(request, f"¡Evidencia {actividad.codigo_evidencia_unico} de atención {atencion.codigo_atencion} validada como '{resultado}'! El Semáforo se ha actualizado.")
+        messages.success(request, f"¡Evidencia {actividad.codigo_evidencia_unico} ({codigo_ref}) validada como '{resultado}'! El Semáforo se ha actualizado.")
 
-    return redirect(request.META.get('HTTP_REFERER') or 'gestion_atenciones')
+    return redirect(redirect_target)
 
 
-@login_required
-def gestion_atenciones_subir_evidencia(request, atencion_id):
-    ctx = global_context(request)
-    redirect_target = request.META.get('HTTP_REFERER') or 'gestion_atenciones'
+def _procesar_subida_evidencia_objeto(
+    request, ctx, *, obj, actividad_getter, saver_fn, delegacion_id, default_redirect
+):
+    """Carga de archivos antes/después compartida para Atención Ciudadana y Compromiso Sectorial."""
+    redirect_target = request.META.get('HTTP_REFERER') or default_redirect
     if request.method != 'POST' or not ctx['permisos'].get('puede_ingresar_atencion', True):
         messages.error(request, "No tienes autorización para adjuntar evidencias.")
         return redirect(redirect_target)
 
-    atencion = get_object_or_404(
-        AtencionCiudadana.objects.select_related('actividad', 'delegacion'),
-        id=atencion_id,
-    )
     es_admin = ctx['permisos']['es_admin'] or ctx['permisos'].get('es_coordinador', False)
     if not es_admin:
         delegacion_activa = ctx['delegacion_activa']
-        if not delegacion_activa or atencion.delegacion_id != delegacion_activa.id:
-            messages.error(request, "No puedes adjuntar evidencias a atenciones de otra delegación.")
+        if not delegacion_activa or delegacion_id != delegacion_activa.id:
+            messages.error(request, "No puedes adjuntar evidencias a registros de otra delegación.")
             return redirect(redirect_target)
 
-    actividad = get_or_create_actividad_para_atencion(atencion)
+    actividad = actividad_getter(obj)
     if not actividad:
-        messages.error(request, "No se pudo asociar la actividad a esta atención. Por favor, intente nuevamente.")
+        messages.error(request, "No se pudo asociar la actividad a este registro. Por favor, intente nuevamente.")
         return redirect(redirect_target)
     if actividad.estado_validacion() == 'Aprobado':
         messages.error(request, "La evidencia ya fue aprobada y no se puede modificar.")
@@ -3726,19 +3888,47 @@ def gestion_atenciones_subir_evidencia(request, atencion_id):
         messages.error(request, "Selecciona al menos una imagen o archivo para adjuntar.")
         return redirect(redirect_target)
 
-    ok_ev, archivos_guardados, err_ev = _guardar_evidencias_atencion(atencion, momento, imagenes, archivos)
+    ok_ev, archivos_guardados, err_ev = saver_fn(obj, momento, imagenes, archivos)
     if not ok_ev:
         messages.error(request, err_ev or "Ocurrió un error al guardar los archivos adjuntos. Por favor, intenta nuevamente.")
         return redirect(redirect_target)
 
-    del_id_ws = atencion.delegacion_id if atencion.delegacion_id else "global"
+    del_id_ws = delegacion_id if delegacion_id else "global"
     def notificar_ws_evidencia():
-        publish_module_changed("atenciones", del_id_ws, "update", atencion.id)
-        publish_module_changed("tubo", del_id_ws, "update", atencion.id)
+        publish_module_changed("atenciones", del_id_ws, "update", obj.id)
+        publish_module_changed("tubo", del_id_ws, "update", obj.id)
     transaction.on_commit(notificar_ws_evidencia)
 
     messages.success(request, f"¡Evidencia adjuntada exitosamente ({archivos_guardados} archivo(s), {momento})! Quedó pendiente de revisión.")
     return redirect(redirect_target)
+
+
+@login_required
+def gestion_atenciones_validar_evidencia(request, atencion_id):
+    ctx = global_context(request)
+    atencion = get_object_or_404(AtencionCiudadana, id=atencion_id)
+    return _procesar_validacion_evidencia_objeto(
+        request, ctx,
+        obj=atencion,
+        actividad_getter=get_or_create_actividad_para_atencion,
+        codigo_ref=atencion.codigo_atencion,
+        delegacion_id=atencion.delegacion_id,
+        default_redirect='gestion_atenciones',
+    )
+
+
+@login_required
+def gestion_atenciones_subir_evidencia(request, atencion_id):
+    ctx = global_context(request)
+    atencion = get_object_or_404(AtencionCiudadana.objects.select_related('actividad', 'delegacion'), id=atencion_id)
+    return _procesar_subida_evidencia_objeto(
+        request, ctx,
+        obj=atencion,
+        actividad_getter=get_or_create_actividad_para_atencion,
+        saver_fn=_guardar_evidencias_atencion,
+        delegacion_id=atencion.delegacion_id,
+        default_redirect='gestion_atenciones',
+    )
 
 
 # --- 8. TIPO DE GESTIÓN ---
@@ -5975,13 +6165,21 @@ def _construir_item_tubo(origen_tipo, obj):
             'url_cambiar_estado': reverse('gestion_tubo_cambiar_estado', args=[obj.id]),
             'url_editar': reverse('gestion_atenciones_editar', args=[obj.id]),
             'url_eliminar': reverse('gestion_atenciones_eliminar', args=[obj.id]),
+            'url_subir_evidencia': reverse('gestion_atenciones_subir_evidencia', args=[obj.id]),
+            'url_validar_evidencia': reverse('gestion_atenciones_validar_evidencia', args=[obj.id]),
         }
 
     resp_user = obj.responsable.user if obj.responsable_id else None
     creador = obj.creado_por
-    sec_nom = obj.sector.nombre if obj.sector_id else (obj.territorio or 'Sector Territorial')
-    telefono_sec = obj.organizacion.telefono_contacto if (obj.organizacion_id and obj.organizacion.telefono_contacto) else ''
+    sec_nom = obj.sector.nombre if obj.sector_id else (obj.territorio or (obj.delegacion.nombre if obj.delegacion_id else 'Delegación Municipal'))
+    telefono_sec = ''
+    actividad_comp = obj.actividad_origen if getattr(obj, 'actividad_origen_id', None) else None
     estado_val = _normalizar_estado_tubo(obj.estado)
+    evi_codigo = (
+        actividad_comp.codigo_evidencia_unico
+        if (actividad_comp and actividad_comp.codigo_evidencia_unico)
+        else f"EVI-{obj.get_codigo_tubo()}"
+    )
     return {
         'item_tipo': 'sector',
         'es_atencion': False,
@@ -5992,7 +6190,7 @@ def _construir_item_tubo(origen_tipo, obj):
         'created_at': obj.created_at,
         'solicitante': obj.solicitante,
         'telefono': telefono_sec,
-        'organizacion': obj.organizacion,
+        'organizacion': None,
         'delegacion': obj.delegacion,
         'delegacion_id': obj.delegacion_id,
         'sector_id': obj.sector_id,
@@ -6000,9 +6198,9 @@ def _construir_item_tubo(origen_tipo, obj):
         'tipo_nombre': 'Compromiso con Sector',
         'sub_nombre': sec_nom,
         'descripcion': obj.observacion or '',
-        'actividad': None,
-        'evidencia_codigo': obj.get_codigo_sector(),
-        'estado_evidencia': 'Sin Atención',
+        'actividad': actividad_comp,
+        'evidencia_codigo': evi_codigo,
+        'estado_evidencia': actividad_comp.estado_validacion() if actividad_comp else 'Pendiente',
         'usuario_responsable': resp_user,
         'usuario_responsable_id': resp_user.id if resp_user else None,
         'responsable_nombre': obtener_nombre_corto(resp_user) if resp_user else 'Sin asignar',
@@ -6017,6 +6215,8 @@ def _construir_item_tubo(origen_tipo, obj):
         'url_cambiar_estado': reverse('gestion_tubo_sector_cambiar_estado', args=[obj.id]),
         'url_editar': reverse('gestion_tubo_sector_editar', args=[obj.id]),
         'url_eliminar': reverse('gestion_tubo_sector_eliminar', args=[obj.id]),
+        'url_subir_evidencia': reverse('gestion_tubo_sector_subir_evidencia', args=[obj.id]),
+        'url_validar_evidencia': reverse('gestion_tubo_sector_validar_evidencia', args=[obj.id]),
     }
 
 
@@ -6035,7 +6235,7 @@ def _adjuntar_roles_tubo_items(items):
 
 
 def _crear_compromiso_sector_tubo(request, ctx):
-    """Crea un compromiso directo con un Sector dentro del Tubo sin requerir Atención Ciudadana."""
+    """Crea un compromiso sectorial directo en el Tubo vinculado a la Delegación activa (sin vecino ni organización)."""
     if not ctx['permisos'].get('puede_ingresar_atencion', True):
         messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para crear compromisos.")
         return redirect('gestion_tubo')
@@ -6052,25 +6252,22 @@ def _crear_compromiso_sector_tubo(request, ctx):
     avance_obs = request.POST.get('avance_observaciones', '').strip()
     origen = request.POST.get('origen', 'INT').strip().upper()
     responsable_id = request.POST.get('responsable_id', '').strip()
-    organizacion_id = request.POST.get('organizacion_id', '').strip()
     solicitante_custom = request.POST.get('solicitante', '').strip()
 
-    if not sector_id or not sector_id.isdigit():
-        messages.error(
-            request,
-            "Para crear un compromiso directo en el Tubo debes seleccionar un Sector válido, o bien registrarlo desde una Atención Ciudadana.",
-        )
-        return redirect('gestion_tubo')
-
-    sector_obj = Sector.objects.filter(
-        id=int(sector_id), estado='Activo', delegacion=del_activa
-    ).first()
-    if not sector_obj:
-        messages.error(request, "El sector seleccionado no existe o no pertenece a tu delegación activa.")
-        return redirect('gestion_tubo')
+    sector_obj = None
+    if sector_id:
+        if not sector_id.isdigit():
+            messages.error(request, "El sector territorial indicado no es válido.")
+            return redirect('gestion_tubo')
+        sector_obj = Sector.objects.filter(
+            id=int(sector_id), estado='Activo', delegacion=del_activa
+        ).first()
+        if not sector_obj:
+            messages.error(request, "El sector seleccionado no existe o no pertenece a tu delegación activa.")
+            return redirect('gestion_tubo')
 
     if not descripcion:
-        messages.error(request, "La descripción del compromiso con el sector es obligatoria.")
+        messages.error(request, "La descripción del compromiso sectorial es obligatoria.")
         return redirect('gestion_tubo')
     ok, err = validar_largo(descripcion, 1000, "Descripción del compromiso")
     if not ok:
@@ -6090,7 +6287,7 @@ def _crear_compromiso_sector_tubo(request, ctx):
         return redirect('gestion_tubo')
 
     if not fecha_str:
-        messages.error(request, "Debes indicar una fecha de compromiso para el seguimiento del sector.")
+        messages.error(request, "Debes indicar una fecha de compromiso para el seguimiento del compromiso.")
         return redirect('gestion_tubo')
     try:
         fecha_comp = datetime.date.fromisoformat(fecha_str)
@@ -6099,10 +6296,6 @@ def _crear_compromiso_sector_tubo(request, ctx):
         return redirect('gestion_tubo')
 
     delegacion_obj = del_activa
-    organizacion_obj = None
-    if organizacion_id and organizacion_id.isdigit():
-        organizacion_obj = _organizaciones_activas_para_delegacion(delegacion_obj).filter(id=int(organizacion_id)).first()
-
     func_resp = None
     if responsable_id and responsable_id.isdigit():
         func_resp = Funcionario.objects.filter(
@@ -6120,20 +6313,21 @@ def _crear_compromiso_sector_tubo(request, ctx):
         messages.error(request, "No hay un funcionario responsable activo disponible para asignar el compromiso.")
         return redirect('gestion_tubo')
 
+    territorio_val = sector_obj.nombre if sector_obj else delegacion_obj.nombre
     solicitante_val = solicitante_custom
     if not solicitante_val:
-        if organizacion_obj:
-            solicitante_val = f"{organizacion_obj.nombre} — {sector_obj.nombre}"[:150]
-        else:
-            solicitante_val = f"Sector {sector_obj.nombre}"[:150]
+        solicitante_val = (
+            f"{delegacion_obj.nombre} — {sector_obj.nombre}"[:150]
+            if sector_obj else delegacion_obj.nombre[:150]
+        )
 
     comp = CompromisoAgenda.objects.create(
         delegacion=delegacion_obj,
         sector=sector_obj,
-        organizacion=organizacion_obj,
+        organizacion=None,
         origen=origen if origen in ('INT', 'EXT') else 'INT',
         solicitante=solicitante_val,
-        territorio=sector_obj.nombre,
+        territorio=territorio_val,
         responsable=func_resp,
         creado_por=request.user,
         area_apoyo=area_apoyo,
@@ -6142,10 +6336,21 @@ def _crear_compromiso_sector_tubo(request, ctx):
         observacion=descripcion,
         avance_observaciones=avance_obs,
     )
+    get_or_create_actividad_para_compromiso(comp)
+
+    imagenes_ev = request.FILES.getlist('imagenes_evidencia') or request.FILES.getlist('imagenes')
+    archivos_ev = request.FILES.getlist('archivos_evidencia') or request.FILES.getlist('archivos')
+    momento_ev = request.POST.get('momento_evidencia', 'antes').strip()
+    if momento_ev not in {'antes', 'despues'}:
+        momento_ev = 'antes'
+    if imagenes_ev or archivos_ev:
+        ok_ev, cant_ev, err_ev = _guardar_evidencias_compromiso(comp, momento_ev, imagenes_ev, archivos_ev)
+        if not ok_ev and err_ev:
+            messages.warning(request, f"Compromiso {comp.get_codigo_tubo()} creado, pero no se pudieron adjuntar evidencias: {err_ev}")
 
     del_id_ws = delegacion_obj.id if delegacion_obj else "global"
     transaction.on_commit(lambda: publish_module_changed("atenciones", del_id_ws, "create", comp.id))
-    messages.success(request, f"Compromiso sectorial {comp.get_codigo_tubo()} ({sector_obj.nombre}) creado en el Tubo de Compromiso.")
+    messages.success(request, f"Compromiso sectorial {comp.get_codigo_tubo()} ({delegacion_obj.nombre}) creado en el Tubo de Compromiso.")
     return redirect('gestion_tubo')
 
 
@@ -6172,9 +6377,12 @@ def gestion_tubo(request):
         'vecino', 'vecino__sector', 'organizacion', 'organizacion__sector', 'actividad'
     ).prefetch_related('actividad__evidencias')
 
-    qs_sec = CompromisoAgenda.objects.filter(sector__isnull=False).select_related(
-        'delegacion', 'sector', 'organizacion', 'organizacion__sector', 'responsable__user', 'creado_por'
-    )
+    qs_sec = CompromisoAgenda.objects.filter(
+        Q(sector__isnull=False) | Q(delegacion__isnull=False)
+    ).select_related(
+        'delegacion', 'sector', 'organizacion', 'organizacion__sector', 'responsable__user', 'creado_por',
+        'actividad_origen',
+    ).prefetch_related('actividad_origen__evidencias')
 
     if not es_admin:
         if del_activa:
@@ -6510,6 +6718,7 @@ def gestion_tubo(request):
         'puede_crear_compromiso_sector': puede_crear_compromiso_sector,
         'sectores_tubo': sectores_tubo,
         'organizaciones_tubo': organizaciones_tubo,
+        'areas_apoyo_catalogo': AreaApoyo.objects.filter(estado='Activo').order_by('nombre'),
         'tubo_total_count': tubo_total_count,
         'ingresados_count': ingresados_count,
         'proceso_count': proceso_count,
@@ -6698,10 +6907,59 @@ def gestion_tubo_sector_editar(request, compromiso_id):
             comp.responsable = func_nuevo
 
     comp.save()
+
+    imagenes_ev = request.FILES.getlist('imagenes') or request.FILES.getlist('imagenes_evidencia')
+    archivos_ev = request.FILES.getlist('archivos') or request.FILES.getlist('archivos_evidencia')
+    evidencias_subidas = 0
+    err_ev = None
+    if imagenes_ev or archivos_ev:
+        comp.refresh_from_db()
+        momento_ev = request.POST.get('momento', '').strip()
+        if momento_ev not in {'antes', 'despues'}:
+            tiene_antes = bool(comp.actividad_origen_id and comp.actividad_origen.evidencias.filter(momento='antes').exists())
+            momento_ev = 'despues' if tiene_antes else 'antes'
+        ok_ev, evidencias_subidas, err_ev = _guardar_evidencias_compromiso(comp, momento_ev, imagenes_ev, archivos_ev)
+
     del_id_ws = comp.delegacion_id if comp.delegacion_id else "global"
     transaction.on_commit(lambda: publish_module_changed("atenciones", del_id_ws, "update", comp.id))
-    messages.success(request, f"Compromiso sectorial {comp.get_codigo_tubo()} actualizado exitosamente.")
+    if err_ev:
+        messages.warning(request, f"Compromiso sectorial {comp.get_codigo_tubo()} actualizado, pero: {err_ev}")
+    elif evidencias_subidas:
+        messages.success(
+            request,
+            f"Compromiso sectorial {comp.get_codigo_tubo()} actualizado y {evidencias_subidas} evidencia(s) adjuntada(s) exitosamente.",
+        )
+    else:
+        messages.success(request, f"Compromiso sectorial {comp.get_codigo_tubo()} actualizado exitosamente.")
     return redirect(request.META.get('HTTP_REFERER') or 'gestion_tubo')
+
+
+@login_required
+def gestion_tubo_sector_validar_evidencia(request, compromiso_id):
+    ctx = global_context(request)
+    comp = get_object_or_404(CompromisoAgenda, id=compromiso_id)
+    return _procesar_validacion_evidencia_objeto(
+        request, ctx,
+        obj=comp,
+        actividad_getter=get_or_create_actividad_para_compromiso,
+        codigo_ref=comp.get_codigo_tubo(),
+        delegacion_id=comp.delegacion_id,
+        default_redirect='gestion_tubo',
+    )
+
+
+@login_required
+def gestion_tubo_sector_subir_evidencia(request, compromiso_id):
+    ctx = global_context(request)
+    comp = get_object_or_404(CompromisoAgenda.objects.select_related('actividad_origen', 'delegacion'), id=compromiso_id)
+    return _procesar_subida_evidencia_objeto(
+        request, ctx,
+        obj=comp,
+        actividad_getter=get_or_create_actividad_para_compromiso,
+        saver_fn=_guardar_evidencias_compromiso,
+        delegacion_id=comp.delegacion_id,
+        default_redirect='gestion_tubo',
+    )
 
 
 @login_required

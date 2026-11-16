@@ -246,9 +246,14 @@
                      class="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs font-bold bg-white">
             </div>
             <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Área / Persona Apoyo</label>
-              <input type="text" id="area_apoyo" name="area_apoyo" maxlength="100" placeholder="DISERCO, OROC, Tránsito..."
-                     class="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs font-medium bg-white">
+              <label class="block text-[11px] font-bold text-slate-700">Área / Persona / Cuadrilla Apoyo</label>
+              <select id="area_apoyo" name="area_apoyo" data-search-select="true" data-search-placeholder="Seleccionar o buscar área, persona o cuadrilla..."
+                      class="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs font-medium bg-white">
+                <option value="">Sin área / cuadrilla asignada...</option>
+                {% for aa in areas_apoyo_catalogo %}
+                  <option value="{{ aa.nombre }}" data-meta="{{ aa.tipo }}" data-search="{{ aa.nombre }} {{ aa.tipo }} {{ aa.codigo|default:'' }}">{{ aa.nombre }}</option>
+                {% endfor %}
+              </select>
             </div>
             <div class="space-y-1">
               <label class="block text-[11px] font-bold text-slate-700">Origen Solicitud</label>
@@ -828,9 +833,14 @@
                      class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-medium focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
             </div>
             <div class="space-y-1">
-              <label for="at-edit-areaapoyo" class="block text-slate-700 text-[11px]">Área de Apoyo</label>
-              <input type="text" id="at-edit-areaapoyo" name="area_apoyo" maxlength="100" placeholder="Ej: DISERCO, Cuadrilla OOCC..."
-                     class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              <label for="at-edit-areaapoyo" class="block text-slate-700 text-[11px]">Área / Persona / Cuadrilla de Apoyo</label>
+              <select id="at-edit-areaapoyo" name="area_apoyo" data-search-select="true" data-search-placeholder="Seleccionar área, persona o cuadrilla..."
+                      class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+                <option value="">Sin área / cuadrilla asignada...</option>
+                {% for aa in areas_apoyo_catalogo %}
+                  <option value="{{ aa.nombre }}" data-meta="{{ aa.tipo }}" data-search="{{ aa.nombre }} {{ aa.tipo }} {{ aa.codigo|default:'' }}">{{ aa.nombre }}</option>
+                {% endfor %}
+              </select>
             </div>
           </div>
           <div class="space-y-1">
@@ -1393,7 +1403,19 @@
         toggleCamposTuboEdicion(vaTuboSelect.value);
       }
       if (fechaCompInput) fechaCompInput.value = fechaComp || '';
-      if (areaApoyoInput) areaApoyoInput.value = areaApoyo || '';
+      if (areaApoyoInput) {
+        areaApoyoInput.querySelectorAll('option[data-temp="1"]').forEach(o => o.remove());
+        const valArea = areaApoyo || '';
+        if (valArea && !Array.from(areaApoyoInput.options).some(o => o.value === valArea)) {
+          const opt = document.createElement('option');
+          opt.value = valArea;
+          opt.textContent = valArea;
+          opt.dataset.temp = '1';
+          areaApoyoInput.appendChild(opt);
+        }
+        areaApoyoInput.value = valArea;
+        areaApoyoInput.dispatchEvent(new Event('change'));
+      }
       if (avanceObsInput) avanceObsInput.value = avanceObs || '';
 
       if (respHidden) respHidden.value = responsableId || '';

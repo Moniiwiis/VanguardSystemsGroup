@@ -117,6 +117,36 @@ class ItemMedicion(BaseModel):
         verbose_name = "Measurement Item"
         verbose_name_plural = "Measurement Items"
 
+
+class AreaApoyo(BaseModel):
+    """Catálogo administrable de áreas municipales, personas o cuadrillas de apoyo."""
+
+    TIPO_CHOICES = [
+        ('Área Municipal', 'Área Municipal'),
+        ('Persona', 'Persona'),
+        ('Cuadrilla', 'Cuadrilla'),
+    ]
+
+    codigo = models.CharField(max_length=20, null=True, blank=True)
+    nombre = models.CharField(max_length=100)
+    tipo = models.CharField(max_length=30, choices=TIPO_CHOICES, default='Área Municipal')
+    descripcion = models.TextField(null=True, blank=True)
+    estado = models.CharField(max_length=20, default='Activo')
+
+    def get_codigo(self):
+        if self.codigo:
+            return self.codigo
+        return f"AA{self.id:03d}" if self.id else "AA001"
+
+    def __str__(self):
+        return f"{self.nombre} ({self.tipo})"
+
+    class Meta:
+        db_table = 'configuration_support_area'
+        verbose_name = "Support Area"
+        verbose_name_plural = "Support Areas"
+        ordering = ['nombre']
+
 class ConfiguracionMeta(BaseModel):
     item = models.ForeignKey(ItemMedicion, on_delete=models.RESTRICT)
     periodo = models.ForeignKey(Periodo, on_delete=models.RESTRICT)

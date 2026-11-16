@@ -460,39 +460,38 @@ class AtencionCiudadana(BaseModel):
         verbose_name_plural = "Citizen Requests"
 
 
-def get_or_create_actividad_para_atencion(atencion):
-    """
-    Garantiza que una AtencionCiudadana tenga una Actividad vinculada con código EVI único,
-    generando dinámicamente cualquier dependencia faltante en la base de datos (Funcionario, Periodo, ItemMedicion).
-    """
-    if atencion.actividad_id:
-        try:
-            return atencion.actividad
-        except Exception:
-            pass
-
+def _crear_actividad_soporte(
+    *,
+    func,
+    delegacion,
+    fallback_user,
+    tipo_atencion_nombre='',
+    descripcion_solicitud='',
+    accion_ejecutada='',
+    contacto_nombre='Delegación',
+    contacto_telefono=None,
+    tipo_registro='accion',
+    va_a_tubo=False,
+):
+    """Crea una Actividad con sus dependencias mínimas garantizadas (Funcionario, Periodo, ItemMedicion)."""
     import datetime
     from django.utils import timezone
     from configuration.models import Periodo, ItemMedicion
     from accounts.models import Funcionario, FuncionarioRol, Delegacion, Cargo
     from django.contrib.auth.models import User
 
-    # 1. Funcionario responsable
-    func = None
-    if atencion.usuario_responsable_id:
-        func = Funcionario.all_objects.filter(user_id=atencion.usuario_responsable_id).first()
-    if not func and atencion.delegacion_id:
-        func = Funcionario.all_objects.filter(delegacion_id=atencion.delegacion_id).first()
+    if not func and delegacion:
+        func = Funcionario.all_objects.filter(delegacion=delegacion).first()
     if not func:
         func = Funcionario.all_objects.first()
     if not func:
-        del_obj = atencion.delegacion or Delegacion.objects.first()
+        del_obj = delegacion or Delegacion.objects.first()
         if not del_obj:
             del_obj = Delegacion.objects.create(nombre="Delegación Centro", codigo="DEL01", estado="Activa")
         cargo_obj = Cargo.objects.first()
         if not cargo_obj:
             cargo_obj = Cargo.objects.create(nombre_cargo="Operador Territorial", estado="Activo")
-        user_obj = atencion.usuario_responsable or atencion.creado_por or User.objects.filter(is_superuser=True).first() or User.objects.first()
+        user_obj = fallback_user or User.objects.filter(is_superuser=True).first() or User.objects.first()
         func = Funcionario.objects.create(
             user=user_obj,
             identificador_institucional=f"FUNC-{user_obj.id if user_obj else 1:04d}",
@@ -501,7 +500,6 @@ def get_or_create_actividad_para_atencion(atencion):
             estado="Activo",
         )
 
-    # 2. Período
     periodo = Periodo.objects.filter(estado='Abierto').first() or Periodo.objects.first()
     if not periodo:
         anio = timezone.now().year
@@ -512,9 +510,8 @@ def get_or_create_actividad_para_atencion(atencion):
             estado='Abierto',
         )
 
-    # 3. Ítem de medición
     item = None
-    if atencion.tipo_atencion and 'social' in atencion.tipo_atencion.nombre.lower():
+    if tipo_atencion_nombre and 'social' in tipo_atencion_nombre.lower():
         item = ItemMedicion.objects.filter(nombre_item__icontains='social').first()
     if not item:
         item = ItemMedicion.objects.filter(nombre_item__icontains='operativo').first()
@@ -527,7 +524,6 @@ def get_or_create_actividad_para_atencion(atencion):
             estado="Activo",
         )
 
-    # 4. Fecha válida
     hoy = timezone.now().date()
     fecha_act = hoy
     if periodo.fecha_inicio and periodo.fecha_termino:
@@ -536,44 +532,89 @@ def get_or_create_actividad_para_atencion(atencion):
         elif hoy > periodo.fecha_termino:
             fecha_act = periodo.fecha_termino
 
-    # 5. Código único de evidencia EVI
     fecha_str = timezone.now().strftime('%Y%m%d')
     uid = uuid.uuid4().hex[:6].upper()
     cod_evi = f"EVI-{fecha_str}-{uid}"
 
-    # 6. Datos de contacto seguros
-    contacto_nombre = (atencion.solicitante[:100] if atencion.solicitante else 'Vecino/a')
-    contacto_tel = (
-        atencion.telefono_contacto
-        or (atencion.vecino.telefono if atencion.vecino else None)
-        or (atencion.organizacion.telefono_contacto if atencion.organizacion else None)
-    )
-    if contacto_tel:
-        contacto_tel = str(contacto_tel)[:20]
-
-    # 7. Rol delegado
     es_delegado = False
     if func:
         fr = FuncionarioRol.objects.filter(funcionario=func).select_related('rol').first()
         if fr and fr.rol and 'delegado' in fr.rol.nombre_rol.lower():
             es_delegado = True
 
-    # 8. Crear actividad
-    actividad = Actividad.objects.create(
+    return Actividad.objects.create(
         codigo_evidencia_unico=cod_evi,
         fecha_actividad=fecha_act,
-        descripcion_solicitud=atencion.descripcion or f"Solicitud ciudadana {atencion.codigo_atencion}",
-        accion_ejecutada=f"Atención ciudadana {atencion.codigo_atencion} ({atencion.tipo_atencion.nombre if atencion.tipo_atencion else 'General'})",
-        contacto_nombre=contacto_nombre,
-        contacto_telefono=contacto_tel,
+        descripcion_solicitud=descripcion_solicitud,
+        accion_ejecutada=accion_ejecutada,
+        contacto_nombre=(contacto_nombre or 'Delegación')[:100],
+        contacto_telefono=str(contacto_telefono)[:20] if contacto_telefono else None,
         funcionario=func,
         item=item,
         periodo=periodo,
-        tipo_registro=getattr(atencion, 'tipo_registro', 'accion') or 'accion',
+        tipo_registro=tipo_registro or 'accion',
         es_gestion_delegado=es_delegado,
-        va_a_tubo=getattr(atencion, 'va_a_tubo', False),
+        va_a_tubo=va_a_tubo,
     )
 
+
+def get_or_create_actividad_para_atencion(atencion):
+    """
+    Garantiza que una AtencionCiudadana tenga una Actividad vinculada con código EVI único,
+    generando dinámicamente cualquier dependencia faltante en la base de datos (Funcionario, Periodo, ItemMedicion).
+    """
+    if atencion.actividad_id:
+        try:
+            return atencion.actividad
+        except Exception:
+            pass
+
+    from accounts.models import Funcionario
+    func = Funcionario.all_objects.filter(user_id=atencion.usuario_responsable_id).first() if atencion.usuario_responsable_id else None
+    contacto_tel = (
+        atencion.telefono_contacto
+        or (atencion.vecino.telefono if atencion.vecino else None)
+        or (atencion.organizacion.telefono_contacto if atencion.organizacion else None)
+    )
+    actividad = _crear_actividad_soporte(
+        func=func,
+        delegacion=atencion.delegacion,
+        fallback_user=atencion.usuario_responsable or atencion.creado_por,
+        tipo_atencion_nombre=atencion.tipo_atencion.nombre if atencion.tipo_atencion else '',
+        descripcion_solicitud=atencion.descripcion or f"Solicitud ciudadana {atencion.codigo_atencion}",
+        accion_ejecutada=f"Atención ciudadana {atencion.codigo_atencion} ({atencion.tipo_atencion.nombre if atencion.tipo_atencion else 'General'})",
+        contacto_nombre=atencion.solicitante[:100] if atencion.solicitante else 'Vecino/a',
+        contacto_telefono=contacto_tel,
+        tipo_registro=getattr(atencion, 'tipo_registro', 'accion') or 'accion',
+        va_a_tubo=getattr(atencion, 'va_a_tubo', False),
+    )
     AtencionCiudadana.all_objects.filter(id=atencion.id).update(actividad=actividad)
     atencion.actividad = actividad
+    return actividad
+
+
+def get_or_create_actividad_para_compromiso(compromiso):
+    """Garantiza que un CompromisoAgenda sectorial tenga una Actividad vinculada para evidencias y validación."""
+    if compromiso.actividad_origen_id:
+        try:
+            return compromiso.actividad_origen
+        except Exception:
+            pass
+
+    from agenda.models import CompromisoAgenda
+    func = compromiso.responsable if compromiso.responsable_id else None
+    del_nombre = compromiso.delegacion.nombre if compromiso.delegacion_id else 'Delegación Municipal'
+    actividad = _crear_actividad_soporte(
+        func=func,
+        delegacion=compromiso.delegacion,
+        fallback_user=(func.user if func else None) or compromiso.creado_por,
+        descripcion_solicitud=compromiso.observacion or f"Compromiso sectorial {compromiso.get_codigo_tubo()}",
+        accion_ejecutada=f"Compromiso sectorial {compromiso.get_codigo_tubo()} ({del_nombre})",
+        contacto_nombre=(compromiso.solicitante[:100] if compromiso.solicitante else del_nombre[:100]),
+        contacto_telefono=None,
+        tipo_registro='accion',
+        va_a_tubo=True,
+    )
+    CompromisoAgenda.all_objects.filter(id=compromiso.id).update(actividad_origen=actividad)
+    compromiso.actividad_origen = actividad
     return actividad

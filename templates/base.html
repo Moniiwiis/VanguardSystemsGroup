@@ -408,7 +408,7 @@
         {% endif %}
 
         <!-- Sección 3: Metas y Catálogos -->
-        {% if permisos.ver_metas or permisos.ver_tipo_atencion or permisos.ver_sub_atencion %}
+        {% if permisos.ver_metas or permisos.ver_tipo_atencion or permisos.ver_sub_atencion or permisos.ver_area_apoyo %}
         <div data-collapsible-section class="pt-2 border-t border-slate-100 space-y-1">
           <button type="button" data-section-toggle data-storage-key="sgr_nav_sec_metas" aria-expanded="true"
             class="w-full flex items-center justify-between px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
@@ -437,6 +437,14 @@
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_sub_atencion' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
               <i data-lucide="git-branch" class="w-4 h-4 shrink-0"></i>
               <span>Sub Atención</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_area_apoyo %}
+            <a href="{% url 'gestion_areas_apoyo' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_areas_apoyo' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="briefcase" class="w-4 h-4 shrink-0"></i>
+              <span>Áreas y Cuadrillas de Apoyo</span>
             </a>
           {% endif %}
           </div>

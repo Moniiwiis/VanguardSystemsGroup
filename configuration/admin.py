@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.db import models
 from core.admin import BaseScopedModelAdmin
-from .models import Periodo, CatalogoActividad, ItemMedicion, ConfiguracionMeta
+from .models import Periodo, CatalogoActividad, ItemMedicion, ConfiguracionMeta, AreaApoyo
 
 @admin.register(Periodo)
 class PeriodoAdmin(BaseScopedModelAdmin):
@@ -27,6 +27,13 @@ class ConfiguracionMetaAdmin(BaseScopedModelAdmin):
     list_display = ('item', 'periodo', 'funcionario', 'valor_objetivo', 'ponderacion', 'umbral_minimo', 'maximo_computable')
     list_filter = ('periodo', 'item__cargo')
     list_select_related = ('item', 'periodo', 'funcionario__user')
+
+
+@admin.register(AreaApoyo)
+class AreaApoyoAdmin(BaseScopedModelAdmin):
+    list_display = ('codigo', 'nombre', 'tipo', 'estado')
+    search_fields = ('codigo', 'nombre', 'tipo')
+    list_filter = ('tipo', 'estado')
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
