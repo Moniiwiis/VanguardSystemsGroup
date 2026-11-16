@@ -175,6 +175,13 @@ def listado(request):
     page_size = _get_page_size(request)
     page_obj = Paginator(qs, page_size).get_page(request.GET.get('page', 1))
 
+    delegacion_filtro = request.GET.get('delegacion', '').strip()
+    delegacion_seleccionada = (
+        Delegacion.objects.filter(id=int(delegacion_filtro), estado='Activa').first()
+        if (ctx['permisos'].get('es_admin') and delegacion_filtro.isdigit())
+        else None
+    )
+
     params = request.GET.copy()
     params.pop('page', None)
     params.pop('export', None)
@@ -187,13 +194,18 @@ def listado(request):
         'pron_filtro': pron_filtro,
         'total_cartas': total_base,
         'total_unidades': total_unidades,
+        'total_en_proceso': totales.get('EN PROCESO', 0),
+        'total_aprobadas': totales.get('APROBADA', 0),
+        'total_finalizadas': totales.get('FINALIZADA', 0),
+        'total_no_aplica': totales.get('NO APLICA', 0),
         'total_registros': qs.count(),
         'totales_cartas': totales,
         'estados_cartas': Carta.ESTADOS,
         'para_choices': Carta.PARA_CHOICES,
         'pron_choices': Carta.PRONUNCIAMIENTO_CHOICES,
-        'delegaciones_cartas': Delegacion.objects.filter(estado='Activa').order_by('nombre') if ctx['permisos'].get('es_admin') else [],
-        'delegacion_filtro': request.GET.get('delegacion', ''),
+        'delegaciones_cartas': Delegacion.objects.filter(estado='Activa').order_by('id') if ctx['permisos'].get('es_admin') else [],
+        'delegacion_filtro': delegacion_filtro,
+        'delegacion_seleccionada': delegacion_seleccionada,
         'orden': orden,
         'orden_opciones': orden_opciones,
         'page_size': page_size,
