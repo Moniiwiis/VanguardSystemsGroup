@@ -682,9 +682,9 @@
             </td>
 
             <!-- Solicitante -->
-            <td class="py-2.5 px-2 max-w-[190px]">
+            <td class="py-2.5 px-2 min-w-[150px] max-w-[190px] [overflow-wrap:anywhere]">
               <div class="font-bold text-slate-900 leading-snug">
-                <span>{{ at.solicitante }}</span>
+                <span class="break-words [overflow-wrap:anywhere]">{{ at.solicitante }}</span>
                 {% if at.organizacion %}
                   <span class="inline-flex items-center px-1.5 py-0.5 ml-1 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
                     {{ at.organizacion.tipo_organizacion }}
@@ -761,10 +761,10 @@
             </td>
 
             <!-- Responsable -->
-            <td class="py-2.5 px-2 text-[11px] max-w-[165px]">
-              <div class="font-bold text-slate-900 flex items-center gap-1 leading-snug">
-                <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#C41230] shrink-0"></i>
-                <span>{{ at.responsable_nombre }}</span>
+            <td class="py-2.5 px-2 text-[11px] min-w-[140px] max-w-[180px] [overflow-wrap:anywhere]">
+              <div class="font-bold text-slate-900 flex items-start gap-1 leading-snug min-w-0">
+                <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#C41230] shrink-0 mt-0.5"></i>
+                <span class="min-w-0 break-words [overflow-wrap:anywhere]">{{ at.responsable_nombre }}</span>
               </div>
               <div class="text-[10px] text-slate-400">{{ at.responsable_rol }}</div>
             </td>
@@ -1064,12 +1064,12 @@
         <tbody class="divide-y divide-slate-100 font-medium">
           {% for c in resumen_colaboradores %}
           <tr class="hover:bg-slate-50/80 transition-colors">
-            <td class="py-3 px-3.5 font-bold text-slate-900">
-              <div class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#C41230]"></span>
-                <span>{{ c.nombre }}</span>
+            <td class="py-3 px-3.5 font-bold text-slate-900 min-w-[180px] max-w-[250px] [overflow-wrap:anywhere]">
+              <div class="flex items-start gap-2 min-w-0">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#C41230] shrink-0 mt-1"></span>
+                <span class="min-w-0 break-words [overflow-wrap:anywhere]">{{ c.nombre }}</span>
               </div>
-              <span class="text-[10px] text-slate-400 font-mono ml-4.5">{{ c.username }}</span>
+              <span class="text-[10px] text-slate-400 font-mono block pl-4.5 break-all">{{ c.username }}</span>
             </td>
             <td class="py-3 px-3.5 text-slate-600 font-semibold">{{ c.cargo }}</td>
             <td class="py-3 px-3.5 whitespace-nowrap">

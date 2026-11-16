@@ -617,8 +617,8 @@
                   </span>
                 {% endif %}
               </td>
-              <td class="py-2.5 px-2.5 font-bold text-slate-900 max-w-[210px]">
-                <span class="leading-snug">{{ a.solicitante }}</span>
+              <td class="py-2.5 px-2.5 font-bold text-slate-900 min-w-[160px] max-w-[210px] [overflow-wrap:anywhere]">
+                <span class="leading-snug break-words [overflow-wrap:anywhere]">{{ a.solicitante }}</span>
                 {% if a.organizacion %}
                   <span class="inline-flex items-center gap-1 px-1.5 py-0.5 ml-1 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
                     {{ a.organizacion.tipo_organizacion }}
@@ -700,13 +700,13 @@
                   </span>
                 {% endif %}
               </td>
-              <td class="py-2.5 px-3 text-[11px] whitespace-nowrap">
-                <div class="font-bold text-slate-900 flex items-center gap-1">
-                  <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#C41230]"></i>
-                  <span>{{ a.usuario_responsable.get_full_name|default:a.usuario_responsable.username }}</span>
+              <td class="py-2.5 px-3 text-[11px] min-w-[170px] max-w-[220px] [overflow-wrap:anywhere]">
+                <div class="font-bold text-slate-900 flex items-start gap-1 min-w-0">
+                  <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#C41230] shrink-0 mt-0.5"></i>
+                  <span class="min-w-0 break-words [overflow-wrap:anywhere]">{{ a.usuario_responsable.get_full_name|default:a.usuario_responsable.username }}</span>
                 </div>
                 <div class="text-[10px] text-slate-500">{{ a.responsable_rol }}</div>
-                <div class="text-[10px] text-slate-400 mt-0.5">
+                <div class="text-[10px] text-slate-400 mt-0.5 break-words [overflow-wrap:anywhere]">
                   Creado por: <span class="text-slate-600 font-semibold">{% if a.creado_por %}{{ a.creado_por.get_full_name|default:a.creado_por.username }}{% else %}Sistema{% endif %}</span>
                 </div>
               </td>

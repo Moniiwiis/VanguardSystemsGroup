@@ -125,9 +125,9 @@
         <tbody class="divide-y divide-slate-100">
           {% for f in funcionarios %}
           <tr class="hover:bg-red-50/30 transition-colors">
-            <td class="p-4">
-              <div class="font-bold text-slate-900">{{ f.user.get_full_name|default:f.user.username }}</div>
-              <div class="text-[11px] text-slate-400 font-mono">{{ f.user.email|default:f.user.username }}</div>
+            <td class="p-4 min-w-[160px] max-w-[240px] [overflow-wrap:anywhere]">
+              <div class="font-bold text-slate-900 break-words [overflow-wrap:anywhere]">{{ f.user.get_full_name|default:f.user.username }}</div>
+              <div class="text-[11px] text-slate-400 font-mono break-all">{{ f.user.email|default:f.user.username }}</div>
             </td>
             <td class="p-4 font-mono font-bold text-[#C41230]">{{ f.identificador_institucional }}</td>
             <td class="p-4 font-medium text-slate-800">{{ f.cargo.nombre_cargo }}</td>
