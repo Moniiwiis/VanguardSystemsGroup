@@ -3264,6 +3264,40 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertRedirects(resp_del, reverse('cartas_listado'))
         self.assertFalse(Carta.objects.filter(id=carta.id).exists())
 
+    def test_seed_cartas_idempotente_y_cobertura_delegaciones(self):
+        import os
+        from django.conf import settings
+        from cartas.models import Carta
+        from core.management.commands.seed_data import Command as SeedCommand
+
+        del_norte, _ = Delegacion.objects.get_or_create(
+            nombre='Delegación Norte', defaults={'codigo': 'DEL02', 'estado': 'Activa'}
+        )
+        del_sur, _ = Delegacion.objects.get_or_create(
+            nombre='Delegación Sur', defaults={'codigo': 'DEL03', 'estado': 'Activa'}
+        )
+        del_rural, _ = Delegacion.objects.get_or_create(
+            nombre='Delegación Rural', defaults={'codigo': 'DEL04', 'estado': 'Activa'}
+        )
+        xlsx_sgr = os.path.join(settings.BASE_DIR, 'fixtures', 'matriz_sgr.xlsx')
+
+        cmd = SeedCommand()
+        creadas_1 = cmd.seed_cartas(
+            self.delegacion, del_norte, del_sur, del_rural, self.user, xlsx_sgr,
+        )
+        self.assertGreaterEqual(creadas_1, 45)
+        for d in (self.delegacion, del_norte, del_sur, del_rural):
+            self.assertTrue(Carta.objects.filter(delegacion=d).exists())
+        for est, _ in Carta.ESTADOS:
+            self.assertTrue(Carta.objects.filter(estado=est).exists())
+
+        total_1 = Carta.objects.count()
+        creadas_2 = cmd.seed_cartas(
+            self.delegacion, del_norte, del_sur, del_rural, self.user, xlsx_sgr,
+        )
+        self.assertEqual(creadas_2, 0)
+        self.assertEqual(Carta.objects.count(), total_1)
+
 
 
 

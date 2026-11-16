@@ -8,6 +8,7 @@ Genera:
   - Cuentas de operación adicionales
   - >2.000 OrganizacionComunitaria desde fixtures/base_datos_JJVV.xlsx
   - Atenciones ciudadanas desde fixtures/matriz_sgr.xlsx
+  - Cartas (Tubo de Cartas) desde fixtures/matriz_sgr.xlsx + registros demostrativos por delegación
   - Vecinos con RUTs válidos Módulo 11
 """
 
@@ -1167,13 +1168,63 @@ class Command(BaseCommand):
             ))
 
         # ------------------------------------------------------------------
-        # 12. TUBO DE CARTAS desde hojas 'TUBO CARTAS' y 'CARTAS ' de matriz_sgr.xlsx
+        # 12. TUBO DE CARTAS (Excel oficial + muestras por todas las delegaciones)
         # ------------------------------------------------------------------
-        if Carta and os.path.exists(xlsx_sgr):
-            self.stdout.write("▶ Importando Tubo de Cartas desde hojas oficiales xlsx...")
+        if Carta:
+            self.stdout.write("▶ Poblando Tubo de Cartas...")
+            cartas_creadas = self.seed_cartas(
+                del_centro, del_norte, del_sur, del_rural,
+                u_editor or u_admin_sys, xlsx_sgr,
+            )
+            self.stdout.write(self.style.SUCCESS(
+                f"  ✓ Tubo de Cartas: {cartas_creadas} creadas (total en DB: {Carta.objects.count()})"
+            ))
+
+        # ------------------------------------------------------------------
+        # RESUMEN FINAL
+        # ------------------------------------------------------------------
+        self.stdout.write("\n" + "=" * 60)
+        self.stdout.write(self.style.SUCCESS("✅ SEED COMPLETADO EXITOSAMENTE"))
+        self.stdout.write("=" * 60)
+        self.stdout.write(f"  OrganizacionesComunitarias: {OrganizacionComunitaria.objects.count()}")
+        self.stdout.write(f"  Vecinos:                    {Vecino.objects.count()}")
+        self.stdout.write(f"  Atenciones Ciudadanas:      {AtencionCiudadana.objects.count()}")
+        if Carta:
+            self.stdout.write(f"  Cartas (Tubo de Cartas):    {Carta.objects.count()}")
+        self.stdout.write(f"  Usuarios:                   {User.objects.count()}")
+        self.stdout.write("\n" + "─" * 60)
+        self.stdout.write("🔑 CUENTAS DE EVALUACIÓN (6 cuentas requeridas):")
+        self.stdout.write("─" * 60)
+        self.stdout.write("  ➊ admin_a      | Admin1234!   | Administrador   | Delegación Centro")
+        self.stdout.write("  ➋ editor_a     | Editor1234!  | Operador/Editor | Delegación Centro")
+        self.stdout.write("  ➌ lector_a     | Lector1234!  | Consultor       | Delegación Centro")
+        self.stdout.write("  ➍ lector_b     | Lector1234!  | Consultor       | Delegación Norte")
+        self.stdout.write("  ➎ cliente_1    | Cliente1234! | Cliente/Vecino  | Portal Ciudadano")
+        self.stdout.write("  ➏ cliente_2    | Cliente1234! | Cliente/Vecino  | Portal Ciudadano")
+        self.stdout.write("─" * 60)
+        self.stdout.write("🔑 CUENTAS DE ORGANIZACIÓN / JJVV (Portal Organización):")
+        self.stdout.write(f"  {formatear_rut(65111001)} / jjvv.centro@organizacion.cl | Cliente1234! | JJVV N° 1 Casco Histórico")
+        self.stdout.write(f"  {formatear_rut(65111002)} / jjvv.norte@organizacion.cl  | Cliente1234! | JJVV N° 12 Las Compañías")
+        self.stdout.write("─" * 60)
+        self.stdout.write("🔑 CUENTAS ADICIONALES DE OPERACIÓN:")
+        self.stdout.write("  admin_sgr         | Admin1234!   | Superadmin Global")
+        self.stdout.write("  delegado_centro   | User1234!    | Delegado Centro")
+        self.stdout.write("  delegado_companias| User1234!    | Delegado Norte")
+        self.stdout.write("  delegado_sur      | User1234!    | Delegado Sur")
+        self.stdout.write("  delegado_rural    | User1234!    | Delegado Rural")
+        self.stdout.write("  funcionario_juan  | User1234!    | Operador Centro")
+        self.stdout.write("  consultor_ana     | User1234!    | Consultor Centro")
+        self.stdout.write("=" * 60)
+
+    def seed_cartas(self, del_centro, del_norte, del_sur, del_rural, creador_carta, xlsx_sgr=None):
+        """Puebla el Tubo de Cartas desde las hojas oficiales del xlsx y muestras para las 4 delegaciones."""
+        if not Carta:
+            return 0
+
+        cartas_creadas = 0
+        if xlsx_sgr and os.path.exists(xlsx_sgr):
             try:
                 wb_cartas = openpyxl.load_workbook(xlsx_sgr, data_only=True, read_only=True)
-                cartas_creadas = 0
                 estados_carta_ok = {c[0] for c in Carta.ESTADOS}
                 para_carta_ok = {c[0] for c in Carta.PARA_CHOICES}
                 pron_carta_ok = {c[0] for c in Carta.PRONUNCIAMIENTO_CHOICES}
@@ -1257,49 +1308,72 @@ class Command(BaseCommand):
                                 'derivada_a': str(r[12] or '').strip()[:180],
                                 'observacion': str(r[13] or '').strip()[:1000],
                                 'unidad': unid_val,
-                                'creado_por': u_editor or u_admin_sys,
+                                'creado_por': creador_carta,
                             }
                         )
                         if created:
                             cartas_creadas += 1
 
                 wb_cartas.close()
-                self.stdout.write(self.style.SUCCESS(
-                    f"  ✓ Tubo de Cartas: {cartas_creadas} creadas (total en DB: {Carta.objects.count()})"
-                ))
             except Exception as exc:
                 self.stdout.write(self.style.WARNING(f"  ⚠ Error importando Tubo de Cartas xlsx: {exc}"))
 
-        # ------------------------------------------------------------------
-        # RESUMEN FINAL
-        # ------------------------------------------------------------------
-        self.stdout.write("\n" + "=" * 60)
-        self.stdout.write(self.style.SUCCESS("✅ SEED COMPLETADO EXITOSAMENTE"))
-        self.stdout.write("=" * 60)
-        self.stdout.write(f"  OrganizacionesComunitarias: {OrganizacionComunitaria.objects.count()}")
-        self.stdout.write(f"  Vecinos:                    {Vecino.objects.count()}")
-        self.stdout.write(f"  Atenciones Ciudadanas:      {AtencionCiudadana.objects.count()}")
-        self.stdout.write(f"  Usuarios:                   {User.objects.count()}")
-        self.stdout.write("\n" + "─" * 60)
-        self.stdout.write("🔑 CUENTAS DE EVALUACIÓN (6 cuentas requeridas):")
-        self.stdout.write("─" * 60)
-        self.stdout.write("  ➊ admin_a      | Admin1234!   | Administrador   | Delegación Centro")
-        self.stdout.write("  ➋ editor_a     | Editor1234!  | Operador/Editor | Delegación Centro")
-        self.stdout.write("  ➌ lector_a     | Lector1234!  | Consultor       | Delegación Centro")
-        self.stdout.write("  ➍ lector_b     | Lector1234!  | Consultor       | Delegación Norte")
-        self.stdout.write("  ➎ cliente_1    | Cliente1234! | Cliente/Vecino  | Portal Ciudadano")
-        self.stdout.write("  ➏ cliente_2    | Cliente1234! | Cliente/Vecino  | Portal Ciudadano")
-        self.stdout.write("─" * 60)
-        self.stdout.write("🔑 CUENTAS DE ORGANIZACIÓN / JJVV (Portal Organización):")
-        self.stdout.write(f"  {formatear_rut(65111001)} / jjvv.centro@organizacion.cl | Cliente1234! | JJVV N° 1 Casco Histórico")
-        self.stdout.write(f"  {formatear_rut(65111002)} / jjvv.norte@organizacion.cl  | Cliente1234! | JJVV N° 12 Las Compañías")
-        self.stdout.write("─" * 60)
-        self.stdout.write("🔑 CUENTAS ADICIONALES DE OPERACIÓN:")
-        self.stdout.write("  admin_sgr         | Admin1234!   | Superadmin Global")
-        self.stdout.write("  delegado_centro   | User1234!    | Delegado Centro")
-        self.stdout.write("  delegado_companias| User1234!    | Delegado Norte")
-        self.stdout.write("  delegado_sur      | User1234!    | Delegado Sur")
-        self.stdout.write("  delegado_rural    | User1234!    | Delegado Rural")
-        self.stdout.write("  funcionario_juan  | User1234!    | Operador Centro")
-        self.stdout.write("  consultor_ana     | User1234!    | Consultor Centro")
-        self.stdout.write("=" * 60)
+        cartas_demo = [
+            (del_centro, datetime.date(2026, 7, 15), 'CEN-2026-001', 'Alcaldesa', 'JJVV N° 1 Casco Histórico', '+56 9 8210 4401',
+             'Solicitud de mejoramiento de luminarias LED en Pasaje Los Carrera', '28/07/2026', 'Camila Paredes', 'EN PROCESO', 'DELEGADO',
+             'Dirección de Obras Municipales', 'En evaluación técnica conjunta con cuadrilla eléctrica', '1'),
+            (del_centro, datetime.date(2026, 7, 18), 'CEN-2026-002', 'Delegado', 'Comité Adelanto Plaza Buenos Aires', '+56 9 8210 4402',
+             'Autorización de feria vecinal costumbrista y apoyo de vallas papales', '02/08/2026', 'Camila Paredes', 'FINALIZADA', 'ALCALDESA',
+             'Dirección de Desarrollo Comunitario', 'Actividad ejecutada sin observaciones', '1'),
+            (del_norte, datetime.date(2026, 7, 19), 'NOR-2026-001', 'Delegado', 'Club Adulto Mayor Las Compañías', '+56 9 8340 1120',
+             'Solicitud de movilización municipal para encuentro comunal en Parque Gabriel Coll', '05/08/2026', 'Javier Rojas', 'EN PROCESO', 'GABINETE',
+             'Departamento de Movilización', 'Coordinando disponibilidad de bus municipal', '1'),
+            (del_sur, datetime.date(2026, 7, 10), 'SUR-2026-001', 'Alcaldesa', 'JJVV San Joaquín Oriente', '+56 9 8450 2201',
+             'Reparación de veredas y rebaje de soleras en Av. Rodolfo Wagenknecht', '30/07/2026', 'Rodrigo Muñoz', 'EN PROCESO', 'DELEGADO',
+             'SECPLAN / Pavimentación', 'Visita inspectiva programada con equipo territorial Sur', '1'),
+            (del_sur, datetime.date(2026, 7, 12), 'SUR-2026-002', 'Delegado', 'Agrupación Deportiva El Milagro', '+56 9 8450 2202',
+             'Préstamo de multicancha techada e iluminación para campeonato juvenil', '08/08/2026', 'Rodrigo Muñoz', 'APROBADA', 'DELEGADO',
+             'Departamento de Deportes', 'Aprobado uso de recinto según reglamento vigente', '1'),
+            (del_sur, datetime.date(2026, 7, 14), 'SUR-2026-003', 'Alcaldesa', 'Consejo Vecinal La Pampa', '+56 9 8450 2203',
+             'Operativo de retiro de escombros y poda preventiva en bandejón Cuatro Esquinas', '20/07/2026', 'Daniela Vega', 'FINALIZADA', 'ALCALDESA',
+             'Dirección de Aseo y Ornato', 'Operativo completado con 2 camiones tolva', '1'),
+            (del_sur, datetime.date(2026, 7, 16), 'SUR-2026-004', 'Otro', 'Centro General de Padres Colegio Sur', '+56 9 8450 2204',
+             'Instalación de lomo de toro en vía concesionada privada fuera de tuición municipal', '25/07/2026', 'Daniela Vega', 'NO APLICA', 'NO APLICA',
+             'Dirección de Tránsito', 'Se informa que tramo corresponde a recinto privado', '0'),
+            (del_rural, datetime.date(2026, 7, 11), 'RUR-2026-001', 'Alcaldesa', 'APR y JJVV Algarrobito', '+56 9 8560 3301',
+             'Apoyo con camión aljibe suplementario y mantención de camino vecinal', '29/07/2026', 'Matías Contreras', 'EN PROCESO', 'ALCALDESA',
+             'Departamento de Emergencias y Vialidad Rural', 'Priorizado en programación semanal de ruta Valle de Elqui', '1'),
+            (del_rural, datetime.date(2026, 7, 13), 'RUR-2026-002', 'Delegado', 'Comunidad Agrícola Altovalsol', '+56 9 8560 3302',
+             'Autorización de operativo veterinario y vacunación antirrábica en sede rural', '06/08/2026', 'Matías Contreras', 'APROBADA', 'DELEGADO',
+             'Centro Veterinario Municipal', 'Confirmado equipo móvil para jornada de sábado', '1'),
+            (del_rural, datetime.date(2026, 7, 15), 'RUR-2026-003', 'Alcaldesa', 'JJVV Las Rojas', '+56 9 8560 3303',
+             'Despeje de acequia de aguas lluvias y limpieza de puente acceso principal', '19/07/2026', 'Paula Castillo', 'FINALIZADA', 'GABINETE',
+             'Cuadrilla Rural Municipal', 'Trabajos ejecutados antes del sistema frontal', '1'),
+            (del_rural, datetime.date(2026, 7, 17), 'RUR-2026-004', 'Otro', 'Comité Parceleros Pelícana', '+56 9 8560 3304',
+             'Solicitud de pavimentación de ruta enrolada MOP (competencia vialidad regional)', '27/07/2026', 'Paula Castillo', 'NO APLICA', 'NO APLICA',
+             'Secretaría de Gabinete', 'Se orienta derivación formal hacia Dirección de Vialidad MOP', '0'),
+        ]
+        for (d_obj, f_dt, num, para_v, rem_v, fono_v, tema_v, f_act_v, enc_v, est_v, pron_v, der_v, obs_v, uni_v) in cartas_demo:
+            _, created = Carta.objects.get_or_create(
+                delegacion=d_obj,
+                numero=num,
+                remite=rem_v,
+                defaults={
+                    'fecha': f_dt,
+                    'para': para_v,
+                    'fono_contacto': fono_v,
+                    'actividad_tema': tema_v,
+                    'fecha_actividad': f_act_v,
+                    'encargado_seguimiento': enc_v,
+                    'estado': est_v,
+                    'pronunciamiento': pron_v,
+                    'derivada_a': der_v,
+                    'observacion': obs_v,
+                    'unidad': uni_v,
+                    'creado_por': creador_carta,
+                }
+            )
+            if created:
+                cartas_creadas += 1
+
+        return cartas_creadas
