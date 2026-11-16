@@ -425,9 +425,23 @@ def obtener_partes_nombre_objeto(obj):
 
 
 def obtener_nombre_corto(obj):
-    """Retorna 'PrimerNombre ApellidoPaterno' (o fallback legible/username si faltan partes)."""
+    """Retorna 'PrimerNombre ApellidoPaterno' (o nombre completo de organización si corresponde)."""
     if not obj:
         return ''
+    if hasattr(obj, 'tipo_organizacion') and hasattr(obj, 'nombre'):
+        return (obj.nombre or '').strip()
+    ident = getattr(obj, 'identificador_institucional', '') or ''
+    user_ref = obj if hasattr(obj, 'username') else getattr(obj, 'user', None)
+    if not ident and user_ref is not None:
+        try:
+            func = user_ref.funcionario
+            ident = getattr(func, 'identificador_institucional', '') or ''
+        except Exception:
+            ident = ''
+    if ident.startswith('ORG-'):
+        nombre_org = (getattr(user_ref, 'first_name', '') or '').strip() if user_ref else ''
+        if nombre_org:
+            return nombre_org
     pn, _sn, ap, _am = obtener_partes_nombre_objeto(obj)
     corto = ' '.join(p for p in (pn, ap) if p).strip()
     if corto:

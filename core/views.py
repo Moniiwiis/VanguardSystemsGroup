@@ -238,11 +238,12 @@ def login_view(request):
                 if rut_ok:
                     user_candidate = User.objects.filter(username__iexact=rut_fmt).first()
                     if not user_candidate:
-                        func_vec = Funcionario.all_objects.filter(
-                            identificador_institucional=_identificador_vecino(rut_fmt)
+                        func_cli = Funcionario.all_objects.filter(
+                            Q(identificador_institucional=_identificador_vecino(rut_fmt))
+                            | (Q(identificador_institucional__startswith='ORG-') & Q(rut__iexact=rut_fmt))
                         ).select_related('user').first()
-                        if func_vec:
-                            user_candidate = func_vec.user
+                        if func_cli:
+                            user_candidate = func_cli.user
         username_to_auth = user_candidate.username if user_candidate else identifier
 
         user = authenticate(request, username=username_to_auth, password=password)
@@ -323,6 +324,9 @@ def cambiar_contrasena_inicial_view(request):
             funcionario.save(update_fields=['debe_cambiar_contrasena', 'updated_at'])
             update_session_auth_hash(request, request.user)
             messages.success(request, "Contraseña actualizada. Ya puedes usar el sistema.")
+            ctx_cambio = global_context(request)
+            if ctx_cambio.get('permisos', {}).get('es_cliente'):
+                return redirect('portal_cliente')
             return redirect('gestion_inicio')
 
     return render(request, 'auth/cambiar_contrasena_inicial.html')
@@ -922,12 +926,14 @@ def gestion_roles_eliminar(request, rol_id):
 
 
 def _funcionarios_municipales_qs(qs=None):
-    """Retorna funcionarios municipales excluyendo cuentas ciudadanas/vecinos (Rol Cliente)."""
+    """Retorna funcionarios municipales excluyendo cuentas ciudadanas (vecinos y organizaciones, Rol Cliente)."""
     base = qs if qs is not None else Funcionario.objects
     return base.exclude(
         funcionariorol__rol__nombre_rol__icontains='cliente'
     ).exclude(
         identificador_institucional__startswith='VEC-'
+    ).exclude(
+        identificador_institucional__startswith='ORG-'
     ).distinct()
 
 
@@ -1023,6 +1029,104 @@ def _crear_o_sincronizar_usuario_vecino(vecino, correo='', anterior_rut='', crea
     )
     FuncionarioRol.objects.create(funcionario=func_vec, rol=rol_cliente)
     return user_vec, provisional_password, True
+
+
+def _identificador_organizacion(org_id):
+    return f"ORG-{int(org_id):05d}"[:20]
+
+
+def _buscar_func_organizacion(org):
+    if not org or not getattr(org, 'id', None):
+        return None
+    ident = _identificador_organizacion(org.id)
+    return Funcionario.all_objects.select_related('user').filter(
+        identificador_institucional=ident
+    ).first()
+
+
+def _crear_o_sincronizar_usuario_organizacion(org, correo='', anterior_rut='', crear=False, actualizar_correo=False):
+    """
+    Crea o sincroniza la cuenta de acceso al Portal Ciudadano (Rol Cliente) asociada a una
+    Junta de Vecinos u Organización Comunitaria, sin exponerla en el listado de Funcionarios.
+    """
+    ident_org = _identificador_organizacion(org.id)
+    func_org = _buscar_func_organizacion(org)
+    correo_clean = (correo or org.email_contacto or '').strip()
+
+    if func_org:
+        user_org = func_org.user
+        user_org.first_name = (org.nombre or '')[:150]
+        if actualizar_correo and correo_clean:
+            user_org.email = correo_clean
+        user_org.is_active = (org.estado != 'Inactiva')
+        if org.rut and org.rut != anterior_rut:
+            debe_reemplazar = (
+                (anterior_rut and user_org.username.lower() == anterior_rut.lower())
+                or user_org.username.lower().startswith(f"org_{org.id:05d}")
+            )
+            if debe_reemplazar and not User.objects.filter(username__iexact=org.rut).exclude(id=user_org.id).exists():
+                user_org.username = org.rut
+        user_org.save()
+
+        func_org.delegacion = org.delegacion
+        func_org.rut = (org.rut or '')[:20]
+        func_org.telefono = (org.telefono_contacto or '')[:20]
+        func_org.estado = 'Activo' if org.estado != 'Inactiva' else 'Inactivo'
+        func_org.deleted_at = None
+        func_org.save()
+        return user_org, None, False
+
+    if not crear or not correo_clean:
+        return None, None, False
+
+    rol_cliente = (
+        Rol.objects.filter(nombre_rol__iexact='Cliente').first()
+        or Rol.objects.create(nombre_rol='Cliente', alcance='Personal', estado='Activo')
+    )
+    cargo_org = (
+        Cargo.objects.filter(nombre_cargo__icontains='Organización').first()
+        or Cargo.objects.filter(nombre_cargo__icontains='Vecino').first()
+        or Cargo.objects.filter(nombre_cargo__icontains='Cliente').first()
+        or Cargo.objects.create(nombre_cargo='Organización / JJVV')
+    )
+
+    if org.rut:
+        username_dest = org.rut
+        if User.objects.filter(username__iexact=username_dest).exists():
+            clean_rut = ''.join(c for c in org.rut.lower() if c.isalnum())
+            username_dest = f"org_{org.id:05d}_{clean_rut}"[:150]
+    else:
+        username_dest = f"org_{org.id:05d}"
+
+    suf = 1
+    base_un = username_dest
+    while User.objects.filter(username__iexact=username_dest).exists():
+        username_dest = f"{base_un}_{suf}"[:150]
+        suf += 1
+
+    provisional_password = _generate_provisional_password()
+    user_org = User.objects.create_user(
+        username=username_dest,
+        email=correo_clean,
+        first_name=(org.nombre or '')[:150],
+        password=provisional_password,
+        is_staff=False,
+    )
+    user_org.is_active = (org.estado != 'Inactiva')
+    user_org.save()
+
+    func_org = Funcionario.all_objects.create(
+        user=user_org,
+        identificador_institucional=ident_org,
+        rut=(org.rut or '')[:20],
+        delegacion=org.delegacion,
+        cargo=cargo_org,
+        telefono=(org.telefono_contacto or '')[:20],
+        estado='Activo' if org.estado != 'Inactiva' else 'Inactivo',
+        debe_cambiar_contrasena=True,
+    )
+    FuncionarioRol.objects.create(funcionario=func_org, rol=rol_cliente)
+    return user_org, provisional_password, True
 
 
 def _validar_y_crear_vecino_desde_post(request, del_activa, prefix='', allow_existing=False):
@@ -1178,7 +1282,7 @@ def _validar_y_crear_vecino_desde_post(request, del_activa, prefix='', allow_exi
 
 
 def _validar_y_crear_organizacion_desde_post(request, del_activa, prefix='', allow_existing=False):
-    """Valida campos del formulario completo de JJVV/Organización y crea (o reutiliza) el registro."""
+    """Valida campos del formulario completo de JJVV/Organización, crea/sincroniza cuenta de usuario y envía clave."""
     nombre = request.POST.get(f'{prefix}nombre', '').strip()
     tipo_org = (
         request.POST.get(f'{prefix}tipo_organizacion', '').strip()
@@ -1214,48 +1318,48 @@ def _validar_y_crear_organizacion_desde_post(request, del_activa, prefix='', all
         estado = 'Activa'
 
     if not nombre:
-        return None, "El nombre de la organización es obligatorio."
+        return None, None, None, False, "El nombre de la organización es obligatorio."
 
     ok, err = validar_largo(nombre, 200, "Nombre de la Organización")
-    if not ok: return None, err
+    if not ok: return None, None, None, False, err
     ok, err = validar_direccion(domicilio, "Domicilio Legal", 250)
-    if not ok: return None, err
+    if not ok: return None, None, None, False, err
     ok, err = validar_direccion(direccion_sede, "Dirección Sede", 250)
-    if not ok: return None, err
+    if not ok: return None, None, None, False, err
     ok, err = validar_largo(rut_org, 20, "RUT Organización")
-    if not ok: return None, err
+    if not ok: return None, None, None, False, err
     if rut_org:
         ok_rut, res_rut = validar_rut(rut_org)
         if not ok_rut:
-            return None, f"RUT de la organización inválido: {res_rut}"
+            return None, None, None, False, f"RUT de la organización inválido: {res_rut}"
         rut_org = res_rut
     ok, err = validar_largo(representante, 150, "Representante Legal")
-    if not ok: return None, err
+    if not ok: return None, None, None, False, err
     ok, err = validar_largo(tel_contacto, 20, "Teléfono Contacto")
-    if not ok: return None, err
+    if not ok: return None, None, None, False, err
     if tel_contacto:
         ok, err = validar_telefono_chileno(tel_contacto)
-        if not ok: return None, err
+        if not ok: return None, None, None, False, err
         tel_contacto = formatear_telefono_chileno(tel_contacto)
     ok, err = validar_largo(num_pj, 50, "N° Reg. Personalidad Jurídica")
-    if not ok: return None, err
+    if not ok: return None, None, None, False, err
     ok, err = validar_largo(reg_dir, 50, "Registro Directiva N°")
-    if not ok: return None, err
+    if not ok: return None, None, None, False, err
     ok, err = validar_largo(directiva, 1000, "Directiva Actual")
-    if not ok: return None, err
+    if not ok: return None, None, None, False, err
     ok, err = validar_largo(observaciones, 1000, "Observaciones")
-    if not ok: return None, err
+    if not ok: return None, None, None, False, err
     if email_contacto:
         ok, err = validar_largo(email_contacto, 100, "Correo Institucional")
-        if not ok: return None, err
+        if not ok: return None, None, None, False, err
         try:
             validate_email(email_contacto)
         except ValidationError:
-            return None, "El correo electrónico institucional de la organización no es válido."
+            return None, None, None, False, "El correo electrónico institucional de la organización no es válido."
 
     directiva_data, err_dir = _extraer_y_validar_directiva(request, field_prefix=prefix)
     if err_dir:
-        return None, err_dir
+        return None, None, None, False, err_dir
 
     tipos_org_validos = {t[0] for t in OrganizacionComunitaria.TIPO_CHOICES}
     if tipo_org not in tipos_org_validos:
@@ -1284,9 +1388,9 @@ def _validar_y_crear_organizacion_desde_post(request, del_activa, prefix='', all
         try:
             fecha_inscripcion_val = datetime.date.fromisoformat(f_insc)
         except ValueError:
-            return None, "La fecha de inscripción en registro no tiene un formato válido."
+            return None, None, None, False, "La fecha de inscripción en registro no tiene un formato válido."
         if fecha_inscripcion_val < timezone.localdate():
-            return None, "La fecha de inscripción en registro no puede ser anterior a la fecha actual."
+            return None, None, None, False, "La fecha de inscripción en registro no puede ser anterior a la fecha actual."
 
     if not domicilio and direccion_sede:
         domicilio = direccion_sede
@@ -1307,7 +1411,33 @@ def _validar_y_crear_organizacion_desde_post(request, del_activa, prefix='', all
             nombre__iexact=nombre
         ).first()
         if org_existente:
-            return org_existente, None
+            correo_sync = email_val or (org_existente.email_contacto or '').strip()
+            func_actual = _buscar_func_organizacion(org_existente)
+            uid_actual = func_actual.user_id if func_actual else None
+            if correo_sync and User.objects.filter(email__iexact=correo_sync).exclude(id=uid_actual).exists():
+                return None, None, None, False, "Ese correo electrónico ya se encuentra asociado a otra cuenta."
+            user_org, prov_pwd, creado = _crear_o_sincronizar_usuario_organizacion(
+                org_existente, correo=correo_sync, crear=bool(correo_sync), actualizar_correo=bool(email_val)
+            )
+            correo_enviado = False
+            if creado and prov_pwd and user_org:
+                try:
+                    _send_welcome_provisional_password(
+                        user=user_org,
+                        provisional_password=prov_pwd,
+                        rol_nombre=f"{org_existente.tipo_organizacion} (Portal Ciudadano)",
+                        delegacion_nombre=del_activa.nombre if del_activa else 'Comuna',
+                    )
+                    correo_enviado = True
+                except (OSError, SMTPException, BadHeaderError):
+                    logger.exception("No se pudo enviar correo de bienvenida a la organización existente sincronizada.")
+            return org_existente, user_org, prov_pwd, correo_enviado, None
+
+    if not email_val:
+        return None, None, None, False, "Debe ingresar un correo electrónico institucional o del contacto en la directiva para crear la cuenta de acceso de la organización."
+
+    if User.objects.filter(email__iexact=email_val).exists():
+        return None, None, None, False, "Ese correo electrónico ya se encuentra asociado a otra cuenta."
 
     nueva_org = OrganizacionComunitaria.objects.create(
         nombre=nombre,
@@ -1334,12 +1464,29 @@ def _validar_y_crear_organizacion_desde_post(request, del_activa, prefix='', all
         **directiva_data,
     )
 
+    user_org, provisional_password, _ = _crear_o_sincronizar_usuario_organizacion(
+        nueva_org, correo=email_val, crear=True, actualizar_correo=True
+    )
+
     del_id_ws = del_activa.id if del_activa else "global"
     def notificar_ws_org():
         publish_module_changed("organizaciones", del_id_ws, "create", nueva_org.id)
     transaction.on_commit(notificar_ws_org)
 
-    return nueva_org, None
+    correo_enviado = False
+    if email_val and user_org and provisional_password:
+        try:
+            _send_welcome_provisional_password(
+                user=user_org,
+                provisional_password=provisional_password,
+                rol_nombre=f"{nueva_org.tipo_organizacion} (Portal Ciudadano)",
+                delegacion_nombre=del_activa.nombre if del_activa else 'Comuna',
+            )
+            correo_enviado = True
+        except (OSError, SMTPException, BadHeaderError):
+            logger.exception("No se pudo enviar correo de bienvenida a la organización creada.")
+
+    return nueva_org, user_org, provisional_password, correo_enviado, None
 
 
 # --- 3. CRUD USUARIOS (Wireframe C4) ---
@@ -2487,7 +2634,7 @@ def gestion_atenciones(request):
             organizacion_id = request.POST.get('organizacion_id', '').strip()
             crear_nueva_org = request.POST.get('crear_nueva_org', '').strip() == '1'
             if crear_nueva_org:
-                organizacion_obj, err_org = _validar_y_crear_organizacion_desde_post(
+                organizacion_obj, _, _, _, err_org = _validar_y_crear_organizacion_desde_post(
                     request, del_activa, prefix='nueva_org_', allow_existing=True
                 )
                 if err_org:
@@ -4450,14 +4597,26 @@ def gestion_organizaciones(request):
             messages.error(request, "Selecciona una delegación activa antes de registrar una organización.")
             return redirect('gestion_organizaciones')
 
-        nueva_org, err_org = _validar_y_crear_organizacion_desde_post(
+        nueva_org, user_org, provisional_password, correo_enviado, err_org = _validar_y_crear_organizacion_desde_post(
             request, del_activa, prefix='', allow_existing=False
         )
         if err_org:
             messages.error(request, err_org)
             return redirect('gestion_organizaciones')
 
-        messages.success(request, f"Organización '{nueva_org.nombre}' registrada exitosamente en {del_activa.nombre}.")
+        correo_reg = user_org.email if user_org else ''
+        if correo_enviado:
+            messages.success(
+                request,
+                f"Organización '{nueva_org.nombre}' registrada con cuenta de acceso '{user_org.username}'. Credenciales enviadas a '{correo_reg}'.",
+            )
+        elif user_org and provisional_password:
+            messages.success(
+                request,
+                f"Organización '{nueva_org.nombre}' registrada exitosamente. Usuario Portal Ciudadano: '{user_org.username}' · Clave provisional: {provisional_password}",
+            )
+        else:
+            messages.success(request, f"Organización '{nueva_org.nombre}' registrada exitosamente en {del_activa.nombre}.")
         return redirect('gestion_organizaciones')
 
     q = request.GET.get('q', '').strip()
@@ -4571,10 +4730,25 @@ def gestion_organizaciones(request):
     total_organizaciones = qs.count()
     page_obj = Paginator(qs, page_size).get_page(request.GET.get('page', 1))
 
+    organizaciones_pagina = list(page_obj.object_list)
+    idents_org = [_identificador_organizacion(o.id) for o in organizaciones_pagina]
+    cuentas_org_map = {}
+    for func_o in Funcionario.all_objects.select_related('user').filter(
+        identificador_institucional__in=idents_org
+    ):
+        cuentas_org_map[func_o.identificador_institucional] = (
+            func_o.user.username or '',
+            func_o.user.email or '',
+        )
+    for o in organizaciones_pagina:
+        un_o, em_o = cuentas_org_map.get(_identificador_organizacion(o.id), ('', ''))
+        o.usuario_username = un_o
+        o.usuario_email = em_o
+
     sectores_org = Sector.objects.filter(delegacion=del_activa, estado='Activo').order_by('nombre') if del_activa else Sector.objects.none()
 
     return render(request, 'gestion/organizaciones.html', {
-        'organizaciones': page_obj.object_list,
+        'organizaciones': organizaciones_pagina,
         'page_obj': page_obj,
         'tipos_organizaciones': tipos_organizaciones,
         'todas_delegaciones': todas_delegaciones,
@@ -4717,9 +4891,8 @@ def gestion_organizaciones_editar(request, org_id):
         elif 'fecha_inscripcion_registro' in request.POST:
             org.fecha_inscripcion_registro = None
 
-        org.numero_registro_pj = num_pj
-        org.registro_directiva_numero = reg_dir
-        org.estado = request.POST.get('estado', org.estado)
+        # Nuevos campos
+        anterior_rut = org.rut or ''
         prioridad_raw = request.POST.get('contacto_prioritario', org.contacto_prioritario or 'presidente').strip()
         prioridad_val, rep_val, tel_val, email_val = _resolver_contacto_prioritario_org(
             directiva_data,
@@ -4728,8 +4901,25 @@ def gestion_organizaciones_editar(request, org_id):
             fallback_tel=tel_contacto,
             fallback_email=email_contacto_e,
         )
+        if email_val:
+            ok_em, err_em = validar_largo(email_val, 100, "Correo Institucional")
+            if not ok_em:
+                messages.error(request, err_em)
+                return redirect('gestion_organizaciones')
+            try:
+                validate_email(email_val)
+            except ValidationError:
+                messages.error(request, "El correo electrónico de la organización no es válido.")
+                return redirect('gestion_organizaciones')
+        func_actual = _buscar_func_organizacion(org)
+        uid_actual = func_actual.user_id if func_actual else None
+        if email_val and User.objects.filter(email__iexact=email_val).exclude(id=uid_actual).exists():
+            messages.error(request, "Ese correo electrónico ya pertenece a otra cuenta.")
+            return redirect('gestion_organizaciones')
 
-        # Nuevos campos
+        org.numero_registro_pj = num_pj
+        org.registro_directiva_numero = reg_dir
+        org.estado = request.POST.get('estado', org.estado)
         org.rut = rut_org or None
         org.personalidad_juridica = personalidad_jur or num_pj or None
         org.contacto_prioritario = prioridad_val
@@ -4742,6 +4932,24 @@ def gestion_organizaciones_editar(request, org_id):
         for campo_dir, valor_dir in directiva_data.items():
             setattr(org, campo_dir, valor_dir)
         org.save()
+
+        user_org, prov_pwd, creado = _crear_o_sincronizar_usuario_organizacion(
+            org,
+            correo=email_val or '',
+            anterior_rut=anterior_rut,
+            crear=bool(email_val),
+            actualizar_correo=bool(email_val),
+        )
+        if creado and prov_pwd and user_org:
+            try:
+                _send_welcome_provisional_password(
+                    user=user_org,
+                    provisional_password=prov_pwd,
+                    rol_nombre=f"{org.tipo_organizacion} (Portal Ciudadano)",
+                    delegacion_nombre=del_obj.nombre if del_obj else 'Comuna',
+                )
+            except (OSError, SMTPException, BadHeaderError):
+                logger.exception("No se pudo enviar correo de bienvenida a la organización editada.")
 
         del_id_ws = del_obj.id if del_obj else "global"
         def notificar_ws_edit_org():
@@ -4770,6 +4978,12 @@ def gestion_organizaciones_eliminar(request, org_id):
     if request.method == 'POST':
         nombre = org.nombre
         del_id_ws = org.delegacion_id if org.delegacion_id else "global"
+        func_org = _buscar_func_organizacion(org)
+        if func_org:
+            u_org = func_org.user
+            u_org.is_active = False
+            u_org.save(update_fields=['is_active'])
+            func_org.delete()
         org.delete()
 
         def notificar_ws_del_org():
@@ -4835,6 +5049,18 @@ def perfil_usuario(request):
             if vecino_cli and vecino_cli.telefono != telefono:
                 vecino_cli.telefono = telefono
                 vecino_cli.save(update_fields=['telefono', 'updated_at'])
+            org_cli = _obtener_organizacion_de_cliente(user)
+            if org_cli:
+                org_updates = []
+                if org_cli.email_contacto != email:
+                    org_cli.email_contacto = email
+                    org_updates.append('email_contacto')
+                if org_cli.telefono_contacto != (telefono or None):
+                    org_cli.telefono_contacto = telefono or None
+                    org_updates.append('telefono_contacto')
+                if org_updates:
+                    org_updates.append('updated_at')
+                    org_cli.save(update_fields=org_updates)
 
             messages.success(request, "Tus datos personales fueron actualizados correctamente.")
             return redirect('perfil_usuario')
@@ -4921,8 +5147,12 @@ def perfil_usuario(request):
                 messages.warning(request, "No se seleccionó ninguna imagen para guardar.")
             return redirect('perfil_usuario')
 
-    vecino_perfil = _obtener_vecino_de_cliente(user)
-    if vecino_perfil:
+    org_perfil = _obtener_organizacion_de_cliente(user)
+    vecino_perfil = None if org_perfil else _obtener_vecino_de_cliente(user)
+    if org_perfil:
+        pn = sn = ap = am = ''
+        perfil_rut = org_perfil.rut or ''
+    elif vecino_perfil:
         pn, sn, ap, am = vecino_perfil.get_partes_nombre()
         perfil_rut = vecino_perfil.rut
     elif funcionario:
@@ -4936,6 +5166,7 @@ def perfil_usuario(request):
     return render(request, 'auth/perfil.html', {
         'funcionario': funcionario,
         'user': user,
+        'org_perfil': org_perfil,
         'perfil_primer_nombre': pn,
         'perfil_segundo_nombre': sn,
         'perfil_apellido_paterno': ap,
@@ -4961,6 +5192,8 @@ def _obtener_vecino_de_cliente(user):
     func = Funcionario.all_objects.filter(user=user).first()
     if func and func.identificador_institucional:
         identificador = func.identificador_institucional
+        if identificador.upper().startswith('ORG-'):
+            return None
 
     # Mapeo explícito para cuentas de evaluación cliente_1 (VEC-C1) y cliente_2 (VEC-C2)
     if user.username == 'cliente_1' or identificador == 'VEC-C1':
@@ -4992,25 +5225,55 @@ def _obtener_vecino_de_cliente(user):
     return None
 
 
+def _obtener_organizacion_de_cliente(user):
+    """
+    Obtiene el registro OrganizacionComunitaria vinculado exclusivamente al usuario Cliente
+    de una Junta de Vecinos u Organización Comunitaria.
+    """
+    if not user or not user.is_authenticated:
+        return None
+
+    func = Funcionario.all_objects.filter(user=user).first()
+    identificador = (func.identificador_institucional or '') if func else ''
+    if identificador.upper().startswith('ORG-'):
+        raw_id = identificador[4:].strip()
+        if raw_id.isdigit():
+            org = OrganizacionComunitaria.objects.select_related('delegacion', 'sector').filter(id=int(raw_id)).first()
+            if org:
+                return org
+        if func and func.rut:
+            org = OrganizacionComunitaria.objects.select_related('delegacion', 'sector').filter(rut__iexact=func.rut).first()
+            if org:
+                return org
+    return None
+
+
 @login_required
 def portal_cliente(request):
     """
-    Portal exclusivo para vecinos / usuarios con rol Cliente.
-    Aislamiento efectivo: Solo permite consultar sus propios datos personales y sus propios registros.
+    Portal exclusivo para vecinos y organizaciones comunitarias con rol Cliente.
+    Aislamiento efectivo: Solo permite consultar sus propios datos y sus propios registros.
     Bloquea creación/edición de registros de negocio y el acceso a funciones administrativas.
     """
     user = request.user
-    vecino = _obtener_vecino_de_cliente(user)
+    organizacion = _obtener_organizacion_de_cliente(user)
+    vecino = None if organizacion else _obtener_vecino_de_cliente(user)
 
     # El rol Cliente solo puede consultar sus datos y registros propios (sin crear registros)
     if request.method == 'POST':
         messages.error(request, 'Acceso denegado: Tu cuenta Cliente solo está habilitada para consultar tus datos y registros propios.')
         return redirect('portal_cliente')
 
-    # Filtro estricto: registros de negocio vinculados exclusivamente a este cliente
+    # Filtro estricto: registros de negocio vinculados exclusivamente a este cliente u organización
+    filtro_cliente = Q(creado_por=user)
+    if vecino:
+        filtro_cliente |= Q(vecino=vecino)
+    if organizacion:
+        filtro_cliente |= Q(organizacion=organizacion)
+
     solicitudes_base = AtencionCiudadana.objects.filter(
-        Q(creado_por=user) | (Q(vecino=vecino) if vecino else Q(pk__in=[]))
-    ).select_related('delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'actividad').order_by('-created_at')
+        filtro_cliente
+    ).select_related('delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'actividad', 'organizacion').order_by('-created_at')
 
     total_propias = solicitudes_base.count()
     resueltas = solicitudes_base.filter(estado__iexact='Resuelta').count()
@@ -5032,9 +5295,20 @@ def portal_cliente(request):
     page_size = _get_page_size(request)
     page_obj = Paginator(solicitudes_qs, page_size).get_page(request.GET.get('page', 1))
 
+    compromisos_org = []
+    if organizacion:
+        from agenda.models import CompromisoAgenda
+        compromisos_org = list(
+            CompromisoAgenda.objects.filter(organizacion=organizacion)
+            .select_related('delegacion', 'sector', 'responsable__user')
+            .order_by('-fecha_comprometida', '-id')
+        )
+
     return render(request, 'portal/cliente.html', {
         'user': user,
         'vecino': vecino,
+        'organizacion': organizacion,
+        'compromisos_org': compromisos_org,
         'funcionario': Funcionario.all_objects.filter(user=user).first(),
         'atenciones': page_obj.object_list,
         'page_obj': page_obj,
@@ -5052,18 +5326,25 @@ def portal_cliente(request):
 @login_required
 def portal_cliente_detalle(request, atencion_id):
     """
-    Detalle de una solicitud propia del cliente final.
+    Detalle de una solicitud propia del cliente final (vecino u organización).
     Rechaza con 404 cualquier intento de acceder a un registro ajeno.
     """
     user = request.user
-    vecino = _obtener_vecino_de_cliente(user)
+    organizacion = _obtener_organizacion_de_cliente(user)
+    vecino = None if organizacion else _obtener_vecino_de_cliente(user)
+
+    filtro_cliente = Q(creado_por=user)
+    if vecino:
+        filtro_cliente |= Q(vecino=vecino)
+    if organizacion:
+        filtro_cliente |= Q(organizacion=organizacion)
 
     # Seguridad: solo buscar dentro del ámbito propio del cliente
     atencion = AtencionCiudadana.objects.filter(
         id=atencion_id
     ).filter(
-        Q(creado_por=user) | (Q(vecino=vecino) if vecino else Q(pk__in=[]))
-    ).select_related('delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable').first()
+        filtro_cliente
+    ).select_related('delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'organizacion').first()
 
     if not atencion:
         # Responder 404 sin revelar si la solicitud de otro usuario existe
@@ -5073,6 +5354,7 @@ def portal_cliente_detalle(request, atencion_id):
         'atencion': atencion,
         'user': user,
         'vecino': vecino,
+        'organizacion': organizacion,
     })
 
 

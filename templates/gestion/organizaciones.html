@@ -224,6 +224,9 @@
                 {% if o.rut %}
                   <span class="font-mono text-[10px] text-slate-500 font-semibold">RUT: {{ o.rut }}</span>
                 {% endif %}
+                {% if o.usuario_email %}
+                  <span class="font-mono text-[10px] text-slate-400">{{ o.usuario_email }}</span>
+                {% endif %}
               </div>
             </td>
 
@@ -337,6 +340,7 @@
                         data-tel="{{ o.telefono_contacto|default:'' }}"
                         data-email="{{ o.email_contacto|default:'' }}"
                         data-estado="{{ o.estado }}"
+                        data-usuario="{{ o.usuario_username|default:'' }}"
                         data-obs="{{ o.observaciones|default:'' }}"
                         data-pres-nombre="{{ o.presidente_nombre|default:'' }}"
                         data-pres-rut="{{ o.presidente_rut|default:'' }}"
@@ -838,6 +842,7 @@
             <p><strong>Fecha de Inscripción en Registro:</strong> ${esc(d.finscDisp)}</p>
             <p><strong>Registro de Directiva N°:</strong> ${esc(d.regdir)}</p>
             <p><strong>RUT Organización:</strong> ${esc(d.rut)}</p>
+            <p class="col-span-2"><strong>Cuenta Portal Ciudadano:</strong> <span class="font-mono">${esc(d.usuario)}</span></p>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
             ${cargoRow('presidente', 'Presidente', d.presNombre, d.presRut, d.presTel, d.presCorreo)}

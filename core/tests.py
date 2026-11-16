@@ -1226,6 +1226,7 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             'nueva_org_tipo': 'Junta de Vecinos',
             'nueva_org_representante': 'Carlos Pérez',
             'nueva_org_telefono': '+56 9 8765 4321',
+            'nueva_org_email_contacto': 'terrazas@brillador.test',
             'nueva_org_direccion': 'Av. El Brillador 450',
             'tipo_atencion_id': self.tipo.id,
             'sub_atencion_id': self.sub.id,
@@ -1997,6 +1998,7 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         # Crear con fecha válida usa obligatoriamente la delegación activa (ignora delegacion_id manipulada)
         self.client.post(reverse('gestion_organizaciones'), {
             'nombre': 'Org Delegacion Bloqueada',
+            'email_contacto': 'delbloq@organizacion.test',
             'delegacion_id': del_otra.id,
             'sector_id': sec_principal.id,
             'fecha_inscripcion_registro': futuro.isoformat(),
@@ -2115,6 +2117,7 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             'nueva_org_contacto_prioritario': 'secretario',
             'nueva_org_secretario_nombre': 'Carla Secretaria',
             'nueva_org_secretario_telefono': '977778888',
+            'nueva_org_secretario_correo': 'carla.inline@jjvv.test',
             'tipo_atencion_id': self.tipo.id,
             'sub_atencion_id': self.sub.id,
             'descripcion': 'Prueba prioridad contacto inline',
@@ -2324,6 +2327,7 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             'nueva_org_socios_activos': '42',
             'nueva_org_numero_registro_pj': 'PJ-7788',
             'nueva_org_registro_directiva_numero': 'DIR-990',
+            'nueva_org_email_contacto': 'jjvv.unificada@example.test',
             'nueva_org_sector_id': org_sector.id,
             'tipo_atencion_id': self.tipo.id,
             'sub_atencion_id': self.sub.id,
@@ -2570,6 +2574,176 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             self.assertContains(resp_admin, en_label)
         for es_label in ('Delegacions', 'Actividads', 'Atencion ciudadanas', 'Cargos', 'Vecinos'):
             self.assertNotContains(resp_admin, es_label)
+
+    def test_usuario_organizacion_provisoria_correo_y_portal(self):
+        from django.core import mail
+        from django.contrib.auth.models import User
+        from django.utils import timezone
+        from accounts.models import Delegacion, Sector, Cargo, Rol, Funcionario, FuncionarioRol
+        from agenda.models import CompromisoAgenda
+        import re
+
+        admin = User.objects.create_superuser('admin_org_usr', 'adminorgu@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        sec = Sector.objects.create(nombre='Sector Org Portal', delegacion=self.delegacion, estado='Activo')
+
+        # 1. Rechaza crear organización si no se ingresa correo institucional ni en directiva
+        antes = OrganizacionComunitaria.objects.count()
+        resp_no_mail = self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV Sin Correo',
+            'tipo_organizacion': 'Junta de Vecinos',
+            'sector_id': sec.id,
+        })
+        self.assertRedirects(resp_no_mail, reverse('gestion_organizaciones'))
+        self.assertEqual(OrganizacionComunitaria.objects.count(), antes)
+
+        # 2. Al crear organización con correo se crea su User (Rol Cliente), Funcionario ORG- y se envía contraseña provisoria
+        mail.outbox.clear()
+        resp_create = self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV Portal Las Compañías',
+            'tipo_organizacion': 'Junta de Vecinos',
+            'rut': '65.987.654-K',
+            'domicilio_legal': 'Av. Viña del Mar 123',
+            'socios_activos': '85',
+            'numero_registro_pj': 'PJ-5544',
+            'registro_directiva_numero': 'DIR-77',
+            'sector_id': sec.id,
+            'contacto_prioritario': 'presidente',
+            'presidente_nombre': 'Carmen Presidenta',
+            'presidente_rut': '11.111.111-1',
+            'presidente_telefono': '912345678',
+            'presidente_correo': 'contacto@jjvvcompanias.test',
+            'estado': 'Activa',
+        })
+        self.assertRedirects(resp_create, reverse('gestion_organizaciones'))
+        org = OrganizacionComunitaria.objects.get(nombre='JJVV Portal Las Compañías')
+        user_org = User.objects.filter(email='contacto@jjvvcompanias.test').first()
+        self.assertIsNotNone(user_org)
+        self.assertFalse(user_org.is_staff)
+        self.assertEqual(user_org.username, '65.987.654-K')
+
+        func_org = Funcionario.objects.get(user=user_org)
+        self.assertEqual(func_org.identificador_institucional, f'ORG-{org.id:05d}')
+        self.assertTrue(func_org.debe_cambiar_contrasena)
+
+        # No debe aparecer en la tabla administrativa de Funcionarios
+        resp_func = self.client.get(reverse('gestion_usuarios'))
+        self.assertNotContains(resp_func, '65.987.654-K')
+
+        # Correo enviado con contraseña provisoria
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['contacto@jjvvcompanias.test'])
+        m = re.search(r'Contraseña provisoria:\s*(\S+)', mail.outbox[0].body)
+        self.assertIsNotNone(m)
+        prov_pwd = m.group(1)
+        self.assertTrue(user_org.check_password(prov_pwd))
+
+        # Registrar una atención y un compromiso vinculados a la organización + una atención ajena
+        at_propia = AtencionCiudadana.objects.create(
+            solicitante=f"{org.nombre} ({org.tipo_organizacion})",
+            organizacion=org,
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Solicitud propia de sede comunitaria',
+            creado_por=admin,
+            usuario_responsable=admin,
+            estado='En proceso',
+        )
+        other_org = OrganizacionComunitaria.objects.create(
+            nombre='Otra JJVV Ajena',
+            tipo_organizacion='Junta de Vecinos',
+            delegacion=self.delegacion,
+            estado='Activa',
+        )
+        at_ajena = AtencionCiudadana.objects.create(
+            solicitante='Otra JJVV Ajena',
+            organizacion=other_org,
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Solicitud confidencial ajena',
+            creado_por=admin,
+            usuario_responsable=admin,
+            estado='Registrada',
+        )
+        cargo_m = Cargo.objects.create(nombre_cargo='Gestor')
+        u_resp = User.objects.create_user('resp_org_comp', 'respcomp@example.test', 'Resp123!')
+        func_resp = Funcionario.objects.create(
+            user=u_resp, identificador_institucional='FUN-9101', delegacion=self.delegacion, cargo=cargo_m
+        )
+        CompromisoAgenda.objects.create(
+            delegacion=self.delegacion,
+            sector=sec,
+            organizacion=org,
+            solicitante=org.nombre,
+            responsable=func_resp,
+            fecha_comprometida=timezone.localdate(),
+            estado='Registrada',
+            observacion='Compromiso territorial de luminarias',
+        )
+
+        # 3. Iniciar sesión por correo (o RUT) con la clave provisoria exige cambio obligatorio y luego entra al portal
+        self.client.logout()
+        resp_login = self.client.post(reverse('login'), {
+            'username': 'contacto@jjvvcompanias.test',
+            'password': prov_pwd,
+        })
+        self.assertRedirects(resp_login, reverse('cambiar_contrasena_inicial'))
+
+        resp_change = self.client.post(reverse('cambiar_contrasena_inicial'), {
+            'nueva_contrasena': 'NuevaClaveOrg!99',
+            'confirmar_contrasena': 'NuevaClaveOrg!99',
+        })
+        self.assertRedirects(resp_change, reverse('portal_cliente'))
+
+        # 4. El portal muestra los datos de la organización (nombre completo, sin truncar) y sus registros propios
+        resp_portal = self.client.get(reverse('portal_cliente'))
+        self.assertEqual(resp_portal.status_code, 200)
+        self.assertContains(resp_portal, 'JJVV Portal Las Compañías')
+        self.assertContains(resp_portal, '65.987.654-K')
+        self.assertContains(resp_portal, 'Av. Viña del Mar 123')
+        self.assertContains(resp_portal, 'PJ-5544')
+        self.assertContains(resp_portal, 'Carmen Presidenta')
+        self.assertContains(resp_portal, 'Solicitud propia de sede comunitaria')
+        self.assertContains(resp_portal, 'Compromiso territorial de luminarias')
+        self.assertNotContains(resp_portal, 'Solicitud confidencial ajena')
+
+        # Detalle propio 200, detalle ajeno 404, ruta interna 403
+        self.assertEqual(self.client.get(reverse('portal_cliente_detalle', args=[at_propia.id])).status_code, 200)
+        self.assertEqual(self.client.get(reverse('portal_cliente_detalle', args=[at_ajena.id])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('gestion_organizaciones')).status_code, 403)
+
+        # Mi Perfil muestra datos de la organización y sincroniza correo/teléfono
+        resp_perf = self.client.get(reverse('perfil_usuario'))
+        self.assertContains(resp_perf, 'Nombre de la Organización')
+        self.assertContains(resp_perf, 'JJVV Portal Las Compañías')
+        self.client.post(reverse('perfil_usuario'), {
+            'accion': 'actualizar_datos',
+            'email': 'nuevo.correo@jjvvcompanias.test',
+            'telefono': '+56 9 8888 7777',
+        })
+        org.refresh_from_db()
+        self.assertEqual(org.email_contacto, 'nuevo.correo@jjvvcompanias.test')
+        self.assertEqual(org.telefono_contacto, '+56 9 8888 7777')
+
+        # También puede ingresar al Portal usando su RUT de organización
+        self.client.logout()
+        resp_login_rut = self.client.post(reverse('login'), {
+            'username': '65987654-k',
+            'password': 'NuevaClaveOrg!99',
+        })
+        self.assertRedirects(resp_login_rut, reverse('portal_cliente'))
+
+        # 5. El editar a Inactiva o eliminar la organización desactiva su cuenta de acceso
+        self.client.force_login(admin)
+        self.client.post(reverse('gestion_organizaciones_eliminar', args=[org.id]))
+        user_org.refresh_from_db()
+        self.assertFalse(user_org.is_active)
 
 
 

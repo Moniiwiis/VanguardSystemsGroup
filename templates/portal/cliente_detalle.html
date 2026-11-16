@@ -56,6 +56,9 @@
       <div>
         <span class="font-bold text-slate-400 block uppercase tracking-wider text-[10px]">Delegación Asignada</span>
         <span class="font-bold text-[#C41230] text-sm mt-0.5 block">{{ atencion.delegacion.nombre }}</span>
+        {% if atencion.organizacion %}
+          <span class="text-slate-700 font-semibold block mt-0.5">{{ atencion.organizacion.nombre }}</span>
+        {% endif %}
         <span class="text-slate-500 font-mono">{{ atencion.created_at|date:"d/m/Y H:i" }}</span>
       </div>
     </div>
