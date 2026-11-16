@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Usuarios del Sistema — Sistema Municipal La Serena{% endblock %}
+{% block title %}Funcionarios del Sistema — Sistema Municipal La Serena{% endblock %}
 
 {% block content %}
 <div class="space-y-5">
@@ -8,13 +8,13 @@
   <!-- Migas de pan y Encabezado (Wireframe C4 - Diseño 7) -->
   <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
     <div>
-      <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Gestión municipal / Usuarios</p>
-      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Usuarios del sistema</h1>
+      <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Gestión municipal / Funcionarios</p>
+      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Funcionarios del sistema</h1>
     </div>
     <button onclick="document.getElementById('modal-crear').classList.remove('hidden')" 
             class="px-4 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
       <i data-lucide="plus" class="w-4 h-4"></i>
-      <span>Nuevo registro</span>
+      <span>Nuevo funcionario</span>
     </button>
   </div>
 
@@ -31,7 +31,7 @@
 
       {% if permisos.es_admin %}
       <select name="delegacion" onchange="this.form.submit()" 
-              class="w-full max-w-[150px] px-2 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+              class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
         <option value="">Filtrar Delegación: Todas</option>
         {% for d in todas_delegaciones %}
           <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
@@ -75,9 +75,9 @@
         <tbody class="divide-y divide-slate-100 font-medium">
           {% for f in funcionarios %}
           <tr class="hover:bg-slate-50/70 transition-colors">
-            <td class="py-3.5 px-6 font-bold text-slate-900 whitespace-nowrap">
-              <div class="flex items-center gap-2">
-                <span>{{ f.user.first_name|default:f.user.username }}</span>
+            <td class="py-3.5 px-6 font-bold text-slate-900 min-w-[160px] max-w-[220px] [overflow-wrap:anywhere]">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="min-w-0 break-words [overflow-wrap:anywhere]">{{ f|nombre_corto }}</span>
                 {% if f.debe_cambiar_contrasena %}
                   <span onmouseenter="mostrarTooltipClave(this)" onmouseleave="ocultarTooltipClave()"
                         class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-50 text-amber-600 border border-amber-300 hover:bg-amber-100 hover:text-amber-700 transition-colors cursor-help shrink-0">
@@ -86,8 +86,8 @@
                 {% endif %}
               </div>
             </td>
-            <td class="py-3.5 px-6 font-mono text-slate-700">{{ f.user.username }}</td>
-            <td class="py-3.5 px-6 text-slate-600">{{ f.user.email|default:"—" }}</td>
+            <td class="py-3.5 px-6 font-mono text-slate-700 min-w-[130px] max-w-[160px] [overflow-wrap:anywhere]">{{ f.user.username }}</td>
+            <td class="py-3.5 px-6 text-slate-600 min-w-[160px] max-w-[200px] [overflow-wrap:anywhere]">{{ f.user.email|default:"—" }}</td>
             <td class="py-3.5 px-6 text-slate-700">{{ f.cargo.nombre_cargo|default:"—" }}</td>
             <td class="py-3.5 px-6">
               {% with f.funcionariorol_set.first as rol_entry %}
@@ -100,27 +100,31 @@
                 {% endif %}
               {% endwith %}
             </td>
-            <td class="py-3.5 px-6 font-semibold text-slate-700">{{ f.delegacion.nombre|default:"Global" }}</td>
+            <td class="py-3.5 px-6 whitespace-nowrap">
+              {% include "gestion/includes/delegacion_cell.html" with nombre=f.delegacion.nombre fallback="Global" %}
+            </td>
             <td class="py-3.5 px-6 text-center">
               <div class="flex items-center justify-center gap-1.5">
                 <!-- Ver Detalle -->
                 <button type="button" 
-                        onclick="verDetalle('{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.cargo.nombre_cargo|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.nombre_rol|default:'Funcionario'|escapejs }}', '{{ f.delegacion.nombre|default:'Global'|escapejs }}', '{{ f.estado|escapejs }}', '{{ f.identificador_institucional|escapejs }}', '{{ f.debe_cambiar_contrasena|yesno:"1,0" }}')"
+                        onclick="verDetalle('{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.cargo.nombre_cargo|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.nombre_rol|default:'Funcionario'|escapejs }}', '{{ f.delegacion.nombre|default:'Global'|escapejs }}', '{{ f.estado|escapejs }}', '{{ f.identificador_institucional|escapejs }}', '{{ f.debe_cambiar_contrasena|yesno:"1,0" }}', '{{ f.get_rut|default:''|escapejs }}')"
                         title="Ver detalle"
                         class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
                 <!-- Editar -->
+                {% with f.get_partes_nombre as f_partes %}
                 <button type="button" 
-                        onclick="editarRegistro('{{ f.id }}', '{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.id|default:'' }}', '{{ f.delegacion.id|default:'' }}', '{{ f.estado|escapejs }}', '{{ f.cargo_id }}')"
-                        title="Editar usuario"
+                        onclick="editarRegistro('{{ f.id }}', '{{ f.user.first_name|default:f.user.username|escapejs }}', '{{ f.user.email|default:''|escapejs }}', '{{ f.funcionariorol_set.first.rol.id|default:'' }}', '{{ f.delegacion.id|default:'' }}', '{{ f.estado|escapejs }}', '{{ f.cargo_id }}', '{{ f.user.username|escapejs }}', '{{ f_partes.0|escapejs }}', '{{ f_partes.1|escapejs }}', '{{ f_partes.2|escapejs }}', '{{ f_partes.3|escapejs }}', '{{ f.get_rut|default:''|escapejs }}')"
+                        title="Editar funcionario"
                         class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all">
                   <i data-lucide="edit-3" class="w-4 h-4"></i>
                 </button>
+                {% endwith %}
                 <!-- Eliminar con confirmación SweetAlert2 -->
                 <form method="POST" action="{% url 'gestion_usuarios_eliminar' f.id %}" onsubmit="return confirmDelete(this, '{{ f.user.first_name|default:f.user.username|escapejs }}');" class="inline">
                   {% csrf_token %}
-                  <button type="submit" title="Eliminar usuario" class="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all">
+                  <button type="submit" title="Eliminar funcionario" class="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all">
                     <i data-lucide="trash-2" class="w-4 h-4 text-red-500"></i>
                   </button>
                 </form>
@@ -130,7 +134,7 @@
           {% empty %}
           <tr>
             <td colspan="7" class="py-8 text-center text-slate-400 font-medium">
-              No se encontraron usuarios para la búsqueda o filtro aplicado.
+              No se encontraron funcionarios para la búsqueda o filtro aplicado.
             </td>
           </tr>
           {% endfor %}
@@ -193,13 +197,14 @@
 <div id="modal-ver" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
   <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-md max-h-[90vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-      <h3 class="text-base font-extrabold text-slate-900">Consulta de Usuario</h3>
+      <h3 class="text-base font-extrabold text-slate-900">Consulta de Funcionario</h3>
       <button onclick="document.getElementById('modal-ver').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
     </div>
     <div class="space-y-3 text-xs">
       <div><span class="font-bold text-slate-500">ID Institucional:</span> <span id="ver-id" class="font-mono font-bold text-slate-900"></span></div>
       <div><span class="font-bold text-slate-500">Nombre Completo:</span> <span id="ver-nombre" class="font-bold text-slate-900"></span></div>
-      <div><span class="font-bold text-slate-500">Usuario:</span> <span id="ver-usuario" class="font-mono text-slate-800"></span></div>
+      <div><span class="font-bold text-slate-500">RUT:</span> <span id="ver-rut" class="font-mono font-bold text-slate-800"></span></div>
+      <div><span class="font-bold text-slate-500">Usuario de acceso:</span> <span id="ver-usuario" class="font-mono text-slate-800"></span></div>
       <div><span class="font-bold text-slate-500">Correo Electrónico:</span> <span id="ver-correo" class="text-slate-800"></span></div>
       <div><span class="font-bold text-slate-500">Cargo:</span> <span id="ver-cargo" class="text-slate-800"></span></div>
       <div><span class="font-bold text-slate-500">Rol:</span> <span id="ver-rol" class="font-bold text-slate-800"></span></div>
@@ -209,7 +214,7 @@
         <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
         <div class="text-[11px] leading-relaxed">
           <span class="font-bold block text-amber-800">Contraseña provisional pendiente</span>
-          <span>El usuario no ha cambiado la contraseña provisional. Se recomienda darle aviso para que lo efectúe a la brevedad.</span>
+          <span>El funcionario no ha cambiado la contraseña provisional. Se recomienda darle aviso para que lo efectúe a la brevedad.</span>
         </div>
       </div>
     </div>
@@ -220,27 +225,45 @@
   </div>
 </div>
 
-<!-- Modal Crear Usuario -->
+<!-- Modal Crear Funcionario -->
 <div id="modal-crear" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-md max-h-[90vh] overflow-y-auto space-y-4">
+  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-      <h3 class="text-base font-extrabold text-slate-900">Nuevo Usuario</h3>
+      <h3 class="text-base font-extrabold text-slate-900">Nuevo Funcionario</h3>
       <button onclick="document.getElementById('modal-crear').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
     </div>
     <form method="POST" action="{% url 'gestion_usuarios' %}" class="space-y-4">
       {% csrf_token %}
-      <div>
-        <label class="block text-xs font-bold text-slate-700 mb-1">Nombre Completo *</label>
-        <input type="text" name="nombre" required placeholder="Nombre y apellidos"
-               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Primer Nombre <span class="text-[#C41230]">*</span></label>
+          <input type="text" id="crear-func-pn" name="primer_nombre" required maxlength="50" placeholder="Ej: María"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Segundo Nombre</label>
+          <input type="text" id="crear-func-sn" name="segundo_nombre" maxlength="50" placeholder="Opcional"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Apellido Paterno <span class="text-[#C41230]">*</span></label>
+          <input type="text" id="crear-func-ap" name="apellido_paterno" required maxlength="50" placeholder="Ej: González"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Apellido Materno</label>
+          <input type="text" id="crear-func-am" name="apellido_materno" maxlength="50" placeholder="Ej: Rojas"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
       </div>
       <div>
-        <label class="block text-xs font-bold text-slate-700 mb-1">Nombre de usuario *</label>
-        <input type="text" name="username" required autocomplete="username"
-               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        <label class="block text-xs font-bold text-slate-700 mb-1">RUT <span class="text-[#C41230]">*</span></label>
+        <input type="text" id="crear-func-rut" name="rut" required data-rut="true" maxlength="12" placeholder="Ej: 12.345.678-5"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        <div class="rut-feedback"></div>
       </div>
       <div>
-        <label class="block text-xs font-bold text-slate-700 mb-1">Correo Electrónico *</label>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Correo Electrónico <span class="text-[#C41230]">*</span></label>
         <input type="email" name="correo" required placeholder="correo@dominio.cl"
                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
       </div>
@@ -290,19 +313,47 @@
   </div>
 </div>
 
-<!-- Modal Editar Usuario -->
+<!-- Modal Editar Funcionario -->
 <div id="modal-editar" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-md space-y-4">
+  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-      <h3 class="text-base font-extrabold text-slate-900">Editar Usuario</h3>
+      <h3 class="text-base font-extrabold text-slate-900">Editar Funcionario</h3>
       <button onclick="document.getElementById('modal-editar').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
     </div>
     <form id="form-editar" method="POST" action="" class="space-y-4">
       {% csrf_token %}
       <div>
-        <label class="block text-xs font-bold text-slate-700 mb-1">Nombre Completo *</label>
-        <input type="text" id="edit-nombre" name="nombre" required 
-               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        <label class="block text-xs font-bold text-slate-700 mb-1">Usuario de acceso</label>
+        <input type="text" id="edit-username-readonly" readonly
+               class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-mono font-bold text-slate-800 focus:outline-none select-none" />
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Primer Nombre <span class="text-[#C41230]">*</span></label>
+          <input type="text" id="edit-primer-nombre" name="primer_nombre" required maxlength="50"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Segundo Nombre</label>
+          <input type="text" id="edit-segundo-nombre" name="segundo_nombre" maxlength="50"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Apellido Paterno <span class="text-[#C41230]">*</span></label>
+          <input type="text" id="edit-apellido-paterno" name="apellido_paterno" required maxlength="50"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Apellido Materno</label>
+          <input type="text" id="edit-apellido-materno" name="apellido_materno" maxlength="50"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">RUT <span class="text-[#C41230]">*</span></label>
+        <input type="text" id="edit-func-rut" name="rut" required data-rut="true" maxlength="12" placeholder="Ej: 12.345.678-5"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        <div class="rut-feedback"></div>
       </div>
       <div>
         <label class="block text-xs font-bold text-slate-700 mb-1">Correo Electrónico *</label>
@@ -360,7 +411,7 @@
       <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0"></i>
       <span>Contraseña provisional pendiente</span>
     </div>
-    <p class="text-slate-200">El usuario no ha cambiado la contraseña provisional. Se recomienda darle aviso para que lo efectúe a la brevedad.</p>
+    <p class="text-slate-200">El funcionario no ha cambiado la contraseña provisional. Se recomienda darle aviso para que lo efectúe a la brevedad.</p>
   </div>
 </div>
 
@@ -387,9 +438,12 @@
     if (tip) tip.classList.add('hidden');
   }
 
-  function verDetalle(nombre, usuario, correo, cargo, rol, delegacion, estado, idInst, debeCambiarPw) {
+  function verDetalle(nombre, usuario, correo, cargo, rol, delegacion, estado, idInst, debeCambiarPw, rut) {
     document.getElementById('ver-id').textContent = idInst || '—';
     document.getElementById('ver-nombre').textContent = nombre;
+    if (document.getElementById('ver-rut')) {
+      document.getElementById('ver-rut').textContent = rut || '—';
+    }
     document.getElementById('ver-usuario').textContent = usuario;
     document.getElementById('ver-correo').textContent = correo;
     document.getElementById('ver-cargo').textContent = cargo || '—';
@@ -409,9 +463,18 @@
     document.getElementById('modal-ver').classList.remove('hidden');
   }
 
-  function editarRegistro(id, nombre, correo, rolId, delId, estado, cargoId) {
+  function editarRegistro(id, nombre, correo, rolId, delId, estado, cargoId, username, primerNombre, segundoNombre, apellidoPaterno, apellidoMaterno, rut) {
     document.getElementById('form-editar').action = `/gestion/usuarios/${id}/editar/`;
-    document.getElementById('edit-nombre').value = nombre;
+    if (document.getElementById('edit-username-readonly')) {
+      document.getElementById('edit-username-readonly').value = username || '';
+    }
+    document.getElementById('edit-primer-nombre').value = primerNombre || '';
+    document.getElementById('edit-segundo-nombre').value = segundoNombre || '';
+    document.getElementById('edit-apellido-paterno').value = apellidoPaterno || '';
+    document.getElementById('edit-apellido-materno').value = apellidoMaterno || '';
+    if (document.getElementById('edit-func-rut')) {
+      document.getElementById('edit-func-rut').value = rut || '';
+    }
     document.getElementById('edit-correo').value = correo;
     if (rolId && document.getElementById('edit-rol')) {
       document.getElementById('edit-rol').value = rolId;

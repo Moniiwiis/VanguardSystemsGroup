@@ -7,15 +7,19 @@
 
   <!-- Header Banner Portal Ciudadano -->
   <div class="bg-gradient-to-r from-[#8B1D19] via-[#C41230] to-[#DB3334] rounded-3xl p-6 sm:p-8 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6">
-    <div class="space-y-2">
+    <div class="space-y-2 min-w-0">
       <span class="inline-block px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-white/20 text-white border border-white/30 backdrop-blur-sm">
-        Portal Ciudadano · Consulta Personal
+        {% if organizacion %}Portal Organización Comunitaria · {{ organizacion.get_tipo_organizacion_display }}{% else %}Portal Ciudadano · Consulta Personal{% endif %}
       </span>
-      <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">
-        Bienvenido(a), {{ request.user.get_full_name|default:request.user.username }}
+      <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight break-words [overflow-wrap:anywhere]">
+        Bienvenido(a), {{ usuario_nombre_corto|default:request.user.username }}
       </h1>
       <p class="text-xs sm:text-sm text-red-100 max-w-2xl leading-relaxed">
-        Consulta exclusivamente tu información personal y el historial de tus registros y solicitudes vinculadas a tu cuenta en tiempo real.
+        {% if organizacion %}
+          Consulta los datos registrados de tu junta de vecinos u organización y el historial de sus solicitudes y compromisos vinculados en tiempo real.
+        {% else %}
+          Consulta exclusivamente tu información personal y el historial de tus registros y solicitudes vinculadas a tu cuenta en tiempo real.
+        {% endif %}
       </p>
     </div>
 
@@ -32,9 +36,9 @@
     </div>
   </div>
 
-  <!-- Ficha Exclusiva de Datos Personales del Cliente -->
+  {% if not organizacion %}
   <div data-realtime-card="portal-datos-personales" class="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-    <div class="flex items-center gap-4">
+    <div class="flex items-center gap-4 min-w-0">
       {% if funcionario and funcionario.foto %}
         <img src="{{ funcionario.foto.url }}" alt="{{ request.user.username }}" class="w-14 h-14 rounded-full object-cover ring-2 ring-[#C41230]/30 shadow-sm shrink-0" />
       {% else %}
@@ -42,16 +46,16 @@
           {{ request.user.first_name|default:request.user.username|make_list|first|upper }}
         </div>
       {% endif %}
-      <div class="text-xs space-y-1">
-        <div class="flex flex-wrap items-center gap-2">
-          <h3 class="font-extrabold text-slate-900 text-sm">
+      <div class="text-xs space-y-1 min-w-0">
+        <div class="flex flex-wrap items-center gap-2 min-w-0">
+          <h3 class="font-extrabold text-slate-900 text-sm break-words [overflow-wrap:anywhere]">
             {% if vecino %}{{ vecino.nombre }}{% else %}{{ request.user.get_full_name|default:request.user.username }}{% endif %}
           </h3>
           <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-50 text-[#C41230] border border-red-200">
             Mis Datos Personales
           </span>
         </div>
-        <p class="text-slate-600 font-mono">
+        <p class="text-slate-600 font-mono break-words [overflow-wrap:anywhere]">
           {% if vecino %}RUT: <strong class="text-slate-900">{{ vecino.rut }}</strong> · {% endif %}
           Correo: <strong class="text-slate-900">{{ request.user.email|default:"No informado" }}</strong> ·
           Tel: <strong class="text-slate-900">{{ funcionario.telefono|default:vecino.telefono|default:"No informado" }}</strong>
@@ -69,45 +73,50 @@
       <span>Delegación: <strong>{% if vecino and vecino.delegacion %}{{ vecino.delegacion.nombre }}{% elif funcionario and funcionario.delegacion %}{{ funcionario.delegacion.nombre }}{% else %}Comuna de La Serena{% endif %}</strong></span>
     </div>
   </div>
+  {% endif %}
 
   <!-- Tarjetas de Resumen de Registros Propios -->
   <div data-realtime-card="portal-kpis" class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+    <a href="?{% if q %}q={{ q|urlencode }}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if not filtro_estado %}border-[#C41230] ring-2 ring-red-100{% else %}border-slate-200 hover:border-red-300{% endif %} shadow-sm hover:shadow-md transition-all flex items-center justify-between group cursor-pointer">
       <div>
         <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Total Propios</span>
         <span class="text-2xl font-black text-slate-900">{{ total_propias }}</span>
       </div>
-      <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+      <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
         <i data-lucide="layers" class="w-5 h-5"></i>
       </div>
-    </div>
-    <div class="bg-white rounded-2xl p-4 border border-blue-200/80 shadow-sm flex items-center justify-between">
+    </a>
+    <a href="{% if filtro_estado == 'Registrada' %}?{% if q %}q={{ q|urlencode }}{% endif %}{% else %}?estado=Registrada{% if q %}&q={{ q|urlencode }}{% endif %}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'Registrada' %}border-blue-500 ring-2 ring-blue-100{% else %}border-blue-200/80 hover:border-blue-400{% endif %} shadow-sm hover:shadow-md transition-all flex items-center justify-between group cursor-pointer">
       <div>
         <span class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 block">Registradas</span>
         <span class="text-2xl font-black text-blue-700">{{ registradas }}</span>
       </div>
-      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
         <i data-lucide="clock" class="w-5 h-5"></i>
       </div>
-    </div>
-    <div class="bg-white rounded-2xl p-4 border border-amber-200/80 shadow-sm flex items-center justify-between">
+    </a>
+    <a href="{% if filtro_estado == 'En proceso' %}?{% if q %}q={{ q|urlencode }}{% endif %}{% else %}?estado=En+proceso{% if q %}&q={{ q|urlencode }}{% endif %}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'En proceso' %}border-amber-500 ring-2 ring-amber-100{% else %}border-amber-200/80 hover:border-amber-400{% endif %} shadow-sm hover:shadow-md transition-all flex items-center justify-between group cursor-pointer">
       <div>
         <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 block">En Proceso</span>
         <span class="text-2xl font-black text-amber-700">{{ en_proceso }}</span>
       </div>
-      <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+      <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
         <i data-lucide="loader" class="w-5 h-5"></i>
       </div>
-    </div>
-    <div class="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-sm flex items-center justify-between">
+    </a>
+    <a href="{% if filtro_estado == 'Resuelta' %}?{% if q %}q={{ q|urlencode }}{% endif %}{% else %}?estado=Resuelta{% if q %}&q={{ q|urlencode }}{% endif %}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'Resuelta' %}border-emerald-500 ring-2 ring-emerald-100{% else %}border-emerald-200/80 hover:border-emerald-400{% endif %} shadow-sm hover:shadow-md transition-all flex items-center justify-between group cursor-pointer">
       <div>
         <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 block">Resueltas</span>
         <span class="text-2xl font-black text-emerald-700">{{ resueltas }}</span>
       </div>
-      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
         <i data-lucide="check-circle-2" class="w-5 h-5"></i>
       </div>
-    </div>
+    </a>
   </div>
 
   <!-- Buscador y Filtro de Registros Propios -->
@@ -210,6 +219,36 @@
       </div>
     {% endif %}
   </div>
+
+  {% if organizacion and compromisos_org %}
+  <div class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+      <div class="flex items-center gap-2.5">
+        <i data-lucide="calendar-check-2" class="w-5 h-5 text-[#C41230]"></i>
+        <h2 class="text-base font-extrabold text-slate-900">Compromisos Territoriales de la Organización</h2>
+      </div>
+      <span class="text-xs font-bold text-slate-400 font-mono">{{ compromisos_org|length }} compromiso(s)</span>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {% for comp in compromisos_org %}
+        <div class="rounded-2xl border border-slate-200 p-4 bg-white space-y-2 text-xs">
+          <div class="flex items-center justify-between">
+            <span class="font-mono text-xs font-black text-[#C41230] bg-red-50 px-2.5 py-1 rounded-lg">{{ comp.get_codigo_tubo }}</span>
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-700 border border-slate-200">{{ comp.estado }}</span>
+          </div>
+          <p class="font-bold text-slate-900">{% if comp.sector %}{{ comp.sector.nombre }}{% elif comp.territorio %}{{ comp.territorio }}{% else %}General{% endif %} · {{ comp.delegacion.nombre|default:"Comuna" }}</p>
+          {% if comp.observacion %}
+            <p class="text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">{{ comp.observacion }}</p>
+          {% endif %}
+          {% if comp.avance_observaciones %}
+            <p class="text-emerald-900 bg-emerald-50/60 p-2 rounded-xl border border-emerald-100"><strong>Avance:</strong> {{ comp.avance_observaciones }}</p>
+          {% endif %}
+          <p class="text-[11px] text-slate-400 font-mono">Fecha comprometida: {{ comp.fecha_comprometida|date:"d/m/Y" }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 
 </div>
 {% endblock %}

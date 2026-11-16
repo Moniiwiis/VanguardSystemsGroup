@@ -1,5 +1,5 @@
-# Sistema Municipal SGR — Municipalidad de La Serena
-**VanguardSystemsGroup · Proyecto Integrado 4to Semestre INACAP · Evaluación 3**
+# Sistema de Gestión Territorial — Municipalidad de La Serena
+**VanguardSystemsGroup · Proyecto Integrado y Programación BackEnd - INACAP La Serena 2026**
 
 ---
 
@@ -58,17 +58,30 @@ python -m daphne -b 0.0.0.0 -p 8000 config.asgi:application
 | ➎ | `cliente_1` | `Cliente1234!` | **Cliente / Vecino** | Portal Ciudadano |
 | ➏ | `cliente_2` | `Cliente1234!` | **Cliente / Vecino** | Portal Ciudadano |
 
-### Cuentas Adicionales de Operación
+### Cuentas de Organización / JJVV (Portal Organización)
 
-| Usuario | Contraseña | Rol | Delegación |
-|---|---|---|---|
-| `admin_sgr` | `Admin1234!` | Superadministrador | Global |
-| `delegado_centro` | `User1234!` | Delegado Municipal | Centro |
-| `delegado_companias` | `User1234!` | Delegado Municipal | Norte / Las Compañías |
-| `delegado_sur` | `User1234!` | Delegado Municipal | Sur |
-| `delegado_rural` | `User1234!` | Delegado Municipal | Rural |
-| `funcionario_juan` | `User1234!` | Operador | Centro |
-| `consultor_ana` | `User1234!` | Consultor | Centro |
+| Organización | Usuario / RUT | Correo | Contraseña | Delegación |
+|---|---|---|---|---|
+| **JJVV N° 1 Casco Histórico** | `65.111.001-7` | `jjvv.centro@organizacion.cl` | `Cliente1234!` | Delegación Centro |
+| **JJVV N° 12 Las Compañías** | `65.111.002-5` | `jjvv.norte@organizacion.cl` | `Cliente1234!` | Delegación Norte |
+| **JJVV El Milagro I** | `65.111.003-3` | `jjvv.sur@organizacion.cl` | `Cliente1234!` | Delegación Sur |
+| **JJVV Algarrobito** | `65.111.004-1` | `jjvv.rural@organizacion.cl` | `Cliente1234!` | Delegación Rural |
+
+### Cuentas Adicionales de Operación (Funcionarios)
+
+| Usuario | Correo | Contraseña | Rol | Delegación |
+|---|---|---|---|---|
+| `admin_sgr` | `admin@laserena.cl` | `Admin1234!` | Superadministrador | Global |
+| `delegado_centro` | `delegado.centro@laserena.cl` | `User1234!` | Delegado Municipal | Centro |
+| `delegado_companias` | `delegado.companias@laserena.cl` | `User1234!` | Delegado Municipal | Norte / Las Compañías |
+| `delegado_sur` | `delegado.sur@laserena.cl` | `User1234!` | Delegado Municipal | Sur |
+| `delegado_rural` | `delegado.rural@laserena.cl` | `User1234!` | Delegado Municipal | Rural |
+| `funcionario_juan` | `juan.perez@laserena.cl` | `User1234!` | Operador | Centro |
+| `consultor_ana` | `ana.ejemplo@laserena.cl` | `User1234!` | Consultor | Centro |
+
+> **Nota sobre inicio de sesión:**
+> - Los **Funcionarios** pueden ingresar con su **usuario** (generado como inicial + apellido paterno al crear nuevos registros) o con su **correo electrónico**.
+> - Los **Vecinos** y **Organizaciones / JJVV** pueden ingresar con su **RUT** o con su **correo electrónico** (los vecinos generados por el seed usan contraseña `Cliente1234!`).
 
 ---
 
@@ -89,10 +102,10 @@ python -m daphne -b 0.0.0.0 -p 8000 config.asgi:application
 
 | Entidad | Total en DB | Fuente |
 |---|---|---|
-| Organizaciones Comunitarias / JJVV | **2.708** | `fixtures/base_datos_JJVV.xlsx` |
-| Atenciones Ciudadanas | **2.100** | `fixtures/matriz_sgr.xlsx` + generadas |
-| Vecinos | **60** | Seed + datos xlsx |
-| Usuarios | **14** | Cuentas de evaluación + operación |
+| Organizaciones Comunitarias / JJVV | **2.712+** | `fixtures/base_datos_JJVV.xlsx` + 4 JJVV destacadas con directiva y cuentas `ORG-` |
+| Atenciones Ciudadanas | **2.200+** | `fixtures/matriz_sgr.xlsx` + generadas + vinculadas a JJVV |
+| Vecinos | **62+** | Seed con nombres estructurados y cuentas ciudadanas `VEC-` |
+| Usuarios | **79+** | Funcionarios + vecinos ciudadanos + cuentas de organizaciones |
 
 > Para re-ejecutar el seed: `python manage.py seed_data`  
 > El script usa `get_or_create` — es seguro ejecutarlo múltiples veces.
@@ -158,7 +171,7 @@ Los usuarios con rol **Cliente** ven exclusivamente:
 | Atenciones Ciudadanas | `/atenciones/` | Operador |
 | Vecinos | `/vecinos/` | Operador |
 | Organizaciones / JJVV | `/organizaciones/` | Operador |
-| Metas SGR | `/metas/` | Coordinador |
+| Metas | `/metas/` | Coordinador |
 | Tipos de Atención | `/tipo-atencion/` | Coordinador |
 | Delegaciones | `/delegaciones/` | Administrador |
 | Roles | `/roles/` | Administrador |
@@ -173,7 +186,7 @@ Los usuarios con rol **Cliente** ven exclusivamente:
 ## 📤 Exportación a Excel (.xlsx)
 
 Disponible en los módulos:
-- **Atenciones** → botón "Exportar Excel" → columnas SGR Matrix
+- **Atenciones** → botón "Exportar Excel" → columnas Matriz Territorial
 - **Organizaciones** → botón "Exportar Excel" → coherente con `base_datos_JJVV.xlsx`
 - **Vecinos** → botón "Exportar Excel"
 
@@ -250,7 +263,7 @@ VanguardSystemsGroup/
 │   └── portal/        # Portal ciudadano cliente
 ├── fixtures/
 │   ├── base_datos_JJVV.xlsx   # 2.708 organizaciones comunitarias
-│   └── matriz_sgr.xlsx         # Atenciones SGR
+│   └── matriz_sgr.xlsx         # Atenciones territoriales
 └── media/perfiles/    # Fotos de perfil (Croppr.js)
 ```
 
@@ -267,4 +280,4 @@ DATABASE_URL=sqlite:///db.sqlite3
 
 ---
 
-*Sistema desarrollado como proyecto académico para la asignatura Proyecto Integrado — INACAP La Serena, 4to Semestre 2026.*
+*Sistema desarrollado como proyecto académico para la asignatura Proyecto Integrado y Programación BackEnd — INACAP La Serena, 4to Semestre 2026.*

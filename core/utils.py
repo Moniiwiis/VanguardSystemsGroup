@@ -2,8 +2,10 @@ import io
 import csv
 import itertools
 import re
+import unicodedata
 from django.db.models import Q
 from django.http import HttpResponse
+from django.utils import timezone
 
 # Mapeo bidireccional de vocales y caracteres especiales para búsquedas en español
 VOWEL_MAP = {
@@ -263,6 +265,17 @@ def validar_imagen_subida(archivo, max_mb=2):
 # EXPORTACIÓN GENUINA A MICROSOFT EXCEL (.XLSX)
 # =====================================================================
 
+def _build_dated_filename(filename, ext):
+    """Agrega la fecha actual en formato DD-MM-YYYY al nombre del archivo exportado."""
+    base = str(filename).strip()
+    if base.lower().endswith(f".{ext}"):
+        base = base[:-len(ext) - 1]
+    fecha_str = timezone.localdate().strftime('%d-%m-%Y')
+    if not re.search(r'\d{2}-\d{2}-\d{4}$', base):
+        base = f"{base}_{fecha_str}"
+    return f"{base}.{ext}"
+
+
 def export_to_excel_xlsx(filename, sheet_title, headers, rows):
     """
     Genera un archivo binario nativo de Microsoft Excel (.xlsx) usando openpyxl.
@@ -328,7 +341,7 @@ def export_to_excel_xlsx(filename, sheet_title, headers, rows):
     wb.save(output)
     output.seek(0)
 
-    clean_filename = f"{filename}.xlsx" if not filename.endswith('.xlsx') else filename
+    clean_filename = _build_dated_filename(filename, 'xlsx')
     response = HttpResponse(
         output.getvalue(),
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -338,11 +351,178 @@ def export_to_excel_xlsx(filename, sheet_title, headers, rows):
 
 def export_to_excel_csv(filename, headers, rows):
     """Fallback a CSV en caso de ser necesario."""
+    clean_filename = _build_dated_filename(filename, 'csv')
     response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
-    response['Content-Disposition'] = f'attachment; filename="{filename}.csv"'
+    response['Content-Disposition'] = f'attachment; filename="{clean_filename}"'
     response.write('\ufeff')
     writer = csv.writer(response, delimiter=';', dialect='excel')
     writer.writerow(headers)
     for row in rows:
         writer.writerow(row)
     return response
+
+
+def construir_nombre_completo(primer_nombre, segundo_nombre='', apellido_paterno='', apellido_materno=''):
+    """Une primer nombre, segundo nombre y apellidos omitiendo vacíos y normalizando espacios."""
+    partes = [
+        ' '.join((p or '').split())
+        for p in (primer_nombre, segundo_nombre, apellido_paterno, apellido_materno)
+    ]
+    return ' '.join(p for p in partes if p)
+
+
+def separar_nombre_completo(nombre_completo):
+    """Divide un nombre completo legado en (primer_nombre, segundo_nombre, apellido_paterno, apellido_materno)."""
+    tokens = (nombre_completo or '').strip().split()
+    if not tokens:
+        return '', '', '', ''
+    if len(tokens) == 1:
+        return tokens[0], '', '', ''
+    if len(tokens) == 2:
+        return tokens[0], '', tokens[1], ''
+    if len(tokens) == 3:
+        return tokens[0], '', tokens[1], tokens[2]
+    return tokens[0], ' '.join(tokens[1:-2]), tokens[-2], tokens[-1]
+
+
+def separar_nombre_usuario(first_name, last_name=''):
+    """Divide first_name + last_name de Django User sin duplicar apellidos ya incluidos en first_name."""
+    fn = ' '.join((first_name or '').split())
+    ln = ' '.join((last_name or '').split())
+    if not fn and not ln:
+        return '', '', '', ''
+    if ln and fn and not fn.lower().endswith(ln.lower()):
+        ft = fn.split()
+        lt = ln.split()
+        pn = ft[0] if ft else ''
+        sn = ' '.join(ft[1:])
+        ap = lt[0] if lt else ''
+        am = ' '.join(lt[1:])
+        return pn, sn, ap, am
+    return separar_nombre_completo(fn or ln)
+
+
+def obtener_partes_nombre_objeto(obj):
+    """Retorna (primer_nombre, segundo_nombre, apellido_paterno, apellido_materno) para Funcionario, Vecino o User."""
+    if not obj:
+        return '', '', '', ''
+    if hasattr(obj, 'get_partes_nombre'):
+        return obj.get_partes_nombre()
+    if hasattr(obj, 'username'):
+        try:
+            func = obj.funcionario
+        except Exception:
+            func = None
+        if func is not None and (func.primer_nombre or func.apellido_paterno):
+            return (
+                func.primer_nombre,
+                func.segundo_nombre,
+                func.apellido_paterno,
+                func.apellido_materno,
+            )
+        return separar_nombre_usuario(getattr(obj, 'first_name', ''), getattr(obj, 'last_name', ''))
+    return separar_nombre_completo(str(obj))
+
+
+def obtener_nombre_corto(obj):
+    """Retorna 'PrimerNombre ApellidoPaterno' (o nombre completo de organización si corresponde)."""
+    if not obj:
+        return ''
+    if hasattr(obj, 'tipo_organizacion') and hasattr(obj, 'nombre'):
+        return (obj.nombre or '').strip()
+    ident = getattr(obj, 'identificador_institucional', '') or ''
+    user_ref = obj if hasattr(obj, 'username') else getattr(obj, 'user', None)
+    if not ident and user_ref is not None:
+        try:
+            func = user_ref.funcionario
+            ident = getattr(func, 'identificador_institucional', '') or ''
+        except Exception:
+            ident = ''
+    if ident.startswith('ORG-'):
+        nombre_org = (getattr(user_ref, 'first_name', '') or '').strip() if user_ref else ''
+        if nombre_org:
+            return nombre_org
+    pn, _sn, ap, _am = obtener_partes_nombre_objeto(obj)
+    corto = ' '.join(p for p in (pn, ap) if p).strip()
+    if corto:
+        return corto
+    if hasattr(obj, 'user'):
+        return getattr(obj.user, 'username', '')
+    if hasattr(obj, 'username'):
+        return obj.username
+    return str(obj)
+
+
+def extraer_partes_persona_desde_post(post_data, prefix='', exigir_estructurado=True):
+    """
+    Extrae primer_nombre, segundo_nombre, apellido_paterno y apellido_materno desde POST.
+    Si solo viene el campo legado 'nombre', lo separa automáticamente como respaldo.
+    Retorna (nombre_completo, partes_dict, error_msg).
+    """
+    pn = ' '.join(post_data.get(f'{prefix}primer_nombre', '').split())
+    sn = ' '.join(post_data.get(f'{prefix}segundo_nombre', '').split())
+    ap = ' '.join(post_data.get(f'{prefix}apellido_paterno', '').split())
+    am = ' '.join(post_data.get(f'{prefix}apellido_materno', '').split())
+    nombre_legado = ' '.join(post_data.get(f'{prefix}nombre', '').split())
+
+    usando_legado = not pn and not ap and bool(nombre_legado)
+    if usando_legado:
+        if len(nombre_legado) > 150:
+            return '', {}, "El nombre completo no puede superar los 150 caracteres."
+        return nombre_legado, {}, None
+
+    if exigir_estructurado and (not pn or not ap):
+        return '', {}, "El primer nombre y el apellido paterno son obligatorios."
+
+    if not usando_legado:
+        for campo, val in (
+            ('Primer nombre', pn),
+            ('Segundo nombre', sn),
+            ('Apellido paterno', ap),
+            ('Apellido materno', am),
+        ):
+            if len(val) > 50:
+                return '', {}, f"El campo '{campo}' no puede superar los 50 caracteres."
+
+    nombre_completo = nombre_legado if usando_legado else construir_nombre_completo(pn, sn, ap, am)
+    if not nombre_completo:
+        return '', {}, "El nombre completo es obligatorio."
+    if len(nombre_completo) > 150:
+        return '', {}, "El nombre completo no puede superar los 150 caracteres."
+
+    return nombre_completo, {
+        'primer_nombre': pn,
+        'segundo_nombre': sn,
+        'apellido_paterno': ap,
+        'apellido_materno': am,
+    }, None
+
+
+def normalizar_slug_usuario(texto):
+    """Normaliza tildes/ñ/espacios dejando solo caracteres ASCII alfanuméricos en minúscula."""
+    descompuesto = unicodedata.normalize('NFKD', (texto or '').strip())
+    sin_tildes = ''.join(c for c in descompuesto if not unicodedata.combining(c))
+    return re.sub(r'[^a-z0-9]', '', sin_tildes.lower())
+
+
+def generar_username_funcionario(primer_nombre, apellido_paterno, exclude_user_id=None):
+    """
+    Genera automáticamente un nombre de usuario único con la inicial del primer nombre
+    y el apellido paterno (ej. María González -> mgonzalez, colisión -> mgonzalez2).
+    """
+    from django.contrib.auth.models import User
+
+    pn = normalizar_slug_usuario(primer_nombre)
+    ap = normalizar_slug_usuario(apellido_paterno)
+    base = f"{pn[:1]}{ap}"[:140] or "func"
+
+    candidato = base
+    sufijo = 2
+    qs = User.objects.all()
+    if exclude_user_id:
+        qs = qs.exclude(id=exclude_user_id)
+    while qs.filter(username__iexact=candidato).exists():
+        candidato = f"{base[:140]}{sufijo}"
+        sufijo += 1
+    return candidato
+

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Ítems y Metas — Sistema Municipal La Serena{% endblock %}
+{% block title %}Ítems y Períodos — Sistema Municipal La Serena{% endblock %}
 
 {% block content %}
 <div class="space-y-5">
@@ -8,16 +8,17 @@
   <!-- Migas de pan y Encabezado (Wireframe C4 - Diseño 8) -->
   <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
     <div>
-      <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Gestión municipal / Ítems y metas</p>
-      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Ítems y metas</h1>
+      <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Gestión municipal / Ítems y Períodos</p>
+      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Ítems y Períodos</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Catálogo de ítems de medición y fechas de período para metas.</p>
     </div>
     <div class="flex flex-wrap items-center gap-2.5">
-      <button onclick="document.getElementById('modal-crear-periodo').classList.remove('hidden')" 
+      <button type="button" onclick="abrirModalCrearPeriodo()"
               class="px-4 py-2.5 bg-white hover:bg-red-50 text-[#C41230] border border-[#C41230]/30 text-xs font-extrabold rounded-xl shadow-sm transition-all flex items-center gap-2">
         <i data-lucide="calendar-plus" class="w-4 h-4"></i>
         <span>Nueva Fecha de Medición</span>
       </button>
-      <button onclick="document.getElementById('modal-crear').classList.remove('hidden')" 
+      <button type="button" onclick="document.getElementById('modal-crear').classList.remove('hidden')" 
               class="px-4 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
         <i data-lucide="plus" class="w-4 h-4"></i>
         <span>Nuevo Ítem</span>
@@ -25,9 +26,32 @@
     </div>
   </div>
 
-  <!-- Barra de Búsqueda Inteligente, Exportación y Filtro de Estado -->
+  <!-- Barra de Pestañas (mismo estilo que Colaboradores en Tubo) -->
+  <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-0">
+    <a href="?tab=items{% if q %}&q={{ q|urlencode }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado|urlencode }}{% endif %}{% if orden %}&orden={{ orden|urlencode }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}"
+       class="pb-3 px-4 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all {% if tab == 'items' %}border-[#C41230] text-[#C41230]{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+      <i data-lucide="target" class="w-4 h-4"></i>
+      <span>Ítems de Medición</span>
+      <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold {% if tab == 'items' %}bg-red-50 text-[#C41230]{% else %}bg-slate-100 text-slate-600{% endif %}">
+        {{ total_items_badge }}
+      </span>
+    </a>
+
+    <a href="?tab=periodos{% if q_per %}&q_per={{ q_per|urlencode }}{% endif %}{% if filtro_estado_per %}&estado_per={{ filtro_estado_per|urlencode }}{% endif %}{% if orden_per %}&orden_per={{ orden_per|urlencode }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}"
+       class="pb-3 px-4 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all {% if tab == 'periodos' %}border-[#C41230] text-[#C41230]{% else %}border-transparent text-slate-500 hover:text-slate-800{% endif %}">
+      <i data-lucide="calendar-range" class="w-4 h-4"></i>
+      <span>Fechas / Períodos</span>
+      <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold {% if tab == 'periodos' %}bg-red-50 text-[#C41230]{% else %}bg-slate-100 text-slate-600{% endif %}">
+        {{ total_periodos_badge }}
+      </span>
+    </a>
+  </div>
+
+  {% if tab == 'items' %}
+  <!-- Barra de Búsqueda Inteligente, Exportación y Filtro de Estado (Ítems) -->
   <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
     <form method="GET" action="{% url 'gestion_metas' %}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <input type="hidden" name="tab" value="items" />
       <div class="relative flex-1">
         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
           <i data-lucide="search" class="w-4 h-4"></i>
@@ -45,7 +69,7 @@
       {% include "gestion/includes/ordering_control.html" %}
     </form>
 
-    <a href="?q={{ q }}&estado={{ filtro_estado }}&orden={{ orden }}&export=excel"
+    <a href="?tab=items&q={{ q|urlencode }}&estado={{ filtro_estado|urlencode }}&orden={{ orden|urlencode }}&export=excel"
        class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
       <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
       <span>Exportar a Excel</span>
@@ -119,20 +143,63 @@
       </table>
     </div>
 
-    {% include "gestion/includes/paginator.html" %}
+    {% include "gestion/includes/paginator.html" with query_params=query_params_items %}
+  </div>
+  {% else %}
+  <!-- Barra de Búsqueda, Filtro, Orden por Fecha y Exportación (Fechas / Períodos) -->
+  <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+    <form method="GET" action="{% url 'gestion_metas' %}" class="flex-1 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
+      <input type="hidden" name="tab" value="periodos" />
+      <div class="relative flex-1 min-w-[200px]">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+          <i data-lucide="search" class="w-4 h-4"></i>
+        </div>
+        <input type="text" name="q_per" value="{{ q_per }}" placeholder="Buscar fecha (DD-MM-YYYY), días o estado..."
+               class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]" />
+      </div>
+
+      <select name="estado_per" onchange="this.form.submit()"
+              class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+        <option value="">Filtrar estado: Todos</option>
+        <option value="Abierto" {% if filtro_estado_per == 'Abierto' %}selected{% endif %}>Abierto</option>
+        <option value="Cerrado" {% if filtro_estado_per == 'Cerrado' %}selected{% endif %}>Cerrado</option>
+      </select>
+
+      <label class="flex items-center gap-2 text-xs font-semibold text-slate-600">
+        <span>Ordenar:</span>
+        <select name="orden_per" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+          {% for valor, etiqueta in orden_per_opciones %}
+            <option value="{{ valor }}" {% if orden_per == valor %}selected{% endif %}>{{ etiqueta }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="flex items-center gap-2 text-xs font-semibold text-slate-600">
+        <span>Mostrar:</span>
+        <select name="page_size" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+          <option value="5" {% if page_size == 5 %}selected{% endif %}>5</option>
+          <option value="15" {% if page_size == 15 %}selected{% endif %}>15</option>
+          <option value="30" {% if page_size == 30 %}selected{% endif %}>30</option>
+        </select>
+      </label>
+    </form>
+
+    <a href="?tab=periodos&q_per={{ q_per|urlencode }}&estado_per={{ filtro_estado_per|urlencode }}&orden_per={{ orden_per|urlencode }}&export=excel"
+       class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
+      <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+      <span>Exportar a Excel</span>
+    </a>
   </div>
 
-  <!-- Tabla de Fechas / Períodos de Medición SGR -->
+  <!-- Tabla de Fechas / Períodos de Medición -->
   <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
     <div class="px-6 py-4 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
       <div class="flex items-center gap-2">
         <i data-lucide="calendar-range" class="w-4 h-4 text-[#C41230]"></i>
-        <h2 class="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Fechas / Períodos de Medición SGR</h2>
+        <h2 class="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Fechas / Períodos de Medición</h2>
       </div>
-      <button type="button" onclick="document.getElementById('modal-crear-periodo').classList.remove('hidden')"
-              class="text-xs font-bold text-[#C41230] hover:underline flex items-center gap-1">
-        <i data-lucide="plus" class="w-3.5 h-3.5"></i> Agregar fecha de medición
-      </button>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full text-left text-xs text-slate-700">
@@ -181,47 +248,118 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="6" class="py-6 text-center text-slate-400">No hay fechas de medición registradas.</td>
+            <td colspan="6" class="py-6 text-center text-slate-400">No hay fechas de medición registradas para los filtros aplicados.</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+
+    <!-- Paginador de Fechas / Períodos -->
+    <div class="px-6 py-4 bg-slate-50/50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 font-medium">
+      <div class="whitespace-nowrap">
+        Mostrando {{ page_obj_per.start_index|default:0 }} a {{ page_obj_per.end_index|default:0 }} de {{ total_periodos|default:page_obj_per.paginator.count }} períodos
+      </div>
+      <div class="flex items-center gap-1.5 flex-nowrap whitespace-nowrap overflow-x-auto max-w-full">
+        {% if page_obj_per.has_previous %}
+          <a href="?tab=periodos&page_per={{ page_obj_per.previous_page_number }}{% if q_per %}&q_per={{ q_per|urlencode }}{% endif %}{% if filtro_estado_per %}&estado_per={{ filtro_estado_per|urlencode }}{% endif %}{% if orden_per %}&orden_per={{ orden_per|urlencode }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}"
+             class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold transition-all shadow-sm">
+            Anterior
+          </a>
+        {% else %}
+          <span class="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 font-bold cursor-not-allowed">
+            Anterior
+          </span>
+        {% endif %}
+
+        {% for p in page_obj_per.paginator.page_range %}
+          {% if p == 1 or p == page_obj_per.paginator.num_pages or p >= page_obj_per.number|add:"-2" and p <= page_obj_per.number|add:"2" %}
+            {% if p == page_obj_per.number %}
+              <span class="px-3 py-1.5 rounded-lg bg-[#C41230] text-white font-bold shadow-sm">{{ p }}</span>
+            {% else %}
+              <a href="?tab=periodos&page_per={{ p }}{% if q_per %}&q_per={{ q_per|urlencode }}{% endif %}{% if filtro_estado_per %}&estado_per={{ filtro_estado_per|urlencode }}{% endif %}{% if orden_per %}&orden_per={{ orden_per|urlencode }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}"
+                 class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all">{{ p }}</a>
+            {% endif %}
+          {% elif p == 2 and page_obj_per.number > 4 %}
+            <span class="px-2 py-1.5 text-slate-400 font-bold select-none">...</span>
+          {% elif p == page_obj_per.paginator.num_pages|add:"-1" and page_obj_per.number < page_obj_per.paginator.num_pages|add:"-3" %}
+            <span class="px-2 py-1.5 text-slate-400 font-bold select-none">...</span>
+          {% endif %}
+        {% endfor %}
+
+        {% if page_obj_per.has_next %}
+          <a href="?tab=periodos&page_per={{ page_obj_per.next_page_number }}{% if q_per %}&q_per={{ q_per|urlencode }}{% endif %}{% if filtro_estado_per %}&estado_per={{ filtro_estado_per|urlencode }}{% endif %}{% if orden_per %}&orden_per={{ orden_per|urlencode }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}"
+             class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold transition-all shadow-sm">
+            Siguiente
+          </a>
+        {% else %}
+          <span class="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 font-bold cursor-not-allowed">
+            Siguiente
+          </span>
+        {% endif %}
+      </div>
+    </div>
   </div>
+  {% endif %}
 
 </div>
 
 <!-- Modal Crear Fecha / Período de Medición -->
 <div id="modal-crear-periodo" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-md space-y-4">
+  <div class="bg-white rounded-3xl p-5 sm:p-6 shadow-2xl border border-slate-200 w-full max-w-md max-h-[92vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-      <h3 class="text-base font-extrabold text-slate-900">Nueva Fecha / Período de Medición</h3>
-      <button onclick="document.getElementById('modal-crear-periodo').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+      <div>
+        <h3 class="text-base font-extrabold text-slate-900">Nueva Fecha / Período de Medición</h3>
+        <p class="text-[11px] text-slate-500">Elige las fechas desde el calendario o el selector (desde hoy en adelante).</p>
+      </div>
+      <button type="button" onclick="document.getElementById('modal-crear-periodo').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
     </div>
-    <form method="POST" action="{% url 'gestion_metas' %}" class="space-y-4">
+    <form id="form-crear-periodo" method="POST" action="{% url 'gestion_metas' %}" onsubmit="return validarFormularioPeriodo('new')" class="space-y-3.5">
       {% csrf_token %}
       <input type="hidden" name="accion" value="crear_periodo" />
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Inicio *</label>
-          <input type="date" id="per-new-inicio" name="fecha_inicio" required onchange="calcularDiasPeriodo('per-new-inicio','per-new-termino','per-new-dias')"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <input type="date" id="per-new-inicio" name="fecha_inicio" min="{{ hoy_iso }}" required
+                 onclick="this.showPicker && this.showPicker()"
+                 onchange="sincronizarDesdeInputs('new')"
+                 class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Término *</label>
-          <input type="date" id="per-new-termino" name="fecha_termino" required onchange="calcularDiasPeriodo('per-new-inicio','per-new-termino','per-new-dias')"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <input type="date" id="per-new-termino" name="fecha_termino" min="{{ hoy_iso }}" required
+                 onclick="this.showPicker && this.showPicker()"
+                 onchange="sincronizarDesdeInputs('new')"
+                 class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
       </div>
+
+      <!-- Mini Calendario Interactivo -->
+      <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <button type="button" onclick="navegarMiniCalendario('new', -1)" class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-[#C41230] text-slate-700 flex items-center justify-center text-xs font-extrabold">&lsaquo;</button>
+          <span id="mini-cal-new-titulo" class="text-xs font-extrabold text-slate-800 capitalize"></span>
+          <button type="button" onclick="navegarMiniCalendario('new', 1)" class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-[#C41230] text-slate-700 flex items-center justify-center text-xs font-extrabold">&rsaquo;</button>
+        </div>
+        <div class="grid grid-cols-7 text-center text-[10px] font-extrabold text-slate-400 uppercase">
+          <span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sá</span><span>Do</span>
+        </div>
+        <div id="mini-cal-new-dias" class="grid grid-cols-7 gap-1 text-center text-[11px]"></div>
+        <div id="mini-cal-new-rango" class="text-[11px] font-bold text-slate-600 text-center pt-1 border-t border-slate-200/80">
+          Selecciona fecha de inicio y término
+        </div>
+      </div>
+      <p id="per-new-error" class="hidden text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2"></p>
+
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Días Computables *</label>
           <input type="number" id="per-new-dias" name="dias_computables" min="1" required placeholder="Ej: 30"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Estado</label>
-          <select name="estado" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          <select name="estado" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
             <option value="Abierto">Abierto</option>
             <option value="Cerrado">Cerrado</option>
           </select>
@@ -239,36 +377,61 @@
 
 <!-- Modal Editar Fecha / Período de Medición -->
 <div id="modal-editar-periodo" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-md space-y-4">
+  <div class="bg-white rounded-3xl p-5 sm:p-6 shadow-2xl border border-slate-200 w-full max-w-md max-h-[92vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-      <h3 class="text-base font-extrabold text-slate-900">Editar Fecha / Período de Medición</h3>
-      <button onclick="document.getElementById('modal-editar-periodo').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+      <div>
+        <h3 class="text-base font-extrabold text-slate-900">Editar Fecha / Período de Medición</h3>
+        <p class="text-[11px] text-slate-500">Formato visual DD-MM-YYYY con selección rápida en calendario.</p>
+      </div>
+      <button type="button" onclick="document.getElementById('modal-editar-periodo').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
     </div>
-    <form method="POST" action="{% url 'gestion_metas' %}" class="space-y-4">
+    <form id="form-editar-periodo" method="POST" action="{% url 'gestion_metas' %}" onsubmit="return validarFormularioPeriodo('edit')" class="space-y-3.5">
       {% csrf_token %}
       <input type="hidden" name="accion" value="editar_periodo" />
       <input type="hidden" id="per-edit-id" name="periodo_id" value="" />
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Inicio *</label>
-          <input type="date" id="per-edit-inicio" name="fecha_inicio" required onchange="calcularDiasPeriodo('per-edit-inicio','per-edit-termino','per-edit-dias')"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <input type="date" id="per-edit-inicio" name="fecha_inicio" required
+                 onclick="this.showPicker && this.showPicker()"
+                 onchange="sincronizarDesdeInputs('edit')"
+                 class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Término *</label>
-          <input type="date" id="per-edit-termino" name="fecha_termino" required onchange="calcularDiasPeriodo('per-edit-inicio','per-edit-termino','per-edit-dias')"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <input type="date" id="per-edit-termino" name="fecha_termino" required
+                 onclick="this.showPicker && this.showPicker()"
+                 onchange="sincronizarDesdeInputs('edit')"
+                 class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
       </div>
+
+      <!-- Mini Calendario Interactivo Edición -->
+      <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <button type="button" onclick="navegarMiniCalendario('edit', -1)" class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-[#C41230] text-slate-700 flex items-center justify-center text-xs font-extrabold">&lsaquo;</button>
+          <span id="mini-cal-edit-titulo" class="text-xs font-extrabold text-slate-800 capitalize"></span>
+          <button type="button" onclick="navegarMiniCalendario('edit', 1)" class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-[#C41230] text-slate-700 flex items-center justify-center text-xs font-extrabold">&rsaquo;</button>
+        </div>
+        <div class="grid grid-cols-7 text-center text-[10px] font-extrabold text-slate-400 uppercase">
+          <span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sá</span><span>Do</span>
+        </div>
+        <div id="mini-cal-edit-dias" class="grid grid-cols-7 gap-1 text-center text-[11px]"></div>
+        <div id="mini-cal-edit-rango" class="text-[11px] font-bold text-slate-600 text-center pt-1 border-t border-slate-200/80">
+          Selecciona fecha de inicio y término
+        </div>
+      </div>
+      <p id="per-edit-error" class="hidden text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2"></p>
+
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Días Computables *</label>
           <input type="number" id="per-edit-dias" name="dias_computables" min="1" required
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Estado</label>
-          <select id="per-edit-estado" name="estado" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          <select id="per-edit-estado" name="estado" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
             <option value="Abierto">Abierto</option>
             <option value="Cerrado">Cerrado</option>
           </select>
@@ -313,11 +476,6 @@
     </div>
     <form method="POST" action="{% url 'gestion_metas' %}" class="space-y-4">
       {% csrf_token %}
-      <div>
-        <label class="block text-xs font-bold text-slate-700 mb-1">Código</label>
-        <input type="text" name="codigo" placeholder="Opcional; se genera automáticamente"
-               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
-      </div>
       <div>
         <label class="block text-xs font-bold text-slate-700 mb-1">Nombre del Ítem *</label>
         <input type="text" name="nombre_item" required placeholder="Nombre del indicador"
@@ -407,17 +565,191 @@
     document.getElementById('modal-editar').classList.remove('hidden');
   }
 
+  const HOY_ISO = "{{ hoy_iso }}";
+  const MESES_ES = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  const miniCalState = {
+    new: { year: 0, month: 0, origInicio: '', origTermino: '' },
+    edit: { year: 0, month: 0, origInicio: '', origTermino: '' },
+  };
+
+  function parseIsoParts(iso) {
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+    const [y, m, d] = iso.split('-').map(Number);
+    return { y, m, d };
+  }
+
+  function formatDmy(iso) {
+    const p = parseIsoParts(iso);
+    if (!p) return '—';
+    return `${String(p.d).padStart(2, '0')}-${String(p.m).padStart(2, '0')}-${p.y}`;
+  }
+
+  function toIso(y, m, d) {
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+
   function calcularDiasPeriodo(idInicio, idTermino, idDias) {
-    const f1 = document.getElementById(idInicio).value;
-    const f2 = document.getElementById(idTermino).value;
-    if (f1 && f2) {
-      const d1 = new Date(f1);
-      const d2 = new Date(f2);
-      const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+    const p1 = parseIsoParts(document.getElementById(idInicio).value);
+    const p2 = parseIsoParts(document.getElementById(idTermino).value);
+    if (p1 && p2) {
+      const d1 = Date.UTC(p1.y, p1.m - 1, p1.d);
+      const d2 = Date.UTC(p2.y, p2.m - 1, p2.d);
+      const diff = Math.round((d2 - d1) / 86400000) + 1;
       if (diff > 0) {
         document.getElementById(idDias).value = diff;
       }
     }
+  }
+
+  function actualizarResumenRango(mode) {
+    const f1 = document.getElementById(`per-${mode}-inicio`).value;
+    const f2 = document.getElementById(`per-${mode}-termino`).value;
+    const box = document.getElementById(`mini-cal-${mode}-rango`);
+    if (!box) return;
+    if (f1 && f2) {
+      box.textContent = `Período: ${formatDmy(f1)} a ${formatDmy(f2)}`;
+    } else if (f1) {
+      box.textContent = `Inicio: ${formatDmy(f1)} · Ahora elige la fecha de término`;
+    } else {
+      box.textContent = 'Selecciona fecha de inicio y término';
+    }
+  }
+
+  function renderMiniCalendario(mode) {
+    const st = miniCalState[mode];
+    const titulo = document.getElementById(`mini-cal-${mode}-titulo`);
+    const grid = document.getElementById(`mini-cal-${mode}-dias`);
+    if (!titulo || !grid) return;
+
+    titulo.textContent = `${MESES_ES[st.month]} ${st.year}`;
+    const firstWeekday = (new Date(st.year, st.month, 1).getDay() + 6) % 7;
+    const daysInMonth = new Date(st.year, st.month + 1, 0).getDate();
+    const f1 = document.getElementById(`per-${mode}-inicio`).value;
+    const f2 = document.getElementById(`per-${mode}-termino`).value;
+
+    let html = '';
+    for (let i = 0; i < firstWeekday; i++) {
+      html += '<span></span>';
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      const iso = toIso(st.year, st.month + 1, day);
+      const esPasado = iso < HOY_ISO;
+      const esInicio = iso === f1;
+      const esTermino = iso === f2;
+      const enRango = f1 && f2 && iso > f1 && iso < f2;
+      const esHoy = iso === HOY_ISO;
+
+      let cls = 'h-7 w-full rounded-lg font-bold transition-all flex items-center justify-center ';
+      if (esPasado) {
+        cls += 'text-slate-300 cursor-not-allowed bg-transparent';
+      } else if (esInicio || esTermino) {
+        cls += 'bg-[#C41230] text-white shadow-sm cursor-pointer';
+      } else if (enRango) {
+        cls += 'bg-red-100 text-[#8B1D19] cursor-pointer hover:bg-red-200';
+      } else {
+        cls += 'text-slate-700 hover:bg-red-50 hover:text-[#C41230] cursor-pointer bg-white border border-slate-200/70';
+      }
+      if (esHoy && !esInicio && !esTermino) {
+        cls += ' ring-1 ring-[#C41230]';
+      }
+
+      if (esPasado) {
+        html += `<button type="button" disabled title="No se puede seleccionar una fecha pasada" class="${cls}">${day}</button>`;
+      } else {
+        html += `<button type="button" onclick="seleccionarDiaMiniCal('${mode}', '${iso}')" class="${cls}">${day}</button>`;
+      }
+    }
+    grid.innerHTML = html;
+    actualizarResumenRango(mode);
+  }
+
+  function seleccionarDiaMiniCal(mode, iso) {
+    if (iso < HOY_ISO) return;
+    const inp1 = document.getElementById(`per-${mode}-inicio`);
+    const inp2 = document.getElementById(`per-${mode}-termino`);
+    const errEl = document.getElementById(`per-${mode}-error`);
+    if (errEl) errEl.classList.add('hidden');
+
+    if (!inp1.value || (inp1.value && inp2.value) || iso < inp1.value) {
+      inp1.value = iso;
+      inp2.value = '';
+    } else {
+      inp2.value = iso;
+      calcularDiasPeriodo(`per-${mode}-inicio`, `per-${mode}-termino`, `per-${mode}-dias`);
+    }
+    renderMiniCalendario(mode);
+  }
+
+  function navegarMiniCalendario(mode, delta) {
+    const st = miniCalState[mode];
+    st.month += delta;
+    if (st.month < 0) { st.month = 11; st.year -= 1; }
+    if (st.month > 11) { st.month = 0; st.year += 1; }
+    renderMiniCalendario(mode);
+  }
+
+  function sincronizarDesdeInputs(mode) {
+    const inp1 = document.getElementById(`per-${mode}-inicio`);
+    const inp2 = document.getElementById(`per-${mode}-termino`);
+    const errEl = document.getElementById(`per-${mode}-error`);
+    if (errEl) errEl.classList.add('hidden');
+
+    const p = parseIsoParts(inp1.value) || parseIsoParts(inp2.value) || parseIsoParts(HOY_ISO);
+    if (p) {
+      miniCalState[mode].year = p.y;
+      miniCalState[mode].month = p.m - 1;
+    }
+    calcularDiasPeriodo(`per-${mode}-inicio`, `per-${mode}-termino`, `per-${mode}-dias`);
+    renderMiniCalendario(mode);
+  }
+
+  function validarFormularioPeriodo(mode) {
+    const f1 = document.getElementById(`per-${mode}-inicio`).value;
+    const f2 = document.getElementById(`per-${mode}-termino`).value;
+    const errEl = document.getElementById(`per-${mode}-error`);
+    const mostrarErr = (msg) => {
+      if (errEl) {
+        errEl.textContent = msg;
+        errEl.classList.remove('hidden');
+      }
+      return false;
+    };
+    if (!f1 || !f2) {
+      return mostrarErr('Debes seleccionar la fecha de inicio y la fecha de término.');
+    }
+    if (mode === 'new' && (f1 < HOY_ISO || f2 < HOY_ISO)) {
+      return mostrarErr('No se puede crear un período en una fecha que ya pasó.');
+    }
+    if (mode === 'edit') {
+      const st = miniCalState.edit;
+      if ((f1 !== st.origInicio && f1 < HOY_ISO) || (f2 !== st.origTermino && f2 < HOY_ISO)) {
+        return mostrarErr('No se puede asignar una fecha que ya pasó al período.');
+      }
+    }
+    if (f2 < f1) {
+      return mostrarErr('La fecha de término no puede ser anterior a la fecha de inicio.');
+    }
+    if (errEl) errEl.classList.add('hidden');
+    return true;
+  }
+
+  function abrirModalCrearPeriodo() {
+    const inp1 = document.getElementById('per-new-inicio');
+    const inp2 = document.getElementById('per-new-termino');
+    const dias = document.getElementById('per-new-dias');
+    const errEl = document.getElementById('per-new-error');
+    inp1.value = '';
+    inp2.value = '';
+    dias.value = '';
+    if (errEl) errEl.classList.add('hidden');
+    const p = parseIsoParts(HOY_ISO) || { y: new Date().getFullYear(), m: new Date().getMonth() + 1 };
+    miniCalState.new.year = p.y;
+    miniCalState.new.month = p.m - 1;
+    renderMiniCalendario('new');
+    document.getElementById('modal-crear-periodo').classList.remove('hidden');
   }
 
   function editarPeriodo(id, inicio, termino, dias, estado) {
@@ -426,6 +758,16 @@
     document.getElementById('per-edit-termino').value = termino;
     document.getElementById('per-edit-dias').value = dias;
     document.getElementById('per-edit-estado').value = estado;
+    const errEl = document.getElementById('per-edit-error');
+    if (errEl) errEl.classList.add('hidden');
+    miniCalState.edit.origInicio = inicio;
+    miniCalState.edit.origTermino = termino;
+    const p = parseIsoParts(inicio) || parseIsoParts(HOY_ISO);
+    if (p) {
+      miniCalState.edit.year = p.y;
+      miniCalState.edit.month = p.m - 1;
+    }
+    renderMiniCalendario('edit');
     document.getElementById('modal-editar-periodo').classList.remove('hidden');
   }
 </script>

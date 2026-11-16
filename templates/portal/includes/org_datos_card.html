@@ -1,0 +1,159 @@
+{% load sgr_tags %}
+<div data-realtime-card="portal-datos-organizacion" class="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm space-y-5">
+  <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
+    <div class="flex items-start gap-4 min-w-0 flex-1">
+      {% if funcionario and funcionario.foto %}
+        <img src="{{ funcionario.foto.url }}" alt="{{ request.user.username }}" class="w-14 h-14 rounded-full object-cover ring-2 ring-[#C41230]/30 shadow-sm shrink-0" />
+      {% else %}
+        <div class="w-14 h-14 rounded-2xl bg-red-50 text-[#C41230] flex items-center justify-center shrink-0 border border-red-100 shadow-inner font-extrabold text-lg">
+          {{ organizacion.nombre|make_list|first|upper }}
+        </div>
+      {% endif %}
+      <div class="text-xs space-y-1.5 min-w-0 flex-1">
+        <div class="flex flex-wrap items-center gap-2 min-w-0">
+          <h3 class="font-extrabold text-slate-900 text-base break-words [overflow-wrap:anywhere]">
+            {{ organizacion.nombre }}
+          </h3>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-50 text-[#C41230] border border-red-200">
+            {{ organizacion.get_tipo_organizacion_display }}
+          </span>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold {% if organizacion.estado == 'Activa' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif organizacion.estado == 'En tramite' %}bg-amber-50 text-amber-700 border border-amber-200{% else %}bg-red-50 text-red-700 border border-red-200{% endif %}">
+            {{ organizacion.estado }}
+          </span>
+        </div>
+        <div class="text-slate-600 font-mono flex flex-wrap items-center gap-x-2 gap-y-1 break-words [overflow-wrap:anywhere]">
+          {% if organizacion.rut %}
+            <span>RUT: <strong class="text-slate-900">{{ organizacion.rut }}</strong></span>
+            <span class="text-slate-300">·</span>
+          {% endif %}
+          <span class="inline-flex items-center gap-1.5">
+            <span>Correo: <strong class="text-slate-900">{{ request.user.email|default:organizacion.email_contacto|default:"No informado" }}</strong></span>
+            {% if editable_perfil %}
+              <button type="button" onclick="toggleEditarCorreoOrg()" title="Editar correo de la organización"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-[#C41230] font-sans text-[10px] font-bold border border-slate-200 transition-colors cursor-pointer">
+                <i data-lucide="edit-3" class="w-3 h-3"></i>
+                <span>Editar</span>
+              </button>
+            {% endif %}
+          </span>
+          <span class="text-slate-300">·</span>
+          <span>Tel: <strong class="text-slate-900">{{ organizacion.telefono_contacto|default:funcionario.telefono|default:"No informado" }}</strong> <span class="font-sans text-[10px] text-slate-400">(contacto prioritario)</span></span>
+        </div>
+        {% if editable_perfil %}
+          <form id="form-editar-correo-org" method="POST" action="{% url 'perfil_usuario' %}" class="hidden pt-2 flex flex-wrap items-center gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="actualizar_datos">
+            <input type="email" name="email" required maxlength="100" value="{{ request.user.email|default:organizacion.email_contacto|default:'' }}"
+                   placeholder="correo@organizacion.cl"
+                   class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-sans focus:ring-2 focus:ring-[#C41230] focus:outline-none min-w-[230px]" />
+            <button type="submit" class="px-3.5 py-1.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-[11px] font-bold rounded-xl shadow-sm transition-all">
+              Guardar correo
+            </button>
+            <button type="button" onclick="toggleEditarCorreoOrg(false)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-xl">
+              Cancelar
+            </button>
+          </form>
+        {% endif %}
+        <p class="text-slate-500">
+          Domicilio Legal: <strong class="text-slate-700">{{ organizacion.domicilio_legal|default:organizacion.direccion_sede|default:"No informado" }}</strong>
+          {% if organizacion.sector %} · Sector: <strong class="text-slate-700">{{ organizacion.sector.nombre }}</strong>{% elif organizacion.territorio %} · Sector: <strong class="text-slate-700">{{ organizacion.territorio }}</strong>{% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 px-3.5 py-2.5 rounded-2xl border border-slate-200 shrink-0">
+      <i data-lucide="map-pin" class="w-4 h-4 text-[#C41230]"></i>
+      <span>Delegación: <strong>{% if organizacion.delegacion %}{{ organizacion.delegacion.nombre }}{% elif funcionario and funcionario.delegacion %}{{ funcionario.delegacion.nombre }}{% else %}Comuna de La Serena{% endif %}</strong></span>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-slate-100 text-xs">
+    <div class="bg-slate-50 rounded-xl p-3 border border-slate-200/80">
+      <span class="text-[10px] font-bold text-slate-400 uppercase block">Socios Activos</span>
+      <span class="font-mono font-extrabold text-slate-900 text-sm">{{ organizacion.socios_activos|default:0 }}</span>
+    </div>
+    <div class="bg-slate-50 rounded-xl p-3 border border-slate-200/80">
+      <span class="text-[10px] font-bold text-slate-400 uppercase block">N° Reg. Personalidad Jurídica</span>
+      <span class="font-mono font-bold text-slate-800">{{ organizacion.numero_registro_pj|default:organizacion.personalidad_juridica|default:"—" }}</span>
+    </div>
+    <div class="bg-slate-50 rounded-xl p-3 border border-slate-200/80">
+      <span class="text-[10px] font-bold text-slate-400 uppercase block">Registro Directiva N°</span>
+      <span class="font-mono font-bold text-slate-800">{{ organizacion.registro_directiva_numero|default:"—" }}</span>
+    </div>
+    <div class="bg-slate-50 rounded-xl p-3 border border-slate-200/80">
+      <span class="text-[10px] font-bold text-slate-400 uppercase block">Constitución / Inscripción</span>
+      <span class="font-mono font-semibold text-slate-700">
+        {% if organizacion.fecha_constitucion %}{{ organizacion.fecha_constitucion|date:"d/m/Y" }}{% else %}—{% endif %}
+        / {% if organizacion.fecha_inscripcion_registro %}{{ organizacion.fecha_inscripcion_registro|date:"d/m/Y" }}{% else %}—{% endif %}
+      </span>
+    </div>
+  </div>
+
+  <div class="pt-3 border-t border-slate-100 space-y-2.5 text-xs">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+        <i data-lucide="users" class="w-3.5 h-3.5 text-[#C41230]"></i>
+        <span>Directiva de la Organización</span>
+      </span>
+      {% if organizacion.representante_legal %}
+        <span class="text-[11px] text-slate-500">Contacto prioritario ({{ organizacion.get_contacto_prioritario_display }}): <strong class="text-slate-800">{{ organizacion.representante_legal|nombre_corto }}</strong></span>
+      {% endif %}
+    </div>
+    {% if editable_perfil and rep_cards_perfil %}
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+        {% for rep in rep_cards_perfil %}
+          <div class="bg-slate-50 rounded-xl p-3 border {% if rep.es_prioritario %}border-[#C41230]/40 bg-red-50/30{% else %}border-slate-200{% endif %} flex flex-col justify-between gap-2">
+            <div class="space-y-0.5">
+              <div class="flex items-center justify-between gap-1">
+                <span class="text-[10px] font-extrabold uppercase text-[#C41230]">{{ rep.titulo }}</span>
+                {% if rep.nombre_corto or rep.rut %}
+                <button type="button"
+                        data-cargo="{{ rep.cargo }}"
+                        data-titulo="{{ rep.titulo }}"
+                        data-pn="{{ rep.pn }}"
+                        data-ap="{{ rep.ap }}"
+                        data-rut="{{ rep.rut }}"
+                        data-tel="{{ rep.telefono }}"
+                        data-correo="{{ rep.correo }}"
+                        data-prioritario="{{ rep.es_prioritario|yesno:'1,0' }}"
+                        onclick="abrirModalEditarRepPerfil(this)"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white hover:bg-red-50 text-slate-700 hover:text-[#C41230] text-[10px] font-bold border border-slate-200 shadow-2xs transition-colors cursor-pointer">
+                  <i data-lucide="edit-3" class="w-3 h-3"></i>
+                  <span>Editar</span>
+                </button>
+                {% endif %}
+              </div>
+              <p class="font-bold text-slate-900 mt-0.5">{{ rep.nombre_corto|default:"—" }}</p>
+              {% if rep.rut %}<p class="font-mono text-[11px] text-slate-500">RUT: {{ rep.rut }}</p>{% endif %}
+              {% if rep.telefono %}<p class="font-mono text-[11px] text-slate-600">{{ rep.telefono }}</p>{% endif %}
+              {% if rep.correo %}<p class="text-[11px] text-slate-600 break-all">{{ rep.correo }}</p>{% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+        <div class="bg-slate-50 rounded-xl p-3 border {% if organizacion.contacto_prioritario == 'presidente' %}border-[#C41230]/40 bg-red-50/30{% else %}border-slate-200{% endif %}">
+          <span class="text-[10px] font-extrabold uppercase text-[#C41230] block">Presidente</span>
+          <p class="font-bold text-slate-900 mt-0.5">{% if organizacion.presidente_nombre %}{{ organizacion.presidente_nombre|nombre_corto }}{% else %}—{% endif %}</p>
+          {% if organizacion.presidente_rut %}<p class="font-mono text-[11px] text-slate-500">RUT: {{ organizacion.presidente_rut }}</p>{% endif %}
+          {% if organizacion.presidente_telefono %}<p class="font-mono text-[11px] text-slate-600">{{ organizacion.presidente_telefono }}</p>{% endif %}
+          {% if organizacion.presidente_correo %}<p class="text-[11px] text-slate-600 break-all">{{ organizacion.presidente_correo }}</p>{% endif %}
+        </div>
+        <div class="bg-slate-50 rounded-xl p-3 border {% if organizacion.contacto_prioritario == 'tesorero' %}border-[#C41230]/40 bg-red-50/30{% else %}border-slate-200{% endif %}">
+          <span class="text-[10px] font-extrabold uppercase text-[#C41230] block">Tesorero</span>
+          <p class="font-bold text-slate-900 mt-0.5">{% if organizacion.tesorero_nombre %}{{ organizacion.tesorero_nombre|nombre_corto }}{% else %}—{% endif %}</p>
+          {% if organizacion.tesorero_rut %}<p class="font-mono text-[11px] text-slate-500">RUT: {{ organizacion.tesorero_rut }}</p>{% endif %}
+          {% if organizacion.tesorero_telefono %}<p class="font-mono text-[11px] text-slate-600">{{ organizacion.tesorero_telefono }}</p>{% endif %}
+          {% if organizacion.tesorero_correo %}<p class="text-[11px] text-slate-600 break-all">{{ organizacion.tesorero_correo }}</p>{% endif %}
+        </div>
+        <div class="bg-slate-50 rounded-xl p-3 border {% if organizacion.contacto_prioritario == 'secretario' %}border-[#C41230]/40 bg-red-50/30{% else %}border-slate-200{% endif %}">
+          <span class="text-[10px] font-extrabold uppercase text-[#C41230] block">Secretario</span>
+          <p class="font-bold text-slate-900 mt-0.5">{% if organizacion.secretario_nombre %}{{ organizacion.secretario_nombre|nombre_corto }}{% else %}—{% endif %}</p>
+          {% if organizacion.secretario_rut %}<p class="font-mono text-[11px] text-slate-500">RUT: {{ organizacion.secretario_rut }}</p>{% endif %}
+          {% if organizacion.secretario_telefono %}<p class="font-mono text-[11px] text-slate-600">{{ organizacion.secretario_telefono }}</p>{% endif %}
+          {% if organizacion.secretario_correo %}<p class="text-[11px] text-slate-600 break-all">{{ organizacion.secretario_correo }}</p>{% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>

@@ -1,3 +1,51 @@
 {% extends 'base.html' %}
-{% block title %}Registrar Carta — Tubo de Cartas{% endblock %}
-{% block content %}<div class="max-w-5xl mx-auto space-y-5"><div class="flex justify-between gap-4 items-center"><div><p class="text-xs uppercase text-slate-500 font-bold">Oficina de Partes / Matriz SGR</p><h1 class="text-2xl font-extrabold text-[#8B1D19]">{% if carta %}Editar carta {{carta.numero}}{% else %}Nueva carta{% endif %}</h1></div><a class="text-sm text-red-700 font-bold" href="{% url 'cartas_listado' %}">Volver al listado</a></div><form method="post" class="bg-white rounded-2xl border p-6 space-y-5">{% csrf_token %}{% if form_carta.non_field_errors %}<div class="text-red-700">{{form_carta.non_field_errors}}</div>{% endif %}<div class="grid sm:grid-cols-2 gap-5">{% for campo in form_carta %}<div class="{% if campo.name == 'actividad_tema' or campo.name == 'pronunciamiento' or campo.name == 'observacion' %}sm:col-span-2{% endif %}"><label for="{{campo.id_for_label}}" class="block text-sm font-semibold text-slate-700 mb-1">{{campo.label}}{% if campo.field.required %} *{% endif %}</label>{{campo}}{% if campo.errors %}<div class="text-red-700 text-xs mt-1">{{campo.errors}}</div>{% endif %}</div>{% endfor %}</div><div class="flex justify-end gap-3"><a class="px-5 py-2.5 rounded-xl border" href="{% url 'cartas_listado' %}">Cancelar</a><button class="px-6 py-2.5 rounded-xl bg-[#C41230] text-white font-bold" type="submit">Guardar carta</button></div></form></div>{% endblock %}
+{% block title %}{% if carta %}Editar Carta {{ carta.numero|default:"S/N" }}{% else %}Registrar Carta{% endif %} — Tubo de Cartas{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-5">
+  <div class="flex justify-between gap-4 items-center">
+    <div>
+      <p class="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Oficina de Partes / Seguimiento Documental</p>
+      <h1 class="text-2xl font-extrabold text-[#8B1D19]">{% if carta %}Editar carta {{ carta.numero|default:"S/N" }}{% else %}Nueva carta{% endif %}</h1>
+    </div>
+    <a class="text-xs text-[#C41230] hover:underline font-bold" href="{% url 'cartas_listado' %}">← Volver al listado</a>
+  </div>
+
+  <form method="post" class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-5">
+    {% csrf_token %}
+    {% if form_carta.non_field_errors %}
+      <div class="rounded-xl bg-red-50 border border-red-200 p-3 text-xs font-bold text-red-700">{{ form_carta.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="grid sm:grid-cols-2 gap-4">
+      {% for campo in form_carta %}
+      <div class="{% if campo.name == 'actividad_tema' or campo.name == 'observacion' %}sm:col-span-2{% endif %} space-y-1">
+        <label for="{{ campo.id_for_label }}" class="block text-xs font-extrabold text-slate-700">
+          {{ campo.label }}{% if campo.field.required %} <span class="text-[#C41230]">*</span>{% endif %}
+        </label>
+        {{ campo }}
+        {% if campo.errors %}
+          <div class="text-red-700 text-xs font-bold mt-1">{{ campo.errors }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <datalist id="cartas-encargados-list">
+      {% for it in catalogo_cartas_items %}
+        <option value="{{ it.label }}" data-search="{{ it.search }}">{{ it.meta }}</option>
+      {% endfor %}
+    </datalist>
+
+    <datalist id="cartas-derivada-list">
+      {% for it in catalogo_cartas_items %}
+        <option value="{{ it.label }}" data-search="{{ it.search }}">{{ it.meta }}</option>
+      {% endfor %}
+    </datalist>
+
+    <div class="flex justify-end gap-3 pt-3 border-t border-slate-100">
+      <a class="px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50" href="{% url 'cartas_listado' %}">Cancelar</a>
+      <button class="px-6 py-2.5 rounded-xl bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-extrabold shadow-sm" type="submit">Guardar carta</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

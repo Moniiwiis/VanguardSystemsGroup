@@ -1,0 +1,111 @@
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+  <div class="sm:col-span-2 space-y-1">
+    <label class="block text-xs font-bold text-slate-700">Organización <span class="text-[#C41230]">*</span></label>
+    <input type="text" id="{{ idp }}nombre" name="{{ p }}nombre" {{ req }} maxlength="200" placeholder="Ej: Junta de Vecinos N° 12 El Milagro"
+           class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+  </div>
+  <div class="space-y-1">
+    <label class="block text-xs font-bold text-slate-700">Tipo de Organización</label>
+    <select id="{{ idp }}tipo_organizacion" name="{{ p }}tipo_organizacion" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+      {% for tipo_val in tipos_organizaciones %}
+        <option value="{{ tipo_val }}" {% if tipo_val == 'Junta de Vecinos' %}selected{% endif %}>{{ tipo_val }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="sm:col-span-2 space-y-1">
+    <label class="block text-xs font-bold text-slate-700">Domicilio Legal</label>
+    <input type="text" id="{{ idp }}domicilio_legal" name="{{ p }}domicilio_legal" maxlength="250" placeholder="Dirección / sede legal de la organización"
+           class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+  </div>
+  <div class="space-y-1">
+    <label class="block text-xs font-bold text-slate-700">Socios Activos</label>
+    <input type="number" id="{{ idp }}socios_activos" name="{{ p }}socios_activos" min="0" value="0"
+           class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white font-mono font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+  </div>
+
+  <div class="space-y-1">
+    <label class="block text-xs font-bold text-slate-700">Delegación</label>
+    <input type="text" readonly
+           value="{% if delegacion_activa %}{{ delegacion_activa.nombre }}{% else %}Sin delegación activa{% endif %}"
+           class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-slate-800 text-xs font-bold focus:outline-none select-none" />
+    {% if incluir_delegacion_hidden %}
+      <input type="hidden" name="delegacion_id" value="{% if delegacion_activa %}{{ delegacion_activa.id }}{% endif %}" />
+    {% endif %}
+  </div>
+  <div class="space-y-1">
+    <label class="block text-xs font-bold text-slate-700">Sector / Territorio</label>
+    <select id="{{ idp }}sector_id" name="{{ p }}sector_id" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+      <option value="">General de la delegación</option>
+      {% for s in sectores %}
+        <option value="{{ s.id }}">{{ s.nombre }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="space-y-1">
+    <label class="block text-xs font-bold text-slate-700">Fecha de Constitución</label>
+    <input type="date" id="{{ idp }}fecha_constitucion" name="{{ p }}fecha_constitucion"
+           onclick="if (this.showPicker) { try { this.showPicker(); } catch(e) {} }"
+           class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white font-mono cursor-pointer focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+  </div>
+
+  <div class="space-y-1">
+    <label class="block text-xs font-bold text-slate-700">N° Registro Personalidad Jurídica</label>
+    <input type="text" id="{{ idp }}numero_registro_pj" name="{{ p }}numero_registro_pj" maxlength="50" placeholder="Ej: 1244 / PJ-1244"
+           class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+  </div>
+  <div class="space-y-1">
+    <label class="block text-xs font-bold text-slate-700">Fecha de Inscripción en Registro</label>
+    <input type="date" id="{{ idp }}fecha_inscripcion_registro" name="{{ p }}fecha_inscripcion_registro" min="{{ hoy_iso }}"
+           onclick="if (this.showPicker) { try { this.showPicker(); } catch(e) {} }"
+           class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white font-mono cursor-pointer focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+  </div>
+  <div class="space-y-1">
+    <label class="block text-xs font-bold text-slate-700">Registro de Directiva N°</label>
+    <input type="text" id="{{ idp }}registro_directiva_numero" name="{{ p }}registro_directiva_numero" maxlength="50" placeholder="Ej: DIR-089"
+           class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+  </div>
+
+  <div class="space-y-1">
+    <label class="block text-xs font-bold text-slate-700">RUT de la Organización</label>
+    <input type="text" id="{{ idp }}rut" name="{{ p }}rut" data-rut="true" maxlength="12" placeholder="Ej: 65.123.456-7"
+           class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+    <div class="rut-feedback"></div>
+  </div>
+  <div class="space-y-1">
+    <label class="block text-xs font-bold text-slate-700">Representante / Prioridad de Contacto</label>
+    <select id="{{ idp }}contacto_prioritario" name="{{ p }}contacto_prioritario" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+      <option value="presidente" selected>Presidente (Prioritario)</option>
+      <option value="tesorero">Tesorero (Prioritario)</option>
+      <option value="secretario">Secretario (Prioritario)</option>
+    </select>
+  </div>
+  <div class="space-y-1">
+    <label class="block text-xs font-bold text-slate-700">Estado de Vigencia</label>
+    <select id="{{ idp }}estado" name="{{ p }}estado" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
+      <option value="Activa">Activa</option>
+      <option value="En tramite">En trámite</option>
+      <option value="Inactiva">Inactiva</option>
+    </select>
+  </div>
+
+  <div class="sm:col-span-3 space-y-1">
+    <label class="block text-xs font-bold text-slate-700">Correo Electrónico Institucional <span class="text-[#C41230]">*</span> <span class="font-normal text-slate-500">(o ingresa el correo en Directiva; recibirá usuario y contraseña provisoria)</span></label>
+    <input type="email" id="{{ idp }}email_contacto" name="{{ p }}email_contacto" maxlength="100" placeholder="contacto@jjvv.cl"
+           class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+  </div>
+
+  <!-- Directiva estructurada (3 columnas por representante) -->
+  {% include 'gestion/includes/org_directiva_fields.html' with p=p idp=idp include_datalist=True %}
+
+  <div class="sm:col-span-3 space-y-1">
+    <label class="block text-xs font-bold text-slate-700">Nómina / Notas de Directiva</label>
+    <textarea id="{{ idp }}directiva_actual" name="{{ p }}directiva_actual" rows="2" maxlength="1000" placeholder="Presidente, Secretario, Tesorero, Directores..."
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+  </div>
+  <div class="sm:col-span-3 space-y-1">
+    <label class="block text-xs font-bold text-slate-700">Observaciones / Antecedentes</label>
+    <textarea id="{{ idp }}observaciones" name="{{ p }}observaciones" rows="2" maxlength="1000" placeholder="Observaciones adicionales..."
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
+  </div>
+</div>

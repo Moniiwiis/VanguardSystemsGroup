@@ -8,11 +8,11 @@
   <div class="bg-white p-6 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
     <div>
       <h2 class="font-display text-xl font-extrabold text-[#8B1D19]">Módulo: Configuración y Metas Institucionales</h2>
-      <p class="text-xs text-slate-500 mt-1">Catálogo de actividades, ítems de medición y metas ponderadas SGR.</p>
+      <p class="text-xs text-slate-500 mt-1">Catálogo de actividades, ítems de medición y metas ponderadas.</p>
     </div>
     <button onclick="document.getElementById('modal-meta').showModal()" class="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-[#C41230] text-white hover:bg-[#8B1D19] shadow-md transition-all flex items-center gap-2 cursor-pointer">
       <i data-lucide="plus-circle" class="w-4 h-4"></i>
-      <span>+ Nueva Meta SGR</span>
+      <span>+ Nueva Meta</span>
     </button>
   </div>
 
@@ -20,7 +20,7 @@
   <dialog id="modal-meta" class="rounded-3xl p-6 max-w-md w-full bg-white shadow-2xl backdrop:bg-slate-900/40 border border-red-100">
     <div class="flex justify-between items-center pb-4 border-b border-slate-100 mb-4">
       <h3 class="font-display font-extrabold text-base text-[#8B1D19] flex items-center gap-2">
-        <i data-lucide="sliders" class="w-5 h-5 text-[#C41230]"></i> Configurar Nueva Meta SGR
+        <i data-lucide="sliders" class="w-5 h-5 text-[#C41230]"></i> Configurar Nueva Meta
       </h3>
       <button onclick="document.getElementById('modal-meta').close()" class="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
     </div>
@@ -102,7 +102,7 @@
             <th class="p-4">Ponderación</th>
             <th class="p-4">% Cumplimiento</th>
             <th class="p-4">Ponderado</th>
-            <th class="p-4">Semáforo SGR</th>
+            <th class="p-4">Semáforo</th>
             <th class="p-4 text-center">Acciones (CRUD)</th>
           </tr>
         </thead>
@@ -151,7 +151,7 @@
               <dialog id="modal-edit-meta-{{ meta.id }}" class="rounded-3xl p-6 max-w-md w-full text-left bg-white shadow-2xl backdrop:bg-slate-900/40 border border-amber-100">
                 <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
                   <h3 class="font-display font-extrabold text-sm text-amber-800 flex items-center gap-2">
-                    <i data-lucide="edit" class="w-4 h-4 text-amber-600"></i> Editar Meta SGR
+                    <i data-lucide="edit" class="w-4 h-4 text-amber-600"></i> Editar Meta
                   </h3>
                   <button onclick="document.getElementById('modal-edit-meta-{{ meta.id }}').close()" class="text-slate-400 font-bold">&times;</button>
                 </div>

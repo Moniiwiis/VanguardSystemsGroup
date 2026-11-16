@@ -65,6 +65,11 @@ urlpatterns = [
     path('gestion/sub-atencion/<int:sub_id>/editar/', views.gestion_sub_atencion_editar, name='gestion_sub_atencion_editar'),
     path('gestion/sub-atencion/<int:sub_id>/eliminar/', views.gestion_sub_atencion_eliminar, name='gestion_sub_atencion_eliminar'),
 
+    # 6b. Áreas / Personas / Cuadrillas de Apoyo
+    path('gestion/areas-apoyo/', views.gestion_areas_apoyo, name='gestion_areas_apoyo'),
+    path('gestion/areas-apoyo/<int:area_id>/editar/', views.gestion_areas_apoyo_editar, name='gestion_areas_apoyo_editar'),
+    path('gestion/areas-apoyo/<int:area_id>/eliminar/', views.gestion_areas_apoyo_eliminar, name='gestion_areas_apoyo_eliminar'),
+
     # 7. Atenciones
     path('gestion/atenciones/', views.gestion_atenciones, name='gestion_atenciones'),
     path('gestion/atenciones/<int:atencion_id>/editar/', views.gestion_atenciones_editar, name='gestion_atenciones_editar'),
@@ -118,6 +123,11 @@ urlpatterns = [
     # 15. Módulo Tubo SGR de Trabajo (Matriz Excel)
     path('gestion/tubo/', views.gestion_tubo, name='gestion_tubo'),
     path('gestion/tubo/<int:atencion_id>/cambiar-estado/', views.gestion_tubo_cambiar_estado, name='gestion_tubo_cambiar_estado'),
+    path('gestion/tubo/sector/<int:compromiso_id>/cambiar-estado/', views.gestion_tubo_sector_cambiar_estado, name='gestion_tubo_sector_cambiar_estado'),
+    path('gestion/tubo/sector/<int:compromiso_id>/editar/', views.gestion_tubo_sector_editar, name='gestion_tubo_sector_editar'),
+    path('gestion/tubo/sector/<int:compromiso_id>/validar-evidencia/', views.gestion_tubo_sector_validar_evidencia, name='gestion_tubo_sector_validar_evidencia'),
+    path('gestion/tubo/sector/<int:compromiso_id>/evidencia/', views.gestion_tubo_sector_subir_evidencia, name='gestion_tubo_sector_subir_evidencia'),
+    path('gestion/tubo/sector/<int:compromiso_id>/eliminar/', views.gestion_tubo_sector_eliminar, name='gestion_tubo_sector_eliminar'),
 ]
 
 from django.views.static import serve

@@ -1,0 +1,299 @@
+<!-- Directiva estructurada (3 columnas por representante con búsqueda en Vecinos o formulario completo de Nuevo Vecino) -->
+<div class="sm:col-span-3 p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-3">
+  <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-extrabold text-slate-800 border-b border-slate-200 pb-1.5">
+    <div class="flex items-center gap-2">
+      <i data-lucide="users" class="w-4 h-4 text-[#C41230]"></i>
+      <span>Directiva de la Organización (Presidente, Tesorero y Secretario)</span>
+    </div>
+    <span class="text-[10px] font-medium text-slate-500">Busca un vecino existente o marca "Registrar nuevo vecino" para crear uno</span>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <!-- Presidente -->
+    <div data-rep-card data-rep-cargo="presidente" class="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
+      <div class="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-100 pb-1.5">
+        <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#C41230]">Presidente</span>
+        <label class="inline-flex items-center gap-1 text-[10px] font-bold text-[#C41230] cursor-pointer">
+          <input type="checkbox" id="{{ idp }}pres-nuevo-chk" name="{{ p }}presidente_nuevo_vecino" value="1"
+                 data-rep-nuevo-chk onchange="toggleNuevoVecinoDirectiva(this)"
+                 class="rounded border-slate-300 text-[#C41230] focus:ring-[#C41230]">
+          <span>Registrar nuevo vecino</span>
+        </label>
+      </div>
+      <div data-rep-existente-panel class="space-y-2.5">
+        <input type="hidden" id="{{ idp }}pres-vec-id" name="{{ p }}presidente_vecino_id" data-rep-field="vecino_id" value="">
+        <div class="space-y-1">
+          <label class="block text-[10px] font-bold text-slate-500">Buscar en Vecinos</label>
+          <input type="text" list="vecinos-directiva-list" autocomplete="off"
+                 oninput="sincronizarVecinoDirectiva(this)" onchange="sincronizarVecinoDirectiva(this)"
+                 placeholder="Buscar por nombre o RUT..."
+                 class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <div data-rep-no-encontrado class="hidden pt-0.5">
+            <button type="button" onclick="activarNuevoVecinoDesdeBusqueda(this)"
+                    class="text-[10px] font-bold text-[#C41230] hover:underline text-left">
+              ¿No existe? Registrar nuevo vecino con formulario completo
+            </button>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="space-y-1">
+            <label class="block text-[11px] font-bold text-slate-700">Primer Nombre</label>
+            <input type="text" id="{{ idp }}pres-pn" name="{{ p }}presidente_primer_nombre" data-rep-field="primer_nombre" readonly tabindex="-1" placeholder="Desde Vecinos"
+                   class="w-full px-3 py-1.5 rounded-full border border-slate-200 bg-slate-100 text-slate-800 text-xs font-semibold focus:outline-none select-none" />
+          </div>
+          <div class="space-y-1">
+            <label class="block text-[11px] font-bold text-slate-700">Apellido Paterno</label>
+            <input type="text" id="{{ idp }}pres-ap" name="{{ p }}presidente_apellido_paterno" data-rep-field="apellido_paterno" readonly tabindex="-1" placeholder="Desde Vecinos"
+                   class="w-full px-3 py-1.5 rounded-full border border-slate-200 bg-slate-100 text-slate-800 text-xs font-semibold focus:outline-none select-none" />
+          </div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-[11px] font-bold text-slate-700">RUT</label>
+          <input type="text" id="{{ idp }}pres-rut" name="{{ p }}presidente_rut" data-rep-field="rut" readonly tabindex="-1" placeholder="Desde Vecinos"
+                 class="w-full px-3 py-1.5 rounded-full border border-slate-200 bg-slate-100 text-slate-800 text-xs font-mono font-semibold focus:outline-none select-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-[11px] font-bold text-slate-700">Teléfono</label>
+          <input type="text" id="{{ idp }}pres-tel" name="{{ p }}presidente_telefono" data-rep-field="telefono" maxlength="15" placeholder="+56 9 8765 4321"
+                 class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <div class="tel-feedback"></div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
+          <input type="email" id="{{ idp }}pres-correo" name="{{ p }}presidente_correo" data-rep-field="correo" maxlength="100" placeholder="presidente@correo.cl"
+                 class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+      </div>
+      <div data-rep-nuevo-panel class="hidden p-3 rounded-xl bg-red-50/40 border border-red-100 space-y-2">
+        <div class="text-[11px] font-extrabold text-[#C41230]">Nuevo Vecino (Presidente) — Padrón y Portal Ciudadano</div>
+        {% with vec_pref=p|add:'presidente_vecino_' vec_idp=idp|add:'pres-vec-' %}
+          {% include 'gestion/includes/vecino_form_fields.html' with p=vec_pref idp=vec_idp req='' incluir_delegacion_hidden=False %}
+        {% endwith %}
+      </div>
+    </div>
+
+    <!-- Tesorero -->
+    <div data-rep-card data-rep-cargo="tesorero" class="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
+      <div class="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-100 pb-1.5">
+        <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#C41230]">Tesorero</span>
+        <label class="inline-flex items-center gap-1 text-[10px] font-bold text-[#C41230] cursor-pointer">
+          <input type="checkbox" id="{{ idp }}tes-nuevo-chk" name="{{ p }}tesorero_nuevo_vecino" value="1"
+                 data-rep-nuevo-chk onchange="toggleNuevoVecinoDirectiva(this)"
+                 class="rounded border-slate-300 text-[#C41230] focus:ring-[#C41230]">
+          <span>Registrar nuevo vecino</span>
+        </label>
+      </div>
+      <div data-rep-existente-panel class="space-y-2.5">
+        <input type="hidden" id="{{ idp }}tes-vec-id" name="{{ p }}tesorero_vecino_id" data-rep-field="vecino_id" value="">
+        <div class="space-y-1">
+          <label class="block text-[10px] font-bold text-slate-500">Buscar en Vecinos</label>
+          <input type="text" list="vecinos-directiva-list" autocomplete="off"
+                 oninput="sincronizarVecinoDirectiva(this)" onchange="sincronizarVecinoDirectiva(this)"
+                 placeholder="Buscar por nombre o RUT..."
+                 class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <div data-rep-no-encontrado class="hidden pt-0.5">
+            <button type="button" onclick="activarNuevoVecinoDesdeBusqueda(this)"
+                    class="text-[10px] font-bold text-[#C41230] hover:underline text-left">
+              ¿No existe? Registrar nuevo vecino con formulario completo
+            </button>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="space-y-1">
+            <label class="block text-[11px] font-bold text-slate-700">Primer Nombre</label>
+            <input type="text" id="{{ idp }}tes-pn" name="{{ p }}tesorero_primer_nombre" data-rep-field="primer_nombre" readonly tabindex="-1" placeholder="Desde Vecinos"
+                   class="w-full px-3 py-1.5 rounded-full border border-slate-200 bg-slate-100 text-slate-800 text-xs font-semibold focus:outline-none select-none" />
+          </div>
+          <div class="space-y-1">
+            <label class="block text-[11px] font-bold text-slate-700">Apellido Paterno</label>
+            <input type="text" id="{{ idp }}tes-ap" name="{{ p }}tesorero_apellido_paterno" data-rep-field="apellido_paterno" readonly tabindex="-1" placeholder="Desde Vecinos"
+                   class="w-full px-3 py-1.5 rounded-full border border-slate-200 bg-slate-100 text-slate-800 text-xs font-semibold focus:outline-none select-none" />
+          </div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-[11px] font-bold text-slate-700">RUT</label>
+          <input type="text" id="{{ idp }}tes-rut" name="{{ p }}tesorero_rut" data-rep-field="rut" readonly tabindex="-1" placeholder="Desde Vecinos"
+                 class="w-full px-3 py-1.5 rounded-full border border-slate-200 bg-slate-100 text-slate-800 text-xs font-mono font-semibold focus:outline-none select-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-[11px] font-bold text-slate-700">Teléfono</label>
+          <input type="text" id="{{ idp }}tes-tel" name="{{ p }}tesorero_telefono" data-rep-field="telefono" maxlength="15" placeholder="+56 9 8765 4321"
+                 class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <div class="tel-feedback"></div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
+          <input type="email" id="{{ idp }}tes-correo" name="{{ p }}tesorero_correo" data-rep-field="correo" maxlength="100" placeholder="tesorero@correo.cl"
+                 class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+      </div>
+      <div data-rep-nuevo-panel class="hidden p-3 rounded-xl bg-red-50/40 border border-red-100 space-y-2">
+        <div class="text-[11px] font-extrabold text-[#C41230]">Nuevo Vecino (Tesorero) — Padrón y Portal Ciudadano</div>
+        {% with vec_pref=p|add:'tesorero_vecino_' vec_idp=idp|add:'tes-vec-' %}
+          {% include 'gestion/includes/vecino_form_fields.html' with p=vec_pref idp=vec_idp req='' incluir_delegacion_hidden=False %}
+        {% endwith %}
+      </div>
+    </div>
+
+    <!-- Secretario -->
+    <div data-rep-card data-rep-cargo="secretario" class="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
+      <div class="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-100 pb-1.5">
+        <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#C41230]">Secretario</span>
+        <label class="inline-flex items-center gap-1 text-[10px] font-bold text-[#C41230] cursor-pointer">
+          <input type="checkbox" id="{{ idp }}sec-nuevo-chk" name="{{ p }}secretario_nuevo_vecino" value="1"
+                 data-rep-nuevo-chk onchange="toggleNuevoVecinoDirectiva(this)"
+                 class="rounded border-slate-300 text-[#C41230] focus:ring-[#C41230]">
+          <span>Registrar nuevo vecino</span>
+        </label>
+      </div>
+      <div data-rep-existente-panel class="space-y-2.5">
+        <input type="hidden" id="{{ idp }}sec-vec-id" name="{{ p }}secretario_vecino_id" data-rep-field="vecino_id" value="">
+        <div class="space-y-1">
+          <label class="block text-[10px] font-bold text-slate-500">Buscar en Vecinos</label>
+          <input type="text" list="vecinos-directiva-list" autocomplete="off"
+                 oninput="sincronizarVecinoDirectiva(this)" onchange="sincronizarVecinoDirectiva(this)"
+                 placeholder="Buscar por nombre o RUT..."
+                 class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <div data-rep-no-encontrado class="hidden pt-0.5">
+            <button type="button" onclick="activarNuevoVecinoDesdeBusqueda(this)"
+                    class="text-[10px] font-bold text-[#C41230] hover:underline text-left">
+              ¿No existe? Registrar nuevo vecino con formulario completo
+            </button>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="space-y-1">
+            <label class="block text-[11px] font-bold text-slate-700">Primer Nombre</label>
+            <input type="text" id="{{ idp }}sec-pn" name="{{ p }}secretario_primer_nombre" data-rep-field="primer_nombre" readonly tabindex="-1" placeholder="Desde Vecinos"
+                   class="w-full px-3 py-1.5 rounded-full border border-slate-200 bg-slate-100 text-slate-800 text-xs font-semibold focus:outline-none select-none" />
+          </div>
+          <div class="space-y-1">
+            <label class="block text-[11px] font-bold text-slate-700">Apellido Paterno</label>
+            <input type="text" id="{{ idp }}sec-ap" name="{{ p }}secretario_apellido_paterno" data-rep-field="apellido_paterno" readonly tabindex="-1" placeholder="Desde Vecinos"
+                   class="w-full px-3 py-1.5 rounded-full border border-slate-200 bg-slate-100 text-slate-800 text-xs font-semibold focus:outline-none select-none" />
+          </div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-[11px] font-bold text-slate-700">RUT</label>
+          <input type="text" id="{{ idp }}sec-rut" name="{{ p }}secretario_rut" data-rep-field="rut" readonly tabindex="-1" placeholder="Desde Vecinos"
+                 class="w-full px-3 py-1.5 rounded-full border border-slate-200 bg-slate-100 text-slate-800 text-xs font-mono font-semibold focus:outline-none select-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-[11px] font-bold text-slate-700">Teléfono</label>
+          <input type="text" id="{{ idp }}sec-tel" name="{{ p }}secretario_telefono" data-rep-field="telefono" maxlength="15" placeholder="+56 9 8765 4321"
+                 class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <div class="tel-feedback"></div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
+          <input type="email" id="{{ idp }}sec-correo" name="{{ p }}secretario_correo" data-rep-field="correo" maxlength="100" placeholder="secretario@correo.cl"
+                 class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+      </div>
+      <div data-rep-nuevo-panel class="hidden p-3 rounded-xl bg-red-50/40 border border-red-100 space-y-2">
+        <div class="text-[11px] font-extrabold text-[#C41230]">Nuevo Vecino (Secretario) — Padrón y Portal Ciudadano</div>
+        {% with vec_pref=p|add:'secretario_vecino_' vec_idp=idp|add:'sec-vec-' %}
+          {% include 'gestion/includes/vecino_form_fields.html' with p=vec_pref idp=vec_idp req='' incluir_delegacion_hidden=False %}
+        {% endwith %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if include_datalist %}
+<datalist id="vecinos-directiva-list">
+  {% for vd in vecinos_directiva %}
+    <option value="{{ vd.nombre_corto }}"
+            data-id="{{ vd.id }}"
+            data-primer-nombre="{{ vd.primer_nombre }}"
+            data-apellido-paterno="{{ vd.apellido_paterno }}"
+            data-rut="{{ vd.rut }}"
+            data-telefono="{{ vd.telefono }}"
+            data-correo="{{ vd.email }}"
+            data-search="{{ vd.nombre_corto }} {{ vd.nombre }} {{ vd.rut }} {{ vd.telefono }} {{ vd.email }}">RUT: {{ vd.rut }}{% if vd.telefono %} · {{ vd.telefono }}{% endif %}{% if vd.email %} · {{ vd.email }}{% endif %}</option>
+  {% endfor %}
+</datalist>
+<script>
+  window.toggleNuevoVecinoDirectiva = function(chk) {
+    if (!chk) return;
+    const card = chk.closest('[data-rep-card]');
+    if (!card) return;
+    const esNuevo = !!chk.checked;
+    card.classList.toggle('md:col-span-3', esNuevo);
+    const pExistente = card.querySelector('[data-rep-existente-panel]');
+    const pNuevo = card.querySelector('[data-rep-nuevo-panel]');
+    const hint = card.querySelector('[data-rep-no-encontrado]');
+    if (pExistente) {
+      pExistente.classList.toggle('hidden', esNuevo);
+      pExistente.querySelectorAll('input').forEach((el) => {
+        el.disabled = esNuevo;
+        if (esNuevo && el.dataset.repField === 'vecino_id') el.value = '';
+      });
+    }
+    if (pNuevo) {
+      pNuevo.classList.toggle('hidden', !esNuevo);
+      pNuevo.querySelectorAll('input, select').forEach((el) => {
+        el.disabled = !esNuevo;
+        const n = el.getAttribute('name') || '';
+        const esOblig = n.endsWith('_primer_nombre') || n.endsWith('_apellido_paterno') || n.endsWith('_rut') || n.endsWith('_correo');
+        if (esNuevo && esOblig) {
+          el.setAttribute('required', 'required');
+        } else {
+          el.removeAttribute('required');
+        }
+      });
+    }
+    if (esNuevo && hint) hint.classList.add('hidden');
+  };
+
+  window.activarNuevoVecinoDesdeBusqueda = function(btn) {
+    const card = btn ? btn.closest('[data-rep-card]') : null;
+    if (!card) return;
+    const chk = card.querySelector('[data-rep-nuevo-chk]');
+    if (chk) {
+      chk.checked = true;
+      window.toggleNuevoVecinoDirectiva(chk);
+    }
+  };
+
+  window.sincronizarVecinoDirectiva = function(inp) {
+    if (!inp) return;
+    const dl = document.getElementById('vecinos-directiva-list');
+    const card = inp.closest('[data-rep-card]');
+    if (!dl || !card) return;
+    const val = (inp.value || '').trim();
+    let matched = null;
+    if (val) {
+      for (const opt of dl.querySelectorAll('option')) {
+        if (opt.value === val) {
+          matched = opt;
+          break;
+        }
+      }
+    }
+    const hint = card.querySelector('[data-rep-no-encontrado]');
+    if (hint) {
+      hint.classList.toggle('hidden', !val || !!matched);
+    }
+    if (!matched) return;
+    const setField = (fieldName, value) => {
+      const el = card.querySelector(`[data-rep-field="${fieldName}"]`);
+      if (el) {
+        el.value = value || '';
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    };
+    setField('vecino_id', matched.dataset.id);
+    setField('primer_nombre', matched.dataset.primerNombre);
+    setField('apellido_paterno', matched.dataset.apellidoPaterno);
+    setField('rut', matched.dataset.rut);
+    setField('telefono', matched.dataset.telefono);
+    setField('correo', matched.dataset.correo);
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-rep-nuevo-chk]').forEach((chk) => {
+      window.toggleNuevoVecinoDirectiva(chk);
+    });
+  });
+</script>
+{% endif %}
