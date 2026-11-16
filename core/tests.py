@@ -1972,3 +1972,21 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(org.nombre, 'Org Delegacion Bloqueada Edit')
         self.assertEqual(org.delegacion_id, self.delegacion.id)
         self.assertEqual(org.fecha_inscripcion_registro, hoy)
+
+        # Verificar etiqueta "Juntas de Vecinos y Organizaciones", sin candado en formularios y calendario clicable
+        resp_ini = self.client.get(reverse('gestion_inicio'))
+        self.assertContains(resp_ini, 'Juntas de Vecinos y Organizaciones')
+        self.assertNotContains(resp_ini, 'JJVV y Organizaciones')
+        self.assertContains(resp_org_activa, 'Juntas de Vecinos y Organizaciones')
+        self.assertContains(resp_org_activa, 'this.showPicker')
+
+        for mod_url in ('gestion_atenciones', 'gestion_sectores', 'gestion_vecinos', 'gestion_organizaciones'):
+            resp_mod = self.client.get(reverse(mod_url))
+            self.assertNotContains(resp_mod, 'data-lucide="lock"')
+
+        # En Sectores el administrador siempre puede filtrar por delegación incluso con delegación activa
+        resp_sec_con_activa = self.client.get(reverse('gestion_sectores'))
+        self.assertContains(resp_sec_con_activa, 'id="filtro-del"')
+        resp_sec_filtro = self.client.get(reverse('gestion_sectores') + f'?delegacion={del_otra.id}')
+        self.assertContains(resp_sec_filtro, sec_otra.nombre)
+        self.assertNotContains(resp_sec_filtro, sec_principal.nombre)

@@ -60,7 +60,7 @@
                class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230] font-medium" />
       </div>
 
-      {% if es_admin and not delegacion_activa %}
+      {% if es_admin %}
       <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs">
         <i data-lucide="filter" class="w-4 h-4 text-[#C41230]"></i>
         <label for="filtro-del" class="font-bold text-slate-600">Delegación:</label>
@@ -192,15 +192,9 @@
           Delegación Territorial <span class="text-[#C41230]">*</span>
         </label>
         {% if delegacion_activa %}
-          <div class="relative">
-            <input type="text" readonly value="{{ delegacion_activa.nombre }}" 
-                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 cursor-not-allowed select-none" />
-            <input type="hidden" name="delegacion_id" value="{{ delegacion_activa.id }}">
-            <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
-              <i data-lucide="lock" class="w-3.5 h-3.5"></i>
-            </div>
-          </div>
-          <p class="text-[10px] text-slate-400 mt-0.5">Bloqueada según tu delegación activa asignada</p>
+          <input type="text" readonly value="{{ delegacion_activa.nombre }}" 
+                 class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
+          <input type="hidden" name="delegacion_id" value="{{ delegacion_activa.id }}">
         {% elif es_admin %}
           <select name="delegacion_id" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
             {% for d in todas_delegaciones %}
@@ -255,13 +249,8 @@
 
       <div>
         <label class="block text-xs font-bold text-slate-700 mb-1">Delegación Territorial</label>
-        <div class="relative">
-          <input type="text" id="edit-sector-del" readonly 
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 cursor-not-allowed select-none" />
-          <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
-            <i data-lucide="lock" class="w-3.5 h-3.5"></i>
-          </div>
-        </div>
+        <input type="text" id="edit-sector-del" readonly 
+               class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">

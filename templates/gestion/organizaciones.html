@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Organizaciones Comunitarias y JJVV — Sistema Municipal La Serena{% endblock %}
+{% block title %}Juntas de Vecinos y Organizaciones — Sistema Municipal La Serena{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -133,7 +133,7 @@
         <div>
           <h2 class="font-extrabold text-sm uppercase tracking-wider text-slate-800 flex items-center gap-2">
             <i data-lucide="list-Checks" class="w-4 h-4 text-[#C41230]"></i>
-            <span>Registro Oficial de Organizaciones Comunitarias y JJVV</span>
+            <span>Registro Oficial de Juntas de Vecinos y Organizaciones</span>
           </h2>
           <p class="text-[11px] text-slate-400">Mostrando {{ organizaciones|length }} de {{ total_organizaciones }} registros filtrados</p>
         </div>
@@ -160,7 +160,7 @@
         <div>
           <select name="delegacion" onchange="this.form.submit()"
                   class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-[#C41230] focus:outline-none bg-white">
-            <option value="" {% if not delegacion_seleccionada %}selected{% endif %}>Territ. Deleg.: Todas</option>
+            <option value="" {% if not delegacion_seleccionada %}selected{% endif %}>Delegación: Todas</option>
             {% for d in todas_delegaciones %}
               <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
                 {{ d.nombre }}
@@ -464,7 +464,7 @@
   <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[92vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
       <div>
-        <h3 class="text-base font-extrabold text-slate-900">Registrar Organización Comunitaria / JJVV</h3>
+        <h3 class="text-base font-extrabold text-slate-900">Registrar Junta de Vecinos u Organización</h3>
         <p class="text-[11px] text-slate-400">Padrón oficial de Juntas de Vecinos y Organizaciones Funcionales (Ley 19.418)</p>
       </div>
       <button onclick="document.getElementById('modal-crear-org').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
@@ -500,9 +500,9 @@
 
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Delegación</label>
-          <input type="text" readonly disabled
+          <input type="text" readonly
                  value="{% if delegacion_activa %}{{ delegacion_activa.nombre }}{% else %}Sin delegación activa{% endif %}"
-                 class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 text-xs font-bold cursor-not-allowed" />
+                 class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-slate-800 text-xs font-bold focus:outline-none select-none" />
           <input type="hidden" name="delegacion_id" value="{% if delegacion_activa %}{{ delegacion_activa.id }}{% endif %}" />
         </div>
         <div class="space-y-1">
@@ -517,7 +517,8 @@
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Fecha de Constitución</label>
           <input type="date" name="fecha_constitucion"
-                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                 onclick="if (this.showPicker) { try { this.showPicker(); } catch(e) {} }"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono cursor-pointer focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
 
         <div class="space-y-1">
@@ -528,7 +529,8 @@
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Fecha de Inscripción en Registro</label>
           <input type="date" name="fecha_inscripcion_registro" min="{{ hoy_iso }}"
-                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                 onclick="if (this.showPicker) { try { this.showPicker(); } catch(e) {} }"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono cursor-pointer focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Registro de Directiva N°</label>
@@ -568,62 +570,71 @@
           </select>
         </div>
 
-        <!-- Directiva estructurada (Presidente, Tesorero y Secretario) -->
+        <!-- Directiva estructurada (3 columnas por representante) -->
         <div class="sm:col-span-3 p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-3">
           <div class="flex items-center gap-2 text-xs font-extrabold text-slate-800 border-b border-slate-200 pb-1.5">
             <i data-lucide="users" class="w-4 h-4 text-[#C41230]"></i>
             <span>Directiva de la Organización (Presidente, Tesorero y Secretario)</span>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Presidente — Nombre y Apellido</label>
-              <input type="text" name="presidente_nombre" maxlength="150" placeholder="Nombre y apellido"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-            </div>
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Presidente — RUT</label>
-              <input type="text" name="presidente_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-              <div class="rut-feedback"></div>
-            </div>
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Presidente — Correo</label>
-              <input type="email" name="presidente_correo" maxlength="100" placeholder="presidente@correo.cl"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-            </div>
-
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Tesorero — Nombre y Apellido</label>
-              <input type="text" name="tesorero_nombre" maxlength="150" placeholder="Nombre y apellido"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-            </div>
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Tesorero — RUT</label>
-              <input type="text" name="tesorero_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-              <div class="rut-feedback"></div>
-            </div>
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Tesorero — Correo</label>
-              <input type="email" name="tesorero_correo" maxlength="100" placeholder="tesorero@correo.cl"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
+              <div class="text-[11px] font-extrabold uppercase tracking-wider text-[#C41230] border-b border-slate-100 pb-1">Presidente</div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Nombre y Apellido</label>
+                <input type="text" name="presidente_nombre" maxlength="150" placeholder="Nombre y apellido"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">RUT</label>
+                <input type="text" name="presidente_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                <div class="rut-feedback"></div>
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
+                <input type="email" name="presidente_correo" maxlength="100" placeholder="presidente@correo.cl"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              </div>
             </div>
 
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Secretario — Nombre y Apellido</label>
-              <input type="text" name="secretario_nombre" maxlength="150" placeholder="Nombre y apellido"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
+              <div class="text-[11px] font-extrabold uppercase tracking-wider text-[#C41230] border-b border-slate-100 pb-1">Tesorero</div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Nombre y Apellido</label>
+                <input type="text" name="tesorero_nombre" maxlength="150" placeholder="Nombre y apellido"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">RUT</label>
+                <input type="text" name="tesorero_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                <div class="rut-feedback"></div>
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
+                <input type="email" name="tesorero_correo" maxlength="100" placeholder="tesorero@correo.cl"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              </div>
             </div>
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Secretario — RUT</label>
-              <input type="text" name="secretario_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-              <div class="rut-feedback"></div>
-            </div>
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Secretario — Correo</label>
-              <input type="email" name="secretario_correo" maxlength="100" placeholder="secretario@correo.cl"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+
+            <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
+              <div class="text-[11px] font-extrabold uppercase tracking-wider text-[#C41230] border-b border-slate-100 pb-1">Secretario</div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Nombre y Apellido</label>
+                <input type="text" name="secretario_nombre" maxlength="150" placeholder="Nombre y apellido"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">RUT</label>
+                <input type="text" name="secretario_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                <div class="rut-feedback"></div>
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
+                <input type="email" name="secretario_correo" maxlength="100" placeholder="secretario@correo.cl"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              </div>
             </div>
           </div>
         </div>
@@ -654,7 +665,7 @@
   <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[92vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
       <div>
-        <h3 class="text-base font-extrabold text-slate-900">Editar Organización Comunitaria / JJVV</h3>
+        <h3 class="text-base font-extrabold text-slate-900">Editar Junta de Vecinos u Organización</h3>
         <p class="text-[11px] text-slate-400">Actualizar datos legales, registro P.J., inscripción y directiva</p>
       </div>
       <button onclick="document.getElementById('modal-editar-org').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
@@ -690,8 +701,8 @@
 
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Delegación</label>
-          <input type="text" id="edit-org-del-nombre" readonly disabled
-                 class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 text-xs font-bold cursor-not-allowed" />
+          <input type="text" id="edit-org-del-nombre" readonly
+                 class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-slate-800 text-xs font-bold focus:outline-none select-none" />
           <input type="hidden" id="edit-org-del" name="delegacion_id" value="" />
         </div>
         <div class="space-y-1">
@@ -706,7 +717,8 @@
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Fecha de Constitución</label>
           <input type="date" id="edit-org-fconst" name="fecha_constitucion"
-                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                 onclick="if (this.showPicker) { try { this.showPicker(); } catch(e) {} }"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono cursor-pointer focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
 
         <div class="space-y-1">
@@ -717,7 +729,8 @@
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Fecha de Inscripción en Registro</label>
           <input type="date" id="edit-org-finsc" name="fecha_inscripcion_registro"
-                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                 onclick="if (this.showPicker) { try { this.showPicker(); } catch(e) {} }"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono cursor-pointer focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Registro de Directiva N°</label>
@@ -757,62 +770,71 @@
           </select>
         </div>
 
-        <!-- Directiva estructurada (Presidente, Tesorero y Secretario) -->
+        <!-- Directiva estructurada (3 columnas por representante) -->
         <div class="sm:col-span-3 p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-3">
           <div class="flex items-center gap-2 text-xs font-extrabold text-slate-800 border-b border-slate-200 pb-1.5">
             <i data-lucide="users" class="w-4 h-4 text-[#C41230]"></i>
             <span>Directiva de la Organización (Presidente, Tesorero y Secretario)</span>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Presidente — Nombre y Apellido</label>
-              <input type="text" id="edit-org-pres-nombre" name="presidente_nombre" maxlength="150" placeholder="Nombre y apellido"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-            </div>
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Presidente — RUT</label>
-              <input type="text" id="edit-org-pres-rut" name="presidente_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-              <div class="rut-feedback"></div>
-            </div>
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Presidente — Correo</label>
-              <input type="email" id="edit-org-pres-correo" name="presidente_correo" maxlength="100" placeholder="presidente@correo.cl"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-            </div>
-
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Tesorero — Nombre y Apellido</label>
-              <input type="text" id="edit-org-tes-nombre" name="tesorero_nombre" maxlength="150" placeholder="Nombre y apellido"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-            </div>
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Tesorero — RUT</label>
-              <input type="text" id="edit-org-tes-rut" name="tesorero_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-              <div class="rut-feedback"></div>
-            </div>
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Tesorero — Correo</label>
-              <input type="email" id="edit-org-tes-correo" name="tesorero_correo" maxlength="100" placeholder="tesorero@correo.cl"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
+              <div class="text-[11px] font-extrabold uppercase tracking-wider text-[#C41230] border-b border-slate-100 pb-1">Presidente</div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Nombre y Apellido</label>
+                <input type="text" id="edit-org-pres-nombre" name="presidente_nombre" maxlength="150" placeholder="Nombre y apellido"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">RUT</label>
+                <input type="text" id="edit-org-pres-rut" name="presidente_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                <div class="rut-feedback"></div>
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
+                <input type="email" id="edit-org-pres-correo" name="presidente_correo" maxlength="100" placeholder="presidente@correo.cl"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              </div>
             </div>
 
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Secretario — Nombre y Apellido</label>
-              <input type="text" id="edit-org-sec-nombre" name="secretario_nombre" maxlength="150" placeholder="Nombre y apellido"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+            <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
+              <div class="text-[11px] font-extrabold uppercase tracking-wider text-[#C41230] border-b border-slate-100 pb-1">Tesorero</div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Nombre y Apellido</label>
+                <input type="text" id="edit-org-tes-nombre" name="tesorero_nombre" maxlength="150" placeholder="Nombre y apellido"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">RUT</label>
+                <input type="text" id="edit-org-tes-rut" name="tesorero_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                <div class="rut-feedback"></div>
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
+                <input type="email" id="edit-org-tes-correo" name="tesorero_correo" maxlength="100" placeholder="tesorero@correo.cl"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              </div>
             </div>
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Secretario — RUT</label>
-              <input type="text" id="edit-org-sec-rut" name="secretario_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
-              <div class="rut-feedback"></div>
-            </div>
-            <div class="space-y-1">
-              <label class="block text-[11px] font-bold text-slate-700">Secretario — Correo</label>
-              <input type="email" id="edit-org-sec-correo" name="secretario_correo" maxlength="100" placeholder="secretario@correo.cl"
-                     class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+
+            <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
+              <div class="text-[11px] font-extrabold uppercase tracking-wider text-[#C41230] border-b border-slate-100 pb-1">Secretario</div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Nombre y Apellido</label>
+                <input type="text" id="edit-org-sec-nombre" name="secretario_nombre" maxlength="150" placeholder="Nombre y apellido"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">RUT</label>
+                <input type="text" id="edit-org-sec-rut" name="secretario_rut" data-rut="true" maxlength="12" placeholder="12.345.678-5"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+                <div class="rut-feedback"></div>
+              </div>
+              <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-slate-700">Correo Electrónico</label>
+                <input type="email" id="edit-org-sec-correo" name="secretario_correo" maxlength="100" placeholder="secretario@correo.cl"
+                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              </div>
             </div>
           </div>
         </div>
