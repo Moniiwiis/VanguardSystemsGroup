@@ -33,7 +33,9 @@ class Periodo(BaseModel):
         return min(round(pct, 2), 100.0)
 
     def __str__(self):
-        return f"Período {self.fecha_inicio} a {self.fecha_termino}"
+        inicio_fmt = self.fecha_inicio.strftime('%d-%m-%Y') if self.fecha_inicio else ''
+        termino_fmt = self.fecha_termino.strftime('%d-%m-%Y') if self.fecha_termino else ''
+        return f"Período {inicio_fmt} a {termino_fmt}"
 
 class TipoAtencion(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)

@@ -1373,8 +1373,11 @@ def gestion_metas(request):
             f_termino = _parse_iso_date(request.POST.get('fecha_termino', ''))
             dias_raw = request.POST.get('dias_computables', '').strip()
             estado_per = request.POST.get('estado', 'Abierto').strip() or 'Abierto'
+            hoy = timezone.localdate()
             if not f_inicio or not f_termino:
                 messages.error(request, "Debes indicar la Fecha de Inicio y la Fecha de Término del período de medición.")
+            elif f_inicio < hoy or f_termino < hoy:
+                messages.error(request, "No se puede crear un período en una fecha que ya pasó.")
             elif f_termino < f_inicio:
                 messages.error(request, "La fecha de término no puede ser anterior a la fecha de inicio.")
             else:
@@ -1391,7 +1394,10 @@ def gestion_metas(request):
                         dias_computables=dias_comp,
                         estado=estado_per,
                     )
-                    messages.success(request, f"Fecha / Período de medición ({f_inicio} a {f_termino}) creado exitosamente.")
+                    messages.success(
+                        request,
+                        f"Fecha / Período de medición ({f_inicio.strftime('%d-%m-%Y')} a {f_termino.strftime('%d-%m-%Y')}) creado exitosamente.",
+                    )
             return redirect('gestion_metas')
 
         elif accion_post == 'editar_periodo':
@@ -1401,8 +1407,11 @@ def gestion_metas(request):
             f_termino = _parse_iso_date(request.POST.get('fecha_termino', ''))
             dias_raw = request.POST.get('dias_computables', '').strip()
             estado_per = request.POST.get('estado', periodo_obj.estado).strip()
+            hoy = timezone.localdate()
             if not f_inicio or not f_termino:
                 messages.error(request, "Las fechas de inicio y término son obligatorias.")
+            elif (f_inicio != periodo_obj.fecha_inicio and f_inicio < hoy) or (f_termino != periodo_obj.fecha_termino and f_termino < hoy):
+                messages.error(request, "No se puede asignar una fecha que ya pasó al período.")
             elif f_termino < f_inicio:
                 messages.error(request, "La fecha de término no puede ser anterior a la fecha de inicio.")
             else:
@@ -1415,7 +1424,10 @@ def gestion_metas(request):
                 periodo_obj.dias_computables = max(1, dias_comp)
                 periodo_obj.estado = estado_per
                 periodo_obj.save()
-                messages.success(request, f"Período de medición ({f_inicio} a {f_termino}) actualizado.")
+                messages.success(
+                    request,
+                    f"Período de medición ({f_inicio.strftime('%d-%m-%Y')} a {f_termino.strftime('%d-%m-%Y')}) actualizado.",
+                )
             return redirect('gestion_metas')
 
         elif accion_post == 'eliminar_periodo':
@@ -1476,6 +1488,7 @@ def gestion_metas(request):
         'page_obj': page_obj,
         'items': page_obj.object_list,
         'periodos': Periodo.objects.all().order_by('-fecha_inicio'),
+        'hoy_iso': timezone.localdate().isoformat(),
         'q': q,
         'filtro_estado': filtro_estado,
         'orden': orden,

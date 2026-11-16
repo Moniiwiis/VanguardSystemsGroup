@@ -1799,3 +1799,56 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.client.post(reverse('gestion_sectores'), {'nombre': 'Sector Auto', 'codigo': 'MANUAL', 'estado': 'Activo'})
         sec_auto = Sector.objects.get(nombre='Sector Auto')
         self.assertTrue(sec_auto.codigo.startswith('SEC'))
+
+    def test_periodo_formato_dmy_validacion_pasado_y_mini_calendario(self):
+        from django.utils import timezone
+        admin = User.objects.create_superuser('admin_per_dmy', 'apd@example.test', 'Admin123!')
+        self.client.force_login(admin)
+
+        hoy = timezone.localdate()
+        ayer = hoy - datetime.timedelta(days=1)
+        futuro = hoy + datetime.timedelta(days=10)
+        futuro_fin = hoy + datetime.timedelta(days=20)
+
+        # Rechazar creación de período con fecha pasada
+        resp_pasado = self.client.post(reverse('gestion_metas'), {
+            'accion': 'crear_periodo',
+            'fecha_inicio': ayer.isoformat(),
+            'fecha_termino': futuro.isoformat(),
+            'dias_computables': '12',
+            'estado': 'Abierto',
+        })
+        self.assertRedirects(resp_pasado, reverse('gestion_metas'))
+        self.assertFalse(Periodo.objects.filter(fecha_inicio=ayer).exists())
+
+        # Permitir creación desde hoy en adelante y verificar formato DD-MM-YYYY y mini-calendario
+        resp_ok = self.client.post(reverse('gestion_metas'), {
+            'accion': 'crear_periodo',
+            'fecha_inicio': futuro.isoformat(),
+            'fecha_termino': futuro_fin.isoformat(),
+            'dias_computables': '11',
+            'estado': 'Abierto',
+        })
+        self.assertRedirects(resp_ok, reverse('gestion_metas'))
+        p_creado = Periodo.objects.get(fecha_inicio=futuro, fecha_termino=futuro_fin)
+        texto_esperado = f"Período {futuro.strftime('%d-%m-%Y')} a {futuro_fin.strftime('%d-%m-%Y')}"
+        self.assertEqual(str(p_creado), texto_esperado)
+
+        resp_get = self.client.get(reverse('gestion_metas'))
+        self.assertContains(resp_get, texto_esperado)
+        self.assertContains(resp_get, 'mini-cal-new-dias')
+        self.assertContains(resp_get, 'mini-cal-edit-dias')
+        self.assertContains(resp_get, f'min="{hoy.isoformat()}"')
+
+        # Rechazar edición cambiando fecha a una pasada
+        resp_edit_bad = self.client.post(reverse('gestion_metas'), {
+            'accion': 'editar_periodo',
+            'periodo_id': p_creado.id,
+            'fecha_inicio': ayer.isoformat(),
+            'fecha_termino': futuro_fin.isoformat(),
+            'dias_computables': '15',
+            'estado': 'Abierto',
+        })
+        self.assertRedirects(resp_edit_bad, reverse('gestion_metas'))
+        p_creado.refresh_from_db()
+        self.assertEqual(p_creado.fecha_inicio, futuro)

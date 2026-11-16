@@ -13,12 +13,12 @@
       <p class="text-xs text-slate-500 mt-0.5">Catálogo de ítems de medición y fechas de período para metas SGR.</p>
     </div>
     <div class="flex flex-wrap items-center gap-2.5">
-      <button onclick="document.getElementById('modal-crear-periodo').classList.remove('hidden')" 
+      <button type="button" onclick="abrirModalCrearPeriodo()"
               class="px-4 py-2.5 bg-white hover:bg-red-50 text-[#C41230] border border-[#C41230]/30 text-xs font-extrabold rounded-xl shadow-sm transition-all flex items-center gap-2">
         <i data-lucide="calendar-plus" class="w-4 h-4"></i>
         <span>Nueva Fecha de Medición</span>
       </button>
-      <button onclick="document.getElementById('modal-crear').classList.remove('hidden')" 
+      <button type="button" onclick="document.getElementById('modal-crear').classList.remove('hidden')" 
               class="px-4 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
         <i data-lucide="plus" class="w-4 h-4"></i>
         <span>Nuevo Ítem</span>
@@ -130,7 +130,7 @@
         <i data-lucide="calendar-range" class="w-4 h-4 text-[#C41230]"></i>
         <h2 class="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Fechas / Períodos de Medición SGR</h2>
       </div>
-      <button type="button" onclick="document.getElementById('modal-crear-periodo').classList.remove('hidden')"
+      <button type="button" onclick="abrirModalCrearPeriodo()"
               class="text-xs font-bold text-[#C41230] hover:underline flex items-center gap-1">
         <i data-lucide="plus" class="w-3.5 h-3.5"></i> Agregar fecha de medición
       </button>
@@ -194,35 +194,60 @@
 
 <!-- Modal Crear Fecha / Período de Medición -->
 <div id="modal-crear-periodo" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-md space-y-4">
+  <div class="bg-white rounded-3xl p-5 sm:p-6 shadow-2xl border border-slate-200 w-full max-w-md max-h-[92vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-      <h3 class="text-base font-extrabold text-slate-900">Nueva Fecha / Período de Medición</h3>
-      <button onclick="document.getElementById('modal-crear-periodo').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+      <div>
+        <h3 class="text-base font-extrabold text-slate-900">Nueva Fecha / Período de Medición</h3>
+        <p class="text-[11px] text-slate-500">Elige las fechas desde el calendario o el selector (desde hoy en adelante).</p>
+      </div>
+      <button type="button" onclick="document.getElementById('modal-crear-periodo').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
     </div>
-    <form method="POST" action="{% url 'gestion_metas' %}" class="space-y-4">
+    <form id="form-crear-periodo" method="POST" action="{% url 'gestion_metas' %}" onsubmit="return validarFormularioPeriodo('new')" class="space-y-3.5">
       {% csrf_token %}
       <input type="hidden" name="accion" value="crear_periodo" />
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Inicio *</label>
-          <input type="date" id="per-new-inicio" name="fecha_inicio" required onchange="calcularDiasPeriodo('per-new-inicio','per-new-termino','per-new-dias')"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <input type="date" id="per-new-inicio" name="fecha_inicio" min="{{ hoy_iso }}" required
+                 onclick="this.showPicker && this.showPicker()"
+                 onchange="sincronizarDesdeInputs('new')"
+                 class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Término *</label>
-          <input type="date" id="per-new-termino" name="fecha_termino" required onchange="calcularDiasPeriodo('per-new-inicio','per-new-termino','per-new-dias')"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <input type="date" id="per-new-termino" name="fecha_termino" min="{{ hoy_iso }}" required
+                 onclick="this.showPicker && this.showPicker()"
+                 onchange="sincronizarDesdeInputs('new')"
+                 class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
       </div>
+
+      <!-- Mini Calendario Interactivo -->
+      <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <button type="button" onclick="navegarMiniCalendario('new', -1)" class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-[#C41230] text-slate-700 flex items-center justify-center text-xs font-extrabold">&lsaquo;</button>
+          <span id="mini-cal-new-titulo" class="text-xs font-extrabold text-slate-800 capitalize"></span>
+          <button type="button" onclick="navegarMiniCalendario('new', 1)" class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-[#C41230] text-slate-700 flex items-center justify-center text-xs font-extrabold">&rsaquo;</button>
+        </div>
+        <div class="grid grid-cols-7 text-center text-[10px] font-extrabold text-slate-400 uppercase">
+          <span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sá</span><span>Do</span>
+        </div>
+        <div id="mini-cal-new-dias" class="grid grid-cols-7 gap-1 text-center text-[11px]"></div>
+        <div id="mini-cal-new-rango" class="text-[11px] font-bold text-slate-600 text-center pt-1 border-t border-slate-200/80">
+          Selecciona fecha de inicio y término
+        </div>
+      </div>
+      <p id="per-new-error" class="hidden text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2"></p>
+
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Días Computables *</label>
           <input type="number" id="per-new-dias" name="dias_computables" min="1" required placeholder="Ej: 30"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Estado</label>
-          <select name="estado" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          <select name="estado" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
             <option value="Abierto">Abierto</option>
             <option value="Cerrado">Cerrado</option>
           </select>
@@ -240,36 +265,61 @@
 
 <!-- Modal Editar Fecha / Período de Medición -->
 <div id="modal-editar-periodo" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-md space-y-4">
+  <div class="bg-white rounded-3xl p-5 sm:p-6 shadow-2xl border border-slate-200 w-full max-w-md max-h-[92vh] overflow-y-auto space-y-4">
     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-      <h3 class="text-base font-extrabold text-slate-900">Editar Fecha / Período de Medición</h3>
-      <button onclick="document.getElementById('modal-editar-periodo').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+      <div>
+        <h3 class="text-base font-extrabold text-slate-900">Editar Fecha / Período de Medición</h3>
+        <p class="text-[11px] text-slate-500">Formato visual DD-MM-YYYY con selección rápida en calendario.</p>
+      </div>
+      <button type="button" onclick="document.getElementById('modal-editar-periodo').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
     </div>
-    <form method="POST" action="{% url 'gestion_metas' %}" class="space-y-4">
+    <form id="form-editar-periodo" method="POST" action="{% url 'gestion_metas' %}" onsubmit="return validarFormularioPeriodo('edit')" class="space-y-3.5">
       {% csrf_token %}
       <input type="hidden" name="accion" value="editar_periodo" />
       <input type="hidden" id="per-edit-id" name="periodo_id" value="" />
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Inicio *</label>
-          <input type="date" id="per-edit-inicio" name="fecha_inicio" required onchange="calcularDiasPeriodo('per-edit-inicio','per-edit-termino','per-edit-dias')"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <input type="date" id="per-edit-inicio" name="fecha_inicio" required
+                 onclick="this.showPicker && this.showPicker()"
+                 onchange="sincronizarDesdeInputs('edit')"
+                 class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Término *</label>
-          <input type="date" id="per-edit-termino" name="fecha_termino" required onchange="calcularDiasPeriodo('per-edit-inicio','per-edit-termino','per-edit-dias')"
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <input type="date" id="per-edit-termino" name="fecha_termino" required
+                 onclick="this.showPicker && this.showPicker()"
+                 onchange="sincronizarDesdeInputs('edit')"
+                 class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
       </div>
+
+      <!-- Mini Calendario Interactivo Edición -->
+      <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <button type="button" onclick="navegarMiniCalendario('edit', -1)" class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-[#C41230] text-slate-700 flex items-center justify-center text-xs font-extrabold">&lsaquo;</button>
+          <span id="mini-cal-edit-titulo" class="text-xs font-extrabold text-slate-800 capitalize"></span>
+          <button type="button" onclick="navegarMiniCalendario('edit', 1)" class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-[#C41230] text-slate-700 flex items-center justify-center text-xs font-extrabold">&rsaquo;</button>
+        </div>
+        <div class="grid grid-cols-7 text-center text-[10px] font-extrabold text-slate-400 uppercase">
+          <span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sá</span><span>Do</span>
+        </div>
+        <div id="mini-cal-edit-dias" class="grid grid-cols-7 gap-1 text-center text-[11px]"></div>
+        <div id="mini-cal-edit-rango" class="text-[11px] font-bold text-slate-600 text-center pt-1 border-t border-slate-200/80">
+          Selecciona fecha de inicio y término
+        </div>
+      </div>
+      <p id="per-edit-error" class="hidden text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2"></p>
+
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Días Computables *</label>
           <input type="number" id="per-edit-dias" name="dias_computables" min="1" required
-                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Estado</label>
-          <select id="per-edit-estado" name="estado" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
+          <select id="per-edit-estado" name="estado" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
             <option value="Abierto">Abierto</option>
             <option value="Cerrado">Cerrado</option>
           </select>
@@ -403,17 +453,191 @@
     document.getElementById('modal-editar').classList.remove('hidden');
   }
 
+  const HOY_ISO = "{{ hoy_iso }}";
+  const MESES_ES = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  const miniCalState = {
+    new: { year: 0, month: 0, origInicio: '', origTermino: '' },
+    edit: { year: 0, month: 0, origInicio: '', origTermino: '' },
+  };
+
+  function parseIsoParts(iso) {
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+    const [y, m, d] = iso.split('-').map(Number);
+    return { y, m, d };
+  }
+
+  function formatDmy(iso) {
+    const p = parseIsoParts(iso);
+    if (!p) return '—';
+    return `${String(p.d).padStart(2, '0')}-${String(p.m).padStart(2, '0')}-${p.y}`;
+  }
+
+  function toIso(y, m, d) {
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+
   function calcularDiasPeriodo(idInicio, idTermino, idDias) {
-    const f1 = document.getElementById(idInicio).value;
-    const f2 = document.getElementById(idTermino).value;
-    if (f1 && f2) {
-      const d1 = new Date(f1);
-      const d2 = new Date(f2);
-      const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+    const p1 = parseIsoParts(document.getElementById(idInicio).value);
+    const p2 = parseIsoParts(document.getElementById(idTermino).value);
+    if (p1 && p2) {
+      const d1 = Date.UTC(p1.y, p1.m - 1, p1.d);
+      const d2 = Date.UTC(p2.y, p2.m - 1, p2.d);
+      const diff = Math.round((d2 - d1) / 86400000) + 1;
       if (diff > 0) {
         document.getElementById(idDias).value = diff;
       }
     }
+  }
+
+  function actualizarResumenRango(mode) {
+    const f1 = document.getElementById(`per-${mode}-inicio`).value;
+    const f2 = document.getElementById(`per-${mode}-termino`).value;
+    const box = document.getElementById(`mini-cal-${mode}-rango`);
+    if (!box) return;
+    if (f1 && f2) {
+      box.textContent = `Período: ${formatDmy(f1)} a ${formatDmy(f2)}`;
+    } else if (f1) {
+      box.textContent = `Inicio: ${formatDmy(f1)} · Ahora elige la fecha de término`;
+    } else {
+      box.textContent = 'Selecciona fecha de inicio y término';
+    }
+  }
+
+  function renderMiniCalendario(mode) {
+    const st = miniCalState[mode];
+    const titulo = document.getElementById(`mini-cal-${mode}-titulo`);
+    const grid = document.getElementById(`mini-cal-${mode}-dias`);
+    if (!titulo || !grid) return;
+
+    titulo.textContent = `${MESES_ES[st.month]} ${st.year}`;
+    const firstWeekday = (new Date(st.year, st.month, 1).getDay() + 6) % 7;
+    const daysInMonth = new Date(st.year, st.month + 1, 0).getDate();
+    const f1 = document.getElementById(`per-${mode}-inicio`).value;
+    const f2 = document.getElementById(`per-${mode}-termino`).value;
+
+    let html = '';
+    for (let i = 0; i < firstWeekday; i++) {
+      html += '<span></span>';
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      const iso = toIso(st.year, st.month + 1, day);
+      const esPasado = iso < HOY_ISO;
+      const esInicio = iso === f1;
+      const esTermino = iso === f2;
+      const enRango = f1 && f2 && iso > f1 && iso < f2;
+      const esHoy = iso === HOY_ISO;
+
+      let cls = 'h-7 w-full rounded-lg font-bold transition-all flex items-center justify-center ';
+      if (esPasado) {
+        cls += 'text-slate-300 cursor-not-allowed bg-transparent';
+      } else if (esInicio || esTermino) {
+        cls += 'bg-[#C41230] text-white shadow-sm cursor-pointer';
+      } else if (enRango) {
+        cls += 'bg-red-100 text-[#8B1D19] cursor-pointer hover:bg-red-200';
+      } else {
+        cls += 'text-slate-700 hover:bg-red-50 hover:text-[#C41230] cursor-pointer bg-white border border-slate-200/70';
+      }
+      if (esHoy && !esInicio && !esTermino) {
+        cls += ' ring-1 ring-[#C41230]';
+      }
+
+      if (esPasado) {
+        html += `<button type="button" disabled title="No se puede seleccionar una fecha pasada" class="${cls}">${day}</button>`;
+      } else {
+        html += `<button type="button" onclick="seleccionarDiaMiniCal('${mode}', '${iso}')" class="${cls}">${day}</button>`;
+      }
+    }
+    grid.innerHTML = html;
+    actualizarResumenRango(mode);
+  }
+
+  function seleccionarDiaMiniCal(mode, iso) {
+    if (iso < HOY_ISO) return;
+    const inp1 = document.getElementById(`per-${mode}-inicio`);
+    const inp2 = document.getElementById(`per-${mode}-termino`);
+    const errEl = document.getElementById(`per-${mode}-error`);
+    if (errEl) errEl.classList.add('hidden');
+
+    if (!inp1.value || (inp1.value && inp2.value) || iso < inp1.value) {
+      inp1.value = iso;
+      inp2.value = '';
+    } else {
+      inp2.value = iso;
+      calcularDiasPeriodo(`per-${mode}-inicio`, `per-${mode}-termino`, `per-${mode}-dias`);
+    }
+    renderMiniCalendario(mode);
+  }
+
+  function navegarMiniCalendario(mode, delta) {
+    const st = miniCalState[mode];
+    st.month += delta;
+    if (st.month < 0) { st.month = 11; st.year -= 1; }
+    if (st.month > 11) { st.month = 0; st.year += 1; }
+    renderMiniCalendario(mode);
+  }
+
+  function sincronizarDesdeInputs(mode) {
+    const inp1 = document.getElementById(`per-${mode}-inicio`);
+    const inp2 = document.getElementById(`per-${mode}-termino`);
+    const errEl = document.getElementById(`per-${mode}-error`);
+    if (errEl) errEl.classList.add('hidden');
+
+    const p = parseIsoParts(inp1.value) || parseIsoParts(inp2.value) || parseIsoParts(HOY_ISO);
+    if (p) {
+      miniCalState[mode].year = p.y;
+      miniCalState[mode].month = p.m - 1;
+    }
+    calcularDiasPeriodo(`per-${mode}-inicio`, `per-${mode}-termino`, `per-${mode}-dias`);
+    renderMiniCalendario(mode);
+  }
+
+  function validarFormularioPeriodo(mode) {
+    const f1 = document.getElementById(`per-${mode}-inicio`).value;
+    const f2 = document.getElementById(`per-${mode}-termino`).value;
+    const errEl = document.getElementById(`per-${mode}-error`);
+    const mostrarErr = (msg) => {
+      if (errEl) {
+        errEl.textContent = msg;
+        errEl.classList.remove('hidden');
+      }
+      return false;
+    };
+    if (!f1 || !f2) {
+      return mostrarErr('Debes seleccionar la fecha de inicio y la fecha de término.');
+    }
+    if (mode === 'new' && (f1 < HOY_ISO || f2 < HOY_ISO)) {
+      return mostrarErr('No se puede crear un período en una fecha que ya pasó.');
+    }
+    if (mode === 'edit') {
+      const st = miniCalState.edit;
+      if ((f1 !== st.origInicio && f1 < HOY_ISO) || (f2 !== st.origTermino && f2 < HOY_ISO)) {
+        return mostrarErr('No se puede asignar una fecha que ya pasó al período.');
+      }
+    }
+    if (f2 < f1) {
+      return mostrarErr('La fecha de término no puede ser anterior a la fecha de inicio.');
+    }
+    if (errEl) errEl.classList.add('hidden');
+    return true;
+  }
+
+  function abrirModalCrearPeriodo() {
+    const inp1 = document.getElementById('per-new-inicio');
+    const inp2 = document.getElementById('per-new-termino');
+    const dias = document.getElementById('per-new-dias');
+    const errEl = document.getElementById('per-new-error');
+    inp1.value = '';
+    inp2.value = '';
+    dias.value = '';
+    if (errEl) errEl.classList.add('hidden');
+    const p = parseIsoParts(HOY_ISO) || { y: new Date().getFullYear(), m: new Date().getMonth() + 1 };
+    miniCalState.new.year = p.y;
+    miniCalState.new.month = p.m - 1;
+    renderMiniCalendario('new');
+    document.getElementById('modal-crear-periodo').classList.remove('hidden');
   }
 
   function editarPeriodo(id, inicio, termino, dias, estado) {
@@ -422,6 +646,16 @@
     document.getElementById('per-edit-termino').value = termino;
     document.getElementById('per-edit-dias').value = dias;
     document.getElementById('per-edit-estado').value = estado;
+    const errEl = document.getElementById('per-edit-error');
+    if (errEl) errEl.classList.add('hidden');
+    miniCalState.edit.origInicio = inicio;
+    miniCalState.edit.origTermino = termino;
+    const p = parseIsoParts(inicio) || parseIsoParts(HOY_ISO);
+    if (p) {
+      miniCalState.edit.year = p.y;
+      miniCalState.edit.month = p.m - 1;
+    }
+    renderMiniCalendario('edit');
     document.getElementById('modal-editar-periodo').classList.remove('hidden');
   }
 </script>
