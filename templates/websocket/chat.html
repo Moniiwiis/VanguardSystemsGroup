@@ -1,228 +1,860 @@
 {% extends "base.html" %}
 
-{% block title %}Chat Territorial en Tiempo Real — Sistema Municipal La Serena{% endblock %}
+{% block title %}{% if is_support_channel %}Soporte Técnico{% else %}Mensajes privados{% endif %} — Sistema Municipal La Serena{% endblock %}
+
+{% block extra_head %}
+<style>
+  .chat-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+  .chat-scroll::-webkit-scrollbar-thumb { background: #d7dce2; border-radius: 999px; }
+  .chat-scroll::-webkit-scrollbar-thumb:hover { background: #aeb6c1; }
+  .chat-wallpaper {
+    background-color: #f5f2ee;
+    background-image: radial-gradient(rgba(127, 95, 78, .08) .7px, transparent .7px);
+    background-size: 15px 15px;
+  }
+  .chat-message-own { border-radius: 18px 18px 18px 5px; }
+  .chat-message-other { border-radius: 18px 18px 5px 18px; }
+  @media (max-width: 1023px) {
+    .chat-layout { height: auto !important; min-height: 0 !important; }
+    .chat-contacts { max-height: 300px; }
+    .chat-conversation { min-height: 620px; }
+  }
+  {% if chat_widget_mode %}
+  body.chat-widget-mode .chat-layout { grid-template-columns: minmax(0, 1fr); border-radius: 0; }
+  body.chat-widget-mode .chat-layout > aside { display: none; }
+  body.chat-widget-mode .chat-conversation { min-height: 0; }
+  {% endif %}
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="space-y-6 max-w-4xl mx-auto">
-  <!-- Cabecera -->
-  <div class="bg-white rounded-3xl p-6 border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+<div class="space-y-4">
+  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3 px-1">
     <div>
-      <div class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
-        <span>Comunicación Interna</span>
-        <span class="text-slate-300">/</span>
-        <span class="text-[#C41230]">Chat Territorial</span>
-      </div>
-      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
-        Chat Colaborativo de la Organización
-      </h1>
-      <p class="text-xs text-slate-500 mt-1">
-        Canal de comunicación directa para el equipo territorial.
-      </p>
+      <p class="text-[10px] font-extrabold uppercase tracking-[.18em] text-[#C41230]">{% if is_support_channel %}Canal compartido{% else %}Comunicación privada{% endif %}</p>
+      <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Mensajes</h1>
     </div>
-
-    <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200">
-      <span id="chat-status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-      <span id="chat-status">Conectado en tiempo real</span>
+    <div class="inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
+      <span id="chat-status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+      <span id="chat-status" aria-live="polite">Conectando…</span>
     </div>
   </div>
 
-  <!-- Caja del Chat -->
-  <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[520px]">
-    <!-- Lista de mensajes -->
-    <div id="messages-container" class="flex-1 p-5 overflow-y-auto space-y-3 bg-slate-50/50">
-      <ul id="messages" class="space-y-3" aria-live="polite">
-        {% for m in initial_messages %}
-          <li data-msg-id="{{ m.id }}" class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm max-w-lg">
-            <div class="flex items-center justify-between text-[11px] font-bold text-slate-600 mb-1">
-              <span class="text-[#C41230] font-extrabold">{{ m.username }}</span>
-              <span class="text-slate-400 font-mono text-[10px]">{{ m.time }}</span>
+  <section class="chat-layout h-[min(76vh,850px)] min-h-[620px] grid grid-cols-1 lg:grid-cols-[350px_minmax(0,1fr)] overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_18px_55px_rgba(30,41,59,.12)]">
+    <aside class="min-h-0 flex flex-col border-b lg:border-b-0 lg:border-r border-slate-200 bg-white">
+      <header class="px-5 pt-5 pb-4 border-b border-slate-100">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#C41230] to-[#8B1D19] text-white flex items-center justify-center shadow-md shadow-red-900/15">
+              <i data-lucide="messages-square" class="w-5 h-5"></i>
             </div>
-            <div class="text-xs text-slate-800 break-words font-medium">{{ m.message }}</div>
-          </li>
-        {% endfor %}
-      </ul>
-    </div>
-
-    <!-- Formulario de envío -->
-    <div class="p-4 bg-white border-t border-slate-200">
-      <form id="chat-form" action="{% url 'websocket:send' %}" class="flex items-center gap-2">
-        {% csrf_token %}
-        <div class="relative flex-1">
-          <input id="message" name="message" maxlength="300" required autocomplete="off"
-                 placeholder="Escribe un mensaje para el equipo territorial (máx 300 caracteres)..."
-                 class="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#C41230] font-medium" />
+            <div>
+              <h2 class="text-lg font-extrabold tracking-tight text-slate-900">Mensajes</h2>
+              <p class="text-[11px] text-slate-500">Chats privados y soporte compartido</p>
+            </div>
+          </div>
+          {% if can_manage_contacts %}
+          <a href="{% url 'gestion_usuarios' %}" title="Administrar contactos" aria-label="Administrar contactos"
+             class="w-9 h-9 rounded-xl border border-slate-200 text-slate-500 hover:text-[#C41230] hover:border-red-200 hover:bg-red-50 flex items-center justify-center transition-colors">
+            <i data-lucide="user-round-cog" class="w-4 h-4"></i>
+          </a>
+          {% endif %}
         </div>
-        <button type="submit" id="send"
-                class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center gap-2 shrink-0 cursor-pointer">
-          <i data-lucide="send" class="w-4 h-4"></i>
-          <span>Enviar</span>
-        </button>
+      </header>
+
+      {% if is_chat_global %}
+      <section id="global-conversations-section" class="border-b border-slate-100">
+        <div class="px-5 py-3 flex items-center justify-between">
+          <h3 class="text-[10px] font-extrabold uppercase tracking-[.14em] text-slate-500">Conversaciones activas · Global</h3>
+          <span id="global-conversations-count" class="text-[10px] font-bold text-slate-400">—</span>
+        </div>
+        <div class="chat-scroll max-h-52 overflow-y-auto px-2 pb-2">
+          <ul id="global-conversations-list" class="space-y-1" aria-live="polite"></ul>
+          <p id="global-conversations-empty" class="hidden px-3 py-4 text-center text-[11px] text-slate-400">Aún no hay conversaciones activas.</p>
+        </div>
+      </section>
+      {% endif %}
+
+      <div class="px-4 py-3 border-b border-slate-100">
+        <form id="contact-filters" class="space-y-2.5">
+          <label class="relative block">
+            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"></i>
+            <input id="contact-search" name="q" placeholder="Buscar contacto, RUT, cargo…" autocomplete="off"
+                   class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-100 border border-transparent text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-red-200 focus:outline-none focus:ring-2 focus:ring-red-50 transition-colors">
+          </label>
+          <div class="flex items-center justify-between">
+            <button type="button" id="toggle-filters" aria-expanded="true" aria-controls="advanced-filters"
+                    class="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-[#C41230]">
+              <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+              Filtros avanzados
+              <span id="active-filter-count" class="hidden min-w-4 h-4 px-1 rounded-full bg-red-100 text-[#C41230] text-[9px] items-center justify-center">0</span>
+            </button>
+            <button type="button" id="clear-filters" class="text-[10px] font-semibold text-slate-400 hover:text-slate-700">Limpiar</button>
+          </div>
+          <div id="advanced-filters" class="grid grid-cols-2 gap-2 pt-1">
+            <input name="rut" placeholder="RUT / ID" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] focus:outline-none focus:border-[#C41230]">
+            <input name="nombre" placeholder="Nombre" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] focus:outline-none focus:border-[#C41230]">
+            <input name="apellido" placeholder="Apellido" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] focus:outline-none focus:border-[#C41230]">
+            <input name="cargo" placeholder="Cargo" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] focus:outline-none focus:border-[#C41230]">
+            <input name="seccion" placeholder="Sección" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] focus:outline-none focus:border-[#C41230]">
+            <input name="delegacion" placeholder="Delegación" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] focus:outline-none focus:border-[#C41230]">
+          </div>
+        </form>
+      </div>
+
+      <div class="px-5 py-3 flex items-center justify-between">
+        <h3 class="text-[10px] font-extrabold uppercase tracking-[.14em] text-slate-400">Chats y contactos</h3>
+        <span id="contacts-count" class="text-[10px] font-bold text-slate-400">—</span>
+      </div>
+      <div id="contacts-container" class="chat-contacts chat-scroll flex-1 min-h-0 overflow-y-auto px-2 pb-3">
+        <ul id="contacts-list" class="space-y-1" aria-live="polite"></ul>
+        <div id="contacts-empty" class="hidden mx-2 my-5 rounded-2xl border border-dashed border-slate-200 py-8 px-4 text-center">
+          <div class="mx-auto w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
+            <i data-lucide="user-round-search" class="w-5 h-5"></i>
+          </div>
+          <p class="mt-2 text-xs font-bold text-slate-600">No encontramos contactos</p>
+          <p class="mt-1 text-[10px] text-slate-400">Prueba con otros filtros.</p>
+        </div>
+      </div>
+      {% if can_manage_contacts %}
+      <a href="{% url 'gestion_usuarios' %}" class="m-3 mt-0 inline-flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-50 hover:bg-red-50 text-slate-600 hover:text-[#C41230] text-[11px] font-bold transition-colors">
+        <i data-lucide="settings-2" class="w-3.5 h-3.5"></i> Gestionar directorio
+      </a>
+      {% endif %}
+    </aside>
+
+    <main class="chat-conversation min-h-0 flex flex-col bg-[#f7f5f3]">
+      <header class="px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3 bg-white border-b border-slate-200 shadow-[0_1px_4px_rgba(15,23,42,.04)]">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-11 h-11 shrink-0 rounded-full bg-gradient-to-br from-rose-100 to-red-200 text-[#9f1239] flex items-center justify-center text-sm font-extrabold ring-2 ring-white shadow-sm">
+            {% if is_support_channel %}<i data-lucide="life-buoy" class="w-5 h-5"></i>{% elif direct_contact %}{{ direct_contact.first_name|default:direct_contact.username|make_list|first|upper }}{% elif conversation_participants %}{{ conversation_participants.0.first_name|default:conversation_participants.0.username|make_list|first|upper }}{% else %}<i data-lucide="message-circle" class="w-5 h-5"></i>{% endif %}
+          </div>
+          <div class="min-w-0">
+            <div id="chat-conversation"
+                 data-chat-id="{{ conversation_id }}"
+                 data-support-channel="{{ is_support_channel|yesno:'true,false' }}"
+                 data-support-messages-url="{{ support_messages_url }}"
+                 data-support-send-url="{{ support_send_url }}"
+                 data-contact-id="{{ direct_contact.id|default:'' }}"
+                 data-read-only="{{ conversation_read_only|yesno:'true,false' }}"
+                 data-alignment-user="{{ alignment_user_id }}"
+                 data-message-action-url="{{ message_action_url }}"
+                 data-contact-preference-url="{{ contact_preference_url }}"></div>
+            <h2 id="conversation-title" class="truncate text-sm sm:text-base font-extrabold text-slate-900">{{ conversation_title }}</h2>
+            <p class="truncate text-[10px] sm:text-[11px] text-slate-500">{{ conversation_subtitle }}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          {% if conversation_id and direct_contact %}
+          <a href="{% url 'websocket:chat_index' %}{% if chat_widget_mode %}?widget=1{% endif %}" title="Volver a contactos"
+             class="w-9 h-9 rounded-xl border border-slate-200 text-slate-500 hover:text-[#C41230] hover:bg-red-50 flex items-center justify-center transition-colors">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+          </a>
+          {% endif %}
+          <span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+            <i data-lucide="lock-keyhole" class="w-3 h-3"></i>
+            {% if is_support_channel %}Canal compartido{% elif conversation_read_only %}Vista Global{% else %}Privado 1 a 1{% endif %}
+          </span>
+          <div class="relative">
+            <button type="button" id="chat-actions-toggle" title="Más opciones" aria-label="Más opciones"
+                    aria-haspopup="true" aria-expanded="false" aria-controls="chat-actions-menu"
+                    class="w-9 h-9 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 flex items-center justify-center">
+              <i data-lucide="ellipsis" class="w-5 h-5"></i>
+            </button>
+            <div id="chat-actions-menu" role="menu" aria-labelledby="chat-actions-toggle"
+                 class="hidden absolute right-0 top-11 z-20 w-56 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
+              <button type="button" id="action-latest" role="menuitem"
+                      class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-red-50 hover:text-[#C41230]">
+                <i data-lucide="arrow-down-to-line" class="w-4 h-4"></i> Ir a mensajes recientes
+              </button>
+              <button type="button" id="action-refresh" role="menuitem"
+                      class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-red-50 hover:text-[#C41230]">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i> Actualizar chat
+              </button>
+              <button type="button" id="action-copy-link" role="menuitem"
+                      class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-red-50 hover:text-[#C41230]">
+                <i data-lucide="link-2" class="w-4 h-4"></i> Copiar enlace al chat
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {% if is_support_channel %}
+      <form id="support-search-form" class="px-4 sm:px-6 py-2.5 bg-white border-b border-slate-200">
+        <label for="support-search" class="relative block">
+          <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+          <input id="support-search" name="q" value="{{ support_query }}" maxlength="100"
+                 placeholder="Buscar mensajes: archivo, error, pegado…"
+                 autocomplete="off"
+                 class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-100 border border-transparent text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-red-200 focus:outline-none focus:ring-2 focus:ring-red-50">
+        </label>
       </form>
-    </div>
-  </div>
+      {% endif %}
+
+      <div id="messages-container" class="chat-scroll chat-wallpaper flex-1 min-h-[340px] overflow-y-auto px-4 sm:px-7 py-5 sm:py-7">
+        <div id="empty-selection" class="{% if conversation_id %}hidden{% endif %} py-16 text-center">
+          <div class="mx-auto w-14 h-14 rounded-2xl bg-white/80 border border-white text-[#C41230] flex items-center justify-center shadow-sm">
+            <i data-lucide="message-circle" class="w-6 h-6"></i>
+          </div>
+          <p class="mt-3 text-xs font-extrabold text-slate-600">Selecciona un contacto</p>
+          <p class="mt-1 text-[10px] text-slate-400">{% if is_support_channel %}Reporta aquí fallas, errores o archivos perdidos; todas las delegaciones pueden participar.{% else %}Cada conversación es privada entre sus dos participantes.{% endif %}</p>
+        </div>
+        <ul id="messages" class="space-y-2.5" aria-live="polite" aria-relevant="additions">
+          {% for m in initial_messages %}
+          <li data-msg-id="{{ m.id }}" class="flex {% if m.sender_id == alignment_user_id %}justify-start{% else %}justify-end{% endif %}">
+            <div class="max-w-[88%] sm:max-w-[72%] px-3.5 py-2.5 shadow-sm {% if m.sender_id == alignment_user_id %}chat-message-own bg-[#C41230] text-white{% else %}chat-message-other bg-white text-slate-800 border border-slate-200/80{% endif %}">
+              {% if conversation_read_only or is_support_channel %}<div class="mb-1 text-[10px] font-extrabold {% if m.sender_id == alignment_user_id %}text-white/80{% else %}text-[#C41230]{% endif %}">{{ m.username }}</div>{% endif %}
+              <p class="message-body whitespace-pre-wrap break-words text-[12px] leading-relaxed">{{ m.message }}</p>
+              {% if m.editado %}<span class="message-edited text-[9px] opacity-70">(editado)</span>{% endif %}
+              {% if not is_support_channel and not conversation_read_only and not m.eliminado %}
+              <div class="mt-1 flex flex-wrap justify-end gap-1">
+                {% if m.sender_id == request.user.id %}
+                <button type="button" data-message-action="edit" class="rounded-md px-1.5 py-0.5 text-[9px] opacity-75 hover:opacity-100 hover:bg-black/10">Editar</button>
+                <button type="button" data-message-action="delete_everyone" class="rounded-md px-1.5 py-0.5 text-[9px] opacity-75 hover:opacity-100 hover:bg-black/10">Eliminar para todos</button>
+                {% endif %}
+                <button type="button" data-message-action="delete_me" class="rounded-md px-1.5 py-0.5 text-[9px] opacity-75 hover:opacity-100 hover:bg-black/10">Eliminar para mí</button>
+              </div>
+              {% endif %}
+              <div class="mt-1 flex items-center justify-end gap-1 text-[9px] {% if m.sender_id == alignment_user_id %}text-white/70{% else %}text-slate-400{% endif %}">
+                <time>{{ m.time }}</time>
+                {% if m.sender_id == alignment_user_id %}<i data-lucide="check-check" class="w-3 h-3"></i>{% endif %}
+              </div>
+            </div>
+          </li>
+          {% empty %}
+          {% if conversation_id %}
+          <li id="empty-messages" class="py-16 text-center">
+            <div class="mx-auto w-14 h-14 rounded-2xl bg-white/80 border border-white text-[#C41230] flex items-center justify-center shadow-sm">
+              <i data-lucide="message-circle" class="w-6 h-6"></i>
+            </div>
+            <p class="mt-3 text-xs font-extrabold text-slate-600">{% if is_support_channel %}Aún no hay reportes{% else %}Inicia la conversación{% endif %}</p>
+            <p class="mt-1 text-[10px] text-slate-400">{% if is_support_channel %}Sé el primero en informar al equipo técnico.{% else %}Envía un mensaje privado para comenzar.{% endif %}</p>
+          </li>
+          {% endif %}
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div id="chat-error" class="hidden mx-4 mt-2 px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800" role="alert"></div>
+      <div id="chat-local-notice" class="hidden mx-4 mt-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800" role="status" aria-live="polite"></div>
+      <form id="chat-actions-csrf" class="hidden">{% csrf_token %}</form>
+      {% if can_send_message %}
+      <footer class="px-3 sm:px-5 py-3 bg-white border-t border-slate-200">
+        <form id="chat-form" action="{% if is_support_channel %}{{ support_send_url }}{% else %}{% url 'websocket:send' %}{% endif %}" class="flex items-end gap-2.5">
+          {% csrf_token %}
+          <div class="flex-1 flex items-end gap-2 px-4 py-2 rounded-[22px] bg-slate-100 border border-transparent focus-within:bg-white focus-within:border-red-200 focus-within:ring-2 focus-within:ring-red-50 transition-colors">
+            <i data-lucide="smile" class="hidden sm:block w-5 h-5 mb-1 text-slate-400"></i>
+            <textarea id="message" name="message" maxlength="300" required rows="1" autocomplete="off"
+                      placeholder="{% if is_support_channel %}Describe la falla o el archivo perdido…{% else %}Escribe un mensaje privado…{% endif %}"
+                      class="chat-scroll resize-none flex-1 max-h-28 py-1.5 bg-transparent text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none"></textarea>
+          </div>
+          <button type="submit" id="send" title="Enviar mensaje" aria-label="Enviar mensaje"
+                  class="w-11 h-11 shrink-0 rounded-full bg-[#C41230] hover:bg-[#8B1D19] disabled:opacity-50 text-white flex items-center justify-center shadow-md shadow-red-900/15 transition-all hover:scale-105">
+            <i data-lucide="send" class="w-[18px] h-[18px]"></i>
+          </button>
+        </form>
+        <p class="mt-1.5 pl-4 text-[9px] text-slate-400">Enter para enviar · Shift + Enter para nueva línea · Máximo 300 caracteres</p>
+      </footer>
+      {% elif conversation_read_only %}
+      <footer class="px-4 py-4 bg-white border-t border-slate-200 text-center text-[11px] text-slate-500">
+        Vista Global de solo lectura. Para escribir, inicia un chat privado desde Contactos activos.
+      </footer>
+      {% endif %}
+    </main>
+  </section>
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-  const form = document.querySelector("#chat-form");
-  const button = document.querySelector("#send");
-  const input = document.querySelector("#message");
-  const state = document.querySelector("#chat-status");
-  const dot = document.querySelector("#chat-status-dot");
-  const container = document.querySelector("#messages-container");
-  const messagesList = document.querySelector("#messages");
-  const renderedIds = new Set();
-  document.querySelectorAll("#messages li[data-msg-id]").forEach(el => {
-    if (el.dataset.msgId) renderedIds.add(el.dataset.msgId);
-  });
-  if (container) container.scrollTop = container.scrollHeight;
-  const currentUsername = "{{ request.user.get_full_name|default:request.user.username|escapejs }}";
+document.addEventListener('DOMContentLoaded', function() {
+  const messagesContainer = document.getElementById('messages-container');
+  const messagesList = document.getElementById('messages');
+  const contactsList = document.getElementById('contacts-list');
+  const contactsEmpty = document.getElementById('contacts-empty');
+  const contactsCount = document.getElementById('contacts-count');
+  const globalConversationsList = document.getElementById('global-conversations-list');
+  const globalConversationsEmpty = document.getElementById('global-conversations-empty');
+  const globalConversationsCount = document.getElementById('global-conversations-count');
+  const filters = document.getElementById('contact-filters');
+  const advancedFilters = document.getElementById('advanced-filters');
+  const filterBadge = document.getElementById('active-filter-count');
+  const form = document.getElementById('chat-form');
+  const input = document.getElementById('message');
+  const sendButton = document.getElementById('send');
+  const errorBox = document.getElementById('chat-error');
+  const statusLabel = document.getElementById('chat-status');
+  const statusDot = document.getElementById('chat-status-dot');
+  const renderedIds = new Set(Array.from(messagesList.querySelectorAll('[data-msg-id]')).map((item) => item.dataset.msgId));
+  const conversation = document.getElementById('chat-conversation');
+  const chatId = conversation.dataset.chatId;
+  const activeContactId = conversation.dataset.contactId;
+  const readOnly = conversation.dataset.readOnly === 'true';
+  const alignmentUserId = conversation.dataset.alignmentUser;
+  const supportChannel = conversation.dataset.supportChannel === 'true';
+  const supportMessagesUrl = conversation.dataset.supportMessagesUrl;
+  const messageActionUrl = conversation.dataset.messageActionUrl;
+  const contactPreferenceUrl = conversation.dataset.contactPreferenceUrl;
+  const widgetMode = new URLSearchParams(window.location.search).get('widget') === '1';
+  const currentUserId = '{{ request.user.id }}';
+  const localNotice = document.getElementById('chat-local-notice');
+  let renderedSupportQuery = supportChannel
+    ? document.getElementById('support-search').value.trim()
+    : '';
+  let socket = null;
+  let pollTimer = null;
+  let contactTimer = null;
+  let retryTimer = null;
+  let localNoticeTimer = null;
+  let supportSearchTimer = null;
 
-  let chatSocket = null;
-  let pollInterval = null;
+  function showLocalNotice(message) {
+    localNotice.textContent = message;
+    localNotice.classList.remove('hidden');
+    clearTimeout(localNoticeTimer);
+    localNoticeTimer = setTimeout(function() {
+      localNotice.classList.add('hidden');
+    }, 2500);
+  }
 
-  function setConnectedUI() {
-    state.textContent = "Conectado en tiempo real";
-    dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
-    button.disabled = false;
+  function setConnectionState(connected) {
+    statusLabel.textContent = connected ? 'En línea' : 'Reconectando…';
+    statusDot.className = 'w-2 h-2 rounded-full ' + (connected ? 'bg-emerald-500' : 'bg-amber-500');
+  }
+
+  async function markConversationRead() {
+    if (!chatId || readOnly) return;
+    const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (!csrfInput) return;
+    const response = await fetch('{% url "websocket:mark_read" %}', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfInput.value,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: new URLSearchParams({chat_id: chatId})
+    });
+    if (!response.ok) throw new Error('No fue posible marcar los mensajes como leídos.');
+    loadContacts();
+    if (window.parent !== window) {
+      window.parent.postMessage({type: 'chat-read'}, window.location.origin);
+    }
   }
 
   function renderMessage(data) {
-    if (!data || data.type !== "chat_message") return;
-    const uname = data.username || data.usuario || "Usuario";
-    const text = data.message || data.mensaje || "";
-    const msgId = data.id || `${uname}-${data.time}-${text}`;
-    if (renderedIds.has(msgId)) return;
-    renderedIds.add(msgId);
-
-    const li = document.createElement("li");
-    li.className = "bg-white p-3 rounded-2xl border border-slate-200 shadow-sm max-w-lg";
-
-    const header = document.createElement("div");
-    header.className = "flex items-center justify-between text-[11px] font-bold text-slate-600 mb-1";
-    header.innerHTML = `<span class="text-[#C41230] font-extrabold">${escapeHTML(uname)}</span><span class="text-slate-400 font-mono text-[10px]">${data.time || ""}</span>`;
-
-    const body = document.createElement("div");
-    body.className = "text-xs text-slate-800 break-words font-medium";
-    body.textContent = text;
-
-    li.appendChild(header);
-    li.appendChild(body);
-    messagesList.appendChild(li);
-    container.scrollTop = container.scrollHeight;
-  }
-
-  async function fetchRecentMessages() {
-    try {
-      const res = await fetch("/chat/messages/", {
-        headers: { "X-Requested-With": "XMLHttpRequest" }
-      });
-      if (!res.ok) return;
-      const payload = await res.json();
-      if (Array.isArray(payload.messages)) {
-        payload.messages.forEach(renderMessage);
-      }
-      setConnectedUI();
-    } catch (e) {
-      // Silencioso
-    }
-  }
-
-  function startFallbackPolling() {
-    setConnectedUI();
-    if (pollInterval) return;
-    fetchRecentMessages();
-    pollInterval = setInterval(fetchRecentMessages, 2000);
-  }
-
-  function connectWebSocket() {
-    const scheme = location.protocol === "https:" ? "wss:" : "ws:";
-    try {
-      chatSocket = new WebSocket(scheme + "//" + location.host + "/ws/chat/");
-    } catch (e) {
-      startFallbackPolling();
+    if (!data || data.chat_id !== chatId) return;
+    if (data.type === 'chat_message_updated') {
+      updateMessage(data);
       return;
     }
-
-    chatSocket.onopen = () => {
-      setConnectedUI();
-      fetchRecentMessages();
-    };
-
-    chatSocket.onclose = () => {
-      startFallbackPolling();
-      setTimeout(connectWebSocket, 4000);
-    };
-
-    chatSocket.onerror = () => {
-      startFallbackPolling();
-    };
-
-    chatSocket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        renderMessage(data);
-      } catch(e) {
-        console.error(e);
+    if (data.type === 'chat_message_hidden') {
+      if (String(data.user_id) === currentUserId) {
+        const hiddenMessage = messagesList.querySelector('[data-msg-id="' + String(data.id) + '"]');
+        if (hiddenMessage) hiddenMessage.remove();
+        renderedIds.delete(String(data.id));
       }
-    };
-  }
-
-  // Habilitar UI y sincronización desde el segundo 0 (sin esperar timeout de Nginx)
-  setConnectedUI();
-  startFallbackPolling();
-  connectWebSocket();
-
-  async function enviarMensajeChat(event) {
-    if (event) event.preventDefault();
-    const msg = input.value.trim();
-    if (!msg) return;
-
-    const msgId = "msg-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
-    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    // Pintar en pantalla inmediatamente (0ms)
-    renderMessage({
-      id: msgId,
-      type: "chat_message",
-      username: currentUsername,
-      message: msg,
-      time: nowStr
-    });
-    input.value = "";
-    input.focus();
-
-    try {
-      const csrfInput = form.querySelector("[name=csrfmiddlewaretoken]");
-      const csrfToken = csrfInput ? csrfInput.value : "";
-      const response = await fetch(form.action, {
-        method: "POST",
-        headers: {
-          "X-CSRFToken": csrfToken,
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: new URLSearchParams({ message: msg, id: msgId })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data && data.item) {
-          renderMessage(data.item);
-        }
+      return;
+    }
+    if (data.type !== (supportChannel ? 'support_message' : 'chat_message')) return;
+    if (renderedIds.has(String(data.id))) {
+      updateMessage(data);
+      return;
+    }
+    renderedIds.add(String(data.id));
+    const emptyMessage = document.getElementById('empty-messages');
+    if (emptyMessage) emptyMessage.remove();
+    const emptySelection = document.getElementById('empty-selection');
+    if (emptySelection) emptySelection.classList.add('hidden');
+    const ownMessage = String(data.sender_id) === alignmentUserId;
+    const li = document.createElement('li');
+    li.dataset.msgId = String(data.id);
+    li.className = 'flex ' + (ownMessage ? 'justify-start' : 'justify-end');
+    const bubble = document.createElement('div');
+    bubble.className = 'max-w-[88%] sm:max-w-[72%] px-3.5 py-2.5 shadow-sm ' +
+      (ownMessage ? 'chat-message-own bg-[#C41230] text-white' : 'chat-message-other bg-white text-slate-800 border border-slate-200/80');
+    if (readOnly || supportChannel) {
+      const sender = document.createElement('div');
+      sender.className = 'mb-1 text-[10px] font-extrabold ' + (ownMessage ? 'text-white/80' : 'text-[#C41230]');
+      sender.textContent = data.username || 'Usuario';
+      bubble.appendChild(sender);
+    }
+    const body = document.createElement('p');
+    body.className = 'message-body whitespace-pre-wrap break-words text-[12px] leading-relaxed';
+    body.textContent = data.message || '';
+    bubble.appendChild(body);
+    if (data.editado) {
+      const edited = document.createElement('span');
+      edited.className = 'message-edited text-[9px] opacity-70';
+      edited.textContent = '(editado)';
+      bubble.appendChild(edited);
+    }
+    if (!supportChannel && !readOnly && !data.eliminado) {
+      const actions = document.createElement('div');
+      actions.className = 'mt-1 flex flex-wrap justify-end gap-1';
+      if (String(data.sender_id) === currentUserId) {
+        actions.append(
+          messageActionButton('edit', 'Editar'),
+          messageActionButton('delete_everyone', 'Eliminar para todos')
+        );
       }
-    } catch (err) {
-      console.error("Error al enviar", err);
+      actions.appendChild(messageActionButton('delete_me', 'Eliminar para mí'));
+      bubble.appendChild(actions);
+    }
+    const meta = document.createElement('div');
+    meta.className = 'mt-1 flex items-center justify-end gap-1 text-[9px] ' +
+      (ownMessage ? 'text-white/70' : 'text-slate-400');
+    const time = document.createElement('time');
+    time.textContent = data.time || '';
+    meta.appendChild(time);
+    if (String(data.sender_id) === currentUserId) {
+      const checks = document.createElement('span');
+      checks.className = 'font-bold';
+      checks.textContent = '✓✓';
+      meta.appendChild(checks);
+    }
+    bubble.appendChild(meta);
+    li.appendChild(bubble);
+    messagesList.appendChild(li);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    if (!supportChannel && String(data.recipient_id) === currentUserId && !readOnly && document.visibilityState === 'visible') {
+      markConversationRead().catch((error) => console.error(error));
     }
   }
 
-  form.addEventListener("submit", enviarMensajeChat);
-
-  function escapeHTML(str) {
-    const p = document.createElement('p');
-    p.textContent = str;
-    return p.innerHTML;
+  function messageActionButton(action, label) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.messageAction = action;
+    button.className = 'rounded-md px-1.5 py-0.5 text-[9px] opacity-75 hover:opacity-100 hover:bg-black/10';
+    button.textContent = label;
+    return button;
   }
+
+  function updateMessage(data) {
+    const item = messagesList.querySelector('[data-msg-id="' + String(data.id) + '"]');
+    if (!item) return;
+    const body = item.querySelector('.message-body');
+    if (body && typeof data.message === 'string') body.textContent = data.message;
+    let edited = item.querySelector('.message-edited');
+    if (data.editado && !edited && body) {
+      edited = document.createElement('span');
+      edited.className = 'message-edited text-[9px] opacity-70';
+      edited.textContent = '(editado)';
+      body.insertAdjacentElement('afterend', edited);
+    }
+    if (data.eliminado) {
+      const actions = item.querySelector('[data-message-action]');
+      if (actions) actions.parentElement.remove();
+    }
+  }
+
+  async function postChatAction(url, values) {
+    const csrfInput = document.querySelector('#chat-actions-csrf [name=csrfmiddlewaretoken]');
+    if (!csrfInput) throw new Error('No se pudo validar la solicitud. Recarga la página.');
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfInput.value,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: new URLSearchParams(values)
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || 'No se pudo completar la acción.');
+    return payload;
+  }
+
+  function unreadBadge(count) {
+    const badge = document.createElement('span');
+    badge.className = 'min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-[10px] font-extrabold flex items-center justify-center';
+    badge.textContent = count > 99 ? '99+' : String(count);
+    badge.setAttribute('aria-label', count + ' mensajes sin leer');
+    return badge;
+  }
+
+  function contactCard(contact) {
+    const item = document.createElement('li');
+    item.className = 'flex items-center gap-1';
+    const link = document.createElement('a');
+    const targetUrl = new URL(window.location.href);
+    targetUrl.search = '';
+    targetUrl.searchParams.set('contact', contact.id);
+    if (widgetMode) targetUrl.searchParams.set('widget', '1');
+    link.href = targetUrl.toString();
+    link.className = 'group flex items-center gap-3 rounded-2xl px-3 py-3 transition-colors hover:bg-slate-50 ' +
+      (String(contact.id) === activeContactId ? 'bg-red-50 hover:bg-red-50 ring-1 ring-red-100' : '');
+    const fullName = [contact.nombre, contact.apellido].filter(Boolean).join(' ') || 'Contacto';
+    link.setAttribute('aria-label', 'Abrir chat con ' + fullName);
+    const avatar = document.createElement('span');
+    avatar.className = 'relative w-11 h-11 shrink-0 rounded-full bg-gradient-to-br from-rose-100 to-red-200 text-[#9f1239] flex items-center justify-center text-xs font-extrabold';
+    avatar.textContent = fullName.trim().split(/\s+/).slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase();
+    const name = document.createElement('span');
+    name.className = 'min-w-0 flex-1 truncate text-xs font-extrabold text-slate-800 group-hover:text-[#C41230]';
+    name.textContent = contact.display_name || fullName;
+    link.append(avatar, name);
+    if (contact.unread_count > 0) link.appendChild(unreadBadge(contact.unread_count));
+    item.appendChild(link);
+    const options = document.createElement('button');
+    options.type = 'button';
+    options.className = 'shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-[#C41230]';
+    options.dataset.contactId = String(contact.id);
+    options.dataset.contactName = fullName;
+    options.dataset.displayName = contact.display_name || '';
+    options.setAttribute('aria-label', 'Opciones para ' + fullName);
+    options.title = 'Cambiar apodo u ocultar chat';
+    options.textContent = '⋯';
+    item.appendChild(options);
+    return item;
+  }
+
+  function globalConversationCard(item) {
+    const listItem = document.createElement('li');
+    const link = document.createElement('a');
+    const targetUrl = new URL(window.location.href);
+    targetUrl.search = '';
+    targetUrl.searchParams.set('chat_id', item.chat_id);
+    if (widgetMode) targetUrl.searchParams.set('widget', '1');
+    link.href = targetUrl.toString();
+    link.className = 'flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-colors hover:bg-slate-50 ' +
+      (item.chat_id === chatId ? 'bg-red-50 ring-1 ring-red-100' : '');
+    const avatar = document.createElement('span');
+    avatar.className = 'w-9 h-9 shrink-0 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center';
+    avatar.innerHTML = '<i data-lucide="messages-square" class="w-4 h-4"></i>';
+    const detail = document.createElement('span');
+    detail.className = 'min-w-0 flex-1';
+    const label = document.createElement('span');
+    label.className = 'block truncate text-[10px] font-extrabold text-slate-800';
+    label.textContent = item.label;
+    const preview = document.createElement('span');
+    preview.className = 'block truncate text-[10px] text-slate-500';
+    preview.textContent = (item.last_sender ? item.last_sender + ': ' : '') + (item.last_message || '');
+    detail.append(label, preview);
+    link.append(avatar, detail);
+    if (item.unread_count > 0) link.appendChild(unreadBadge(item.unread_count));
+    listItem.appendChild(link);
+    return listItem;
+  }
+
+  function supportChannelCard() {
+    const item = document.createElement('li');
+    const link = document.createElement('a');
+    const targetUrl = new URL(window.location.href);
+    targetUrl.search = '';
+    targetUrl.searchParams.set('support', '1');
+    if (widgetMode) targetUrl.searchParams.set('widget', '1');
+    link.href = targetUrl.toString();
+    link.className = 'group flex items-center gap-3 rounded-2xl px-3 py-3 transition-colors hover:bg-amber-50 ' +
+      (supportChannel ? 'bg-amber-50 ring-1 ring-amber-200' : '');
+    const avatar = document.createElement('span');
+    avatar.className = 'w-11 h-11 shrink-0 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center';
+    avatar.innerHTML = '<i data-lucide="life-buoy" class="w-5 h-5"></i>';
+    const detail = document.createElement('span');
+    detail.className = 'min-w-0 flex-1';
+    const name = document.createElement('span');
+    name.className = 'block truncate text-xs font-extrabold text-slate-800 group-hover:text-amber-800';
+    name.textContent = 'Soporte Técnico';
+    const subtitle = document.createElement('span');
+    subtitle.className = 'block truncate text-[10px] text-slate-500';
+    subtitle.textContent = 'Canal compartido · todas las delegaciones';
+    detail.append(name, subtitle);
+    link.append(avatar, detail);
+    item.appendChild(link);
+    return item;
+  }
+
+  function updateFilterCount() {
+    const advancedCount = Array.from(advancedFilters.querySelectorAll('input')).filter((item) => item.value.trim()).length;
+    filterBadge.textContent = String(advancedCount);
+    filterBadge.classList.toggle('hidden', advancedCount === 0);
+    filterBadge.classList.toggle('inline-flex', advancedCount > 0);
+  }
+
+  async function loadContacts() {
+    const params = new URLSearchParams(new FormData(filters));
+    updateFilterCount();
+    try {
+      const response = await fetch('{{ chat_contacts_url }}?' + params.toString(), {
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+      });
+      if (!response.ok) throw new Error('No fue posible cargar los contactos.');
+      const payload = await response.json();
+      contactsList.replaceChildren(supportChannelCard(), ...payload.contacts.map(contactCard));
+      const visibleCount = payload.contacts.length + 1;
+      contactsCount.textContent = visibleCount + (visibleCount === 1 ? ' canal/contacto' : ' canales/contactos');
+      contactsEmpty.classList.add('hidden');
+      if (globalConversationsList) {
+        globalConversationsList.replaceChildren(...payload.conversations.map(globalConversationCard));
+        globalConversationsCount.textContent = payload.conversations.length + (payload.conversations.length === 1 ? ' chat' : ' chats');
+        globalConversationsEmpty.classList.toggle('hidden', payload.conversations.length > 0);
+      }
+      if (window.lucide) lucide.createIcons();
+    } catch (error) {
+      contactsList.replaceChildren();
+      contactsCount.textContent = '—';
+      contactsEmpty.classList.remove('hidden');
+      contactsEmpty.querySelector('p:last-child').textContent = error.message;
+    }
+  }
+
+  async function pollMessages() {
+    if (!chatId) return;
+    try {
+      const messagesUrl = supportChannel
+        ? supportMessagesUrl + '?q=' + encodeURIComponent(document.getElementById('support-search').value.trim())
+        : '{% url "websocket:messages" %}?chat_id=' + encodeURIComponent(chatId);
+      const response = await fetch(messagesUrl, {
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+      });
+      if (!response.ok) throw new Error('No fue posible actualizar los mensajes.');
+      const payload = await response.json();
+      if (supportChannel && renderedSupportQuery !== document.getElementById('support-search').value.trim()) {
+        messagesList.replaceChildren();
+        renderedIds.clear();
+        renderedSupportQuery = document.getElementById('support-search').value.trim();
+      }
+      if (supportChannel && !payload.messages.length && !messagesList.children.length) {
+        const empty = document.createElement('li');
+        empty.className = 'py-12 text-center text-xs text-slate-500';
+        empty.textContent = renderedSupportQuery
+          ? 'No hay mensajes que coincidan con la búsqueda.'
+          : 'Aún no hay reportes en este canal.';
+        messagesList.appendChild(empty);
+      }
+      payload.messages.forEach(renderMessage);
+    } catch (error) {
+      setConnectionState(false);
+    }
+  }
+
+  function connectSocket() {
+    if (!chatId || socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+    const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const socketUrl = supportChannel
+      ? scheme + '//' + location.host + '/ws/chat/support/'
+      : scheme + '//' + location.host + '/ws/chat/?chat_id=' + encodeURIComponent(chatId);
+    socket = new WebSocket(socketUrl);
+    socket.onopen = function() {
+      setConnectionState(true);
+      pollMessages();
+    };
+    socket.onmessage = function(event) {
+      try {
+        const payload = JSON.parse(event.data);
+        if (supportChannel && document.getElementById('support-search').value.trim()) {
+          pollMessages();
+        } else {
+          renderMessage(payload);
+        }
+      } catch (error) {
+        console.error('Respuesta de chat inválida', error);
+      }
+    };
+    socket.onclose = function() {
+      if (!chatId) return;
+      setConnectionState(false);
+      if (!pollTimer) pollTimer = setInterval(pollMessages, 4000);
+      retryTimer = setTimeout(connectSocket, 4000);
+    };
+    socket.onerror = function() {
+      setConnectionState(false);
+    };
+  }
+
+  document.getElementById('toggle-filters').addEventListener('click', function() {
+    const opening = advancedFilters.classList.contains('hidden');
+    advancedFilters.classList.toggle('hidden', !opening);
+    this.setAttribute('aria-expanded', String(opening));
+  });
+  document.getElementById('clear-filters').addEventListener('click', function() {
+    filters.querySelectorAll('input').forEach((item) => { item.value = ''; });
+    loadContacts();
+  });
+  filters.addEventListener('input', function() {
+    clearTimeout(contactTimer);
+    contactTimer = setTimeout(loadContacts, 250);
+  });
+  if (supportChannel) {
+    const searchForm = document.getElementById('support-search-form');
+    const searchInput = document.getElementById('support-search');
+    searchForm.addEventListener('submit', function(event) {
+      event.preventDefault();
+      pollMessages();
+    });
+    searchInput.addEventListener('input', function() {
+      clearTimeout(supportSearchTimer);
+      supportSearchTimer = setTimeout(pollMessages, 250);
+    });
+  }
+  contactsList.addEventListener('click', async function(event) {
+    const button = event.target.closest('button[data-contact-id]');
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const newName = window.prompt(
+      'Escribe un apodo para ' + button.dataset.contactName +
+      '. Deja vacío para quitar el apodo o pulsa Cancelar para ocultar el chat.',
+      button.dataset.displayName
+    );
+    const endpoint = contactPreferenceUrl.replace('/0/preference/', '/' + button.dataset.contactId + '/preference/');
+    try {
+      if (newName === null) {
+        if (!window.confirm('¿Ocultar este chat de tu lista? Volverá a aparecer al recibir un mensaje nuevo.')) return;
+        await postChatAction(endpoint, {action: 'hide'});
+      } else {
+        await postChatAction(endpoint, {action: 'rename', display_name: newName});
+      }
+      loadContacts();
+    } catch (error) {
+      window.alert(error.message);
+    }
+  });
+  messagesList.addEventListener('click', async function(event) {
+    const button = event.target.closest('button[data-message-action]');
+    if (!button) return;
+    const messageElement = button.closest('[data-msg-id]');
+    if (!messageElement) return;
+    const messageId = messageElement.dataset.msgId;
+    const action = button.dataset.messageAction;
+    let message = '';
+    if (action === 'edit') {
+      const body = messageElement.querySelector('.message-body');
+      message = window.prompt('Edita tu mensaje (máximo 300 caracteres):', body ? body.textContent : '');
+      if (message === null) return;
+      message = message.trim();
+      if (!message || message.length > 300) {
+        window.alert('El mensaje debe tener entre 1 y 300 caracteres.');
+        return;
+      }
+    } else if (action === 'delete_everyone' &&
+      !window.confirm('¿Eliminar este mensaje para ambos participantes?')) {
+      return;
+    } else if (action === 'delete_me' &&
+      !window.confirm('¿Eliminar este mensaje solo de tu vista?')) {
+      return;
+    }
+    try {
+      const payload = await postChatAction(messageActionUrl, {
+        chat_id: chatId,
+        message_id: messageId,
+        action: action,
+        message: message
+      });
+      if (payload.item.type === 'chat_message_hidden') {
+        messageElement.remove();
+        renderedIds.delete(messageId);
+      } else {
+        updateMessage(payload.item);
+      }
+    } catch (error) {
+      errorBox.textContent = error.message;
+      errorBox.classList.remove('hidden');
+    }
+  });
+  const actionToggle = document.getElementById('chat-actions-toggle');
+  const actionMenu = document.getElementById('chat-actions-menu');
+  function closeActionMenu() {
+    actionMenu.classList.add('hidden');
+    actionToggle.setAttribute('aria-expanded', 'false');
+  }
+  actionToggle.addEventListener('click', function() {
+    const opening = actionMenu.classList.contains('hidden');
+    actionMenu.classList.toggle('hidden', !opening);
+    actionToggle.setAttribute('aria-expanded', String(opening));
+  });
+  document.addEventListener('click', function(event) {
+    if (!actionMenu.contains(event.target) && !actionToggle.contains(event.target)) closeActionMenu();
+  });
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') closeActionMenu();
+  });
+  document.getElementById('action-latest').addEventListener('click', function() {
+    messagesContainer.scrollTo({top: messagesContainer.scrollHeight, behavior: 'smooth'});
+    closeActionMenu();
+  });
+  document.getElementById('action-refresh').addEventListener('click', function() {
+    pollMessages();
+    loadContacts();
+    closeActionMenu();
+  });
+  document.getElementById('action-copy-link').addEventListener('click', async function() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      showLocalNotice('Enlace al chat copiado.');
+    } catch (error) {
+      showLocalNotice('No se pudo copiar. Usa el enlace de la barra del navegador.');
+    }
+    closeActionMenu();
+  });
+  if (form) {
+    form.addEventListener('submit', async function(event) {
+      event.preventDefault();
+      const message = input.value.trim();
+      if (!message) return;
+      sendButton.disabled = true;
+      errorBox.classList.add('hidden');
+      const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrf,
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: new URLSearchParams({message: message, chat_id: chatId})
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'No se pudo enviar el mensaje.');
+        input.value = '';
+        input.style.height = 'auto';
+        renderMessage(payload.item);
+        input.focus();
+        loadContacts();
+      } catch (error) {
+        errorBox.textContent = error.message;
+        errorBox.classList.remove('hidden');
+      } finally {
+        sendButton.disabled = false;
+      }
+    });
+    input.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 112) + 'px';
+    });
+    input.addEventListener('keydown', function(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        form.requestSubmit();
+      }
+    });
+  }
+
+  window.addEventListener('chat-notification', function(event) {
+    const payload = event.detail || {};
+    loadContacts();
+    if (payload.chat_id === chatId) pollMessages();
+  });
+  if (chatId && !readOnly && !supportChannel) markConversationRead().catch((error) => console.error(error));
+  loadContacts();
+  contactTimer = setInterval(loadContacts, 15000);
+  if (chatId) {
+    pollTimer = setInterval(pollMessages, 4000);
+    connectSocket();
+  }
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  window.addEventListener('beforeunload', function() {
+    clearInterval(pollTimer);
+    clearInterval(contactTimer);
+    clearTimeout(retryTimer);
+    if (socket) socket.close();
+  });
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible' && chatId) {
+      pollMessages();
+      if (!readOnly && !supportChannel) markConversationRead().catch((error) => console.error(error));
+    }
+  });
 });
 </script>
 {% endblock %}
-

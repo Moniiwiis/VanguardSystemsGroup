@@ -98,74 +98,121 @@ class ModuleChangeConsumer(JsonWebsocketConsumer):
 
 
 class ChatConsumer(JsonWebsocketConsumer):
-    """
-    Consumer para canal de chat colaborativo municipal en tiempo real.
-    Implementación fiel a la Guía de Clase 11 (Tiempo Real con Django Channels).
-    """
     def connect(self):
         user = self.scope.get("user")
         if not user or not user.is_authenticated:
             self.close()
             return
 
+        from .services import resolve_chat_room
+        query_string = self.scope.get('query_string', b'').decode('utf-8')
+        from urllib.parse import parse_qs
+        query = parse_qs(query_string)
+        requested_chat_id = query.get('chat_id', query.get('conversation', ['']))[0]
+        self.chat_id = resolve_chat_room(user, requested_chat_id)
+        if not self.chat_id:
+            self.close()
+            return
+
+        self.group_name = f"chat_room_{self.chat_id}"
+        async_to_sync(self.channel_layer.group_add)(self.group_name, self.channel_name)
+        self.accept()
+
+    def disconnect(self, close_code):
+        if hasattr(self, 'group_name'):
+            async_to_sync(self.channel_layer.group_discard)(self.group_name, self.channel_name)
+
+    def receive_json(self, content):
+        if not isinstance(content, dict):
+            return
+        message = content.get('message', '')
+        if not isinstance(message, str):
+            return
+        message = message.strip()
+        if not 1 <= len(message) <= 300:
+            return
+
+        from .services import publish_chat_message
         try:
-            func = getattr(user, 'funcionario', None)
-            if func:
-                from accounts.models import FuncionarioRol
-                f_rol = FuncionarioRol.objects.filter(funcionario=func).select_related('rol').first()
-                if f_rol and f_rol.rol and 'cliente' in f_rol.rol.nombre_rol.lower():
-                    self.close()
-                    return
-            if func and func.delegacion_id:
-                self.org_id = str(func.delegacion_id)
-            else:
-                self.org_id = "global"
-        except (ObjectDoesNotExist, AttributeError):
-            self.org_id = "global"
+            publish_chat_message(
+                self.scope['user'],
+                self.chat_id,
+                message,
+            )
+        except PermissionError:
+            self.send_json({
+                'type': 'chat_error',
+                'message': 'No tienes permiso para enviar mensajes en esta conversación.',
+            })
 
-        self.group_name = f"chat_org_{self.org_id}"
+    def chat_event(self, event):
+        self.send_json(event["payload"])
 
+
+class TechnicalSupportConsumer(JsonWebsocketConsumer):
+    group_name = 'technical_support_room'
+
+    def connect(self):
+        user = self.scope.get('user')
+        from .services import can_access_support_channel
+        if not user or not user.is_authenticated or not can_access_support_channel(user):
+            self.close()
+            return
         async_to_sync(self.channel_layer.group_add)(
             self.group_name,
-            self.channel_name
-        )
-        async_to_sync(self.channel_layer.group_add)(
-            "chat_org_all",
-            self.channel_name
+            self.channel_name,
         )
         self.accept()
 
     def disconnect(self, close_code):
-        if hasattr(self, "group_name"):
+        if hasattr(self, 'channel_name'):
             async_to_sync(self.channel_layer.group_discard)(
                 self.group_name,
-                self.channel_name
+                self.channel_name,
             )
-        async_to_sync(self.channel_layer.group_discard)(
-            "chat_org_all",
-            self.channel_name
-        )
 
     def receive_json(self, content):
-        mensaje = content.get("mensaje", "")
-        if not isinstance(mensaje, str):
+        if not isinstance(content, dict):
             return
-        mensaje = mensaje.strip()
-        if not mensaje or len(mensaje) > 500:
+        message = content.get('message', '')
+        if not isinstance(message, str) or not 1 <= len(message.strip()) <= 300:
+            self.send_json({
+                'type': 'support_error',
+                'message': 'El mensaje debe tener entre 1 y 300 caracteres.',
+            })
+            return
+        from .services import publish_support_message
+        try:
+            publish_support_message(self.scope['user'], message)
+        except PermissionError:
+            self.send_json({
+                'type': 'support_error',
+                'message': 'No tienes permiso para usar Soporte Técnico.',
+            })
+
+    def support_event(self, event):
+        self.send_json(event['payload'])
+
+
+class ChatNotificationsConsumer(JsonWebsocketConsumer):
+    def connect(self):
+        user = self.scope.get("user")
+        if not user or not user.is_authenticated:
+            self.close()
             return
 
-        async_to_sync(self.channel_layer.group_send)(
-            self.group_name,
-            {
-                "type": "chat_event",
-                "payload": {
-                    "type": "chat_message",
-                    "mensaje": mensaje,
-                    "usuario": self.scope["user"].get_full_name() or self.scope["user"].username
-                }
-            }
-        )
+        from .services import get_chat_access
+        self.notification_groups = [f"chat_notifications_user_{user.pk}"]
+        if get_chat_access(user)['es_global']:
+            self.notification_groups.append("chat_notifications_global")
+        for group in self.notification_groups:
+            async_to_sync(self.channel_layer.group_add)(group, self.channel_name)
+        self.accept()
 
-    def chat_event(self, event):
+    def disconnect(self, close_code):
+        for group in getattr(self, 'notification_groups', []):
+            async_to_sync(self.channel_layer.group_discard)(group, self.channel_name)
+
+    def chat_notification(self, event):
         self.send_json(event["payload"])
 
