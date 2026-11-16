@@ -1889,3 +1889,86 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             resp_xlsx['Content-Disposition'],
             f'attachment; filename="Vecinos_{hoy_str}.xlsx"',
         )
+
+    def test_organizaciones_delegacion_bloqueada_sectores_fecha_y_boton_metas_eliminado(self):
+        from django.utils import timezone
+        admin = User.objects.create_superuser('admin_org_guard', 'aog@example.test', 'Admin123!')
+        self.client.force_login(admin)
+
+        # 1. En Ítems y Períodos, el botón duplicado "+ Agregar fecha de medición" fue eliminado
+        resp_per_tab = self.client.get(reverse('gestion_metas') + '?tab=periodos')
+        self.assertContains(resp_per_tab, 'Nueva Fecha de Medición')
+        self.assertNotContains(resp_per_tab, 'Agregar fecha de medición')
+
+        del_otra = Delegacion.objects.create(codigo='DEL-OT', nombre='Delegación Sur Test', estado='Activa')
+        sec_principal = Sector.objects.create(nombre='Sector Principal', delegacion=self.delegacion, estado='Activo')
+        sec_otra = Sector.objects.create(nombre='Sector Sur Oculto', delegacion=del_otra, estado='Activo')
+
+        hoy = timezone.localdate()
+        ayer = hoy - datetime.timedelta(days=1)
+        futuro = hoy + datetime.timedelta(days=5)
+
+        # 2. En modo Global (sin delegación activa) NO se permite crear organización
+        resp_org_global = self.client.get(reverse('gestion_organizaciones'))
+        self.assertContains(resp_org_global, 'Nueva Organización (Elige Delegación)')
+        self.assertNotContains(resp_org_global, 'onclick="abrirModalCrearOrg()"')
+        self.assertEqual(resp_org_global.context['sectores'].count(), 0)
+
+        antes = OrganizacionComunitaria.objects.count()
+        self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'Org Sin Delegacion Activa',
+            'delegacion_id': self.delegacion.id,
+        })
+        self.assertEqual(OrganizacionComunitaria.objects.count(), antes)
+
+        # 3. Con delegación activa: delegación bloqueada, sectores solo de delegación activa y fecha inscripción >= hoy
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        resp_org_activa = self.client.get(reverse('gestion_organizaciones'))
+        self.assertContains(resp_org_activa, 'onclick="abrirModalCrearOrg()"')
+        sectores_ids = set(resp_org_activa.context['sectores'].values_list('id', flat=True))
+        self.assertIn(sec_principal.id, sectores_ids)
+        self.assertNotIn(sec_otra.id, sectores_ids)
+
+        # Rechazar fecha de inscripción anterior a hoy
+        self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'Org Fecha Pasada',
+            'delegacion_id': del_otra.id,
+            'fecha_inscripcion_registro': ayer.isoformat(),
+        })
+        self.assertFalse(OrganizacionComunitaria.objects.filter(nombre='Org Fecha Pasada').exists())
+
+        # Crear con fecha válida usa obligatoriamente la delegación activa (ignora delegacion_id manipulada)
+        self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'Org Delegacion Bloqueada',
+            'delegacion_id': del_otra.id,
+            'sector_id': sec_principal.id,
+            'fecha_inscripcion_registro': futuro.isoformat(),
+        })
+        org = OrganizacionComunitaria.objects.get(nombre='Org Delegacion Bloqueada')
+        self.assertEqual(org.delegacion_id, self.delegacion.id)
+        self.assertEqual(org.sector_id, sec_principal.id)
+        self.assertEqual(org.fecha_inscripcion_registro, futuro)
+
+        # Al editar no puede cambiar delegación ni asignar fecha de inscripción pasada
+        self.client.post(reverse('gestion_organizaciones_editar', args=[org.id]), {
+            'nombre': 'Org Delegacion Bloqueada Edit',
+            'delegacion_id': del_otra.id,
+            'fecha_inscripcion_registro': ayer.isoformat(),
+        })
+        org.refresh_from_db()
+        self.assertEqual(org.nombre, 'Org Delegacion Bloqueada')
+        self.assertEqual(org.delegacion_id, self.delegacion.id)
+        self.assertEqual(org.fecha_inscripcion_registro, futuro)
+
+        self.client.post(reverse('gestion_organizaciones_editar', args=[org.id]), {
+            'nombre': 'Org Delegacion Bloqueada Edit',
+            'delegacion_id': del_otra.id,
+            'fecha_inscripcion_registro': hoy.isoformat(),
+        })
+        org.refresh_from_db()
+        self.assertEqual(org.nombre, 'Org Delegacion Bloqueada Edit')
+        self.assertEqual(org.delegacion_id, self.delegacion.id)
+        self.assertEqual(org.fecha_inscripcion_registro, hoy)

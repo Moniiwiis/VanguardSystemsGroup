@@ -34,17 +34,17 @@
       </a>
 
       {% if not permisos.es_consultor %}
-        {% if not es_admin or delegacion_activa or delegacion_seleccionada %}
+        {% if delegacion_activa %}
           <button type="button" onclick="abrirModalCrearOrg()"
                   class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
             <i data-lucide="plus-circle" class="w-4 h-4"></i>
             <span>Nueva Organización</span>
           </button>
         {% else %}
-          <button type="button" onclick="abrirModalCrearOrg()"
-                  class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">
+          <button type="button" disabled title="Selecciona una delegación activa para registrar una nueva organización"
+                  class="px-5 py-2.5 bg-slate-100 text-slate-400 border border-slate-200 text-xs font-bold rounded-2xl cursor-not-allowed flex items-center gap-2">
             <i data-lucide="plus-circle" class="w-4 h-4"></i>
-            <span>Nueva Organización</span>
+            <span>Nueva Organización (Elige Delegación)</span>
           </button>
         {% endif %}
       {% endif %}
@@ -499,19 +499,18 @@
         </div>
 
         <div class="space-y-1">
-          <label class="block text-xs font-bold text-slate-700">Territ. Deleg. (Delegación)</label>
-          <select name="delegacion_id" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-            {% for d in delegaciones %}
-              <option value="{{ d.id }}" {% if delegacion_activa and delegacion_activa.id == d.id %}selected{% elif delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>{{ d.nombre }}</option>
-            {% endfor %}
-          </select>
+          <label class="block text-xs font-bold text-slate-700">Territ. Deleg. (Delegación Activa)</label>
+          <input type="text" readonly disabled
+                 value="{% if delegacion_activa %}{{ delegacion_activa.nombre }}{% else %}Sin delegación activa{% endif %}"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 text-xs font-bold cursor-not-allowed" />
+          <input type="hidden" name="delegacion_id" value="{% if delegacion_activa %}{{ delegacion_activa.id }}{% endif %}" />
         </div>
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Sector / Territorio</label>
           <select name="sector_id" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
             <option value="">General de la delegación</option>
             {% for s in sectores %}
-              <option value="{{ s.id }}">{{ s.nombre }}{% if es_admin and not delegacion_activa %} ({{ s.delegacion.nombre }}){% endif %}</option>
+              <option value="{{ s.id }}">{{ s.nombre }}</option>
             {% endfor %}
           </select>
         </div>
@@ -528,7 +527,7 @@
         </div>
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Fecha Inscripc en Reg.</label>
-          <input type="date" name="fecha_inscripcion_registro"
+          <input type="date" name="fecha_inscripcion_registro" min="{{ hoy_iso }}"
                  class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div class="space-y-1">
@@ -691,18 +690,16 @@
 
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Territ. Deleg. (Delegación)</label>
-          <select id="edit-org-del" name="delegacion_id" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-            {% for d in delegaciones %}
-              <option value="{{ d.id }}">{{ d.nombre }}</option>
-            {% endfor %}
-          </select>
+          <input type="text" id="edit-org-del-nombre" readonly disabled
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 text-xs font-bold cursor-not-allowed" />
+          <input type="hidden" id="edit-org-del" name="delegacion_id" value="" />
         </div>
         <div class="space-y-1">
           <label class="block text-xs font-bold text-slate-700">Sector / Territorio</label>
           <select id="edit-org-sector" name="sector_id" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#C41230] focus:outline-none">
             <option value="">General de la delegación</option>
             {% for s in sectores %}
-              <option value="{{ s.id }}">{{ s.nombre }}{% if es_admin and not delegacion_activa %} ({{ s.delegacion.nombre }}){% endif %}</option>
+              <option value="{{ s.id }}">{{ s.nombre }}</option>
             {% endfor %}
           </select>
         </div>
@@ -845,13 +842,42 @@
 
 {% block extra_js %}
 <script>
+  const ORG_HOY_ISO = "{{ hoy_iso }}";
+  const ORG_TIENE_DEL_ACTIVA = {{ delegacion_activa|yesno:"true,false" }};
+
   function abrirModalCrearOrg() {
     document.getElementById('modal-crear-org').classList.remove('hidden');
   }
 
+  function cargarSectoresOrgEdit(delId, selectedSectorId) {
+    const sel = document.getElementById('edit-org-sector');
+    if (!sel) return;
+    if (ORG_TIENE_DEL_ACTIVA || !delId) {
+      sel.value = selectedSectorId || '';
+      return;
+    }
+    sel.innerHTML = '<option value="">General de la delegación</option>';
+    fetch(`/api/sectores/${delId}/`)
+      .then(r => r.json())
+      .then(data => {
+        (data.sectores || []).forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.nombre;
+          sel.appendChild(opt);
+        });
+        sel.value = selectedSectorId || '';
+      })
+      .catch(() => {
+        sel.value = selectedSectorId || '';
+      });
+  }
+
   function abrirModalEditarOrgBtn(btn) {
     const d = btn.dataset;
-    document.getElementById('form-editar-org').action = `/gestion/organizaciones/${d.id}/editar/`;
+    const formEdit = document.getElementById('form-editar-org');
+    formEdit.action = `/gestion/organizaciones/${d.id}/editar/`;
+    formEdit.dataset.origFinsc = d.finscIso || '';
     document.getElementById('edit-org-nombre').value = d.nombre || '';
     document.getElementById('edit-org-tipo').value = d.tipo || 'Junta de Vecinos';
     document.getElementById('edit-org-domicilio').value = d.domicilio || '';
@@ -876,10 +902,30 @@
     document.getElementById('edit-org-sec-nombre').value = d.secNombre || '';
     document.getElementById('edit-org-sec-rut').value = d.secRut || '';
     document.getElementById('edit-org-sec-correo').value = d.secCorreo || '';
-    if (d.delId) document.getElementById('edit-org-del').value = d.delId;
-    document.getElementById('edit-org-sector').value = d.sectorId || '';
+    document.getElementById('edit-org-del').value = d.delId || '';
+    document.getElementById('edit-org-del-nombre').value = d.delegacion || 'Sin delegación';
+    cargarSectoresOrgEdit(d.delId, d.sectorId);
     document.getElementById('modal-editar-org').classList.remove('hidden');
   }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const formEdit = document.getElementById('form-editar-org');
+    if (formEdit) {
+      formEdit.addEventListener('submit', (ev) => {
+        const val = document.getElementById('edit-org-finsc').value;
+        const orig = formEdit.dataset.origFinsc || '';
+        if (val && val !== orig && val < ORG_HOY_ISO) {
+          ev.preventDefault();
+          Swal.fire({
+            icon: 'error',
+            title: 'Fecha inválida',
+            text: 'La fecha de inscripción en registro no puede ser anterior a la fecha actual.',
+            confirmButtonColor: '#C41230',
+          });
+        }
+      });
+    }
+  });
 
   function verDetalleOrgBtn(btn) {
     const d = btn.dataset;

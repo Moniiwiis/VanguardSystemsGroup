@@ -4205,16 +4205,11 @@ def gestion_organizaciones(request):
         reg_dir = request.POST.get('registro_directiva_numero', '').strip()
         estado = request.POST.get('estado', 'Activa')
 
-        # Determinar delegación a usar
-        del_a_usar = del_activa
-        if es_admin and delegacion_id_post and delegacion_id_post.isdigit():
-            del_tmp = Delegacion.objects.filter(id=int(delegacion_id_post), estado='Activa').first()
-            if del_tmp:
-                del_a_usar = del_tmp
-
-        if not del_a_usar:
+        # Determinar delegación a usar: obligatoriamente la delegación activa (sin cambio manual)
+        if not del_activa:
             messages.error(request, "Selecciona una delegación activa antes de registrar una organización.")
             return redirect('gestion_organizaciones')
+        del_a_usar = del_activa
 
         if not nombre:
             messages.error(request, "El nombre de la organización es obligatorio.")
@@ -4282,7 +4277,11 @@ def gestion_organizaciones(request):
             try:
                 fecha_inscripcion_val = datetime.date.fromisoformat(f_insc)
             except ValueError:
-                pass
+                messages.error(request, "La fecha de inscripción en registro no tiene un formato válido.")
+                return redirect('gestion_organizaciones')
+            if fecha_inscripcion_val < timezone.localdate():
+                messages.error(request, "La fecha de inscripción en registro no puede ser anterior a la fecha actual.")
+                return redirect('gestion_organizaciones')
 
         if not domicilio and direccion_sede:
             domicilio = direccion_sede
@@ -4433,12 +4432,7 @@ def gestion_organizaciones(request):
     total_organizaciones = qs.count()
     page_obj = Paginator(qs, page_size).get_page(request.GET.get('page', 1))
 
-    if del_activa:
-        sectores_org = Sector.objects.filter(delegacion=del_activa, estado='Activo').order_by('nombre')
-    elif delegacion_seleccionada:
-        sectores_org = Sector.objects.filter(delegacion=delegacion_seleccionada, estado='Activo').order_by('nombre')
-    else:
-        sectores_org = Sector.objects.none()
+    sectores_org = Sector.objects.filter(delegacion=del_activa, estado='Activo').order_by('nombre') if del_activa else Sector.objects.none()
 
     return render(request, 'gestion/organizaciones.html', {
         'organizaciones': page_obj.object_list,
@@ -4448,6 +4442,7 @@ def gestion_organizaciones(request):
         'delegaciones': todas_delegaciones,  # alias para el template
         'delegacion_seleccionada': delegacion_seleccionada,
         'sectores': sectores_org,
+        'hoy_iso': timezone.localdate().isoformat(),
         'es_admin': es_admin,
         'q': q,
         'filtro_tipo': filtro_tipo,
@@ -4480,11 +4475,7 @@ def gestion_organizaciones_editar(request, org_id):
 
     if request.method == 'POST':
         delegacion_anterior = org.delegacion
-        if es_admin:
-            del_id = request.POST.get('delegacion_id', '').strip()
-            del_obj = Delegacion.objects.filter(id=del_id, estado='Activa').first() if del_id else None
-        else:
-            del_obj = del_activa
+        del_obj = org.delegacion or del_activa
 
         sec_id = request.POST.get('sector_id', '').strip()
         sec_obj = Sector.objects.filter(id=sec_id, delegacion=del_obj, estado='Activo').first() if (sec_id and del_obj) else None
@@ -4568,8 +4559,15 @@ def gestion_organizaciones_editar(request, org_id):
 
         f_insc = request.POST.get('fecha_inscripcion_registro', '').strip()
         if f_insc:
-            try: org.fecha_inscripcion_registro = datetime.date.fromisoformat(f_insc)
-            except ValueError: pass
+            try:
+                nueva_f_insc = datetime.date.fromisoformat(f_insc)
+            except ValueError:
+                messages.error(request, "La fecha de inscripción en registro no tiene un formato válido.")
+                return redirect('gestion_organizaciones')
+            if nueva_f_insc != org.fecha_inscripcion_registro and nueva_f_insc < timezone.localdate():
+                messages.error(request, "La fecha de inscripción en registro no puede ser anterior a la fecha actual.")
+                return redirect('gestion_organizaciones')
+            org.fecha_inscripcion_registro = nueva_f_insc
         elif 'fecha_inscripcion_registro' in request.POST:
             org.fecha_inscripcion_registro = None
 
