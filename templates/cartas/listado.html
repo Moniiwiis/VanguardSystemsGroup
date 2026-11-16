@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Tubo de Cartas — Municipalidad de La Serena{% endblock %}
+{% block content %}
+<div class="space-y-6">
+ <div class="bg-white p-6 rounded-3xl border border-red-100 flex justify-between items-center gap-4 flex-wrap">
+  <div><div class="text-xs uppercase tracking-widest font-bold text-slate-500">Oficina de Partes / Matriz SGR</div><h1 class="text-2xl font-extrabold text-[#8B1D19]">Tubo de Seguimiento de Cartas</h1><p class="text-sm text-slate-600 mt-1">Control de cartas, derivaciones, pronunciamientos y estados según hojas TUBO CARTAS y CARTAS.</p></div>
+  {% if puede_editar_cartas %}<a href="{% url 'cartas_nueva' %}" class="px-5 py-3 bg-[#C41230] text-white rounded-xl text-sm font-bold">+ Nueva carta</a>{% endif %}
+ </div>
+ <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+  <div class="bg-white border-l-4 border-slate-700 shadow-sm p-4"><div class="text-xs uppercase font-bold text-slate-500">Total</div><div class="text-3xl font-bold">{{total_cartas}}</div></div>
+  {% for estado,cantidad in totales_cartas.items %}<div class="bg-white border-l-4 {% if estado == 'FINALIZADA' %}border-green-600{% elif estado == 'APROBADA' %}border-blue-600{% elif estado == 'NO APLICA' %}border-slate-400{% else %}border-amber-500{% endif %} shadow-sm p-4"><div class="text-xs uppercase font-bold text-slate-500">{{estado}}</div><div class="text-3xl font-bold">{{cantidad}}</div></div>{% endfor %}
+ </div>
+ <form method="get" class="bg-white border rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+  <div><label class="text-xs font-bold">Buscar carta</label><input name="q" value="{{q_cartas}}" placeholder="Nº, remitente, tema..." class="w-full border rounded-xl px-3 py-2" /></div>
+  <div><label class="text-xs font-bold">Estado</label><select name="estado" class="w-full border rounded-xl px-3 py-2"><option value="">Todos los estados</option>{% for valor,nombre in estados_cartas %}<option value="{{valor}}" {% if estado_filtro == valor %}selected{% endif %}>{{nombre}}</option>{% endfor %}</select></div>
+  {% if permisos.es_admin %}<div><label class="text-xs font-bold">Delegación</label><select name="delegacion" class="w-full border rounded-xl px-3 py-2"><option value="">Todas</option>{% for d in delegaciones_cartas %}<option value="{{d.pk}}" {% if delegacion_filtro == d.pk|stringformat:'s' %}selected{% endif %}>{{d.nombre}}</option>{% endfor %}</select></div>{% endif %}
+  <div class="flex gap-2"><button class="px-4 py-2 bg-slate-800 text-white rounded-xl font-bold text-sm">Filtrar</button><a href="{% url 'cartas_listado' %}" class="px-3 py-2 border rounded-xl text-sm">Limpiar</a></div>
+ </form>
+ <div class="flex justify-end"><a href="?{{query_export}}{% if query_export %}&{% endif %}export=csv" class="px-4 py-2 bg-green-700 text-white rounded-xl text-sm font-bold">Exportar CSV (Excel)</a></div>
+ <div class="bg-white border rounded-2xl overflow-x-auto shadow-sm"><table class="min-w-full text-sm"><thead class="bg-slate-100 text-slate-700"><tr><th class="p-3 text-left">Nº</th><th class="p-3 text-left">Fecha</th><th class="p-3 text-left">Para</th><th class="p-3 text-left">Remite</th><th class="p-3 text-left">Actividad o tema</th><th class="p-3 text-left">Encargado</th><th class="p-3 text-left">Estado</th><th class="p-3 text-left">Derivada a</th><th class="p-3 text-left">Unidad</th><th class="p-3 text-left">Acciones</th></tr></thead><tbody class="divide-y">
+ {% for carta in page_obj %}<tr class="hover:bg-red-50/40"><td class="p-3 font-mono font-bold">{{carta.numero}}</td><td class="p-3 whitespace-nowrap">{{carta.fecha|date:'d/m/Y'}}</td><td class="p-3">{{carta.para}}</td><td class="p-3">{{carta.remite}}</td><td class="p-3 max-w-sm">{{carta.actividad_tema|truncatechars:105}}</td><td class="p-3">{{carta.encargado_seguimiento|default:'—'}}</td><td class="p-3 font-semibold">{{carta.estado}}</td><td class="p-3">{{carta.derivada_a|default:'—'}}</td><td class="p-3">{{carta.unidad|default:'—'}}</td><td class="p-3 whitespace-nowrap text-center">
+   <div class="inline-flex items-center justify-center gap-1">
+    <a href="{% url 'cartas_detalle' carta.pk %}" title="Ver detalle de carta" aria-label="Ver carta Nº {{carta.numero}}" class="p-1.5 rounded-lg text-slate-500 hover:text-[#C41230] hover:bg-red-50 transition-all inline-flex items-center justify-center">
+      <i data-lucide="eye" class="w-4 h-4"></i>
+    </a>
+    {% if puede_editar_cartas %}
+    <a href="{% url 'cartas_editar' carta.pk %}" title="Editar carta" aria-label="Editar carta Nº {{carta.numero}}" class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all inline-flex items-center justify-center">
+      <i data-lucide="edit-3" class="w-4 h-4"></i>
+    </a>
+    {% endif %}
+    {% if puede_eliminar_cartas %}
+    <a href="{% url 'cartas_eliminar' carta.pk %}" title="Eliminar carta" aria-label="Eliminar carta Nº {{carta.numero}}" class="p-1.5 rounded-lg text-slate-500 hover:text-red-700 hover:bg-red-100 transition-all inline-flex items-center justify-center">
+      <i data-lucide="trash-2" class="w-4 h-4"></i>
+    </a>
+    {% endif %}
+   </div>
+  </td></tr>
+ {% empty %}<tr><td colspan="10" class="p-8 text-center text-slate-500">Aún no hay cartas para estos filtros.</td></tr>{% endfor %}
+ </tbody></table></div>
+ <div class="flex justify-between text-sm text-slate-600"><span>Página {{page_obj.number}} de {{page_obj.paginator.num_pages}}</span><div class="flex gap-3">{% if page_obj.has_previous %}<a href="?q={{q_cartas|urlencode}}&estado={{estado_filtro|urlencode}}&delegacion={{delegacion_filtro}}&page={{page_obj.previous_page_number}}">Anterior</a>{% endif %}{% if page_obj.has_next %}<a href="?q={{q_cartas|urlencode}}&estado={{estado_filtro|urlencode}}&delegacion={{delegacion_filtro}}&page={{page_obj.next_page_number}}">Siguiente</a>{% endif %}</div></div>
+</div>
+{% endblock %}

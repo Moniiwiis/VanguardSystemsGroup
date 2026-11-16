@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'analytics',
     'configuration',
     'core',
+    'cartas',  # Módulo independiente Tubo de Cartas
 ]
 
 MIDDLEWARE = [
