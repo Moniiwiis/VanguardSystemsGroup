@@ -3008,9 +3008,49 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         # Tampoco aparece el rol del responsable en la columna de Atenciones ni Tubo
         resp_at = self.client.get(reverse('gestion_atenciones'))
         self.assertNotContains(resp_at, '<div class="text-[10px] text-slate-500">RolOcultoVisualCheck</div>')
+        # En barra superior y pie Creado por sí se ve Cargo/Rol para funcionarios
+        self.assertContains(resp_at, '<span>Delegado Territorial</span>')
+        self.assertContains(resp_at, '(Delegado Territorial)')
+
         resp_tubo = self.client.get(reverse('gestion_tubo') + '?vista=tabla')
         self.assertNotContains(resp_tubo, '<div class="text-[10px] text-slate-400">RolOcultoVisualCheck</div>')
+        self.assertContains(resp_tubo, 'Responsable / Creador')
+        self.assertContains(resp_tubo, 'Creado por: <strong class="text-slate-800">Carla Torres</strong> <span class="text-slate-400 font-semibold">(Delegado Territorial)</span>')
         self.assertTrue(at.id)
+
+        # Para Cliente NO se muestra rol ni cargo en la cabecera ni en perfil
+        cli_user = User.objects.create_user(
+            username='cliente_vis_test',
+            password='Password123!',
+            first_name='Rosa',
+            last_name='Molina',
+            email='rosa.molina@example.test',
+        )
+        cargo_cli = Cargo.objects.create(nombre_cargo='Ciudadano')
+        rol_cli = Rol.objects.create(nombre_rol='Cliente', alcance='Personal', estado='Activo')
+        func_cli = Funcionario.objects.create(
+            user=cli_user,
+            cargo=cargo_cli,
+            delegacion=self.delegacion,
+            identificador_institucional='CLI-VISUAL-01',
+            rut='19.333.444-5',
+            estado='Activo',
+        )
+        FuncionarioRol.objects.create(funcionario=func_cli, rol=rol_cli)
+        Vecino.objects.create(
+            nombre='Rosa Molina',
+            primer_nombre='Rosa',
+            apellido_paterno='Molina',
+            rut='19.333.444-5',
+            telefono='+56 9 1234 0000',
+            delegacion=self.delegacion,
+            estado='Activo',
+        )
+        self.client.force_login(cli_user)
+        resp_cli = self.client.get(reverse('portal_cliente'))
+        self.assertEqual(resp_cli.status_code, 200)
+        self.assertNotContains(resp_cli, '<span>Ciudadano</span>')
+        self.assertNotContains(resp_cli, '<span>Cliente</span>')
 
 
 

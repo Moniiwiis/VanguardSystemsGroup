@@ -290,7 +290,7 @@
         <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div class="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
             <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i>
-            <span>Creado por: <strong class="text-slate-800">{{ usuario_nombre_corto|default:request.user.username }}</strong> </span>
+            <span>Creado por: <strong class="text-slate-800">{{ usuario_nombre_corto|default:request.user.username }}</strong>{% if not permisos.es_cliente %} <span class="text-slate-400 font-semibold">({% if funcionario_actual and funcionario_actual.cargo %}{{ funcionario_actual.cargo.nombre_cargo }}{% else %}{{ user_rol_name }}{% endif %})</span>{% endif %}</span>
           </div>
 
           <div class="flex items-center gap-2 w-full sm:w-auto justify-end">

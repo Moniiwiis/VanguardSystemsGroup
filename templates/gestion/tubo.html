@@ -667,7 +667,7 @@
             <th class="py-2.5 px-2 whitespace-nowrap">Territorio</th>
             <th class="py-2.5 px-2 leading-tight">Tipo / Sub Atención</th>
             <th class="py-2.5 px-2 whitespace-nowrap">Evidencia</th>
-            <th class="py-2.5 px-2 whitespace-nowrap">Responsable</th>
+            <th class="py-2.5 px-2 whitespace-nowrap">Responsable / Creador</th>
             <th class="py-2.5 px-2 leading-tight w-[94px]">Fecha Compromiso</th>
             <th class="py-2.5 px-2 leading-tight">Área de Apoyo</th>
             <th class="py-2.5 px-2 leading-tight">Avance / Observaciones</th>
@@ -768,11 +768,14 @@
               {% endif %}
             </td>
 
-            <!-- Responsable -->
+            <!-- Responsable / Creador -->
             <td class="py-2.5 px-2 text-[11px] min-w-[140px] max-w-[180px] [overflow-wrap:anywhere]">
               <div class="font-bold text-slate-900 flex items-start gap-1 leading-snug min-w-0">
                 <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#C41230] shrink-0 mt-0.5"></i>
                 <span class="min-w-0 break-words [overflow-wrap:anywhere]">{{ at.responsable_nombre }}</span>
+              </div>
+              <div class="text-[10px] text-slate-400 mt-0.5 break-words [overflow-wrap:anywhere]">
+                Creado por: <span class="text-slate-600 font-semibold">{{ at.creado_por_nombre }}</span>
               </div>
             </td>
 
@@ -1579,16 +1582,23 @@
                   class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none"></textarea>
       </div>
 
-      <div class="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
-        <button type="button" onclick="document.getElementById('modal-nuevo-compromiso-sector').classList.add('hidden')"
-                class="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-600 transition-colors">
-          Cancelar
-        </button>
-        <button type="submit"
-                class="px-5 py-2 rounded-xl bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-extrabold shadow-sm transition-all flex items-center gap-1.5">
-          <i data-lucide="save" class="w-4 h-4"></i>
-          <span>Guardar Compromiso en Tubo</span>
-        </button>
+      <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div class="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i>
+          <span>Creado por: <strong class="text-slate-800">{{ usuario_nombre_corto|default:request.user.username }}</strong>{% if not permisos.es_cliente %} <span class="text-slate-400 font-semibold">({% if funcionario_actual and funcionario_actual.cargo %}{{ funcionario_actual.cargo.nombre_cargo }}{% else %}{{ user_rol_name }}{% endif %})</span>{% endif %}</span>
+        </div>
+
+        <div class="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+          <button type="button" onclick="document.getElementById('modal-nuevo-compromiso-sector').classList.add('hidden')"
+                  class="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-600 transition-colors">
+            Cancelar
+          </button>
+          <button type="submit"
+                  class="px-5 py-2 rounded-xl bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-extrabold shadow-sm transition-all flex items-center gap-1.5">
+            <i data-lucide="save" class="w-4 h-4"></i>
+            <span>Guardar Compromiso en Tubo</span>
+          </button>
+        </div>
       </div>
     </form>
   </div>

@@ -289,6 +289,11 @@
             <div class="font-bold text-white text-xs leading-tight group-hover:underline truncate">
               {{ usuario_nombre_corto|default:request.user.username }}
             </div>
+            {% if not permisos.es_cliente %}
+            <div class="text-[11px] text-white/80 leading-tight truncate">
+              <span>{% if funcionario_actual and funcionario_actual.cargo %}{{ funcionario_actual.cargo.nombre_cargo }}{% else %}{{ user_rol_name }}{% endif %}</span>
+            </div>
+            {% endif %}
           </div>
         </a>
 
