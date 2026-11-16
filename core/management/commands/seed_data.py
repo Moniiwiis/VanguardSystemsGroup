@@ -15,9 +15,11 @@ import os
 import re
 import datetime
 import random
+import unicodedata
 import openpyxl
 
 from django.core.management.base import BaseCommand
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User, Permission
 from django.utils import timezone
 
@@ -25,6 +27,8 @@ from accounts.models import Delegacion, Cargo, Funcionario, Rol, FuncionarioRol,
 from activities.models import (
     Actividad, Vecino, AtencionCiudadana, OrganizacionComunitaria, TipoGestion,
 )
+from agenda.models import CompromisoAgenda
+from core.utils import separar_nombre_completo, separar_nombre_usuario
 
 try:
     from configuration.models import TipoAtencion, SubAtencion, Periodo, CatalogoActividad, ItemMedicion, ConfiguracionMeta
@@ -86,6 +90,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write(self.style.MIGRATE_HEADING(
             "=== Iniciando seed de datos SGR (Evaluación 3) ==="))
+
+        # Pre-cargar números base de RUT ya usados para garantizar idempotencia
+        for r_ex in list(Vecino.all_objects.values_list('rut', flat=True)) + list(
+            Funcionario.all_objects.exclude(rut__isnull=True).values_list('rut', flat=True)
+        ):
+            dig = ''.join(ch for ch in (r_ex or '').split('-')[0] if ch.isdigit())
+            if dig.isdigit():
+                _ruts_usados.add(int(dig))
 
         # ------------------------------------------------------------------
         # 1. DELEGACIONES
@@ -201,6 +213,7 @@ class Command(BaseCommand):
         cargo_coord     = mk_cargo("Coordinador Territorial", "Supervisión de compromisos comunitarios.")
         cargo_inspector = mk_cargo("Inspector Municipal", "Fiscalización y respuesta a denuncias.")
         cargo_ciudadano = mk_cargo("Ciudadano", "Usuario ciudadano portal vecinal.")
+        cargo_org       = mk_cargo("Organización / JJVV", "Cuenta ciudadana de organización comunitaria.")
 
         # ------------------------------------------------------------------
         # 5. TIPOS DE ATENCIÓN Y SUB-ATENCIONES
@@ -277,7 +290,9 @@ class Command(BaseCommand):
 
         def mk_user_funcionario(username, password, first_name, last_name, email,
                                 identificador, delegacion, cargo, rol,
-                                is_staff=False, is_superuser=False, perms=None):
+                                is_staff=False, is_superuser=False, perms=None,
+                                rut='', telefono=''):
+            pn, sn, ap, am = separar_nombre_usuario(first_name, last_name)
             u, _ = User.objects.get_or_create(
                 username=username,
                 defaults={'email': email, 'first_name': first_name, 'last_name': last_name,
@@ -294,7 +309,14 @@ class Command(BaseCommand):
                           'delegacion': delegacion, 'cargo': cargo, 'estado': 'Activo'}
             )
             f.identificador_institucional = identificador
+            f.primer_nombre = pn; f.segundo_nombre = sn
+            f.apellido_paterno = ap; f.apellido_materno = am
+            if rut:
+                f.rut = rut
+            if telefono:
+                f.telefono = telefono
             f.delegacion = delegacion; f.cargo = cargo
+            f.debe_cambiar_contrasena = False
             f.estado = 'Activo'; f.deleted_at = None; f.save()
             # Asignar rol
             fr = FuncionarioRol.all_objects.filter(funcionario=f, rol=rol).first()
@@ -311,7 +333,8 @@ class Command(BaseCommand):
             email='admin_a@laserena.cl',
             identificador='EVAL-ADM-A', delegacion=del_centro,
             cargo=cargo_admin, rol=rol_admin,
-            is_staff=True, is_superuser=True
+            is_staff=True, is_superuser=True,
+            rut=formatear_rut(14111001), telefono='+56 9 5100 0001'
         )
 
         # ➋ editor_a — Operador/Editor, Delegación Centro
@@ -321,7 +344,8 @@ class Command(BaseCommand):
             email='editor_a@laserena.cl',
             identificador='EVAL-EDT-A', delegacion=del_centro,
             cargo=cargo_gestor, rol=rol_operador,
-            is_staff=True, perms=all_perms
+            is_staff=True, perms=all_perms,
+            rut=formatear_rut(14111002), telefono='+56 9 5100 0002'
         )
 
         # ➌ lector_a — Consultor/Lector, Delegación Centro
@@ -331,7 +355,8 @@ class Command(BaseCommand):
             email='lector_a@laserena.cl',
             identificador='EVAL-LEC-A', delegacion=del_centro,
             cargo=cargo_inspector, rol=rol_consultor,
-            is_staff=False
+            is_staff=False,
+            rut=formatear_rut(14111003), telefono='+56 9 5100 0003'
         )
 
         # ➍ lector_b — Consultor/Lector, Delegación Norte (Las Compañías)
@@ -341,7 +366,8 @@ class Command(BaseCommand):
             email='lector_b@laserena.cl',
             identificador='EVAL-LEC-B', delegacion=del_norte,
             cargo=cargo_inspector, rol=rol_consultor,
-            is_staff=False
+            is_staff=False,
+            rut=formatear_rut(14111004), telefono='+56 9 5100 0004'
         )
 
         # ➎ cliente_1 — Cliente, crea vecino propio (RUT 12.345.678-9)
@@ -359,7 +385,11 @@ class Command(BaseCommand):
                       'cargo': cargo_ciudadano, 'estado': 'Activo'}
         )
         f_c1.identificador_institucional = 'VEC-C1'
+        f_c1.primer_nombre = 'María'; f_c1.segundo_nombre = ''
+        f_c1.apellido_paterno = 'González'; f_c1.apellido_materno = 'Pérez'
+        f_c1.rut = '12.345.678-9'; f_c1.telefono = '+56 9 8765 4321'
         f_c1.delegacion = del_centro; f_c1.cargo = cargo_ciudadano
+        f_c1.debe_cambiar_contrasena = False
         f_c1.estado = 'Activo'; f_c1.deleted_at = None; f_c1.save()
         fr_c1 = FuncionarioRol.all_objects.filter(funcionario=f_c1, rol=rol_cliente).first()
         if fr_c1:
@@ -369,12 +399,17 @@ class Command(BaseCommand):
         # Vecino asociado
         v_cliente1, _ = Vecino.all_objects.get_or_create(
             rut='12.345.678-9',
-            defaults={'nombre': 'María González Pérez', 'direccion': 'Av. Balmaceda 120, La Serena',
+            defaults={'nombre': 'María González Pérez',
+                      'primer_nombre': 'María', 'segundo_nombre': '',
+                      'apellido_paterno': 'González', 'apellido_materno': 'Pérez',
+                      'direccion': 'Av. Balmaceda 120, La Serena',
                       'telefono': '+56 9 8765 4321', 'delegacion': del_centro,
                       'sector': sectores_dict.get('SEC-CEN01'),
                       'territorio': 'Casco Histórico', 'tipo_gestion': tg_sol, 'estado': 'Activo'}
         )
-        v_cliente1.nombre = 'María González Pérez'; v_cliente1.deleted_at = None; v_cliente1.save()
+        v_cliente1.nombre = 'María González Pérez'
+        v_cliente1.primer_nombre = 'María'; v_cliente1.apellido_paterno = 'González'; v_cliente1.apellido_materno = 'Pérez'
+        v_cliente1.deleted_at = None; v_cliente1.save()
 
         # ➏ cliente_2 — Cliente, crea vecino propio (RUT 9.876.543-2)
         u_cliente2, _ = User.objects.get_or_create(
@@ -391,7 +426,11 @@ class Command(BaseCommand):
                       'cargo': cargo_ciudadano, 'estado': 'Activo'}
         )
         f_c2.identificador_institucional = 'VEC-C2'
+        f_c2.primer_nombre = 'Pedro'; f_c2.segundo_nombre = ''
+        f_c2.apellido_paterno = 'Rojas'; f_c2.apellido_materno = 'Soto'
+        f_c2.rut = '9.876.543-2'; f_c2.telefono = '+56 9 7654 3210'
         f_c2.delegacion = del_norte; f_c2.cargo = cargo_ciudadano
+        f_c2.debe_cambiar_contrasena = False
         f_c2.estado = 'Activo'; f_c2.deleted_at = None; f_c2.save()
         fr_c2 = FuncionarioRol.all_objects.filter(funcionario=f_c2, rol=rol_cliente).first()
         if fr_c2:
@@ -400,62 +439,74 @@ class Command(BaseCommand):
             FuncionarioRol.objects.create(funcionario=f_c2, rol=rol_cliente)
         v_cliente2, _ = Vecino.all_objects.get_or_create(
             rut='9.876.543-2',
-            defaults={'nombre': 'Pedro Rojas Soto', 'direccion': "Calle O'Higgins 455, Las Compañías",
+            defaults={'nombre': 'Pedro Rojas Soto',
+                      'primer_nombre': 'Pedro', 'segundo_nombre': '',
+                      'apellido_paterno': 'Rojas', 'apellido_materno': 'Soto',
+                      'direccion': "Calle O'Higgins 455, Las Compañías",
                       'telefono': '+56 9 7654 3210', 'delegacion': del_norte,
                       'sector': sectores_dict.get('SEC-NOR01'),
                       'territorio': 'Compañía Alta', 'tipo_gestion': tg_rec, 'estado': 'Activo'}
         )
-        v_cliente2.nombre = 'Pedro Rojas Soto'; v_cliente2.deleted_at = None; v_cliente2.save()
+        v_cliente2.nombre = 'Pedro Rojas Soto'
+        v_cliente2.primer_nombre = 'Pedro'; v_cliente2.apellido_paterno = 'Rojas'; v_cliente2.apellido_materno = 'Soto'
+        v_cliente2.deleted_at = None; v_cliente2.save()
 
         # Cuentas de operación adicionales (superadmin y operadores de sistema)
         self.stdout.write("▶ Creando cuentas adicionales de operación...")
         mk_user_funcionario(
             username='admin_sgr', password='Admin1234!',
-            first_name='Administrador General', last_name='SGR',
+            first_name='Administrador', last_name='General SGR',
             email='admin@laserena.cl', identificador='ADM-001',
             delegacion=None, cargo=cargo_coord, rol=rol_admin,
-            is_staff=True, is_superuser=True
+            is_staff=True, is_superuser=True,
+            rut=formatear_rut(14111005), telefono='+56 9 5100 0005'
         )
         mk_user_funcionario(
             username='delegado_centro', password='User1234!',
             first_name='Carlos', last_name='Mendoza Silva',
             email='delegado.centro@laserena.cl', identificador='DEL-001',
             delegacion=del_centro, cargo=cargo_coord, rol=rol_delegado,
-            is_staff=True, perms=all_perms
+            is_staff=True, perms=all_perms,
+            rut=formatear_rut(14111006), telefono='+56 9 5100 0006'
         )
         mk_user_funcionario(
             username='delegado_companias', password='User1234!',
             first_name='María', last_name='Rojas Barraza',
             email='delegado.companias@laserena.cl', identificador='DEL-002',
             delegacion=del_norte, cargo=cargo_coord, rol=rol_delegado,
-            is_staff=True, perms=all_perms
+            is_staff=True, perms=all_perms,
+            rut=formatear_rut(14111007), telefono='+56 9 5100 0007'
         )
         mk_user_funcionario(
             username='delegado_sur', password='User1234!',
             first_name='Gonzalo', last_name='Herrera Vega',
             email='delegado.sur@laserena.cl', identificador='DEL-003',
             delegacion=del_sur, cargo=cargo_coord, rol=rol_delegado,
-            is_staff=True, perms=all_perms
+            is_staff=True, perms=all_perms,
+            rut=formatear_rut(14111008), telefono='+56 9 5100 0008'
         )
         mk_user_funcionario(
             username='delegado_rural', password='User1234!',
             first_name='Patricia', last_name='Vega Moreno',
             email='delegado.rural@laserena.cl', identificador='DEL-004',
             delegacion=del_rural, cargo=cargo_coord, rol=rol_delegado,
-            is_staff=True, perms=all_perms
+            is_staff=True, perms=all_perms,
+            rut=formatear_rut(14111009), telefono='+56 9 5100 0009'
         )
         mk_user_funcionario(
             username='funcionario_juan', password='User1234!',
             first_name='Juan', last_name='Pérez López',
             email='juan.perez@laserena.cl', identificador='FUN-101',
             delegacion=del_centro, cargo=cargo_gestor, rol=rol_operador,
-            is_staff=True, perms=all_perms
+            is_staff=True, perms=all_perms,
+            rut=formatear_rut(14111010), telefono='+56 9 5100 0010'
         )
         mk_user_funcionario(
             username='consultor_ana', password='User1234!',
             first_name='Ana', last_name='Ejemplo Flores',
             email='ana.ejemplo@laserena.cl', identificador='CON-201',
-            delegacion=del_centro, cargo=cargo_inspector, rol=rol_consultor
+            delegacion=del_centro, cargo=cargo_inspector, rol=rol_consultor,
+            rut=formatear_rut(14111011), telefono='+56 9 5100 0011'
         )
 
         # Referencia al usuario editor para las atenciones
@@ -613,9 +664,14 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(f"  ⚠ Error importando JJVV xlsx: {exc}"))
 
         # ------------------------------------------------------------------
-        # 9. VECINOS ADICIONALES (para >2000 registros de negocio)
+        # 9. VECINOS ADICIONALES (con nombres estructurados y cuentas ciudadanas VEC-)
         # ------------------------------------------------------------------
-        self.stdout.write("▶ Creando vecinos adicionales...")
+        self.stdout.write("▶ Creando vecinos adicionales y cuentas ciudadanas...")
+
+        def _slug_ascii(txt):
+            norm = unicodedata.normalize('NFKD', (txt or '').strip().lower())
+            cleaned = ''.join(c for c in norm if not unicodedata.combining(c))
+            return re.sub(r'[^a-z0-9]+', '', cleaned)
 
         nombres_pool = [
             ('Alejandra', 'Muñoz'), ('Carlos', 'Espinoza'), ('Diana', 'Flores'),
@@ -628,6 +684,7 @@ class Command(BaseCommand):
             ('Yolanda', 'Sepúlveda'), ('Zulema', 'Contreras'), ('Andrés', 'Núñez'),
             ('Beatriz', 'Godoy'), ('César', 'Herrera'), ('Daniela', 'López'),
         ]
+        apellidos_mat_pool = ['Martínez', 'González', 'Sánchez', 'Pérez', 'Rodríguez']
         calles_pool = [
             'Calle Los Pinos', 'Av. Balmaceda', 'Pasaje El Sauce', 'Calle Prat',
             'Calle Los Álamos', 'Pasaje Los Jazmines', 'Av. Francisco de Aguirre',
@@ -642,7 +699,10 @@ class Command(BaseCommand):
 
         for i in range(vecinos_a_crear):
             nombre_tuple = random.choice(nombres_pool)
-            nombre_v = f"{nombre_tuple[0]} {nombre_tuple[1]} {random.choice(['Martínez','González','Sánchez','Pérez','Rodríguez'])}"
+            pn_v = nombre_tuple[0]
+            ap_v = nombre_tuple[1]
+            am_v = random.choice(apellidos_mat_pool)
+            nombre_v = f"{pn_v} {ap_v} {am_v}"
             calle_v = random.choice(calles_pool)
             num_v = random.randint(10, 2000)
             dir_v = f"{calle_v} {num_v}"
@@ -651,13 +711,239 @@ class Command(BaseCommand):
             tel_v = f"+56 9 {random.randint(1000,9999)} {random.randint(1000,9999)}"
             rut_v = gen_rut()
             Vecino.objects.create(
-                rut=rut_v, nombre=nombre_v, direccion=dir_v,
-                telefono=tel_v, delegacion=del_v,
+                rut=rut_v,
+                nombre=nombre_v,
+                primer_nombre=pn_v,
+                segundo_nombre='',
+                apellido_paterno=ap_v,
+                apellido_materno=am_v,
+                direccion=dir_v,
+                telefono=tel_v,
+                delegacion=del_v,
                 sector=sec_v,
                 territorio=sec_v.nombre if sec_v else del_v.nombre,
                 tipo_gestion=random.choice([tg_sol, tg_rec]),
-                estado='Activo'
+                estado='Activo',
             )
+
+        hashed_cliente_pwd = make_password('Cliente1234!')
+        for v_item in Vecino.objects.select_related('delegacion', 'sector').all():
+            pn_v, sn_v, ap_v, am_v = v_item.get_partes_nombre()
+            if not v_item.primer_nombre or not v_item.apellido_paterno:
+                v_item.primer_nombre = pn_v
+                v_item.segundo_nombre = sn_v
+                v_item.apellido_paterno = ap_v
+                v_item.apellido_materno = am_v
+                v_item.save(update_fields=[
+                    'primer_nombre', 'segundo_nombre', 'apellido_paterno', 'apellido_materno', 'updated_at'
+                ])
+
+            if v_item.id in (v_cliente1.id, v_cliente2.id) or not v_item.rut:
+                continue
+
+            clean_rut_v = ''.join(ch for ch in v_item.rut.upper() if ch.isalnum())
+            ident_v = f"VEC-{clean_rut_v}"[:20]
+            func_v = Funcionario.all_objects.select_related('user').filter(
+                identificador_institucional=ident_v
+            ).first()
+            if not func_v:
+                correo_v = f"{_slug_ascii(pn_v) or 'vecino'}.{_slug_ascii(ap_v) or 'user'}.{v_item.id}@vecino.cl"
+                u_v, created_u = User.objects.get_or_create(
+                    username=v_item.rut,
+                    defaults={
+                        'email': correo_v,
+                        'first_name': v_item.nombre[:150],
+                        'password': hashed_cliente_pwd,
+                        'is_staff': False,
+                        'is_active': True,
+                    },
+                )
+                if created_u:
+                    u_v.password = hashed_cliente_pwd
+                    u_v.save(update_fields=['password'])
+                func_v = Funcionario.all_objects.create(
+                    user=u_v,
+                    identificador_institucional=ident_v,
+                    primer_nombre=pn_v[:50],
+                    segundo_nombre=sn_v[:50],
+                    apellido_paterno=ap_v[:50],
+                    apellido_materno=am_v[:50],
+                    rut=v_item.rut,
+                    delegacion=v_item.delegacion,
+                    cargo=cargo_ciudadano,
+                    telefono=(v_item.telefono or '')[:20],
+                    estado='Activo',
+                    debe_cambiar_contrasena=False,
+                )
+                FuncionarioRol.objects.get_or_create(funcionario=func_v, rol=rol_cliente)
+
+        # ------------------------------------------------------------------
+        # 9.5 ORGANIZACIONES DESTACADAS CON DIRECTIVA (VECINOS) Y CUENTA PORTAL (ORG-)
+        # ------------------------------------------------------------------
+        self.stdout.write("▶ Configurando Juntas de Vecinos con directiva, cuentas portal ORG- y registros...")
+        vecinos_por_del = {
+            d.id: list(Vecino.objects.filter(delegacion=d, estado='Activo').order_by('id'))
+            for d in delegaciones_list
+        }
+        vecinos_fallback = list(Vecino.objects.filter(estado='Activo').order_by('id'))
+
+        def _correo_vecino(v_obj):
+            clean_r = ''.join(ch for ch in (v_obj.rut or '').upper() if ch.isalnum())
+            ident = f"VEC-{clean_r}"[:20]
+            fv = Funcionario.all_objects.select_related('user').filter(identificador_institucional=ident).first()
+            if fv and fv.user.email:
+                return fv.user.email
+            if v_obj.rut == '12.345.678-9':
+                return 'cliente1@vecino.cl'
+            if v_obj.rut == '9.876.543-2':
+                return 'cliente2@vecino.cl'
+            return f"vecino.{v_obj.id}@vecino.cl"
+
+        def _nombre_corto_vec(v_obj):
+            p_n, _s_n, a_p, _a_m = v_obj.get_partes_nombre()
+            return ' '.join(p for p in (p_n, a_p) if p).strip() or v_obj.nombre
+
+        demo_orgs_spec = [
+            ('JJVV N° 1 Casco Histórico', del_centro, sectores_dict.get('SEC-CEN01'), formatear_rut(65111001), 'jjvv.centro@organizacion.cl', 'PJ-1001', 'DIR-2026-01', 'Av. Balmaceda 320'),
+            ('JJVV N° 12 Las Compañías', del_norte, sectores_dict.get('SEC-NOR01'), formatear_rut(65111002), 'jjvv.norte@organizacion.cl', 'PJ-1002', 'DIR-2026-02', 'Av. Viña del Mar 480'),
+            ('JJVV El Milagro I', del_sur, sectores_dict.get('SEC-SUR02'), formatear_rut(65111003), 'jjvv.sur@organizacion.cl', 'PJ-1003', 'DIR-2026-03', 'Av. Cuatro Esquinas 910'),
+            ('JJVV Algarrobito', del_rural, sectores_dict.get('SEC-RUR01'), formatear_rut(65111004), 'jjvv.rural@organizacion.cl', 'PJ-1004', 'DIR-2026-04', 'Camino Elqui Km 12'),
+        ]
+
+        hoy = timezone.localdate()
+        for idx_o, (nom_o, del_o, sec_o, rut_o, email_o, pj_o, dir_o, dom_o) in enumerate(demo_orgs_spec, start=1):
+            pool_o = vecinos_por_del.get(del_o.id) or vecinos_fallback
+            if len(pool_o) < 3:
+                pool_o = vecinos_fallback
+            v_pres = pool_o[0] if len(pool_o) >= 1 else v_cliente1
+            v_tes = pool_o[1] if len(pool_o) >= 2 else v_pres
+            v_sec = pool_o[2] if len(pool_o) >= 3 else v_pres
+
+            org_demo, _ = OrganizacionComunitaria.all_objects.get_or_create(
+                nombre=nom_o,
+                defaults={
+                    'tipo_organizacion': 'Junta de Vecinos',
+                    'domicilio_legal': dom_o,
+                    'delegacion': del_o,
+                    'sector': sec_o,
+                    'territorio': sec_o.nombre if sec_o else del_o.nombre,
+                    'socios_activos': 45 + (idx_o * 10),
+                    'fecha_constitucion': datetime.date(2015, 5, 10 + idx_o),
+                    'fecha_inscripcion_registro': hoy,
+                    'numero_registro_pj': pj_o,
+                    'personalidad_juridica': pj_o,
+                    'registro_directiva_numero': dir_o,
+                    'rut': rut_o,
+                    'estado': 'Activa',
+                },
+            )
+            org_demo.tipo_organizacion = 'Junta de Vecinos'
+            org_demo.domicilio_legal = org_demo.domicilio_legal or dom_o
+            org_demo.delegacion = del_o
+            org_demo.sector = sec_o
+            org_demo.territorio = sec_o.nombre if sec_o else del_o.nombre
+            org_demo.numero_registro_pj = pj_o
+            org_demo.personalidad_juridica = pj_o
+            org_demo.registro_directiva_numero = dir_o
+            org_demo.fecha_constitucion = org_demo.fecha_constitucion or datetime.date(2015, 5, 10 + idx_o)
+            org_demo.fecha_inscripcion_registro = org_demo.fecha_inscripcion_registro or hoy
+            org_demo.rut = rut_o
+            org_demo.contacto_prioritario = 'presidente'
+            org_demo.presidente_nombre = _nombre_corto_vec(v_pres)
+            org_demo.presidente_rut = v_pres.rut
+            org_demo.presidente_telefono = v_pres.telefono
+            org_demo.presidente_correo = _correo_vecino(v_pres)
+            org_demo.tesorero_nombre = _nombre_corto_vec(v_tes)
+            org_demo.tesorero_rut = v_tes.rut
+            org_demo.tesorero_telefono = v_tes.telefono
+            org_demo.tesorero_correo = _correo_vecino(v_tes)
+            org_demo.secretario_nombre = _nombre_corto_vec(v_sec)
+            org_demo.secretario_rut = v_sec.rut
+            org_demo.secretario_telefono = v_sec.telefono
+            org_demo.secretario_correo = _correo_vecino(v_sec)
+            org_demo.representante_legal = org_demo.presidente_nombre
+            org_demo.telefono_contacto = org_demo.presidente_telefono
+            org_demo.email_contacto = email_o
+            org_demo.estado = 'Activa'
+            org_demo.deleted_at = None
+            org_demo.save()
+
+            ident_org = f"ORG-{org_demo.id:05d}"[:20]
+            func_org = Funcionario.all_objects.select_related('user').filter(
+                identificador_institucional=ident_org
+            ).first()
+            if not func_org:
+                u_org, created_uo = User.objects.get_or_create(
+                    username=rut_o,
+                    defaults={
+                        'email': email_o,
+                        'first_name': org_demo.nombre[:150],
+                        'password': hashed_cliente_pwd,
+                        'is_staff': False,
+                        'is_active': True,
+                    },
+                )
+                if created_uo:
+                    u_org.password = hashed_cliente_pwd
+                    u_org.save(update_fields=['password'])
+                func_org = Funcionario.all_objects.create(
+                    user=u_org,
+                    identificador_institucional=ident_org,
+                    rut=rut_o,
+                    delegacion=del_o,
+                    cargo=cargo_org,
+                    telefono=(org_demo.telefono_contacto or '')[:20],
+                    estado='Activo',
+                    debe_cambiar_contrasena=False,
+                )
+                FuncionarioRol.objects.get_or_create(funcionario=func_org, rol=rol_cliente)
+            else:
+                func_org.user.first_name = org_demo.nombre[:150]
+                func_org.user.email = email_o
+                func_org.user.is_active = True
+                func_org.user.save(update_fields=['first_name', 'email', 'is_active'])
+                func_org.rut = rut_o
+                func_org.telefono = (org_demo.telefono_contacto or '')[:20]
+                func_org.delegacion = del_o
+                func_org.debe_cambiar_contrasena = False
+                func_org.deleted_at = None
+                func_org.save()
+                FuncionarioRol.objects.get_or_create(funcionario=func_org, rol=rol_cliente)
+
+            AtencionCiudadana.all_objects.get_or_create(
+                codigo_atencion=f"AT-ORG-{idx_o:05d}",
+                defaults={
+                    'solicitante': f"{org_demo.nombre} ({org_demo.tipo_organizacion})"[:150],
+                    'organizacion': org_demo,
+                    'delegacion': del_o,
+                    'tipo_atencion': ta_default,
+                    'sub_atencion': sa_default,
+                    'descripcion': f"Mejoramiento de sede social y luminarias para {org_demo.nombre}.",
+                    'avance_observaciones': 'En evaluación técnica por equipo territorial.',
+                    'area_apoyo': 'SECPLAN / Obras',
+                    'origen': 'EXT',
+                    'fecha_compromiso': hoy + datetime.timedelta(days=15),
+                    'va_a_tubo': True,
+                    'usuario_responsable': u_editor or u_admin_sys,
+                    'creado_por': u_editor or u_admin_sys,
+                    'estado': 'En proceso',
+                },
+            )
+            if not CompromisoAgenda.objects.filter(organizacion=org_demo).exists():
+                CompromisoAgenda.objects.create(
+                    delegacion=del_o,
+                    sector=sec_o,
+                    organizacion=org_demo,
+                    origen='EXT',
+                    solicitante=org_demo.nombre[:150],
+                    territorio=sec_o.nombre if sec_o else del_o.nombre,
+                    responsable=f_editor_a,
+                    creado_por=u_editor or u_admin_sys,
+                    area_apoyo='Operaciones Municipales',
+                    fecha_comprometida=hoy + datetime.timedelta(days=20),
+                    estado='Registrada',
+                    observacion=f"Operativo de mantención comunitaria junto a {org_demo.nombre}.",
+                )
 
         # ------------------------------------------------------------------
         # 10. ATENCIONES CIUDADANAS desde matriz_sgr.xlsx
@@ -864,6 +1150,10 @@ class Command(BaseCommand):
         self.stdout.write("  ➍ lector_b     | Lector1234!  | Consultor       | Delegación Norte")
         self.stdout.write("  ➎ cliente_1    | Cliente1234! | Cliente/Vecino  | Portal Ciudadano")
         self.stdout.write("  ➏ cliente_2    | Cliente1234! | Cliente/Vecino  | Portal Ciudadano")
+        self.stdout.write("─" * 60)
+        self.stdout.write("🔑 CUENTAS DE ORGANIZACIÓN / JJVV (Portal Organización):")
+        self.stdout.write(f"  {formatear_rut(65111001)} / jjvv.centro@organizacion.cl | Cliente1234! | JJVV N° 1 Casco Histórico")
+        self.stdout.write(f"  {formatear_rut(65111002)} / jjvv.norte@organizacion.cl  | Cliente1234! | JJVV N° 12 Las Compañías")
         self.stdout.write("─" * 60)
         self.stdout.write("🔑 CUENTAS ADICIONALES DE OPERACIÓN:")
         self.stdout.write("  admin_sgr         | Admin1234!   | Superadmin Global")
