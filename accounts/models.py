@@ -48,12 +48,27 @@ class Cargo(BaseModel):
 class Funcionario(BaseModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='funcionario')
     identificador_institucional = models.CharField(max_length=20, unique=True)
+    primer_nombre = models.CharField(max_length=50, blank=True, default='')
+    segundo_nombre = models.CharField(max_length=50, blank=True, default='')
+    apellido_paterno = models.CharField(max_length=50, blank=True, default='')
+    apellido_materno = models.CharField(max_length=50, blank=True, default='')
     delegacion = models.ForeignKey(Delegacion, on_delete=models.RESTRICT, null=True, blank=True)
     cargo = models.ForeignKey(Cargo, on_delete=models.RESTRICT)
     estado = models.CharField(max_length=20, default='Activo')
     debe_cambiar_contrasena = models.BooleanField(default=False)
     foto = models.ImageField(upload_to='perfiles/', null=True, blank=True)
     telefono = models.CharField(max_length=20, null=True, blank=True, verbose_name='Teléfono de contacto')
+
+    def get_partes_nombre(self):
+        from core.utils import separar_nombre_completo
+        if self.primer_nombre or self.apellido_paterno:
+            return (
+                self.primer_nombre,
+                self.segundo_nombre,
+                self.apellido_paterno,
+                self.apellido_materno,
+            )
+        return separar_nombre_completo(self.user.get_full_name() or self.user.first_name)
 
     def get_foto_url(self):
         if self.foto and hasattr(self.foto, 'url'):

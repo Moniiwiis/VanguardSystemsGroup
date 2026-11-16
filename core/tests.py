@@ -203,8 +203,10 @@ class UserManagementTests(TestCase):
         self.client.force_login(self.admin)
 
         response = self.client.post(reverse('gestion_usuarios'), {
-            'nombre': 'Usuario de prueba',
-            'username': 'usuario_prueba',
+            'primer_nombre': 'María',
+            'segundo_nombre': 'Isabel',
+            'apellido_paterno': 'González',
+            'apellido_materno': 'Rojas',
             'correo': 'usuario@example.test',
             'cargo_id': str(self.cargo.id),
             'rol_id': str(self.admin_role.id),
@@ -217,12 +219,17 @@ class UserManagementTests(TestCase):
             reverse('gestion_usuarios'),
             fetch_redirect_response=False,
         )
-        created_user = User.objects.get(username='usuario_prueba')
+        created_user = User.objects.get(username='mgonzalez')
+        self.assertEqual(created_user.first_name, 'María Isabel González Rojas')
         funcionario = Funcionario.objects.get(user=created_user)
+        self.assertEqual(funcionario.primer_nombre, 'María')
+        self.assertEqual(funcionario.segundo_nombre, 'Isabel')
+        self.assertEqual(funcionario.apellido_paterno, 'González')
+        self.assertEqual(funcionario.apellido_materno, 'Rojas')
         self.assertTrue(funcionario.debe_cambiar_contrasena)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ['usuario@example.test'])
-        self.assertIn('usuario_prueba', mail.outbox[0].body)
+        self.assertIn('mgonzalez', mail.outbox[0].body)
         pw_match = re.search(r'Contraseña provisoria:\s*(\S+)', mail.outbox[0].body)
         self.assertIsNotNone(pw_match)
         provisional_pw = pw_match.group(1)
@@ -234,11 +241,35 @@ class UserManagementTests(TestCase):
             reverse('gestion_usuarios'),
             {'page_size': '30'},
         )
-        self.assertContains(list_response, 'usuario_prueba')
+        self.assertContains(list_response, 'mgonzalez')
+        self.assertContains(list_response, 'Funcionarios del sistema')
         self.assertEqual(
             list_response.context['page_obj'].paginator.per_page,
             30,
         )
+
+        # Colisión de inicial + apellido paterno genera sufijo numérico automático (mgonzalez2)
+        self.client.post(reverse('gestion_usuarios'), {
+            'primer_nombre': 'Marcos',
+            'apellido_paterno': 'González',
+            'correo': 'mgonzalez2@example.test',
+            'cargo_id': str(self.cargo.id),
+            'rol_id': str(self.admin_role.id),
+            'estado': 'Activo',
+            'delegacion_id': '',
+        })
+        self.assertTrue(User.objects.filter(username='mgonzalez2').exists())
+
+        # El funcionario puede iniciar sesión tanto con su usuario automático como con su correo
+        self.client.logout()
+        for ident in ('mgonzalez', 'usuario@example.test'):
+            resp_login = self.client.post(reverse('login'), {
+                'username': ident,
+                'password': provisional_pw,
+            })
+            self.assertEqual(resp_login.status_code, 302)
+            self.assertEqual(str(self.client.session['_auth_user_id']), str(created_user.id))
+            self.client.post(reverse('logout'))
 
     def test_first_login_requires_password_change_and_clears_flag(self):
         user = User.objects.create_user(
@@ -2325,6 +2356,60 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         resp_cli_res = self.client.get(reverse('portal_cliente') + '?estado=Resuelta')
         self.assertContains(resp_cli_res, 'Atención resuelta del cliente')
         self.assertNotContains(resp_cli_res, 'Atención en proceso del cliente')
+
+    def test_nombres_estructurados_vecino_y_login_con_rut_o_correo(self):
+        admin = User.objects.create_superuser('admin_nom4', 'nom4@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        sector = Sector.objects.create(nombre='Sector Nombres', delegacion=self.delegacion, estado='Activo')
+
+        # Verificar etiquetas "Funcionarios" en inicio/sidebar y 4 campos de nombre en Vecinos
+        resp_inicio = self.client.get(reverse('gestion_inicio'))
+        self.assertContains(resp_inicio, 'Funcionarios')
+        self.assertContains(resp_inicio, 'CRUD Funcionarios')
+
+        resp_vec_get = self.client.get(reverse('gestion_vecinos'))
+        self.assertContains(resp_vec_get, 'name="primer_nombre"')
+        self.assertContains(resp_vec_get, 'name="segundo_nombre"')
+        self.assertContains(resp_vec_get, 'name="apellido_paterno"')
+        self.assertContains(resp_vec_get, 'name="apellido_materno"')
+
+        # Crear vecino con los 4 campos de nombre + correo obligatorio
+        mail.outbox.clear()
+        resp_vec_post = self.client.post(reverse('gestion_vecinos'), {
+            'primer_nombre': 'Camila',
+            'segundo_nombre': 'Andrea',
+            'apellido_paterno': 'Pérez',
+            'apellido_materno': 'Muñoz',
+            'rut': '17.654.321-3',
+            'correo': 'camila.perez@example.test',
+            'sector_id': sector.id,
+            'estado': 'Activo',
+        })
+        self.assertRedirects(resp_vec_post, reverse('gestion_vecinos'))
+        vec = Vecino.objects.get(rut='17.654.321-3')
+        self.assertEqual(vec.nombre, 'Camila Andrea Pérez Muñoz')
+        self.assertEqual(vec.get_partes_nombre(), ('Camila', 'Andrea', 'Pérez', 'Muñoz'))
+
+        user_vec = User.objects.get(email='camila.perez@example.test')
+        user_vec.set_password('Vecina123!')
+        user_vec.save()
+        user_vec.funcionario.debe_cambiar_contrasena = False
+        user_vec.funcionario.save()
+
+        # Vecino puede ingresar con RUT formateado, RUT sin puntos/guion o correo
+        self.client.logout()
+        for ident in ('17.654.321-3', '176543213', 'camila.perez@example.test'):
+            resp_in = self.client.post(reverse('login'), {
+                'username': ident,
+                'password': 'Vecina123!',
+            })
+            self.assertRedirects(resp_in, reverse('portal_cliente'), fetch_redirect_response=False)
+            self.client.post(reverse('logout'))
+
 
 
 

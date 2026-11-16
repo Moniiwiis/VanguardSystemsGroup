@@ -1026,7 +1026,8 @@
 
     const inputSolicitante = document.getElementById('solicitante');
     const hiddenVecinoId = document.getElementById('vecino_id');
-    const inputNuevoNombre = document.getElementById('nuevo_vecino_nombre');
+    const inputNuevoPrimerNombre = document.getElementById('nuevo_vecino_primer_nombre');
+    const inputNuevoApPaterno = document.getElementById('nuevo_vecino_apellido_paterno');
     const inputNuevoRut = document.getElementById('nuevo_vecino_rut');
     const inputNuevoCorreo = document.getElementById('nuevo_vecino_correo');
     const selectNuevoSector = document.getElementById('nuevo_vecino_sector_id');
@@ -1063,9 +1064,13 @@
       if (vecinoExistenteObligatorio) inputSolicitante.setAttribute('required', 'required');
       else inputSolicitante.removeAttribute('required');
     }
-    if (inputNuevoNombre) {
-      if (esNuevoVec) inputNuevoNombre.setAttribute('required', 'required');
-      else inputNuevoNombre.removeAttribute('required');
+    if (inputNuevoPrimerNombre) {
+      if (esNuevoVec) inputNuevoPrimerNombre.setAttribute('required', 'required');
+      else inputNuevoPrimerNombre.removeAttribute('required');
+    }
+    if (inputNuevoApPaterno) {
+      if (esNuevoVec) inputNuevoApPaterno.setAttribute('required', 'required');
+      else inputNuevoApPaterno.removeAttribute('required');
     }
     if (inputNuevoRut) {
       if (esNuevoVec) inputNuevoRut.setAttribute('required', 'required');
@@ -1252,7 +1257,7 @@
     }
     const desc = document.getElementById('descripcion')?.value;
     const sol = document.getElementById('solicitante')?.value;
-    const nuevoNom = document.getElementById('nuevo_vecino_nombre')?.value;
+    const nuevoNom = document.getElementById('nuevo_vecino_primer_nombre')?.value;
 
     if (desc || sol || nuevoNom) {
       Swal.fire({

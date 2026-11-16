@@ -24,7 +24,8 @@ from core.context_processors import global_context
 from core.utils import (
     export_to_excel_csv, export_to_excel_xlsx, build_accent_query,
     validar_rut, formatear_rut, validar_largo, validar_direccion,
-    validar_telefono_chileno, formatear_telefono_chileno, validar_imagen_subida
+    validar_telefono_chileno, formatear_telefono_chileno, validar_imagen_subida,
+    extraer_partes_persona_desde_post, generar_username_funcionario,
 )
 from activities.models import (
     Actividad, Evidencia, ValidacionEvidencia, TipoGestion, Vecino,
@@ -225,12 +226,22 @@ def login_view(request):
         identifier = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
 
-        # Buscar por username, RUT normalizado o correo
-        user_candidate = User.objects.filter(Q(username__iexact=identifier) | Q(email__iexact=identifier)).first()
-        if not user_candidate:
-            rut_ok, rut_fmt = validar_rut(identifier)
-            if rut_ok:
-                user_candidate = User.objects.filter(username__iexact=rut_fmt).first()
+        # Buscar por username (funcionario/vecino), correo electrónico o RUT normalizado (vecino)
+        user_candidate = None
+        if identifier:
+            user_candidate = User.objects.filter(
+                Q(username__iexact=identifier) | Q(email__iexact=identifier)
+            ).first()
+            if not user_candidate:
+                rut_ok, rut_fmt = validar_rut(identifier)
+                if rut_ok:
+                    user_candidate = User.objects.filter(username__iexact=rut_fmt).first()
+                    if not user_candidate:
+                        func_vec = Funcionario.all_objects.filter(
+                            identificador_institucional=_identificador_vecino(rut_fmt)
+                        ).select_related('user').first()
+                        if func_vec:
+                            user_candidate = func_vec.user
         username_to_auth = user_candidate.username if user_candidate else identifier
 
         user = authenticate(request, username=username_to_auth, password=password)
@@ -1012,8 +1023,10 @@ def _crear_o_sincronizar_usuario_vecino(vecino, correo='', anterior_rut='', crea
 
 
 def _validar_y_crear_vecino_desde_post(request, del_activa, prefix='', allow_existing=False):
-    """Valida campos del formulario completo de Vecino (exigiendo correo) y crea/sincroniza el registro."""
-    nombre = request.POST.get(f'{prefix}nombre', '').strip()
+    """Valida campos del formulario completo de Vecino (exigiendo correo y nombres/apellidos) y crea/sincroniza el registro."""
+    nombre, partes_nombre, err_nombre = extraer_partes_persona_desde_post(
+        request.POST, prefix=prefix, exigir_estructurado=True
+    )
     rut = request.POST.get(f'{prefix}rut', '').strip()
     correo = request.POST.get(f'{prefix}correo', '').strip()
     direccion = request.POST.get(f'{prefix}direccion', '').strip()
@@ -1024,17 +1037,16 @@ def _validar_y_crear_vecino_desde_post(request, del_activa, prefix='', allow_exi
     if estado not in ('Activo', 'Inactivo'):
         estado = 'Activo'
 
+    if err_nombre:
+        return None, None, None, False, err_nombre
     if not nombre or not rut or not correo:
-        return None, None, None, False, "El nombre completo, RUT y correo electrónico del vecino son obligatorios."
+        return None, None, None, False, "El primer nombre, apellido paterno, RUT y correo electrónico del vecino son obligatorios."
 
     rut_ok, rut_fmt = validar_rut(rut)
     if not rut_ok:
         return None, None, None, False, f"RUT de vecino inválido: {rut_fmt}"
     rut = rut_fmt
 
-    ok, err = validar_largo(nombre, 150, "Nombre Completo")
-    if not ok:
-        return None, None, None, False, err
     ok, err = validar_largo(correo, 100, "Correo Electrónico")
     if not ok:
         return None, None, None, False, err
@@ -1078,6 +1090,11 @@ def _validar_y_crear_vecino_desde_post(request, del_activa, prefix='', allow_exi
         if nombre and vecino_existente.nombre != nombre:
             vecino_existente.nombre = nombre
             actualizado = True
+        for attr in ('primer_nombre', 'segundo_nombre', 'apellido_paterno', 'apellido_materno'):
+            val_part = partes_nombre.get(attr, '')
+            if val_part and getattr(vecino_existente, attr) != val_part:
+                setattr(vecino_existente, attr, val_part)
+                actualizado = True
         if telefono and not vecino_existente.telefono:
             vecino_existente.telefono = telefono
             actualizado = True
@@ -1119,6 +1136,10 @@ def _validar_y_crear_vecino_desde_post(request, del_activa, prefix='', allow_exi
 
     nuevo_v = Vecino.objects.create(
         nombre=nombre,
+        primer_nombre=partes_nombre.get('primer_nombre', ''),
+        segundo_nombre=partes_nombre.get('segundo_nombre', ''),
+        apellido_paterno=partes_nombre.get('apellido_paterno', ''),
+        apellido_materno=partes_nombre.get('apellido_materno', ''),
         rut=rut,
         direccion=direccion,
         telefono=telefono,
@@ -1324,7 +1345,7 @@ def _validar_y_crear_organizacion_desde_post(request, del_activa, prefix='', all
 def gestion_usuarios(request):
     ctx = global_context(request)
     if not ctx['permisos']['ver_usuarios']:
-        messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para gestionar Usuarios.")
+        messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para gestionar Funcionarios.")
         return redirect('gestion_inicio')
 
     del_activa = ctx['delegacion_activa']
@@ -1333,9 +1354,10 @@ def gestion_usuarios(request):
         if not ctx['permisos'].get('puede_crear', True):
             messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para realizar esta acción.")
             return redirect('gestion_usuarios')
-        nombre = request.POST.get('nombre', '').strip()
+        nombre, partes_nombre, err_nombre = extraer_partes_persona_desde_post(
+            request.POST, prefix='', exigir_estructurado=True
+        )
         correo = request.POST.get('correo', '').strip()
-        username = request.POST.get('username', '').strip()
         rol_id = request.POST.get('rol_id')
         cargo_id = request.POST.get('cargo_id')
         delegacion_id = request.POST.get('delegacion_id')
@@ -1347,16 +1369,16 @@ def gestion_usuarios(request):
 
         rol_obj = Rol.objects.filter(id=rol_id, estado='Activo').first()
         cargo_obj = Cargo.objects.filter(id=cargo_id).first()
-        if not nombre or not correo or not username or not rol_obj or not cargo_obj:
-            messages.error(request, "Nombre, usuario, correo, rol y cargo son obligatorios.")
+        if err_nombre:
+            messages.error(request, err_nombre)
+        elif not nombre or not correo or not rol_obj or not cargo_obj:
+            messages.error(request, "Primer nombre, apellido paterno, correo, rol y cargo son obligatorios.")
         elif (
             not ctx['permisos']['es_admin']
             and rol_obj.nombre_rol.strip().casefold()
             in {'administrador', 'superadministrador'}
         ):
             messages.error(request, "Solo un administrador puede asignar el rol de administrador.")
-        elif User.objects.filter(username__iexact=username).exists():
-            messages.error(request, "Ese nombre de usuario ya está registrado.")
         elif User.objects.filter(email__iexact=correo).exists():
             messages.error(request, "Ese correo electrónico ya está registrado.")
         else:
@@ -1378,6 +1400,10 @@ def gestion_usuarios(request):
                     messages.error(request, "Selecciona una delegación activa válida.")
                     return redirect('gestion_usuarios')
 
+            username = generar_username_funcionario(
+                partes_nombre.get('primer_nombre', ''),
+                partes_nombre.get('apellido_paterno', ''),
+            )
             provisional_password = _generate_provisional_password()
 
             user = User.objects.create_user(
@@ -1394,11 +1420,19 @@ def gestion_usuarios(request):
                 user=user,
                 defaults={
                     'identificador_institucional': f"USR-{user.id:03d}",
+                    'primer_nombre': partes_nombre.get('primer_nombre', ''),
+                    'segundo_nombre': partes_nombre.get('segundo_nombre', ''),
+                    'apellido_paterno': partes_nombre.get('apellido_paterno', ''),
+                    'apellido_materno': partes_nombre.get('apellido_materno', ''),
                     'delegacion': del_obj,
                     'cargo': cargo_obj,
                     'estado': estado
                 }
             )[0]
+            func.primer_nombre = partes_nombre.get('primer_nombre', '')
+            func.segundo_nombre = partes_nombre.get('segundo_nombre', '')
+            func.apellido_paterno = partes_nombre.get('apellido_paterno', '')
+            func.apellido_materno = partes_nombre.get('apellido_materno', '')
             func.delegacion = del_obj
             func.cargo = cargo_obj
             func.estado = estado
@@ -1424,17 +1458,17 @@ def gestion_usuarios(request):
                 )
                 correo_enviado = True
             except (OSError, SMTPException, BadHeaderError):
-                logger.exception("No se pudo enviar el correo con la contraseña provisoria al nuevo usuario.")
+                logger.exception("No se pudo enviar el correo con la contraseña provisoria al nuevo funcionario.")
 
             if correo_enviado:
                 messages.success(
                     request,
-                    f"Usuario '{username}' creado exitosamente. Se enviaron las credenciales de acceso al correo '{correo}'.",
+                    f"Funcionario '{nombre}' (usuario: '{username}') creado exitosamente. Se enviaron las credenciales de acceso al correo '{correo}'.",
                 )
             else:
                 messages.warning(
                     request,
-                    f"Usuario '{username}' creado exitosamente con contraseña provisional: {provisional_password} (no fue posible enviar el correo de notificación en este momento).",
+                    f"Funcionario '{nombre}' (usuario: '{username}') creado exitosamente con contraseña provisional: {provisional_password} (no fue posible enviar el correo de notificación en este momento).",
                 )
             return redirect('gestion_usuarios')
 
@@ -1462,7 +1496,10 @@ def gestion_usuarios(request):
                 qs = qs.filter(delegacion=delegacion_seleccionada)
 
     if q:
-        qs = qs.filter(build_accent_query(['user__first_name', 'user__email', 'user__username', 'delegacion__nombre'], q))
+        qs = qs.filter(build_accent_query([
+            'user__first_name', 'user__email', 'user__username', 'delegacion__nombre',
+            'primer_nombre', 'segundo_nombre', 'apellido_paterno', 'apellido_materno',
+        ], q))
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
 
@@ -1493,7 +1530,7 @@ def gestion_usuarios(request):
                 del_txt,
                 f.estado,
             ])
-        return export_to_excel_csv("Usuarios", headers, rows)
+        return export_to_excel_csv("Funcionarios", headers, rows)
 
     page_size = _get_page_size(request)
     paginator = Paginator(qs, page_size)
@@ -1577,11 +1614,22 @@ def gestion_usuarios_editar(request, user_id):
                 return redirect('gestion_usuarios')
 
         estado = request.POST.get('estado', funcionario.estado)
-        funcionario.user.first_name = request.POST.get('nombre', funcionario.user.first_name).strip()
+        nombre_edit, partes_edit, err_nombre_edit = extraer_partes_persona_desde_post(
+            request.POST, prefix='', exigir_estructurado=False
+        )
+        if err_nombre_edit:
+            messages.error(request, err_nombre_edit)
+            return redirect('gestion_usuarios')
+        funcionario.user.first_name = nombre_edit or funcionario.user.first_name
         funcionario.user.email = request.POST.get('correo', funcionario.user.email).strip()
         funcionario.user.is_active = (estado == 'Activo')
         funcionario.user.save()
 
+        if partes_edit:
+            funcionario.primer_nombre = partes_edit.get('primer_nombre', '')
+            funcionario.segundo_nombre = partes_edit.get('segundo_nombre', '')
+            funcionario.apellido_paterno = partes_edit.get('apellido_paterno', '')
+            funcionario.apellido_materno = partes_edit.get('apellido_materno', '')
         funcionario.cargo = cargo_obj
 
         if ctx['permisos']['es_admin']:
@@ -1616,7 +1664,7 @@ def gestion_usuarios_editar(request, user_id):
             else:
                 FuncionarioRol.objects.create(funcionario=funcionario, rol=rol_obj)
 
-        messages.success(request, f"Usuario '{funcionario.user.first_name}' actualizado exitosamente.")
+        messages.success(request, f"Funcionario '{funcionario.user.first_name}' actualizado exitosamente.")
     return redirect('gestion_usuarios')
 
 
@@ -1630,7 +1678,7 @@ def gestion_usuarios_eliminar(request, user_id):
     funcionario = get_object_or_404(Funcionario, id=user_id)
     if ctx['permisos']['es_delegado'] and not ctx['permisos']['es_admin']:
         if funcionario.delegacion != ctx['delegacion_activa']:
-            messages.error(request, "No puedes eliminar usuarios de otra delegación.")
+            messages.error(request, "No puedes eliminar funcionarios de otra delegación.")
             return redirect('gestion_usuarios')
 
     if request.method == 'POST':
@@ -1639,7 +1687,7 @@ def gestion_usuarios_eliminar(request, user_id):
         funcionario.user.is_active = False
         funcionario.user.save()
         funcionario.delete()
-        messages.success(request, f"Usuario '{nombre}' desactivado correctamente.")
+        messages.success(request, f"Funcionario '{nombre}' desactivado correctamente.")
     return redirect('gestion_usuarios')
 
 
@@ -2397,13 +2445,15 @@ def gestion_atenciones(request):
 
         # Manejo de vecino u organización comunitaria (JJVV / ONG / Club, etc.)
         nuevo_nombre = request.POST.get('nuevo_vecino_nombre', '').strip()
+        nuevo_pn = request.POST.get('nuevo_vecino_primer_nombre', '').strip()
+        nuevo_ap = request.POST.get('nuevo_vecino_apellido_paterno', '').strip()
         nuevo_rut = request.POST.get('nuevo_vecino_rut', '').strip()
 
         chk_nuevo_vecino = request.POST.get('chk_nuevo_vecino', '').strip() == '1'
         chk_representa_org = request.POST.get('chk_representa_org', '').strip() == '1'
         es_modo_org = chk_representa_org or (modo_vecino == 'organizacion')
         es_modo_nuevo_vec = (not es_modo_org) and (
-            chk_nuevo_vecino or (modo_vecino == 'nuevo') or bool(nuevo_nombre and nuevo_rut)
+            chk_nuevo_vecino or (modo_vecino == 'nuevo') or bool((nuevo_nombre or (nuevo_pn and nuevo_ap)) and nuevo_rut)
         )
 
         vecino_obj = None
@@ -3440,7 +3490,14 @@ def gestion_vecinos_editar(request, vecino_id):
                 return redirect('gestion_vecinos')
 
         anterior_rut = vecino.rut
-        nuevo_nombre = request.POST.get('nombre', vecino.nombre).strip()
+        nuevo_nombre, partes_vec_edit, err_vec_edit = extraer_partes_persona_desde_post(
+            request.POST, prefix='', exigir_estructurado=False
+        )
+        if err_vec_edit:
+            messages.error(request, err_vec_edit)
+            return redirect('gestion_vecinos')
+        if not nuevo_nombre:
+            nuevo_nombre = vecino.nombre
         nuevo_rut = request.POST.get('rut', vecino.rut).strip()
         nuevo_correo = request.POST.get('correo', '').strip()
         correo_presente = 'correo' in request.POST
@@ -3484,6 +3541,11 @@ def gestion_vecinos_editar(request, vecino_id):
             nuevo_tel = formatear_telefono_chileno(nuevo_tel)
 
         vecino.nombre = nuevo_nombre
+        if partes_vec_edit:
+            vecino.primer_nombre = partes_vec_edit.get('primer_nombre', '')
+            vecino.segundo_nombre = partes_vec_edit.get('segundo_nombre', '')
+            vecino.apellido_paterno = partes_vec_edit.get('apellido_paterno', '')
+            vecino.apellido_materno = partes_vec_edit.get('apellido_materno', '')
         vecino.rut = rut_fmt
         vecino.direccion = nueva_dir
         vecino.telefono = nuevo_tel

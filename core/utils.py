@@ -2,6 +2,7 @@ import io
 import csv
 import itertools
 import re
+import unicodedata
 from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
@@ -359,3 +360,101 @@ def export_to_excel_csv(filename, headers, rows):
     for row in rows:
         writer.writerow(row)
     return response
+
+
+def construir_nombre_completo(primer_nombre, segundo_nombre='', apellido_paterno='', apellido_materno=''):
+    """Une primer nombre, segundo nombre y apellidos omitiendo vacíos y normalizando espacios."""
+    partes = [
+        ' '.join((p or '').split())
+        for p in (primer_nombre, segundo_nombre, apellido_paterno, apellido_materno)
+    ]
+    return ' '.join(p for p in partes if p)
+
+
+def separar_nombre_completo(nombre_completo):
+    """Divide un nombre completo legado en (primer_nombre, segundo_nombre, apellido_paterno, apellido_materno)."""
+    tokens = (nombre_completo or '').strip().split()
+    if not tokens:
+        return '', '', '', ''
+    if len(tokens) == 1:
+        return tokens[0], '', '', ''
+    if len(tokens) == 2:
+        return tokens[0], '', tokens[1], ''
+    if len(tokens) == 3:
+        return tokens[0], '', tokens[1], tokens[2]
+    return tokens[0], ' '.join(tokens[1:-2]), tokens[-2], tokens[-1]
+
+
+def extraer_partes_persona_desde_post(post_data, prefix='', exigir_estructurado=True):
+    """
+    Extrae primer_nombre, segundo_nombre, apellido_paterno y apellido_materno desde POST.
+    Si solo viene el campo legado 'nombre', lo separa automáticamente como respaldo.
+    Retorna (nombre_completo, partes_dict, error_msg).
+    """
+    pn = ' '.join(post_data.get(f'{prefix}primer_nombre', '').split())
+    sn = ' '.join(post_data.get(f'{prefix}segundo_nombre', '').split())
+    ap = ' '.join(post_data.get(f'{prefix}apellido_paterno', '').split())
+    am = ' '.join(post_data.get(f'{prefix}apellido_materno', '').split())
+    nombre_legado = ' '.join(post_data.get(f'{prefix}nombre', '').split())
+
+    usando_legado = not pn and not ap and bool(nombre_legado)
+    if usando_legado:
+        if len(nombre_legado) > 150:
+            return '', {}, "El nombre completo no puede superar los 150 caracteres."
+        return nombre_legado, {}, None
+
+    if exigir_estructurado and (not pn or not ap):
+        return '', {}, "El primer nombre y el apellido paterno son obligatorios."
+
+    if not usando_legado:
+        for campo, val in (
+            ('Primer nombre', pn),
+            ('Segundo nombre', sn),
+            ('Apellido paterno', ap),
+            ('Apellido materno', am),
+        ):
+            if len(val) > 50:
+                return '', {}, f"El campo '{campo}' no puede superar los 50 caracteres."
+
+    nombre_completo = nombre_legado if usando_legado else construir_nombre_completo(pn, sn, ap, am)
+    if not nombre_completo:
+        return '', {}, "El nombre completo es obligatorio."
+    if len(nombre_completo) > 150:
+        return '', {}, "El nombre completo no puede superar los 150 caracteres."
+
+    return nombre_completo, {
+        'primer_nombre': pn,
+        'segundo_nombre': sn,
+        'apellido_paterno': ap,
+        'apellido_materno': am,
+    }, None
+
+
+def normalizar_slug_usuario(texto):
+    """Normaliza tildes/ñ/espacios dejando solo caracteres ASCII alfanuméricos en minúscula."""
+    descompuesto = unicodedata.normalize('NFKD', (texto or '').strip())
+    sin_tildes = ''.join(c for c in descompuesto if not unicodedata.combining(c))
+    return re.sub(r'[^a-z0-9]', '', sin_tildes.lower())
+
+
+def generar_username_funcionario(primer_nombre, apellido_paterno, exclude_user_id=None):
+    """
+    Genera automáticamente un nombre de usuario único con la inicial del primer nombre
+    y el apellido paterno (ej. María González -> mgonzalez, colisión -> mgonzalez2).
+    """
+    from django.contrib.auth.models import User
+
+    pn = normalizar_slug_usuario(primer_nombre)
+    ap = normalizar_slug_usuario(apellido_paterno)
+    base = f"{pn[:1]}{ap}"[:140] or "func"
+
+    candidato = base
+    sufijo = 2
+    qs = User.objects.all()
+    if exclude_user_id:
+        qs = qs.exclude(id=exclude_user_id)
+    while qs.filter(username__iexact=candidato).exists():
+        candidato = f"{base[:140]}{sufijo}"
+        sufijo += 1
+    return candidato
+

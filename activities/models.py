@@ -291,6 +291,10 @@ class OrganizacionComunitaria(BaseModel):
 
 class Vecino(BaseModel):
     nombre = models.CharField(max_length=150)
+    primer_nombre = models.CharField(max_length=50, blank=True, default='')
+    segundo_nombre = models.CharField(max_length=50, blank=True, default='')
+    apellido_paterno = models.CharField(max_length=50, blank=True, default='')
+    apellido_materno = models.CharField(max_length=50, blank=True, default='')
     rut = models.CharField(max_length=20, unique=True)
     direccion = models.CharField(max_length=200, null=True, blank=True)
     telefono = models.CharField(max_length=30, null=True, blank=True)
@@ -299,6 +303,17 @@ class Vecino(BaseModel):
     territorio = models.CharField(max_length=100, null=True, blank=True)
     tipo_gestion = models.ForeignKey(TipoGestion, on_delete=models.SET_NULL, null=True, blank=True)
     estado = models.CharField(max_length=20, default='Activo')
+
+    def get_partes_nombre(self):
+        from core.utils import separar_nombre_completo
+        if self.primer_nombre or self.apellido_paterno:
+            return (
+                self.primer_nombre,
+                self.segundo_nombre,
+                self.apellido_paterno,
+                self.apellido_materno,
+            )
+        return separar_nombre_completo(self.nombre)
 
     def clean(self):
         super().clean()
@@ -316,7 +331,16 @@ class Vecino(BaseModel):
                 raise ValidationError({'direccion': err_dir})
 
     def save(self, *args, **kwargs):
-        from core.utils import validar_rut
+        from core.utils import construir_nombre_completo, validar_rut
+        if self.primer_nombre or self.apellido_paterno:
+            compuesto = construir_nombre_completo(
+                self.primer_nombre,
+                self.segundo_nombre,
+                self.apellido_paterno,
+                self.apellido_materno,
+            )
+            if compuesto:
+                self.nombre = compuesto[:150]
         if self.rut:
             valido, res = validar_rut(self.rut)
             if valido:

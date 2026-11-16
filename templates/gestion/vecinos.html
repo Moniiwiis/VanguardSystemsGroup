@@ -154,12 +154,14 @@
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
                 {% if not permisos.es_consultor %}
+                {% with v.get_partes_nombre as n_partes %}
                 <button type="button" 
-                        onclick="openEditVecino('{{ v.id }}', '{{ v.nombre|escapejs }}', '{{ v.rut|escapejs }}', '{{ v.direccion|default:''|escapejs }}', '{{ v.telefono|default:''|escapejs }}', '{{ v.sector.id|default:'' }}', '{{ v.delegacion.id|default:'' }}', '{% if v.delegacion %}{{ v.delegacion.nombre|escapejs }}{% elif delegacion_activa %}{{ delegacion_activa.nombre|escapejs }}{% else %}Sin delegación{% endif %}', '{{ v.tipo_gestion.id|default:'' }}', '{{ v.estado|escapejs }}', '{{ v.usuario_email|default:''|escapejs }}')" 
+                        onclick="openEditVecino('{{ v.id }}', '{{ v.nombre|escapejs }}', '{{ v.rut|escapejs }}', '{{ v.direccion|default:''|escapejs }}', '{{ v.telefono|default:''|escapejs }}', '{{ v.sector.id|default:'' }}', '{{ v.delegacion.id|default:'' }}', '{% if v.delegacion %}{{ v.delegacion.nombre|escapejs }}{% elif delegacion_activa %}{{ delegacion_activa.nombre|escapejs }}{% else %}Sin delegación{% endif %}', '{{ v.tipo_gestion.id|default:'' }}', '{{ v.estado|escapejs }}', '{{ v.usuario_email|default:''|escapejs }}', '{{ n_partes.0|escapejs }}', '{{ n_partes.1|escapejs }}', '{{ n_partes.2|escapejs }}', '{{ n_partes.3|escapejs }}')" 
                         title="Editar vecino"
                         class="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all">
                   <i data-lucide="edit-3" class="w-4 h-4"></i>
                 </button>
+                {% endwith %}
                 {% endif %}
                 {% if permisos.puede_eliminar %}
                 <form method="POST" action="{% url 'gestion_vecinos_eliminar' v.id %}" onsubmit="return confirmDelete(this, '{{ v.nombre|escapejs }}');" class="inline">
@@ -232,10 +234,28 @@
     </div>
     <form id="form-editar-vecino" method="POST" action="" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {% csrf_token %}
-      <div class="sm:col-span-2">
-        <label class="block text-xs font-bold text-slate-700 mb-1">Nombre Completo <span class="text-[#C41230]">*</span></label>
-        <input type="text" id="edit-vecino-nombre" name="nombre" required maxlength="150"
-               placeholder="Nombre y apellidos (máx 150 caracteres)"
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Primer Nombre <span class="text-[#C41230]">*</span></label>
+        <input type="text" id="edit-vecino-primer-nombre" name="primer_nombre" required maxlength="50"
+               placeholder="Ej: Patricia"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Segundo Nombre</label>
+        <input type="text" id="edit-vecino-segundo-nombre" name="segundo_nombre" maxlength="50"
+               placeholder="Opcional"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Apellido Paterno <span class="text-[#C41230]">*</span></label>
+        <input type="text" id="edit-vecino-apellido-paterno" name="apellido_paterno" required maxlength="50"
+               placeholder="Ej: Morales"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Apellido Materno</label>
+        <input type="text" id="edit-vecino-apellido-materno" name="apellido_materno" maxlength="50"
+               placeholder="Ej: Castro"
                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
       </div>
       <div>
@@ -424,9 +444,12 @@
     document.getElementById('modal-ver-vecino').classList.remove('hidden');
   }
 
-  function openEditVecino(id, nombre, rut, direccion, telefono, sectorId, delegacionId, delegacionNombre, tipoGestionId, estado, correo) {
+  function openEditVecino(id, nombre, rut, direccion, telefono, sectorId, delegacionId, delegacionNombre, tipoGestionId, estado, correo, primerNombre, segundoNombre, apellidoPaterno, apellidoMaterno) {
     document.getElementById('form-editar-vecino').action = `/gestion/vecinos/${id}/editar/`;
-    document.getElementById('edit-vecino-nombre').value = nombre;
+    document.getElementById('edit-vecino-primer-nombre').value = primerNombre || '';
+    document.getElementById('edit-vecino-segundo-nombre').value = segundoNombre || '';
+    document.getElementById('edit-vecino-apellido-paterno').value = apellidoPaterno || '';
+    document.getElementById('edit-vecino-apellido-materno').value = apellidoMaterno || '';
     document.getElementById('edit-vecino-rut').value = rut;
     var editCorreo = document.getElementById('edit-vecino-correo');
     if (editCorreo) {
