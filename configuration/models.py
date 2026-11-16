@@ -33,7 +33,14 @@ class Periodo(BaseModel):
         return min(round(pct, 2), 100.0)
 
     def __str__(self):
-        return f"Período {self.fecha_inicio} a {self.fecha_termino}"
+        inicio_fmt = self.fecha_inicio.strftime('%d-%m-%Y') if self.fecha_inicio else ''
+        termino_fmt = self.fecha_termino.strftime('%d-%m-%Y') if self.fecha_termino else ''
+        return f"Período {inicio_fmt} a {termino_fmt}"
+
+    class Meta:
+        db_table = 'configuration_period'
+        verbose_name = "Period"
+        verbose_name_plural = "Periods"
 
 class TipoAtencion(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
@@ -49,6 +56,11 @@ class TipoAtencion(BaseModel):
     def __str__(self):
         return f"{self.get_codigo()} - {self.nombre}"
 
+    class Meta:
+        db_table = 'configuration_request_type'
+        verbose_name = "Request Type"
+        verbose_name_plural = "Request Types"
+
 class SubAtencion(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
     nombre = models.CharField(max_length=100)
@@ -63,6 +75,11 @@ class SubAtencion(BaseModel):
     def __str__(self):
         return f"{self.get_codigo()} - {self.nombre} ({self.tipo_atencion.nombre})"
 
+    class Meta:
+        db_table = 'configuration_request_subtype'
+        verbose_name = "Request Subtype"
+        verbose_name_plural = "Request Subtypes"
+
 class CatalogoActividad(BaseModel):
     tipo_actividad = models.CharField(max_length=100)
     servicio = models.CharField(max_length=100)
@@ -72,6 +89,11 @@ class CatalogoActividad(BaseModel):
 
     def __str__(self):
         return f"{self.tipo_actividad} - {self.servicio}"
+
+    class Meta:
+        db_table = 'configuration_activity_catalog'
+        verbose_name = "Activity Catalog"
+        verbose_name_plural = "Activity Catalogs"
 
 class ItemMedicion(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
@@ -90,6 +112,41 @@ class ItemMedicion(BaseModel):
     def __str__(self):
         return f"{self.get_codigo()} - {self.nombre_item}"
 
+    class Meta:
+        db_table = 'configuration_measurement_item'
+        verbose_name = "Measurement Item"
+        verbose_name_plural = "Measurement Items"
+
+
+class AreaApoyo(BaseModel):
+    """Catálogo administrable de áreas municipales, personas o cuadrillas de apoyo."""
+
+    TIPO_CHOICES = [
+        ('Área Municipal', 'Área Municipal'),
+        ('Persona', 'Persona'),
+        ('Cuadrilla', 'Cuadrilla'),
+    ]
+
+    codigo = models.CharField(max_length=20, null=True, blank=True)
+    nombre = models.CharField(max_length=100)
+    tipo = models.CharField(max_length=30, choices=TIPO_CHOICES, default='Área Municipal')
+    descripcion = models.TextField(null=True, blank=True)
+    estado = models.CharField(max_length=20, default='Activo')
+
+    def get_codigo(self):
+        if self.codigo:
+            return self.codigo
+        return f"AA{self.id:03d}" if self.id else "AA001"
+
+    def __str__(self):
+        return f"{self.nombre} ({self.tipo})"
+
+    class Meta:
+        db_table = 'configuration_support_area'
+        verbose_name = "Support Area"
+        verbose_name_plural = "Support Areas"
+        ordering = ['nombre']
+
 class ConfiguracionMeta(BaseModel):
     item = models.ForeignKey(ItemMedicion, on_delete=models.RESTRICT)
     periodo = models.ForeignKey(Periodo, on_delete=models.RESTRICT)
@@ -107,6 +164,9 @@ class ConfiguracionMeta(BaseModel):
             raise ValidationError({'ponderacion': 'La ponderación debe estar entre 0% y 100%.'})
 
     class Meta:
+        db_table = 'configuration_goal_configuration'
+        verbose_name = "Goal Configuration"
+        verbose_name_plural = "Goal Configurations"
         # Asegura que no exista una meta duplicada para la misma combinación de ítem, período y funcionario
         unique_together = ('item', 'periodo', 'funcionario')
 
@@ -192,4 +252,4 @@ class ConfiguracionMeta(BaseModel):
             return 'ROJO'
 
     def __str__(self):
-        return f"Meta para {self.item} - Período {self.periodo}"
+        return f"Meta para {self.item} - Período {self.periodo}"

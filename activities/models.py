@@ -145,8 +145,19 @@ class Actividad(BaseModel):
             return 'Pendiente'
         return val.resultado
 
+    def tiene_evidencias_completas(self):
+        evis = self.evidencias.filter(
+            Q(imagen__gt='') | Q(archivo__gt='')
+        )
+        return evis.filter(momento='antes').exists() and evis.filter(momento='despues').exists()
+
     def __str__(self):
         return f"Actividad {self.codigo_evidencia_unico} {'✓' if self.da_puntaje else '✗'}"
+
+    class Meta:
+        db_table = 'activities_activity'
+        verbose_name = "Activity"
+        verbose_name_plural = "Activities"
 
 class Evidencia(BaseModel):
     MOMENTO_CHOICES = [
@@ -161,11 +172,21 @@ class Evidencia(BaseModel):
     momento = models.CharField(max_length=10, choices=MOMENTO_CHOICES, default='despues')
     metadatos = models.TextField(null=True, blank=True)
 
+    class Meta:
+        db_table = 'activities_evidence'
+        verbose_name = "Evidence"
+        verbose_name_plural = "Evidences"
+
 class ValidacionEvidencia(BaseModel):
     actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE)
     verificador = models.ForeignKey("accounts.Funcionario", on_delete=models.RESTRICT)
     resultado = models.CharField(max_length=30)
     observaciones = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'activities_evidence_validation'
+        verbose_name = "Evidence Validation"
+        verbose_name_plural = "Evidence Validations"
 
 class AtencionSocialGestion(BaseModel):
     actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE)
@@ -174,6 +195,9 @@ class AtencionSocialGestion(BaseModel):
     fecha_gestion = models.DateField()
     resultado_gestion = models.TextField(null=True, blank=True)
     class Meta:
+        db_table = 'activities_social_management'
+        verbose_name = "Social Management"
+        verbose_name_plural = "Social Managements"
         # Garantiza que una actividad no tenga dos veces la gestión número 1, 2 o 3
         unique_together = ('actividad', 'numero_gestion')
 
@@ -187,6 +211,11 @@ class TipoGestion(BaseModel):
 
     def __str__(self):
         return self.nombre
+
+    class Meta:
+        db_table = 'activities_management_type'
+        verbose_name = "Management Type"
+        verbose_name_plural = "Management Types"
 
 class OrganizacionComunitaria(BaseModel):
     """
@@ -202,6 +231,12 @@ class OrganizacionComunitaria(BaseModel):
         ('Agrupación Cultural/Juvenil', 'Agrupación Cultural o Juvenil'),
         ('Comité de Vivienda/APR', 'Comité de Vivienda o APR'),
         ('Otra Organización Funcional', 'Otra Organización Funcional'),
+    ]
+
+    CONTACTO_PRIORITARIO_CHOICES = [
+        ('presidente', 'Presidente'),
+        ('tesorero', 'Tesorero'),
+        ('secretario', 'Secretario'),
     ]
 
     nombre = models.CharField(max_length=200)
@@ -223,6 +258,25 @@ class OrganizacionComunitaria(BaseModel):
     telefono_contacto = models.CharField(max_length=20, null=True, blank=True, verbose_name="Teléfono Contacto")
     email_contacto = models.EmailField(max_length=100, null=True, blank=True, verbose_name="Correo Contacto")
     direccion_sede = models.CharField(max_length=250, null=True, blank=True, verbose_name="Dirección Sede")
+    contacto_prioritario = models.CharField(
+        max_length=20,
+        choices=CONTACTO_PRIORITARIO_CHOICES,
+        default='presidente',
+        verbose_name="Representante / Contacto Prioritario",
+    )
+    # Directiva estructurada (Presidente, Tesorero, Secretario)
+    presidente_nombre = models.CharField(max_length=150, null=True, blank=True, verbose_name="Presidente - Nombre y Apellido")
+    presidente_rut = models.CharField(max_length=20, null=True, blank=True, verbose_name="Presidente - RUT")
+    presidente_correo = models.EmailField(max_length=100, null=True, blank=True, verbose_name="Presidente - Correo")
+    presidente_telefono = models.CharField(max_length=20, null=True, blank=True, verbose_name="Presidente - Teléfono")
+    tesorero_nombre = models.CharField(max_length=150, null=True, blank=True, verbose_name="Tesorero - Nombre y Apellido")
+    tesorero_rut = models.CharField(max_length=20, null=True, blank=True, verbose_name="Tesorero - RUT")
+    tesorero_correo = models.EmailField(max_length=100, null=True, blank=True, verbose_name="Tesorero - Correo")
+    tesorero_telefono = models.CharField(max_length=20, null=True, blank=True, verbose_name="Tesorero - Teléfono")
+    secretario_nombre = models.CharField(max_length=150, null=True, blank=True, verbose_name="Secretario - Nombre y Apellido")
+    secretario_rut = models.CharField(max_length=20, null=True, blank=True, verbose_name="Secretario - RUT")
+    secretario_correo = models.EmailField(max_length=100, null=True, blank=True, verbose_name="Secretario - Correo")
+    secretario_telefono = models.CharField(max_length=20, null=True, blank=True, verbose_name="Secretario - Teléfono")
     directiva_actual = models.TextField(null=True, blank=True, verbose_name="Directiva Actual")
     observaciones = models.TextField(null=True, blank=True, verbose_name="Observaciones")
 
@@ -254,12 +308,17 @@ class OrganizacionComunitaria(BaseModel):
         return f"{self.nombre} ({self.tipo_organizacion})"
 
     class Meta:
-        verbose_name = "Organización Comunitaria / JJVV"
-        verbose_name_plural = "Organizaciones Comunitarias / JJVV"
+        db_table = 'activities_community_organization'
+        verbose_name = "Community Organization"
+        verbose_name_plural = "Community Organizations"
         ordering = ['nombre']
 
 class Vecino(BaseModel):
     nombre = models.CharField(max_length=150)
+    primer_nombre = models.CharField(max_length=50, blank=True, default='')
+    segundo_nombre = models.CharField(max_length=50, blank=True, default='')
+    apellido_paterno = models.CharField(max_length=50, blank=True, default='')
+    apellido_materno = models.CharField(max_length=50, blank=True, default='')
     rut = models.CharField(max_length=20, unique=True)
     direccion = models.CharField(max_length=200, null=True, blank=True)
     telefono = models.CharField(max_length=30, null=True, blank=True)
@@ -268,6 +327,17 @@ class Vecino(BaseModel):
     territorio = models.CharField(max_length=100, null=True, blank=True)
     tipo_gestion = models.ForeignKey(TipoGestion, on_delete=models.SET_NULL, null=True, blank=True)
     estado = models.CharField(max_length=20, default='Activo')
+
+    def get_partes_nombre(self):
+        from core.utils import separar_nombre_completo
+        if self.primer_nombre or self.apellido_paterno:
+            return (
+                self.primer_nombre,
+                self.segundo_nombre,
+                self.apellido_paterno,
+                self.apellido_materno,
+            )
+        return separar_nombre_completo(self.nombre)
 
     def clean(self):
         super().clean()
@@ -285,7 +355,16 @@ class Vecino(BaseModel):
                 raise ValidationError({'direccion': err_dir})
 
     def save(self, *args, **kwargs):
-        from core.utils import validar_rut
+        from core.utils import construir_nombre_completo, validar_rut
+        if self.primer_nombre or self.apellido_paterno:
+            compuesto = construir_nombre_completo(
+                self.primer_nombre,
+                self.segundo_nombre,
+                self.apellido_paterno,
+                self.apellido_materno,
+            )
+            if compuesto:
+                self.nombre = compuesto[:150]
         if self.rut:
             valido, res = validar_rut(self.rut)
             if valido:
@@ -299,6 +378,11 @@ class Vecino(BaseModel):
 
     def __str__(self):
         return f"{self.nombre} ({self.rut})"
+
+    class Meta:
+        db_table = 'activities_neighbor'
+        verbose_name = "Neighbor"
+        verbose_name_plural = "Neighbors"
 
 class AtencionCiudadana(BaseModel):
     codigo_atencion = models.CharField(max_length=50, unique=True, blank=True)
@@ -339,10 +423,18 @@ class AtencionCiudadana(BaseModel):
             return self.actividad.codigo_evidencia_unico
         return f"EVI-{self.codigo_atencion.replace('AT-', '')}"
 
+    def get_codigo_tubo(self):
+        return f"TUB-{self.id:05d}" if self.id else "TUB-00000"
+
     def estado_evidencia(self):
         if self.actividad:
             return self.actividad.estado_validacion()
         return "Pendiente"
+
+    def tiene_evidencias_completas(self):
+        if not self.actividad_id:
+            return False
+        return self.actividad.tiene_evidencias_completas()
 
     def save(self, *args, **kwargs):
         is_new = self.id is None
@@ -362,6 +454,109 @@ class AtencionCiudadana(BaseModel):
     def __str__(self):
         return f"{self.codigo_atencion} - {self.solicitante}"
 
+    class Meta:
+        db_table = 'activities_citizen_request'
+        verbose_name = "Citizen Request"
+        verbose_name_plural = "Citizen Requests"
+
+
+def _crear_actividad_soporte(
+    *,
+    func,
+    delegacion,
+    fallback_user,
+    tipo_atencion_nombre='',
+    descripcion_solicitud='',
+    accion_ejecutada='',
+    contacto_nombre='Delegación',
+    contacto_telefono=None,
+    tipo_registro='accion',
+    va_a_tubo=False,
+):
+    """Crea una Actividad con sus dependencias mínimas garantizadas (Funcionario, Periodo, ItemMedicion)."""
+    import datetime
+    from django.utils import timezone
+    from configuration.models import Periodo, ItemMedicion
+    from accounts.models import Funcionario, FuncionarioRol, Delegacion, Cargo
+    from django.contrib.auth.models import User
+
+    if not func and delegacion:
+        func = Funcionario.all_objects.filter(delegacion=delegacion).first()
+    if not func:
+        func = Funcionario.all_objects.first()
+    if not func:
+        del_obj = delegacion or Delegacion.objects.first()
+        if not del_obj:
+            del_obj = Delegacion.objects.create(nombre="Delegación Centro", codigo="DEL01", estado="Activa")
+        cargo_obj = Cargo.objects.first()
+        if not cargo_obj:
+            cargo_obj = Cargo.objects.create(nombre_cargo="Operador Territorial", estado="Activo")
+        user_obj = fallback_user or User.objects.filter(is_superuser=True).first() or User.objects.first()
+        func = Funcionario.objects.create(
+            user=user_obj,
+            identificador_institucional=f"FUNC-{user_obj.id if user_obj else 1:04d}",
+            cargo=cargo_obj,
+            delegacion=del_obj,
+            estado="Activo",
+        )
+
+    periodo = Periodo.objects.filter(estado='Abierto').first() or Periodo.objects.first()
+    if not periodo:
+        anio = timezone.now().year
+        periodo = Periodo.objects.create(
+            fecha_inicio=datetime.date(anio, 1, 1),
+            fecha_termino=datetime.date(anio, 12, 31),
+            dias_computables=365,
+            estado='Abierto',
+        )
+
+    item = None
+    if tipo_atencion_nombre and 'social' in tipo_atencion_nombre.lower():
+        item = ItemMedicion.objects.filter(nombre_item__icontains='social').first()
+    if not item:
+        item = ItemMedicion.objects.filter(nombre_item__icontains='operativo').first()
+    if not item:
+        item = ItemMedicion.objects.first()
+    if not item:
+        item = ItemMedicion.objects.create(
+            nombre_item="Atención Ciudadana y Requerimientos Territoriales",
+            descripcion="Ítem base para requerimientos territoriales y evidencias",
+            estado="Activo",
+        )
+
+    hoy = timezone.now().date()
+    fecha_act = hoy
+    if periodo.fecha_inicio and periodo.fecha_termino:
+        if hoy < periodo.fecha_inicio:
+            fecha_act = periodo.fecha_inicio
+        elif hoy > periodo.fecha_termino:
+            fecha_act = periodo.fecha_termino
+
+    fecha_str = timezone.now().strftime('%Y%m%d')
+    uid = uuid.uuid4().hex[:6].upper()
+    cod_evi = f"EVI-{fecha_str}-{uid}"
+
+    es_delegado = False
+    if func:
+        fr = FuncionarioRol.objects.filter(funcionario=func).select_related('rol').first()
+        if fr and fr.rol and 'delegado' in fr.rol.nombre_rol.lower():
+            es_delegado = True
+
+    return Actividad.objects.create(
+        codigo_evidencia_unico=cod_evi,
+        fecha_actividad=fecha_act,
+        descripcion_solicitud=descripcion_solicitud,
+        accion_ejecutada=accion_ejecutada,
+        contacto_nombre=(contacto_nombre or 'Delegación')[:100],
+        contacto_telefono=str(contacto_telefono)[:20] if contacto_telefono else None,
+        funcionario=func,
+        item=item,
+        periodo=periodo,
+        tipo_registro=tipo_registro or 'accion',
+        es_gestion_delegado=es_delegado,
+        va_a_tubo=va_a_tubo,
+    )
+
 
 def get_or_create_actividad_para_atencion(atencion):
     """
@@ -374,105 +569,52 @@ def get_or_create_actividad_para_atencion(atencion):
         except Exception:
             pass
 
-    import datetime
-    from django.utils import timezone
-    from configuration.models import Periodo, ItemMedicion
-    from accounts.models import Funcionario, FuncionarioRol, Delegacion, Cargo
-    from django.contrib.auth.models import User
-
-    # 1. Funcionario responsable
-    func = None
-    if atencion.usuario_responsable_id:
-        func = Funcionario.all_objects.filter(user_id=atencion.usuario_responsable_id).first()
-    if not func and atencion.delegacion_id:
-        func = Funcionario.all_objects.filter(delegacion_id=atencion.delegacion_id).first()
-    if not func:
-        func = Funcionario.all_objects.first()
-    if not func:
-        del_obj = atencion.delegacion or Delegacion.objects.first()
-        if not del_obj:
-            del_obj = Delegacion.objects.create(nombre="Delegación Centro", codigo="DEL01", estado="Activa")
-        cargo_obj = Cargo.objects.first()
-        if not cargo_obj:
-            cargo_obj = Cargo.objects.create(nombre_cargo="Operador Territorial", estado="Activo")
-        user_obj = atencion.usuario_responsable or atencion.creado_por or User.objects.filter(is_superuser=True).first() or User.objects.first()
-        func = Funcionario.objects.create(
-            user=user_obj,
-            identificador_institucional=f"FUNC-{user_obj.id if user_obj else 1:04d}",
-            cargo=cargo_obj,
-            delegacion=del_obj,
-            estado="Activo",
-        )
-
-    # 2. Período
-    periodo = Periodo.objects.filter(estado='Abierto').first() or Periodo.objects.first()
-    if not periodo:
-        anio = timezone.now().year
-        periodo = Periodo.objects.create(
-            fecha_inicio=datetime.date(anio, 1, 1),
-            fecha_termino=datetime.date(anio, 12, 31),
-            dias_computables=365,
-            estado='Abierto',
-        )
-
-    # 3. Ítem de medición
-    item = None
-    if atencion.tipo_atencion and 'social' in atencion.tipo_atencion.nombre.lower():
-        item = ItemMedicion.objects.filter(nombre_item__icontains='social').first()
-    if not item:
-        item = ItemMedicion.objects.filter(nombre_item__icontains='operativo').first()
-    if not item:
-        item = ItemMedicion.objects.first()
-    if not item:
-        item = ItemMedicion.objects.create(
-            nombre_item="Atención Ciudadana y Requerimientos Territoriales",
-            descripcion="Ítem base para requerimientos territoriales y evidencias SGR",
-            estado="Activo",
-        )
-
-    # 4. Fecha válida
-    hoy = timezone.now().date()
-    fecha_act = hoy
-    if periodo.fecha_inicio and periodo.fecha_termino:
-        if hoy < periodo.fecha_inicio:
-            fecha_act = periodo.fecha_inicio
-        elif hoy > periodo.fecha_termino:
-            fecha_act = periodo.fecha_termino
-
-    # 5. Código único de evidencia EVI
-    fecha_str = timezone.now().strftime('%Y%m%d')
-    uid = uuid.uuid4().hex[:6].upper()
-    cod_evi = f"EVI-{fecha_str}-{uid}"
-
-    # 6. Datos de contacto seguros
-    contacto_nombre = (atencion.solicitante[:100] if atencion.solicitante else 'Vecino/a')
-    contacto_tel = atencion.telefono_contacto or (atencion.vecino.telefono if atencion.vecino else None)
-    if contacto_tel:
-        contacto_tel = str(contacto_tel)[:20]
-
-    # 7. Rol delegado
-    es_delegado = False
-    if func:
-        fr = FuncionarioRol.objects.filter(funcionario=func).select_related('rol').first()
-        if fr and fr.rol and 'delegado' in fr.rol.nombre_rol.lower():
-            es_delegado = True
-
-    # 8. Crear actividad
-    actividad = Actividad.objects.create(
-        codigo_evidencia_unico=cod_evi,
-        fecha_actividad=fecha_act,
+    from accounts.models import Funcionario
+    func = Funcionario.all_objects.filter(user_id=atencion.usuario_responsable_id).first() if atencion.usuario_responsable_id else None
+    contacto_tel = (
+        atencion.telefono_contacto
+        or (atencion.vecino.telefono if atencion.vecino else None)
+        or (atencion.organizacion.telefono_contacto if atencion.organizacion else None)
+    )
+    actividad = _crear_actividad_soporte(
+        func=func,
+        delegacion=atencion.delegacion,
+        fallback_user=atencion.usuario_responsable or atencion.creado_por,
+        tipo_atencion_nombre=atencion.tipo_atencion.nombre if atencion.tipo_atencion else '',
         descripcion_solicitud=atencion.descripcion or f"Solicitud ciudadana {atencion.codigo_atencion}",
         accion_ejecutada=f"Atención ciudadana {atencion.codigo_atencion} ({atencion.tipo_atencion.nombre if atencion.tipo_atencion else 'General'})",
-        contacto_nombre=contacto_nombre,
+        contacto_nombre=atencion.solicitante[:100] if atencion.solicitante else 'Vecino/a',
         contacto_telefono=contacto_tel,
-        funcionario=func,
-        item=item,
-        periodo=periodo,
         tipo_registro=getattr(atencion, 'tipo_registro', 'accion') or 'accion',
-        es_gestion_delegado=es_delegado,
         va_a_tubo=getattr(atencion, 'va_a_tubo', False),
     )
-
     AtencionCiudadana.all_objects.filter(id=atencion.id).update(actividad=actividad)
     atencion.actividad = actividad
+    return actividad
+
+
+def get_or_create_actividad_para_compromiso(compromiso):
+    """Garantiza que un CompromisoAgenda sectorial tenga una Actividad vinculada para evidencias y validación."""
+    if compromiso.actividad_origen_id:
+        try:
+            return compromiso.actividad_origen
+        except Exception:
+            pass
+
+    from agenda.models import CompromisoAgenda
+    func = compromiso.responsable if compromiso.responsable_id else None
+    del_nombre = compromiso.delegacion.nombre if compromiso.delegacion_id else 'Delegación Municipal'
+    actividad = _crear_actividad_soporte(
+        func=func,
+        delegacion=compromiso.delegacion,
+        fallback_user=(func.user if func else None) or compromiso.creado_por,
+        descripcion_solicitud=compromiso.observacion or f"Compromiso sectorial {compromiso.get_codigo_tubo()}",
+        accion_ejecutada=f"Compromiso sectorial {compromiso.get_codigo_tubo()} ({del_nombre})",
+        contacto_nombre=(compromiso.solicitante[:100] if compromiso.solicitante else del_nombre[:100]),
+        contacto_telefono=None,
+        tipo_registro='accion',
+        va_a_tubo=True,
+    )
+    CompromisoAgenda.all_objects.filter(id=compromiso.id).update(actividad_origen=actividad)
+    compromiso.actividad_origen = actividad
     return actividad

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Carta {{ carta.numero|default:"S/N" }} — Tubo de Cartas{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-5">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Oficina de Partes / Tubo de Cartas</p>
+      <h1 class="text-2xl font-extrabold text-[#8B1D19]">Carta Nº {{ carta.numero|default:"S/N" }}</h1>
+    </div>
+    <div class="flex gap-2">
+      <a class="border border-slate-200 bg-white hover:bg-slate-50 rounded-xl px-4 py-2 text-xs font-bold text-slate-700" href="{% url 'cartas_listado' %}">Volver</a>
+      {% if permisos.puede_editar %}
+        <a class="bg-[#C41230] hover:bg-[#8B1D19] text-white rounded-xl px-4 py-2 text-xs font-bold inline-flex items-center gap-2" href="{% url 'cartas_editar' carta.pk %}">
+          <i data-lucide="edit-3" class="w-4 h-4"></i> Editar
+        </a>
+      {% endif %}
+      {% if permisos.es_admin %}
+        <a class="border border-red-200 text-red-700 hover:bg-red-50 rounded-xl px-4 py-2 text-xs font-bold inline-flex items-center gap-2" href="{% url 'cartas_eliminar' carta.pk %}">
+          <i data-lucide="trash-2" class="w-4 h-4"></i> Eliminar
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="bg-white border border-slate-200 shadow-sm rounded-3xl p-6 grid sm:grid-cols-2 gap-5 text-xs">
+    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Fecha ingreso</p><b class="text-sm text-slate-900 font-mono">{{ carta.fecha|date:'d/m/Y' }}</b></div>
+    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Estado</p><b class="text-sm text-slate-900">{{ carta.get_estado_display }}</b></div>
+    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Para</p><b class="text-sm text-slate-900">{{ carta.para }}</b></div>
+    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Remite</p><b class="text-sm text-slate-900">{{ carta.remite }}</b></div>
+    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Fono contacto</p><b class="text-sm text-slate-900 font-mono">{{ carta.fono_contacto|default:'—' }}</b></div>
+    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Fecha de actividad</p><b class="text-sm text-slate-900">{{ carta.fecha_actividad|default:'—' }}</b></div>
+    <div class="sm:col-span-2"><p class="text-[11px] font-bold text-slate-500 uppercase">Actividad o tema</p><p class="text-sm text-slate-800 whitespace-pre-line mt-1">{{ carta.actividad_tema }}</p></div>
+    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Encargado de seguimiento</p><b class="text-sm text-slate-900">{{ carta.encargado_seguimiento|default:'—' }}</b></div>
+    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Pronunciamiento</p><b class="text-sm text-slate-900">{{ carta.get_pronunciamiento_display|default:'No aplica' }}</b></div>
+    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Derivada a</p><b class="text-sm text-slate-900">{{ carta.derivada_a|default:'—' }}</b></div>
+    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Unidad</p><b class="text-sm text-slate-900 font-mono">{{ carta.unidad|default:'1' }}</b></div>
+    <div class="sm:col-span-2"><p class="text-[11px] font-bold text-slate-500 uppercase">Observación</p><p class="text-sm text-slate-800 whitespace-pre-line mt-1">{{ carta.observacion|default:'—' }}</p></div>
+    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Delegación</p><b class="text-sm text-slate-900">{{ carta.delegacion.nombre }}</b></div>
+    <div><p class="text-[11px] font-bold text-slate-500 uppercase">Registrado por</p><b class="text-sm text-slate-900">{% if carta.creado_por %}{{ carta.creado_por.get_full_name|default:carta.creado_por.username }}{% else %}Sistema{% endif %}</b></div>
+  </div>
+</div>
+{% endblock %}

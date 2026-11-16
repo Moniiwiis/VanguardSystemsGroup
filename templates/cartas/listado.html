@@ -1,0 +1,300 @@
+{% extends 'base.html' %}
+
+{% block title %}Tubo de Cartas — Sistema Municipal La Serena{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Migas de pan y Encabezado (Idéntico a Atenciones y Organizaciones) -->
+  <div class="bg-white rounded-3xl p-6 sm:p-7 border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div class="space-y-1">
+      <div class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+        <span>Gestión Municipal</span>
+        <span class="text-slate-300">/</span>
+        <span class="text-[#C41230]">Tubo de Cartas</span>
+      </div>
+      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
+        Tubo de Seguimiento de Cartas
+      </h1>
+      <p class="text-xs text-slate-500 max-w-xl">
+        Registro, derivación, pronunciamientos y seguimiento documental de cartas de Oficina de Partes.
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 shrink-0">
+      <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl {% if delegacion_activa or delegacion_seleccionada %}bg-red-50 text-[#C41230] border border-red-200/90{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %} text-xs font-bold">
+        <i data-lucide="{% if delegacion_activa or delegacion_seleccionada %}map-pin{% else %}globe{% endif %}" class="w-4 h-4"></i>
+        <span>Delegación Activa: <strong>{% if delegacion_seleccionada %}{{ delegacion_seleccionada.nombre }}{% elif delegacion_activa %}{{ delegacion_activa.nombre }}{% else %}Global (Todas){% endif %}</strong></span>
+      </div>
+
+      {% if puede_editar_cartas %}
+        <a href="{% url 'cartas_nueva' %}"
+           class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2 shrink-0">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          <span>Nueva Carta</span>
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Tarjetas de Resumen Clicables (Idénticas a Atenciones) -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+    <!-- Total Cartas -->
+    <a href="?q={{ q_cartas|urlencode }}&para={{ para_filtro|urlencode }}&pronunciamiento={{ pron_filtro|urlencode }}{% if delegacion_filtro %}&delegacion={{ delegacion_filtro|urlencode }}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if not estado_filtro %}border-[#C41230] ring-2 ring-red-100{% else %}border-slate-200/80 hover:border-red-300{% endif %} shadow-sm transition-all hover:shadow group block">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total</span>
+        <div class="w-8 h-8 rounded-xl bg-red-50 text-[#C41230] flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="layers" class="w-4 h-4"></i>
+        </div>
+      </div>
+      <div class="mt-2 flex items-baseline gap-2">
+        <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">{{ total_cartas }}</span>
+        <span class="text-[10px] text-slate-400 font-semibold">cartas</span>
+      </div>
+      <div class="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-[#C41230]">
+        <span class="w-2 h-2 rounded-full bg-[#C41230]"></span>
+        <span>Todas las cartas</span>
+      </div>
+    </a>
+
+    <!-- Unidades (1) -->
+    <a href="?q={{ q_cartas|urlencode }}&para={{ para_filtro|urlencode }}&pronunciamiento={{ pron_filtro|urlencode }}{% if delegacion_filtro %}&delegacion={{ delegacion_filtro|urlencode }}{% endif %}"
+       class="bg-white rounded-2xl p-4 border border-slate-200/80 hover:border-indigo-300 shadow-sm transition-all hover:shadow group block">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Unidades (1)</span>
+        <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="mail" class="w-4 h-4"></i>
+        </div>
+      </div>
+      <div class="mt-2 flex items-baseline gap-2">
+        <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">{{ total_unidades }}</span>
+        <span class="text-[10px] text-slate-400 font-semibold">activas</span>
+      </div>
+      <div class="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-indigo-600">
+        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+        <span>Contabilizadas</span>
+      </div>
+    </a>
+
+    <!-- En Proceso -->
+    <a href="?q={{ q_cartas|urlencode }}&para={{ para_filtro|urlencode }}&pronunciamiento={{ pron_filtro|urlencode }}&estado=EN+PROCESO{% if delegacion_filtro %}&delegacion={{ delegacion_filtro|urlencode }}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if estado_filtro == 'EN PROCESO' %}border-amber-500 ring-2 ring-amber-100{% else %}border-slate-200/80 hover:border-amber-300{% endif %} shadow-sm transition-all hover:shadow group block">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">En Proceso</span>
+        <div class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="clock" class="w-4 h-4"></i>
+        </div>
+      </div>
+      <div class="mt-2 flex items-baseline gap-2">
+        <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">{{ total_en_proceso }}</span>
+        <span class="text-[10px] text-slate-400 font-semibold">cartas</span>
+      </div>
+      <div class="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-amber-600">
+        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+        <span>En gestión</span>
+      </div>
+    </a>
+
+    <!-- Aprobadas -->
+    <a href="?q={{ q_cartas|urlencode }}&para={{ para_filtro|urlencode }}&pronunciamiento={{ pron_filtro|urlencode }}&estado=APROBADA{% if delegacion_filtro %}&delegacion={{ delegacion_filtro|urlencode }}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if estado_filtro == 'APROBADA' %}border-blue-500 ring-2 ring-blue-100{% else %}border-slate-200/80 hover:border-blue-300{% endif %} shadow-sm transition-all hover:shadow group block">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Aprobadas</span>
+        <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="check-circle" class="w-4 h-4"></i>
+        </div>
+      </div>
+      <div class="mt-2 flex items-baseline gap-2">
+        <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">{{ total_aprobadas }}</span>
+        <span class="text-[10px] text-slate-400 font-semibold">cartas</span>
+      </div>
+      <div class="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-blue-600">
+        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+        <span>Autorizadas</span>
+      </div>
+    </a>
+
+    <!-- Finalizadas -->
+    <a href="?q={{ q_cartas|urlencode }}&para={{ para_filtro|urlencode }}&pronunciamiento={{ pron_filtro|urlencode }}&estado=FINALIZADA{% if delegacion_filtro %}&delegacion={{ delegacion_filtro|urlencode }}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if estado_filtro == 'FINALIZADA' %}border-emerald-500 ring-2 ring-emerald-100{% else %}border-slate-200/80 hover:border-emerald-300{% endif %} shadow-sm transition-all hover:shadow group block">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Finalizadas</span>
+        <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+        </div>
+      </div>
+      <div class="mt-2 flex items-baseline gap-2">
+        <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">{{ total_finalizadas }}</span>
+        <span class="text-[10px] text-slate-400 font-semibold">cartas</span>
+      </div>
+      <div class="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        <span>Concluidas</span>
+      </div>
+    </a>
+
+    <!-- No Aplica -->
+    <a href="?q={{ q_cartas|urlencode }}&para={{ para_filtro|urlencode }}&pronunciamiento={{ pron_filtro|urlencode }}&estado=NO+APLICA{% if delegacion_filtro %}&delegacion={{ delegacion_filtro|urlencode }}{% endif %}"
+       class="bg-white rounded-2xl p-4 border {% if estado_filtro == 'NO APLICA' %}border-slate-500 ring-2 ring-slate-200{% else %}border-slate-200/80 hover:border-slate-300{% endif %} shadow-sm transition-all hover:shadow group block">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">No Aplica</span>
+        <div class="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="minus-circle" class="w-4 h-4"></i>
+        </div>
+      </div>
+      <div class="mt-2 flex items-baseline gap-2">
+        <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">{{ total_no_aplica }}</span>
+        <span class="text-[10px] text-slate-400 font-semibold">cartas</span>
+      </div>
+      <div class="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+        <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+        <span>Solo conocimiento</span>
+      </div>
+    </a>
+  </div>
+
+  <!-- Historial y Barra de Búsqueda/Filtros (Idéntica a Atenciones) -->
+  <div class="space-y-4 pt-4 border-t border-slate-200">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-extrabold text-slate-900">Historial de cartas registradas</h2>
+        <p class="text-xs text-slate-500 font-medium">Consulta y seguimiento de correspondencia en Oficina de Partes</p>
+      </div>
+      <div class="flex items-center gap-2.5 shrink-0">
+        {% if q_cartas or estado_filtro or para_filtro or pron_filtro or delegacion_filtro %}
+          <a href="{% url 'cartas_listado' %}" class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            <span>Limpiar filtros</span>
+          </a>
+        {% endif %}
+        <a href="?{{ query_export }}{% if query_export %}&{% endif %}export=excel"
+           class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-sm shrink-0">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+          <span>Exportar a Excel</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Barra de búsqueda y filtros en línea -->
+    <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <form method="GET" action="{% url 'cartas_listado' %}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+        <div class="relative flex-1 min-w-[220px]">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <i data-lucide="search" class="w-4 h-4"></i>
+          </div>
+          <input type="text" name="q" value="{{ q_cartas }}" placeholder="Buscar por N°, remitente, actividad, encargado o derivada a..."
+                 class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]" />
+        </div>
+
+        {% if permisos.es_admin %}
+        <select name="delegacion" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+          <option value="">Filtrar Delegación: Todas</option>
+          {% for d in delegaciones_cartas %}
+            <option value="{{ d.pk }}" {% if delegacion_filtro == d.pk|stringformat:'s' %}selected{% endif %}>
+              {{ d.get_codigo }} — {{ d.nombre }}
+            </option>
+          {% endfor %}
+        </select>
+        {% endif %}
+
+        <select name="para" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+          <option value="">Filtrar Para: Todos</option>
+          {% for valor, nombre in para_choices %}
+            <option value="{{ valor }}" {% if para_filtro == valor %}selected{% endif %}>{{ nombre }}</option>
+          {% endfor %}
+        </select>
+
+        <select name="estado" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+          <option value="">Filtrar Estado: Todos</option>
+          {% for valor, nombre in estados_cartas %}
+            <option value="{{ valor }}" {% if estado_filtro == valor %}selected{% endif %}>{{ nombre }}</option>
+          {% endfor %}
+        </select>
+
+        <select name="pronunciamiento" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+          <option value="">Pronunciamiento: Todos</option>
+          {% for valor, nombre in pron_choices %}
+            <option value="{{ valor }}" {% if pron_filtro == valor %}selected{% endif %}>{{ nombre }}</option>
+          {% endfor %}
+        </select>
+
+        {% include "gestion/includes/ordering_control.html" %}
+      </form>
+    </div>
+
+    <!-- Tabla -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-700">
+          <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+            <tr>
+              <th class="py-2.5 px-3 whitespace-nowrap">Nº</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Fecha</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Para</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Remite</th>
+              <th class="py-2.5 px-3">Actividad o tema</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Encargado</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Estado</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Pronunciamiento</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Derivada a</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap">Unidad</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap w-24 sticky right-0 bg-slate-50/95 backdrop-blur-sm shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-medium">
+            {% for carta in page_obj %}
+            <tr class="group hover:bg-slate-50/70 transition-colors">
+              <td class="py-2.5 px-3 font-mono font-bold text-[#C41230] whitespace-nowrap">{{ carta.numero|default:"S/N" }}</td>
+              <td class="py-2.5 px-3 font-mono whitespace-nowrap">{{ carta.fecha|date:'d/m/Y' }}</td>
+              <td class="py-2.5 px-3 whitespace-nowrap font-semibold">{{ carta.para }}</td>
+              <td class="py-2.5 px-3 min-w-[150px] max-w-[200px] [overflow-wrap:anywhere]">{{ carta.remite }}</td>
+              <td class="py-2.5 px-3 min-w-[200px] max-w-sm [overflow-wrap:anywhere]">{{ carta.actividad_tema|truncatechars:105 }}</td>
+              <td class="py-2.5 px-3 whitespace-nowrap">{{ carta.encargado_seguimiento|default:'—' }}</td>
+              <td class="py-2.5 px-3 whitespace-nowrap">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold {% if carta.estado == 'FINALIZADA' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif carta.estado == 'APROBADA' %}bg-blue-50 text-blue-700 border border-blue-200{% elif carta.estado == 'NO APLICA' %}bg-slate-100 text-slate-600 border border-slate-200{% else %}bg-amber-50 text-amber-700 border border-amber-200{% endif %}">
+                  {{ carta.get_estado_display }}
+                </span>
+              </td>
+              <td class="py-2.5 px-3 whitespace-nowrap text-[11px] font-semibold text-slate-700">{{ carta.get_pronunciamiento_display|default:'No aplica' }}</td>
+              <td class="py-2.5 px-3 whitespace-nowrap">{{ carta.derivada_a|default:'—' }}</td>
+              <td class="py-2.5 px-3 text-center font-mono font-bold">{{ carta.unidad|default:'1' }}</td>
+              <td class="py-2.5 px-3 whitespace-nowrap text-center sticky right-0 bg-white group-hover:bg-slate-50/95 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
+                <div class="inline-flex items-center justify-center gap-1">
+                  <a href="{% url 'cartas_detalle' carta.pk %}" title="Ver detalle de carta" aria-label="Ver carta Nº {{ carta.numero }}"
+                     class="p-1.5 rounded-lg text-slate-500 hover:text-[#C41230] hover:bg-red-50 transition-all inline-flex items-center justify-center">
+                    <i data-lucide="eye" class="w-4 h-4"></i>
+                  </a>
+                  {% if puede_editar_cartas %}
+                  <a href="{% url 'cartas_editar' carta.pk %}" title="Editar carta" aria-label="Editar carta Nº {{ carta.numero }}"
+                     class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all inline-flex items-center justify-center">
+                    <i data-lucide="edit-3" class="w-4 h-4"></i>
+                  </a>
+                  {% endif %}
+                  {% if puede_eliminar_cartas %}
+                  <a href="{% url 'cartas_eliminar' carta.pk %}" title="Eliminar carta" aria-label="Eliminar carta Nº {{ carta.numero }}"
+                     class="p-1.5 rounded-lg text-slate-500 hover:text-red-700 hover:bg-red-100 transition-all inline-flex items-center justify-center">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="11" class="p-8 text-center text-slate-400 font-medium">Aún no hay cartas registradas para los filtros aplicados.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% include "gestion/includes/paginator.html" %}
+    </div>
+  </div>
+</div>
+{% endblock %}

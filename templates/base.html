@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}Municipalidad de La Serena — Sistema Municipal SGR{% endblock %}</title>
+  <title>{% block title %}Municipalidad de La Serena — Sistema de Gestión Territorial{% endblock %}</title>
   
   <!-- Google Fonts (Public Sans + Fraunces) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -37,8 +37,78 @@
   
   <!-- SweetAlert2 CDN -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <script>
+    try {
+      if (localStorage.getItem('sgr_sidebar_collapsed') === '1') {
+        document.documentElement.classList.add('sgr-sidebar-collapsed');
+      }
+    } catch (e) {}
+  </script>
   
   <style>
+    html.sgr-sidebar-collapsed #appSidebar {
+      display: none !important;
+    }
+    html.sgr-sidebar-collapsed #appLayoutContainer,
+    html.sgr-sidebar-collapsed #appHeaderInner {
+      max-width: 1480px !important;
+    }
+    html.sgr-sidebar-collapsed [data-sidebar-icon-open] {
+      display: none !important;
+    }
+    html.sgr-sidebar-collapsed [data-sidebar-icon-closed] {
+      display: inline-flex !important;
+    }
+    /* Tablas consistentes: al estar el menú desplegado mantienen su ancho legible con scroll horizontal */
+    @media (min-width: 768px) {
+      html:not(.sgr-sidebar-collapsed) .overflow-x-auto > table {
+        min-width: min(1180px, calc(100vw - 4rem));
+      }
+    }
+    /* Barra de desplazamiento horizontal limpia para tablas */
+    .overflow-x-auto {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(196, 18, 48, 0.35) rgba(15, 23, 42, 0.05);
+    }
+    .overflow-x-auto::-webkit-scrollbar {
+      height: 8px;
+    }
+    .overflow-x-auto::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.05);
+      border-radius: 9999px;
+    }
+    .overflow-x-auto::-webkit-scrollbar-thumb {
+      background: rgba(196, 18, 48, 0.35);
+      border-radius: 9999px;
+    }
+    .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+      background: rgba(196, 18, 48, 0.65);
+    }
+    /* Columna Acciones (ver, editar, eliminar) fija siempre visible al hacer scroll */
+    table.sgr-sticky-actions thead th:last-child {
+      position: sticky;
+      right: 0;
+      z-index: 20;
+      background-color: #f8fafc;
+      box-shadow: -4px 0 8px -2px rgba(15, 23, 42, 0.06);
+      white-space: nowrap;
+    }
+    table.sgr-sticky-actions tbody td:last-child:not([colspan]) {
+      position: sticky;
+      right: 0;
+      z-index: 10;
+      background-color: #ffffff;
+      box-shadow: -4px 0 8px -2px rgba(15, 23, 42, 0.06);
+      white-space: nowrap;
+    }
+    table.sgr-sticky-actions tbody tr:hover td:last-child:not([colspan]) {
+      background-color: #f8fafc;
+    }
+    /* Evitar desbordamiento horizontal por textos largos sin espacios */
+    main, aside {
+      min-width: 0;
+    }
     body {
       font-family: 'Public Sans', sans-serif;
       background-color: #FDF6F6;
@@ -67,6 +137,31 @@
     .desc-roll::-webkit-scrollbar-thumb:hover {
       background: rgba(196,18,48,0.6);
     }
+    /* Cuadro de texto espacioso de 5 líneas con scrollbar para descripciones de hasta 1000 caracteres */
+    .desc-box-5lines {
+      max-height: 6.5rem;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 0.35rem;
+      word-break: break-all;
+      overflow-wrap: anywhere;
+      white-space: pre-line;
+      line-height: 1.35;
+    }
+    .desc-box-5lines::-webkit-scrollbar {
+      width: 5px;
+    }
+    .desc-box-5lines::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.05);
+      border-radius: 6px;
+    }
+    .desc-box-5lines::-webkit-scrollbar-thumb {
+      background: rgba(196,18,48,0.35);
+      border-radius: 6px;
+    }
+    .desc-box-5lines::-webkit-scrollbar-thumb:hover {
+      background: rgba(196,18,48,0.7);
+    }
     /* Evitar que contenedores con space-y-* desplacen modales fixed inset-0 */
     .fixed.inset-0 {
       margin-top: 0 !important;
@@ -86,18 +181,32 @@
 
   <!-- TopBar Oficial de la Ilustre Municipalidad de La Serena (Wireframes C3-C6) -->
   <header class="sticky top-0 z-40 shadow-md text-white" style="background: linear-gradient(90deg, #8B1D19 0%, #C41230 60%, #DB3334 100%);">
-    <div class="max-w-[1440px] mx-auto px-4 md:px-8 py-2.5 flex items-center justify-between gap-4">
+    <div id="appHeaderInner" class="max-w-[1440px] mx-auto px-4 md:px-8 py-2.5 flex items-center justify-between gap-4">
       
-      <!-- Izquierda: Logo y Marca Institucional -->
-      <a href="{% if permisos.es_cliente %}{% url 'portal_cliente' %}{% else %}{% url 'gestion_inicio' %}{% endif %}" class="flex items-center gap-3 shrink-0 group">
-        <img src="{% static 'horizontal-blanco.svg' %}" 
-             alt="La Serena — Ilustre Municipalidad" 
-             class="h-9 w-auto object-contain drop-shadow-sm"
-             onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
-        <span class="hidden sm:inline-block font-extrabold tracking-wider text-xs uppercase text-white/95 border-l border-white/20 pl-3">
-          Sistema Municipal
-        </span>
-      </a>
+      <!-- Izquierda: Botón Ocultar/Mostrar Menú + Logo y Marca Institucional -->
+      <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
+        <button type="button"
+                id="btnToggleSidebar"
+                data-sidebar-toggle
+                aria-expanded="true"
+                aria-controls="appSidebar"
+                title="Ocultar / mostrar menú lateral"
+                class="inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white border border-white/25 transition-all cursor-pointer shadow-sm">
+          <i data-lucide="panel-left-close" data-sidebar-icon-open class="w-4 h-4"></i>
+          <i data-lucide="panel-left-open" data-sidebar-icon-closed class="w-4 h-4 hidden"></i>
+          <span class="hidden lg:inline text-[11px] font-bold tracking-wide" data-sidebar-label>Ocultar menú</span>
+        </button>
+
+        <a href="{% if permisos.es_cliente %}{% url 'portal_cliente' %}{% else %}{% url 'gestion_inicio' %}{% endif %}" class="flex items-center gap-3 shrink-0 group">
+          <img src="{% static 'horizontal-blanco.svg' %}" 
+               alt="La Serena — Ilustre Municipalidad" 
+               class="h-9 w-auto object-contain drop-shadow-sm"
+               onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
+          <span class="hidden sm:inline-block font-extrabold tracking-wider text-xs uppercase text-white/95 border-l border-white/20 pl-3">
+            Sistema Municipal
+          </span>
+        </a>
+      </div>
 
       <!-- Centro: Distintivo de Delegación Activa según el Perfil (Requisito Crítico A2 / Wireframes) -->
       <!-- Centro: Distintivo de Delegación Activa según el Perfil (Requisito Crítico A2 / Wireframes) -->
@@ -110,8 +219,8 @@
                     aria-haspopup="true"
                     aria-expanded="false"
                     class="flex items-center gap-2.5 bg-[#700F17]/95 hover:bg-[#5C0A10] active:scale-95 text-white text-xs font-bold px-4 py-2 rounded-full border border-white/30 shadow-md transition-all cursor-pointer select-none">
-              <i data-lucide="{% if delegacion_activa %}building-2{% else %}globe{% endif %}" class="w-3.5 h-3.5 text-white/90"></i>
-              <span>{% if delegacion_activa %}{{ delegacion_activa.get_codigo }} · {{ delegacion_activa.nombre }}{% else %}Global · Todas las delegaciones{% endif %}</span>
+              <i data-lucide="{% if delegacion_activa %}building-2{% else %}globe{% endif %}" class="w-3.5 h-3.5 text-white/90 shrink-0"></i>
+              <span class="max-w-[180px] sm:max-w-[260px] truncate">{% if delegacion_activa %}{{ delegacion_activa.get_codigo }} · {{ delegacion_activa.nombre }}{% else %}Global · Todas las delegaciones{% endif %}</span>
               <i data-lucide="chevron-down" id="delegacionChevron" class="w-3.5 h-3.5 text-white/80 transition-transform duration-200"></i>
             </button>
             
@@ -172,24 +281,26 @@
       </div>
 
       <!-- Derecha: Identificación de Usuario, Rol y Salir (Wireframe C3-C6) -->
-      <div class="flex items-center gap-3 shrink-0 text-xs">
-        <a href="{% url 'perfil_usuario' %}" class="flex items-center gap-2 group hover:opacity-90 transition-opacity">
+      <div class="flex items-center gap-3 shrink-0 min-w-0 text-xs">
+        <a href="{% url 'perfil_usuario' %}" title="{{ usuario_nombre_corto|default:request.user.username }}" class="flex items-center gap-2 min-w-0 group hover:opacity-90 transition-opacity">
           {% if funcionario_actual and funcionario_actual.foto %}
-            <img src="{{ funcionario_actual.foto.url }}" alt="{{ request.user.username }}" class="w-8 h-8 rounded-full object-cover ring-2 ring-white/40 shadow-sm" />
+            <img src="{{ funcionario_actual.foto.url }}" alt="{{ request.user.username }}" class="w-8 h-8 rounded-full object-cover ring-2 ring-white/40 shadow-sm shrink-0" />
           {% elif request.user.funcionario.foto %}
-            <img src="{{ request.user.funcionario.foto.url }}" alt="{{ request.user.username }}" class="w-8 h-8 rounded-full object-cover ring-2 ring-white/40 shadow-sm" />
+            <img src="{{ request.user.funcionario.foto.url }}" alt="{{ request.user.username }}" class="w-8 h-8 rounded-full object-cover ring-2 ring-white/40 shadow-sm shrink-0" />
           {% else %}
-            <div class="w-8 h-8 rounded-full bg-white/20 ring-2 ring-white/30 flex items-center justify-center font-bold text-white text-xs">
-              {{ request.user.first_name|default:request.user.username|make_list|first|upper }}
+            <div class="w-8 h-8 rounded-full bg-white/20 ring-2 ring-white/30 flex items-center justify-center font-bold text-white text-xs shrink-0">
+              {{ usuario_nombre_corto|default:request.user.username|make_list|first|upper }}
             </div>
           {% endif %}
-          <div class="text-right hidden sm:block">
-            <div class="font-bold text-white text-xs leading-tight group-hover:underline">
-              {{ request.user.first_name|default:request.user.username }}
+          <div class="text-right hidden sm:block min-w-0 max-w-[160px] md:max-w-[200px]">
+            <div class="font-bold text-white text-xs leading-tight group-hover:underline truncate">
+              {{ usuario_nombre_corto|default:request.user.username }}
             </div>
-            <div class="text-[11px] text-white/80 leading-tight">
-              <span>{{ user_rol_name }}</span>
+            {% if not permisos.es_cliente %}
+            <div class="text-[11px] text-white/80 leading-tight truncate">
+              <span>{% if funcionario_actual and funcionario_actual.cargo %}{{ funcionario_actual.cargo.nombre_cargo }}{% else %}{{ user_rol_name }}{% endif %}</span>
             </div>
+            {% endif %}
           </div>
         </a>
 
@@ -212,171 +323,218 @@
   </header>
 
   <!-- Contenedor Principal (Sidebar + Contenido) -->
-  <div class="flex-1 max-w-[1440px] w-full mx-auto px-4 md:px-8 py-6 flex flex-col md:flex-row gap-6">
+  <div id="appLayoutContainer" class="flex-1 max-w-[1440px] w-full mx-auto px-4 md:px-8 py-6 flex flex-col md:flex-row gap-6">
     
     <!-- Sidebar Navegación de Módulos (Filtrado según Perfil del Usuario) -->
-    <aside class="w-full md:w-60 shrink-0 flex flex-col gap-5">
+    <aside id="appSidebar" class="w-full md:w-60 shrink-0 flex flex-col gap-5">
       
-      <!-- Menú Módulos Flat y Adaptable según wireframes C3-C6 -->
-      <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-1 text-xs font-bold">
+      <!-- Menú de Módulos Organizado por Secciones -->
+      <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-3 text-xs font-bold">
         
         <!-- Inicio (Oculto para rol Cliente) -->
         {% if permisos.ver_inicio %}
-        <a href="{% url 'gestion_inicio' %}" 
-           class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_inicio' or request.resolver_match.url_name == 'gestion_inicio_alt' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-          <i data-lucide="home" class="w-4 h-4 shrink-0"></i>
-          <span>Inicio</span>
-        </a>
-        {% endif %}
-
-        <!-- 1. Delegaciones (Solo Administrador) -->
-        {% if permisos.ver_delegaciones %}
-          <a href="{% url 'gestion_delegaciones' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_delegaciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="building-2" class="w-4 h-4 shrink-0"></i>
-            <span>Delegaciones</span>
+        <div class="space-y-1">
+          <a href="{% url 'gestion_inicio' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_inicio' or request.resolver_match.url_name == 'gestion_inicio_alt' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="home" class="w-4 h-4 shrink-0"></i>
+            <span>Inicio</span>
           </a>
+        </div>
         {% endif %}
 
-        <!-- 2. Roles (Solo Administrador) -->
-        {% if permisos.ver_roles %}
-          <a href="{% url 'gestion_roles' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_roles' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="shield-check" class="w-4 h-4 shrink-0"></i>
-            <span>Roles</span>
-          </a>
-        {% endif %}
-
-        <!-- 3. Usuarios (Administrador y Delegado Municipal) -->
-        {% if permisos.ver_usuarios %}
-          <a href="{% url 'gestion_usuarios' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_usuarios' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="users" class="w-4 h-4 shrink-0"></i>
-            <span>Usuarios</span>
-          </a>
-        {% endif %}
-
-        <!-- 4. Ítems y metas (Administrador y Coordinador) -->
-        {% if permisos.ver_metas %}
-          <a href="{% url 'gestion_metas' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_metas' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="target" class="w-4 h-4 shrink-0"></i>
-            <span>Ítems y metas</span>
-          </a>
-        {% endif %}
-
-        <!-- 5. Tipo de Atención (Administrador y Coordinador) -->
-        {% if permisos.ver_tipo_atencion %}
-          <a href="{% url 'gestion_tipo_atencion' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_tipo_atencion' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="heart-handshake" class="w-4 h-4 shrink-0"></i>
-            <span>Tipo de Atención</span>
-          </a>
-        {% endif %}
-
-        <!-- 6. Sub Atención (Administrador y Coordinador) -->
-        {% if permisos.ver_sub_atencion %}
-          <a href="{% url 'gestion_sub_atencion' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_sub_atencion' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="git-branch" class="w-4 h-4 shrink-0"></i>
-            <span>Sub Atención</span>
-          </a>
-        {% endif %}
-
-        <!-- 7. Atenciones (Ingreso y Gestión) -->
-        {% if permisos.ver_atenciones %}
-          <a href="{% url 'gestion_atenciones' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_atenciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0"></i>
-            <span>Atenciones</span>
-          </a>
-        {% endif %}
-
-        <!-- 7b. Tubo SGR de Trabajo (Matriz Excel) -->
+        <!-- Sección 1: Gestión Territorial -->
         {% if permisos.ver_atenciones or permisos.ver_reportes or permisos.es_admin %}
-          <a href="{% url 'gestion_tubo' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_tubo' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="git-pull-request" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
-            <span>Tubo de Trabajo SGR</span>
+        <div data-collapsible-section class="pt-2 border-t border-slate-100 space-y-1">
+          <button type="button" data-section-toggle data-storage-key="sgr_nav_sec_territorial" aria-expanded="true"
+            class="w-full flex items-center justify-between px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+            <span>Gestión Territorial</span>
+            <i data-lucide="chevron-down" data-section-chevron class="w-3.5 h-3.5 transition-transform duration-150"></i>
+          </button>
+          <div data-section-body class="space-y-1">
+          {% if permisos.ver_atenciones %}
+            <a href="{% url 'gestion_atenciones' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_atenciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0"></i>
+              <span>Atenciones</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_atenciones or permisos.ver_reportes or permisos.es_admin %}
+            <a href="{% url 'gestion_tubo' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_tubo' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="git-pull-request" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
+              <span>Tubo de Compromiso</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_atenciones or permisos.es_admin %}
+            <a href="{% url 'cartas_listado' %}"
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'cartas_listado' or request.resolver_match.url_name == 'cartas_nueva' or request.resolver_match.url_name == 'cartas_detalle' or request.resolver_match.url_name == 'cartas_editar' or request.resolver_match.url_name == 'cartas_eliminar' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="mail" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
+              <span>Tubo de Cartas</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_reportes %}
+            <a href="{% url 'gestion_reportes' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_reportes' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="bar-chart-3" class="w-4 h-4 shrink-0"></i>
+              <span>Reportes</span>
+            </a>
+          {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Sección 2: Padrón y Comunidad -->
+        {% if permisos.ver_vecinos or permisos.ver_organizaciones or permisos.ver_sectores %}
+        <div data-collapsible-section class="pt-2 border-t border-slate-100 space-y-1">
+          <button type="button" data-section-toggle data-storage-key="sgr_nav_sec_padron" aria-expanded="true"
+            class="w-full flex items-center justify-between px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+            <span>Padrón y Comunidad</span>
+            <i data-lucide="chevron-down" data-section-chevron class="w-3.5 h-3.5 transition-transform duration-150"></i>
+          </button>
+          <div data-section-body class="space-y-1">
+          {% if permisos.ver_vecinos %}
+            <a href="{% url 'gestion_vecinos' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_vecinos' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="user-check" class="w-4 h-4 shrink-0"></i>
+              <span>Vecinos</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_organizaciones %}
+            <a href="{% url 'gestion_organizaciones' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_organizaciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="landmark" class="w-4 h-4 shrink-0"></i>
+              <span>Juntas de Vecinos y Organizaciones</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_sectores %}
+            <a href="{% url 'gestion_sectores' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_sectores' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="map-pin" class="w-4 h-4 shrink-0"></i>
+              <span>Sectores / Territorio</span>
+            </a>
+          {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Sección 3: Metas y Catálogos -->
+        {% if permisos.ver_metas or permisos.ver_tipo_atencion or permisos.ver_sub_atencion or permisos.ver_area_apoyo %}
+        <div data-collapsible-section class="pt-2 border-t border-slate-100 space-y-1">
+          <button type="button" data-section-toggle data-storage-key="sgr_nav_sec_metas" aria-expanded="true"
+            class="w-full flex items-center justify-between px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+            <span>Metas y Catálogos</span>
+            <i data-lucide="chevron-down" data-section-chevron class="w-3.5 h-3.5 transition-transform duration-150"></i>
+          </button>
+          <div data-section-body class="space-y-1">
+          {% if permisos.ver_metas %}
+            <a href="{% url 'gestion_metas' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_metas' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="target" class="w-4 h-4 shrink-0"></i>
+              <span>Ítems y Períodos</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_tipo_atencion %}
+            <a href="{% url 'gestion_tipo_atencion' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_tipo_atencion' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="heart-handshake" class="w-4 h-4 shrink-0"></i>
+              <span>Tipo de Atención</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_sub_atencion %}
+            <a href="{% url 'gestion_sub_atencion' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_sub_atencion' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="git-branch" class="w-4 h-4 shrink-0"></i>
+              <span>Sub Atención</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_area_apoyo %}
+            <a href="{% url 'gestion_areas_apoyo' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_areas_apoyo' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="briefcase" class="w-4 h-4 shrink-0"></i>
+              <span>Áreas y Cuadrillas de Apoyo</span>
+            </a>
+          {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Sección 4: Administración -->
+        {% if permisos.ver_delegaciones or permisos.ver_roles or permisos.ver_usuarios %}
+        <div data-collapsible-section class="pt-2 border-t border-slate-100 space-y-1">
+          <button type="button" data-section-toggle data-storage-key="sgr_nav_sec_admin" aria-expanded="true"
+            class="w-full flex items-center justify-between px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+            <span>Administración</span>
+            <i data-lucide="chevron-down" data-section-chevron class="w-3.5 h-3.5 transition-transform duration-150"></i>
+          </button>
+          <div data-section-body class="space-y-1">
+          {% if permisos.ver_delegaciones %}
+            <a href="{% url 'gestion_delegaciones' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_delegaciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="building-2" class="w-4 h-4 shrink-0"></i>
+              <span>Delegaciones</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_roles %}
+            <a href="{% url 'gestion_roles' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_roles' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="shield-check" class="w-4 h-4 shrink-0"></i>
+              <span>Roles</span>
+            </a>
+          {% endif %}
+
+          {% if permisos.ver_usuarios %}
+            <a href="{% url 'gestion_usuarios' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_usuarios' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="users" class="w-4 h-4 shrink-0"></i>
+              <span>Funcionarios</span>
+            </a>
+          {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Sección 5: Cuenta y Comunicación -->
+        <div data-collapsible-section class="{% if permisos.ver_inicio or permisos.ver_atenciones or permisos.ver_vecinos or permisos.ver_metas or permisos.ver_delegaciones or permisos.ver_usuarios %}pt-2 border-t border-slate-100 {% endif %}space-y-1">
+          <button type="button" data-section-toggle data-storage-key="sgr_nav_sec_cuenta" aria-expanded="true"
+            class="w-full flex items-center justify-between px-3.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+            <span>Cuenta y Comunicación</span>
+            <i data-lucide="chevron-down" data-section-chevron class="w-3.5 h-3.5 transition-transform duration-150"></i>
+          </button>
+          <div data-section-body class="space-y-1">
+          {% if permisos.ver_portal_cliente or permisos.es_cliente %}
+            <a href="{% url 'portal_cliente' %}" 
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'portal_cliente' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+              <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
+              <span>Mis Registros</span>
+            </a>
+          {% endif %}
+
+          {% if not permisos.es_cliente %}
+          <a href="{% url 'websocket:chat_index' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'chat' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="messages-square" class="w-4 h-4 shrink-0 text-red-600"></i>
+            <span>Chat en Vivo</span>
           </a>
-        {% endif %}
+          {% endif %}
 
-        <!-- 8. Vecinos -->
-        {% if permisos.ver_vecinos %}
-          <a href="{% url 'gestion_vecinos' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_vecinos' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="user-check" class="w-4 h-4 shrink-0"></i>
-            <span>Vecinos</span>
+          <a href="{% url 'perfil_usuario' %}" 
+             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'perfil_usuario' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i data-lucide="user-cog" class="w-4 h-4 shrink-0"></i>
+            <span>{% if permisos.es_cliente %}Mis Datos y Perfil{% else %}Mi Perfil y Foto{% endif %}</span>
           </a>
-        {% endif %}
-
-        <!-- 8a. Organizaciones Comunitarias / JJVV (Coherencia Excel JJVV) -->
-        {% if permisos.ver_organizaciones %}
-          <a href="{% url 'gestion_organizaciones' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_organizaciones' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="landmark" class="w-4 h-4 shrink-0"></i>
-            <span>JJVV y Organizaciones</span>
-          </a>
-        {% endif %}
-
-        <!-- 8b. Sectores / Territorio por Delegación -->
-        {% if permisos.ver_sectores %}
-          <a href="{% url 'gestion_sectores' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_sectores' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="map-pin" class="w-4 h-4 shrink-0"></i>
-            <span>Sectores / Territorio</span>
-          </a>
-        {% endif %}
-
-        <!-- 9. Reportes (Administrador, Coordinador y Delegado) -->
-        {% if permisos.ver_reportes %}
-          <a href="{% url 'gestion_reportes' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_reportes' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="bar-chart-3" class="w-4 h-4 shrink-0"></i>
-            <span>Reportes</span>
-          </a>
-        {% endif %}
-
-        {% if not permisos.es_cliente %}
-        <div class="pt-2 border-t border-slate-100 my-1"></div>
-
-        <!-- Tiempo Real / Chat (Channels WebSockets - Solo Funcionarios) -->
-        <a href="{% url 'websocket:chat_index' %}" 
-           class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'chat' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-          <i data-lucide="messages-square" class="w-4 h-4 shrink-0 text-red-600"></i>
-          <span>Chat en Vivo</span>
-        </a>
-        {% endif %}
-
-        <!-- Portal Ciudadano (Acceso para rol Cliente) -->
-        {% if permisos.ver_portal_cliente or permisos.es_cliente %}
-          <a href="{% url 'portal_cliente' %}" 
-             class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'portal_cliente' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
-            <span>Mis Registros</span>
-          </a>
-        {% endif %}
-
-        <!-- Mi Perfil (Croppr.js y Credenciales) -->
-        <a href="{% url 'perfil_usuario' %}" 
-           class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'perfil_usuario' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-          <i data-lucide="user-cog" class="w-4 h-4 shrink-0"></i>
-          <span>Mi Perfil y Foto</span>
-        </a>
+          </div>
+        </div>
 
       </nav>
-
-      <!-- Card Informativa Institucional -->
-      <div class="bg-white rounded-3xl p-4 shadow-sm border border-[rgba(196,18,48,0.15)] text-center flex flex-col items-center gap-2">
-        <img src="{% static 'vertical-color.svg' %}" 
-             alt="Escudo La Serena" 
-             class="h-10 w-auto object-contain"
-             onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
-        <p class="text-[10px] text-slate-500 font-medium">
-          Ilustre Municipalidad de La Serena<br>
-          <span class="font-bold text-slate-700">Gestión de Atención Ciudadana</span>
-        </p>
-      </div>
 
     </aside>
 
@@ -395,7 +553,7 @@
              alt="Escudo Municipal" 
              class="h-8 w-auto opacity-80"
              onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
-        <span>Ilustre Municipalidad de La Serena · Sistema Integrado SGR</span>
+        <span>Ilustre Municipalidad de La Serena · Sistema de Gestión Territorial</span>
       </div>
       <div>
         <span>Vanguard Systems Group © 2026</span>
@@ -904,6 +1062,15 @@
       });
       return false;
     }
+
+    // Límite global de 1000 caracteres para todos los campos de texto extenso / descripciones
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('textarea').forEach(function(ta) {
+        if (!ta.getAttribute('maxlength') || parseInt(ta.getAttribute('maxlength')) > 1000) {
+          ta.setAttribute('maxlength', '1000');
+        }
+      });
+    });
 
     // Manejo interactivo y accesible del selector de delegación activa
     function toggleDelegacionDropdown(e) {
@@ -1599,6 +1766,662 @@
           });
         {% endfor %}
       {% endif %}
+    });
+
+    // --- VISOR DE EVIDENCIAS EN PANTALLA (SIN ABRIR NUEVA PESTAÑA) ---
+    function abrirVisorEvidencia(url, titulo, momento) {
+      if (!url) return;
+      const modal = document.getElementById('modal-visor-evidencia');
+      const imgEl = document.getElementById('visor-img');
+      const frameEl = document.getElementById('visor-frame');
+      const fallbackEl = document.getElementById('visor-fallback');
+      const tituloEl = document.getElementById('visor-titulo');
+      const badgeEl = document.getElementById('visor-momento-badge');
+      const downloadBtn = document.getElementById('visor-descargar-btn');
+      const fallbackBtn = document.getElementById('visor-fallback-btn');
+      const fallbackNombre = document.getElementById('visor-fallback-nombre');
+
+      if (!modal) return;
+
+      if (tituloEl) tituloEl.textContent = titulo || 'Evidencia de Respaldo';
+      if (downloadBtn) {
+        downloadBtn.href = url;
+        const nombreArchivo = (titulo || 'evidencia').replace(/[^a-zA-Z0-9_\.-]/g, '_');
+        downloadBtn.setAttribute('download', nombreArchivo);
+      }
+      if (fallbackBtn) fallbackBtn.href = url;
+      if (fallbackNombre) fallbackNombre.textContent = titulo || 'Archivo de evidencia';
+
+      if (badgeEl) {
+        const momLower = (momento || '').toLowerCase();
+        if (momLower.includes('antes')) {
+          badgeEl.textContent = 'Antes del trabajo';
+          badgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200 shrink-0';
+        } else if (momLower.includes('despues') || momLower.includes('después')) {
+          badgeEl.textContent = 'Después del trabajo';
+          badgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0';
+        } else {
+          badgeEl.textContent = momento || 'Evidencia';
+          badgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-700 border border-slate-200 shrink-0';
+        }
+      }
+
+      if (imgEl) { imgEl.classList.add('hidden'); imgEl.src = ''; }
+      if (frameEl) { frameEl.classList.add('hidden'); frameEl.src = ''; }
+      if (fallbackEl) { fallbackEl.classList.add('hidden'); }
+
+      const cleanUrl = url.split('?')[0].toLowerCase();
+      const esImagen = cleanUrl.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)$/i) || url.startsWith('data:image/');
+      const esPdf = cleanUrl.endsWith('.pdf');
+
+      if (esImagen && imgEl) {
+        imgEl.src = url;
+        imgEl.classList.remove('hidden');
+      } else if (esPdf && frameEl) {
+        frameEl.src = url;
+        frameEl.classList.remove('hidden');
+      } else if (fallbackEl) {
+        fallbackEl.classList.remove('hidden');
+      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function cerrarVisorEvidencia() {
+      const modal = document.getElementById('modal-visor-evidencia');
+      const imgEl = document.getElementById('visor-img');
+      const frameEl = document.getElementById('visor-frame');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+      if (imgEl) imgEl.src = '';
+      if (frameEl) frameEl.src = '';
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') cerrarVisorEvidencia();
+    });
+
+    // Interceptar clics en enlaces a evidencias para visualizarlos directamente sin abrir pestañas
+    document.addEventListener('click', function(e) {
+      const link = e.target.closest('a');
+      if (!link) return;
+      const href = link.getAttribute('href') || '';
+      if (link.closest('#modal-visor-evidencia') || link.hasAttribute('download')) return;
+      if (link.classList.contains('visor-evidencia') ||
+          href.includes('/media/evidencias/') ||
+          href.includes('/media/archivos/') ||
+          (href.startsWith('/media/') && href.match(/\.(jpg|jpeg|png|gif|webp|svg|pdf)$/i))) {
+        e.preventDefault();
+        e.stopPropagation();
+        const titulo = link.getAttribute('data-titulo') || link.textContent.trim() || 'Evidencia de Respaldo';
+        const momento = link.getAttribute('data-momento') || (link.closest('[data-momento]') ? link.closest('[data-momento]').dataset.momento : '');
+        abrirVisorEvidencia(href, titulo, momento);
+      }
+    });
+  </script>
+
+  <!-- Modal Global Visor de Evidencias Sin Abrir Pestaña -->
+  <div id="modal-visor-evidencia" class="fixed inset-0 z-[100] hidden items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-sm transition-all" onclick="if (event.target === this) cerrarVisorEvidencia();">
+    <div class="relative w-full max-w-4xl max-h-[92vh] bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-slate-200" onclick="event.stopPropagation();">
+      <!-- Header del Visor -->
+      <div class="flex items-center justify-between px-5 py-3.5 bg-slate-50 border-b border-slate-200">
+        <div class="flex items-center gap-2.5 overflow-hidden">
+          <span id="visor-momento-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-50 text-[#C41230] border border-red-200 shrink-0">
+            Evidencia
+          </span>
+          <h4 id="visor-titulo" class="font-display font-extrabold text-sm text-slate-800 truncate">
+            Visualizador de Evidencia
+          </h4>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <a id="visor-descargar-btn" href="#" download class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5" title="Descargar archivo original">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">Descargar</span>
+          </a>
+          <button type="button" onclick="cerrarVisorEvidencia()" class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center justify-center font-bold transition-all">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Contenedor de Vista Previa -->
+      <div id="visor-contenedor" class="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-900/5 min-h-[320px] max-h-[calc(92vh-100px)]">
+        <!-- Imagen -->
+        <img id="visor-img" src="" alt="Evidencia" class="max-w-full max-h-[75vh] object-contain rounded-xl shadow-md hidden" />
+        
+        <!-- PDF / Documento interactivo -->
+        <iframe id="visor-frame" src="" class="w-full h-[75vh] rounded-xl border border-slate-200 hidden bg-white"></iframe>
+
+        <!-- Fallback si no es previsualizable en línea -->
+        <div id="visor-fallback" class="text-center p-8 hidden">
+          <i data-lucide="file-text" class="w-16 h-16 mx-auto text-slate-400 mb-3"></i>
+          <p id="visor-fallback-nombre" class="font-bold text-sm text-slate-700 mb-2"></p>
+          <p class="text-xs text-slate-500 mb-4">Este tipo de archivo no se puede renderizar directamente en el navegador.</p>
+          <a id="visor-fallback-btn" href="#" download class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#C41230] text-white text-xs font-bold hover:bg-[#8B1D19]">
+            <i data-lucide="download" class="w-4 h-4"></i> Descargar para visualizar
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('[data-section-toggle]').forEach((btn) => {
+        const section = btn.closest('[data-collapsible-section]');
+        if (!section) return;
+        const body = section.querySelector('[data-section-body]');
+        const storageKey = btn.dataset.storageKey;
+        if (!body) return;
+
+        const applyState = (collapsed) => {
+          body.classList.toggle('hidden', collapsed);
+          btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+          const chevron = btn.querySelector('[data-section-chevron]');
+          if (chevron) {
+            chevron.classList.toggle('-rotate-90', collapsed);
+          }
+        };
+
+        let isCollapsed = false;
+        if (storageKey) {
+          try {
+            isCollapsed = localStorage.getItem(storageKey) === '1';
+          } catch (e) {}
+        }
+        applyState(isCollapsed);
+
+        btn.addEventListener('click', () => {
+          const nextCollapsed = !body.classList.contains('hidden');
+          applyState(nextCollapsed);
+          if (storageKey) {
+            try {
+              if (nextCollapsed) {
+                localStorage.setItem(storageKey, '1');
+              } else {
+                localStorage.removeItem(storageKey);
+              }
+            } catch (e) {}
+          }
+        });
+      });
+
+      // Toggle global para ocultar / mostrar el menú lateral izquierdo
+      const syncSidebarBtnUI = () => {
+        const isCollapsed = document.documentElement.classList.contains('sgr-sidebar-collapsed');
+        document.querySelectorAll('[data-sidebar-toggle]').forEach((btn) => {
+          btn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+          const lbl = btn.querySelector('[data-sidebar-label]');
+          if (lbl) {
+            lbl.textContent = isCollapsed ? 'Mostrar menú' : 'Ocultar menú';
+          }
+        });
+      };
+      syncSidebarBtnUI();
+
+      document.querySelectorAll('[data-sidebar-toggle]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const isCollapsed = document.documentElement.classList.toggle('sgr-sidebar-collapsed');
+          try {
+            if (isCollapsed) {
+              localStorage.setItem('sgr_sidebar_collapsed', '1');
+            } else {
+              localStorage.removeItem('sgr_sidebar_collapsed');
+            }
+          } catch (e) {}
+          syncSidebarBtnUI();
+        });
+      });
+
+      // Fijar automáticamente la columna de Acciones (ver, editar, eliminar) en tablas con scroll
+      document.querySelectorAll('.overflow-x-auto > table').forEach((table) => {
+        const lastTh = table.querySelector('thead tr:last-child th:last-child');
+        if (!lastTh) return;
+        const headerText = (lastTh.textContent || '').trim().toLowerCase();
+        if (headerText.includes('acción') || headerText.includes('accion')) {
+          table.classList.add('sgr-sticky-actions');
+        }
+      });
+
+      // Listas desplegables buscables (reemplaza datalist nativo y <select data-search-select="true">)
+      const normSearch = (txt) => (txt || '')
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+      const compactSearch = (txt) => normSearch(txt).replace(/[.\-\s_]+/g, '');
+
+      const matchesTokens = (itemSearchNorm, itemSearchCompact, query) => {
+        const qNorm = normSearch(query);
+        if (!qNorm) return true;
+        const tokens = qNorm.split(/\s+/).filter(Boolean);
+        return tokens.every((tok) => {
+          const tokComp = tok.replace(/[.\-\s_]+/g, '');
+          return itemSearchNorm.includes(tok) || (tokComp && itemSearchCompact.includes(tokComp));
+        });
+      };
+
+      let openComboCloser = null;
+      document.addEventListener('click', (ev) => {
+        if (openComboCloser && !ev.target.closest('.sgr-combo-wrap')) {
+          openComboCloser();
+          openComboCloser = null;
+        }
+      });
+
+      const attachSearchCombo = (input, getItems, onSelect, placeholderText) => {
+        if (!input || input.dataset.sgrCombo === '1') return;
+        input.dataset.sgrCombo = '1';
+        input.setAttribute('autocomplete', 'off');
+        if (placeholderText && !input.placeholder) input.placeholder = placeholderText;
+
+        let wrap = input.parentElement;
+        if (!wrap || !wrap.classList.contains('relative')) {
+          wrap = document.createElement('div');
+          wrap.className = 'relative w-full';
+          input.parentNode.insertBefore(wrap, input);
+          wrap.appendChild(input);
+        }
+        wrap.classList.add('sgr-combo-wrap');
+        input.classList.add('pr-14');
+
+        const controls = document.createElement('div');
+        controls.className = 'absolute inset-y-0 right-1.5 flex items-center gap-0.5';
+
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.title = 'Limpiar';
+        clearBtn.className = 'hidden w-6 h-6 rounded-lg text-slate-400 hover:text-[#C41230] hover:bg-red-50 flex items-center justify-center text-xs font-extrabold transition-colors';
+        clearBtn.innerHTML = '&times;';
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.title = 'Ver listado completo';
+        toggleBtn.className = 'w-6 h-6 rounded-lg text-slate-500 hover:text-[#C41230] hover:bg-slate-100 flex items-center justify-center transition-colors';
+        toggleBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+
+        controls.appendChild(clearBtn);
+        controls.appendChild(toggleBtn);
+        wrap.appendChild(controls);
+
+        const menu = document.createElement('div');
+        menu.className = 'sgr-combo-menu hidden absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto z-[80] py-1 divide-y divide-slate-100';
+        wrap.appendChild(menu);
+
+        let isOpen = false;
+        let activeIdx = -1;
+        let currentFiltered = [];
+        let showAllOnOpen = false;
+        let inEditSession = false;
+        let prevLabel = '';
+        let dirtyTyped = false;
+        let confirmedChoice = false;
+        let explicitlyCleared = false;
+        let isRestoring = false;
+        let skipMouseUp = false;
+
+        const syncClearBtn = () => {
+          clearBtn.classList.toggle('hidden', !input.value);
+        };
+
+        const closeMenu = () => {
+          menu.classList.add('hidden');
+          isOpen = false;
+          activeIdx = -1;
+          if (openComboCloser === closeMenu) openComboCloser = null;
+        };
+
+        const beginEditSession = () => {
+          inEditSession = true;
+          prevLabel = input.value || '';
+          dirtyTyped = false;
+          confirmedChoice = false;
+          explicitlyCleared = false;
+          if (onSelect) onSelect({ snapshotStart: true });
+          if (prevLabel) {
+            try { input.select(); } catch (e) {}
+          }
+        };
+
+        const restorePreviousValue = () => {
+          isRestoring = true;
+          input.value = prevLabel;
+          onSelect({ label: prevLabel, value: prevLabel, restored: true });
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          isRestoring = false;
+          dirtyTyped = false;
+          syncClearBtn();
+        };
+
+        const stripPrevFromIME = (rawVal) => {
+          if (!prevLabel || rawVal === prevLabel) return rawVal;
+          if (rawVal.startsWith(prevLabel) && rawVal.length > prevLabel.length) {
+            return rawVal.slice(prevLabel.length);
+          }
+          if (rawVal.endsWith(prevLabel) && rawVal.length > prevLabel.length) {
+            return rawVal.slice(0, rawVal.length - prevLabel.length);
+          }
+          return rawVal;
+        };
+
+        const renderMenu = (forceAll = false) => {
+          const allItems = getItems().map((it) => {
+            const rawSearch = `${it.label} ${it.meta || ''} ${it.search || ''}`;
+            return {
+              ...it,
+              _norm: normSearch(rawSearch),
+              _comp: compactSearch(rawSearch),
+            };
+          });
+          const q = (forceAll || showAllOnOpen) ? '' : input.value;
+          const matched = allItems.filter((it) => matchesTokens(it._norm, it._comp, q));
+          currentFiltered = matched.slice(0, 120);
+          activeIdx = -1;
+          menu.innerHTML = '';
+
+          if (!currentFiltered.length) {
+            const empty = document.createElement('div');
+            empty.className = 'px-3.5 py-3 text-xs text-slate-400 text-center font-medium';
+            empty.textContent = 'Sin coincidencias para tu búsqueda';
+            menu.appendChild(empty);
+          } else {
+            currentFiltered.forEach((it, idx) => {
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              const isSelected = input.value && it.label === input.value;
+              btn.className = `w-full text-left px-3.5 py-2 transition-colors flex flex-col gap-0.5 ${isSelected ? 'bg-red-50/80 text-[#C41230]' : 'hover:bg-slate-50 text-slate-800'}`;
+              btn.dataset.idx = String(idx);
+
+              const titleEl = document.createElement('span');
+              titleEl.className = `text-xs leading-snug ${isSelected ? 'font-extrabold text-[#C41230]' : 'font-bold text-slate-900'}`;
+              titleEl.textContent = it.label;
+              btn.appendChild(titleEl);
+
+              if (it.meta) {
+                const metaEl = document.createElement('span');
+                metaEl.className = 'text-[10px] text-slate-500 font-medium leading-tight';
+                metaEl.textContent = it.meta;
+                btn.appendChild(metaEl);
+              }
+
+              btn.addEventListener('mousedown', (ev) => {
+                ev.preventDefault();
+                showAllOnOpen = false;
+                confirmedChoice = true;
+                explicitlyCleared = false;
+                dirtyTyped = false;
+                prevLabel = it.label || '';
+                onSelect(it);
+                closeMenu();
+                syncClearBtn();
+              });
+              menu.appendChild(btn);
+            });
+
+            if (matched.length > currentFiltered.length) {
+              const more = document.createElement('div');
+              more.className = 'px-3.5 py-1.5 text-[10px] text-slate-400 bg-slate-50 text-center font-semibold';
+              more.textContent = `Mostrando ${currentFiltered.length} de ${matched.length} resultados · escribe para acotar`;
+              menu.appendChild(more);
+            }
+          }
+
+          if (openComboCloser && openComboCloser !== closeMenu) openComboCloser();
+          menu.classList.remove('hidden');
+          isOpen = true;
+          openComboCloser = closeMenu;
+        };
+
+        const highlightItem = (nextIdx) => {
+          const buttons = menu.querySelectorAll('button[data-idx]');
+          if (!buttons.length) return;
+          activeIdx = Math.max(0, Math.min(nextIdx, buttons.length - 1));
+          buttons.forEach((b, i) => {
+            b.classList.toggle('bg-red-50', i === activeIdx);
+          });
+          buttons[activeIdx].scrollIntoView({ block: 'nearest' });
+        };
+
+        input.addEventListener('focus', () => {
+          skipMouseUp = true;
+          beginEditSession();
+          showAllOnOpen = true;
+          renderMenu(true);
+        });
+        input.addEventListener('mouseup', (ev) => {
+          if (skipMouseUp) {
+            skipMouseUp = false;
+            if (prevLabel) {
+              ev.preventDefault();
+              try { input.select(); } catch (e) {}
+            }
+          }
+        });
+        input.addEventListener('click', () => {
+          if (!inEditSession || !isOpen) {
+            beginEditSession();
+          }
+          showAllOnOpen = true;
+          renderMenu(true);
+        });
+        input.addEventListener('keydown', (ev) => {
+          if (ev.key === 'ArrowDown') {
+            ev.preventDefault();
+            if (!isOpen) renderMenu(true);
+            else highlightItem(activeIdx + 1);
+            return;
+          }
+          if (ev.key === 'ArrowUp') {
+            ev.preventDefault();
+            if (isOpen) highlightItem(activeIdx - 1);
+            return;
+          }
+          if (ev.key === 'Enter' && isOpen && activeIdx >= 0 && currentFiltered[activeIdx]) {
+            ev.preventDefault();
+            const chosen = currentFiltered[activeIdx];
+            showAllOnOpen = false;
+            confirmedChoice = true;
+            explicitlyCleared = false;
+            dirtyTyped = false;
+            prevLabel = chosen.label || '';
+            onSelect(chosen);
+            closeMenu();
+            syncClearBtn();
+            return;
+          }
+          if (ev.key === 'Escape') {
+            if (inEditSession && !confirmedChoice && !explicitlyCleared && input.value !== prevLabel) {
+              restorePreviousValue();
+            }
+            if (isOpen) closeMenu();
+            return;
+          }
+          const isTypingKey = (ev.key.length === 1 && !ev.ctrlKey && !ev.metaKey && !ev.altKey)
+            || ev.key === 'Backspace' || ev.key === 'Delete';
+          if (isTypingKey && inEditSession && !dirtyTyped && prevLabel) {
+            const selStart = input.selectionStart;
+            const selEnd = input.selectionEnd;
+            const allSelected = (selStart === 0 && selEnd === input.value.length);
+            if (!allSelected) {
+              input.value = '';
+            }
+            dirtyTyped = true;
+          }
+        });
+        input.addEventListener('input', () => {
+          if (isRestoring) return;
+          if (inEditSession && !dirtyTyped && prevLabel && input.value !== prevLabel) {
+            input.value = stripPrevFromIME(input.value);
+            dirtyTyped = true;
+          }
+          confirmedChoice = false;
+          showAllOnOpen = false;
+          syncClearBtn();
+          renderMenu(false);
+        });
+        input.addEventListener('blur', () => {
+          skipMouseUp = false;
+          if (inEditSession && !confirmedChoice && !explicitlyCleared && input.value !== prevLabel) {
+            restorePreviousValue();
+          }
+          inEditSession = false;
+          closeMenu();
+          syncClearBtn();
+        });
+
+        toggleBtn.addEventListener('mousedown', (ev) => {
+          ev.preventDefault();
+          if (isOpen) {
+            if (inEditSession && !confirmedChoice && !explicitlyCleared && input.value !== prevLabel) {
+              restorePreviousValue();
+            }
+            closeMenu();
+          } else {
+            showAllOnOpen = true;
+            input.focus();
+            renderMenu(true);
+          }
+        });
+
+        clearBtn.addEventListener('mousedown', (ev) => {
+          ev.preventDefault();
+          explicitlyCleared = true;
+          confirmedChoice = false;
+          dirtyTyped = false;
+          prevLabel = '';
+          input.value = '';
+          showAllOnOpen = true;
+          onSelect({ label: '', value: '', cleared: true });
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          syncClearBtn();
+          input.focus();
+          renderMenu(true);
+        });
+
+        syncClearBtn();
+        input._sgrSyncUI = syncClearBtn;
+      };
+
+      // 1) Mejorar todos los inputs vinculados a <datalist>
+      document.querySelectorAll('input[list]').forEach((inp) => {
+        const listId = inp.getAttribute('list');
+        const dl = listId ? document.getElementById(listId) : null;
+        if (!dl) return;
+        inp.dataset.sourceList = listId;
+        inp.removeAttribute('list');
+
+        attachSearchCombo(
+          inp,
+          () => Array.from(dl.querySelectorAll('option')).map((opt) => ({
+            label: opt.value,
+            value: opt.value,
+            meta: (opt.textContent || '').trim(),
+            search: opt.dataset.search || '',
+          })),
+          (it) => {
+            if (!it || it.snapshotStart) return;
+            inp.value = it.label || '';
+            inp.dispatchEvent(new Event('input', { bubbles: true }));
+            if (!it.restored) {
+              inp.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
+        );
+      });
+
+      // 2) Mejorar todos los <select> (excepto [data-native-select] / multiple) con buscador + lista visible como Vecinos/Responsable
+      document.querySelectorAll('select:not([data-native-select="true"]):not([multiple])').forEach((sel) => {
+        if (sel.dataset.sgrSelectInit === '1') return;
+        sel.dataset.sgrSelectInit = '1';
+
+        const isFullWidth = sel.classList.contains('w-full');
+        const wrap = document.createElement('div');
+        wrap.className = isFullWidth ? 'relative w-full' : 'relative w-full sm:w-auto min-w-[165px]';
+        sel.parentNode.insertBefore(wrap, sel);
+
+        const emptyOpt = Array.from(sel.options).find((o) => o.value === '');
+        const defaultPlaceholder = sel.dataset.searchPlaceholder
+          || (emptyOpt ? emptyOpt.textContent.trim() : '')
+          || 'Escribe o haz clic para buscar...';
+
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        const baseCls = (sel.className || 'w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none')
+          .replace('font-bold', 'font-semibold');
+        inp.className = isFullWidth ? baseCls : `${baseCls} w-full`;
+        inp.placeholder = defaultPlaceholder;
+        if (sel.required) inp.required = true;
+        if (sel.disabled) inp.disabled = true;
+
+        sel.classList.add('hidden');
+        wrap.appendChild(inp);
+        wrap.appendChild(sel);
+
+        const syncInputFromSelect = () => {
+          const cur = sel.options[sel.selectedIndex];
+          inp.value = (cur && cur.value !== '') ? cur.textContent.trim() : '';
+          inp.disabled = !!sel.disabled;
+          if (inp._sgrSyncUI) inp._sgrSyncUI();
+        };
+        syncInputFromSelect();
+        sel.addEventListener('change', syncInputFromSelect);
+        if (sel.form) {
+          sel.form.addEventListener('reset', () => setTimeout(syncInputFromSelect, 0));
+        }
+
+        // Mantener sincronizado si otro script rellena dinámicamente las opciones o cambia disabled
+        if (window.MutationObserver) {
+          const obs = new MutationObserver(() => syncInputFromSelect());
+          obs.observe(sel, { childList: true, attributes: true, attributeFilter: ['disabled'] });
+        }
+
+        let prevSelectVal = sel.value;
+        attachSearchCombo(
+          inp,
+          () => Array.from(sel.options)
+            .filter((opt) => opt.value !== '')
+            .map((opt) => ({
+              label: opt.textContent.trim(),
+              value: opt.value,
+              meta: opt.dataset.meta || '',
+              search: opt.dataset.search || '',
+            })),
+          (it) => {
+            if (!it) return;
+            if (it.snapshotStart) {
+              prevSelectVal = sel.value;
+              return;
+            }
+            if (it.restored) {
+              sel.value = prevSelectVal;
+              syncInputFromSelect();
+              return;
+            }
+            if (it.cleared) {
+              sel.value = emptyOpt ? '' : '';
+              inp.value = '';
+              prevSelectVal = '';
+            } else {
+              sel.value = it.value;
+              inp.value = it.label;
+              prevSelectVal = it.value;
+            }
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        );
+
+        inp.addEventListener('input', () => {
+          if (!inp.value.trim()) {
+            sel.value = '';
+          }
+        });
+      });
     });
   </script>
   {% block extra_js %}{% endblock %}

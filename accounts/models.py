@@ -18,6 +18,11 @@ class Delegacion(BaseModel):
     def __str__(self):
         return f"{self.get_codigo()} - {self.nombre}"
 
+    class Meta:
+        db_table = 'accounts_delegation'
+        verbose_name = "Delegation"
+        verbose_name_plural = "Delegations"
+
 class Sector(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
     nombre = models.CharField(max_length=150)
@@ -34,8 +39,9 @@ class Sector(BaseModel):
         return f"{self.nombre} ({self.delegacion.nombre})"
 
     class Meta:
-        verbose_name = "Sector / Territorio"
-        verbose_name_plural = "Sectores / Territorios"
+        db_table = 'accounts_sector'
+        verbose_name = "Sector / Territory"
+        verbose_name_plural = "Sectors / Territories"
         ordering = ['delegacion', 'nombre']
 
 class Cargo(BaseModel):
@@ -44,6 +50,11 @@ class Cargo(BaseModel):
 
     def __str__(self):
         return self.nombre_cargo
+
+    class Meta:
+        db_table = 'accounts_position'
+        verbose_name = "Position"
+        verbose_name_plural = "Positions"
 
 class Funcionario(BaseModel):
     TRATAMIENTO_CHOICES = [
@@ -54,6 +65,11 @@ class Funcionario(BaseModel):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='funcionario')
     identificador_institucional = models.CharField(max_length=20, unique=True)
+    rut = models.CharField(max_length=20, null=True, blank=True)
+    primer_nombre = models.CharField(max_length=50, blank=True, default='')
+    segundo_nombre = models.CharField(max_length=50, blank=True, default='')
+    apellido_paterno = models.CharField(max_length=50, blank=True, default='')
+    apellido_materno = models.CharField(max_length=50, blank=True, default='')
     delegacion = models.ForeignKey(Delegacion, on_delete=models.RESTRICT, null=True, blank=True)
     sector = models.ForeignKey(Sector, on_delete=models.SET_NULL, null=True, blank=True, related_name='funcionarios')
     cargo = models.ForeignKey(Cargo, on_delete=models.RESTRICT)
@@ -68,13 +84,51 @@ class Funcionario(BaseModel):
         verbose_name='Tratamiento del saludo',
     )
 
+    def get_partes_nombre(self):
+        from core.utils import separar_nombre_usuario
+        if self.primer_nombre or self.apellido_paterno:
+            return (
+                self.primer_nombre,
+                self.segundo_nombre,
+                self.apellido_paterno,
+                self.apellido_materno,
+            )
+        return separar_nombre_usuario(self.user.first_name, self.user.last_name)
+
+    def get_nombre_corto(self):
+        pn, _sn, ap, _am = self.get_partes_nombre()
+        return ' '.join(p for p in (pn, ap) if p).strip() or self.user.username
+
+    def get_nombre_completo(self):
+        from core.utils import construir_nombre_completo
+        pn, sn, ap, am = self.get_partes_nombre()
+        return construir_nombre_completo(pn, sn, ap, am) or self.user.first_name or self.user.username
+
     def get_foto_url(self):
         if self.foto and hasattr(self.foto, 'url'):
             return self.foto.url
         return None
 
+    def get_rut(self):
+        if self.rut:
+            return self.rut
+        from activities.models import Vecino
+        from core.utils import validar_rut
+        if self.identificador_institucional and self.identificador_institucional.startswith('VEC-'):
+            raw = self.identificador_institucional[4:]
+            ok, fmt = validar_rut(raw)
+            if ok:
+                return fmt
+        vec = Vecino.objects.filter(rut=self.user.username).first()
+        return vec.rut if vec else ''
+
     def __str__(self):
         return f"{self.user.username} - {self.identificador_institucional}"
+
+    class Meta:
+        db_table = 'accounts_staff'
+        verbose_name = "Staff Member"
+        verbose_name_plural = "Staff"
 
 class Rol(BaseModel):
     codigo = models.CharField(max_length=20, null=True, blank=True)
@@ -92,9 +146,17 @@ class Rol(BaseModel):
     def __str__(self):
         return self.nombre_rol
 
+    class Meta:
+        db_table = 'accounts_role'
+        verbose_name = "Role"
+        verbose_name_plural = "Roles"
+
 class FuncionarioRol(BaseModel):
     funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE)
     rol = models.ForeignKey(Rol, on_delete=models.CASCADE)
 
     class Meta:
+        db_table = 'accounts_staff_role'
+        verbose_name = "Staff Role"
+        verbose_name_plural = "Staff Roles"
         unique_together = ('funcionario', 'rol')

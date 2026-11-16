@@ -1,10 +1,12 @@
 from django.conf import settings
 from accounts.models import Delegacion, Funcionario, FuncionarioRol, Rol
+from core.utils import obtener_nombre_corto
 
 def global_context(request):
     if not request.user.is_authenticated:
         return {
             'user_rol_name': 'Invitado',
+            'usuario_nombre_corto': '',
             'delegacion_activa': None,
             'delegaciones_autorizadas': [],
             'can_switch_delegacion': False,
@@ -83,6 +85,7 @@ def global_context(request):
         'ver_metas': es_admin or es_coordinador,
         'ver_tipo_atencion': es_admin or es_coordinador,
         'ver_sub_atencion': es_admin or es_coordinador,
+        'ver_area_apoyo': es_admin or es_coordinador,
         'ver_atenciones': not es_cliente,
         'ver_organizaciones': not es_cliente,
         'ver_tipo_gestion': es_admin or es_coordinador,
@@ -92,8 +95,11 @@ def global_context(request):
         'ver_portal_cliente': es_cliente,
     }
 
+    nombre_corto = obtener_nombre_corto(funcionario or request.user)
+
     return {
         'funcionario_actual': funcionario,
+        'usuario_nombre_corto': nombre_corto,
         'user_rol_name': rol_name,
         'delegacion_activa': delegacion_activa,
         'delegaciones_autorizadas': delegaciones_autorizadas,

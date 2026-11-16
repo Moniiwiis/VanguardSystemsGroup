@@ -1,3 +1,4 @@
+import datetime
 from io import BytesIO
 import re
 from tempfile import TemporaryDirectory
@@ -10,7 +11,8 @@ from django.urls import reverse
 from PIL import Image
 
 from accounts.models import Cargo, Delegacion, Funcionario, FuncionarioRol, Rol, Sector
-from activities.models import Actividad, AtencionCiudadana, Evidencia, ValidacionEvidencia, Vecino
+from activities.models import Actividad, AtencionCiudadana, Evidencia, OrganizacionComunitaria, ValidacionEvidencia, Vecino
+from agenda.models import CompromisoAgenda
 from configuration.models import ItemMedicion, Periodo, SubAtencion, TipoAtencion
 from core.utils import build_accent_query
 from core.views import _apply_list_ordering, _get_page_size, _validate_password
@@ -201,8 +203,11 @@ class UserManagementTests(TestCase):
         self.client.force_login(self.admin)
 
         response = self.client.post(reverse('gestion_usuarios'), {
-            'nombre': 'Usuario de prueba',
-            'username': 'usuario_prueba',
+            'primer_nombre': 'María',
+            'segundo_nombre': 'Isabel',
+            'apellido_paterno': 'González',
+            'apellido_materno': 'Rojas',
+            'rut': '12.345.678-5',
             'correo': 'usuario@example.test',
             'cargo_id': str(self.cargo.id),
             'rol_id': str(self.admin_role.id),
@@ -215,12 +220,18 @@ class UserManagementTests(TestCase):
             reverse('gestion_usuarios'),
             fetch_redirect_response=False,
         )
-        created_user = User.objects.get(username='usuario_prueba')
+        created_user = User.objects.get(username='mgonzalez')
+        self.assertEqual(created_user.first_name, 'María Isabel González Rojas')
         funcionario = Funcionario.objects.get(user=created_user)
+        self.assertEqual(funcionario.rut, '12.345.678-5')
+        self.assertEqual(funcionario.primer_nombre, 'María')
+        self.assertEqual(funcionario.segundo_nombre, 'Isabel')
+        self.assertEqual(funcionario.apellido_paterno, 'González')
+        self.assertEqual(funcionario.apellido_materno, 'Rojas')
         self.assertTrue(funcionario.debe_cambiar_contrasena)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ['usuario@example.test'])
-        self.assertIn('usuario_prueba', mail.outbox[0].body)
+        self.assertIn('mgonzalez', mail.outbox[0].body)
         pw_match = re.search(r'Contraseña provisoria:\s*(\S+)', mail.outbox[0].body)
         self.assertIsNotNone(pw_match)
         provisional_pw = pw_match.group(1)
@@ -232,11 +243,51 @@ class UserManagementTests(TestCase):
             reverse('gestion_usuarios'),
             {'page_size': '30'},
         )
-        self.assertContains(list_response, 'usuario_prueba')
+        self.assertContains(list_response, 'mgonzalez')
+        self.assertContains(list_response, 'Funcionarios del sistema')
+        self.assertContains(list_response, 'name="rut"')
+        self.assertNotContains(list_response, 'Se generará como inicial + apellido paterno')
+        self.assertContains(list_response, 'id="ver-usuario"')
+        self.assertContains(list_response, 'id="ver-rut"')
         self.assertEqual(
             list_response.context['page_obj'].paginator.per_page,
             30,
         )
+
+        # Rechazar creación de funcionario sin RUT o con RUT duplicado
+        self.client.post(reverse('gestion_usuarios'), {
+            'primer_nombre': 'Sin',
+            'apellido_paterno': 'Rut',
+            'correo': 'sinrut@example.test',
+            'cargo_id': str(self.cargo.id),
+            'rol_id': str(self.admin_role.id),
+            'estado': 'Activo',
+        })
+        self.assertFalse(User.objects.filter(username='srut').exists())
+
+        # Colisión de inicial + apellido paterno genera sufijo numérico automático (mgonzalez2)
+        self.client.post(reverse('gestion_usuarios'), {
+            'primer_nombre': 'Marcos',
+            'apellido_paterno': 'González',
+            'rut': '15.444.333-9',
+            'correo': 'mgonzalez2@example.test',
+            'cargo_id': str(self.cargo.id),
+            'rol_id': str(self.admin_role.id),
+            'estado': 'Activo',
+            'delegacion_id': '',
+        })
+        self.assertTrue(User.objects.filter(username='mgonzalez2').exists())
+
+        # El funcionario puede iniciar sesión tanto con su usuario automático como con su correo
+        self.client.logout()
+        for ident in ('mgonzalez', 'usuario@example.test'):
+            resp_login = self.client.post(reverse('login'), {
+                'username': ident,
+                'password': provisional_pw,
+            })
+            self.assertEqual(resp_login.status_code, 302)
+            self.assertEqual(str(self.client.session['_auth_user_id']), str(created_user.id))
+            self.client.post(reverse('logout'))
 
     def test_first_login_requires_password_change_and_clears_flag(self):
         user = User.objects.create_user(
@@ -365,6 +416,18 @@ class ActivityEvidenceUploadTests(TestCase):
                     self.client.post(
                         reverse('gestion_atenciones_validar_evidencia', args=[atencion.id]),
                         {'resultado_evidencia': 'Aprobado'},
+                    ),
+                    reverse('gestion_atenciones'),
+                    fetch_redirect_response=False,
+                )
+                self.assertFalse(
+                    ValidacionEvidencia.objects.filter(actividad=actividad).exists()
+                )
+                # Tampoco debe permitir rechazar si falta la evidencia del despues
+                self.assertRedirects(
+                    self.client.post(
+                        reverse('gestion_atenciones_validar_evidencia', args=[atencion.id]),
+                        {'resultado_evidencia': 'Rechazado'},
                     ),
                     reverse('gestion_atenciones'),
                     fetch_redirect_response=False,
@@ -574,6 +637,7 @@ class AtencionCiudadanaEnhancementTests(TestCase):
             'modo_vecino': 'nuevo',
             'nuevo_vecino_nombre': 'Pedro Vecino Nuevo',
             'nuevo_vecino_rut': '12.345.678-5',
+            'nuevo_vecino_correo': 'pedro.vecino@example.test',
             'nuevo_vecino_telefono': '+56987654321',
             'nuevo_vecino_direccion': 'Pasaje Los Aromos 123',
             'tipo_atencion_id': self.tipo.id,
@@ -843,6 +907,7 @@ class SectorYTerritorioTests(TestCase):
         response = self.client.post(reverse('gestion_vecinos'), {
             'nombre': 'Mariana Valenzuela',
             'rut': '18.999.888-0',
+            'correo': 'mariana.valenzuela@example.test',
             'telefono': '+56911223344',
             'direccion': 'Avenida Central 456',
             'delegacion_id': self.delegacion2.id,  # Intento de bypass
@@ -928,6 +993,7 @@ class SectorYTerritorioTests(TestCase):
         response = self.client.post(reverse('gestion_vecinos'), {
             'nombre': 'Vecino en contexto activo',
             'rut': '13.345.678-3',
+            'correo': 'vecino.contexto@example.test',
             'delegacion_id': self.delegacion2.id,
             'sector_id': self.sector1.id,
             'estado': 'Activo',
@@ -944,6 +1010,7 @@ class SectorYTerritorioTests(TestCase):
             'modo_vecino': 'nuevo',
             'nuevo_vecino_nombre': 'Rodrigo Tapia',
             'nuevo_vecino_rut': '15.444.333-9',
+            'nuevo_vecino_correo': 'rodrigo.tapia@example.test',
             'nuevo_vecino_telefono': '+56998877665',
             'nuevo_vecino_direccion': 'Calle del Sol 789',
             'nuevo_vecino_sector_id': self.sector1.id,
@@ -1081,8 +1148,2158 @@ class SectorYTerritorioTests(TestCase):
         self.client.post(reverse('gestion_vecinos'), {
             'nombre': 'Vecino Dirección Completa',
             'rut': '18.999.888-0',
+            'correo': 'vecino.dir@example.test',
             'direccion': 'Avenida Francisco de Aguirre 123',
             'sector_id': self.sector1.id,
             'estado': 'Activo',
         })
         self.assertTrue(Vecino.objects.filter(rut='18.999.888-0').exists())
+
+
+class TuboCompromisoYOrganizacionesTests(TestCase):
+    def setUp(self):
+        self.delegacion = Delegacion.objects.create(nombre='Delegación Centro', estado='Activa')
+        self.otra_delegacion = Delegacion.objects.create(nombre='Delegación Norte', estado='Activa')
+        self.cargo = Cargo.objects.create(nombre_cargo='Delegado Territorial')
+        self.user = User.objects.create_user(
+            username='delegado_tubo',
+            first_name='Carla',
+            last_name='Vega',
+            email='carla@example.test',
+            password='Prueba123!',
+        )
+        self.func = Funcionario.objects.create(
+            user=self.user,
+            identificador_institucional='FUNC-TUB01',
+            cargo=self.cargo,
+            delegacion=self.delegacion,
+            estado='Activo',
+        )
+        self.rol = Rol.objects.create(nombre_rol='Delegado', alcance='Delegación', estado='Activo')
+        FuncionarioRol.objects.create(funcionario=self.func, rol=self.rol)
+        self.tipo = TipoAtencion.objects.create(nombre='Social', estado='Activo')
+        self.sub = SubAtencion.objects.create(nombre='Luminarias', tipo_atencion=self.tipo, estado='Activa')
+        self.org_local = OrganizacionComunitaria.objects.create(
+            nombre='JJVV El Brillador',
+            tipo_organizacion='Junta de Vecinos',
+            delegacion=self.delegacion,
+            territorio='El Brillador',
+            representante_legal='Marta Henríquez',
+            telefono_contacto='+56 9 1234 5678',
+            estado='Activo',
+        )
+        self.org_externa = OrganizacionComunitaria.objects.create(
+            nombre='JJVV Las Compañías Norte',
+            tipo_organizacion='Junta de Vecinos',
+            delegacion=self.otra_delegacion,
+            estado='Activo',
+        )
+
+    def test_atencion_permite_jjvv_existente_y_nueva(self):
+        self.client.force_login(self.user)
+
+        # 1. Crear atención con JJVV existente y envío a Tubo de Compromiso
+        resp = self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'organizacion_id': self.org_local.id,
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Instalación de reductores de velocidad en Av. Islón',
+            'va_a_tubo': '1',
+            'fecha_compromiso': '2026-12-01',
+            'area_apoyo': 'Dirección de Tránsito',
+            'origen': 'EXT',
+        })
+        self.assertRedirects(resp, reverse('gestion_atenciones'))
+        at1 = AtencionCiudadana.objects.filter(organizacion=self.org_local).first()
+        self.assertIsNotNone(at1)
+        self.assertTrue(at1.va_a_tubo)
+        self.assertIn('JJVV El Brillador', at1.solicitante)
+        self.assertEqual(at1.area_apoyo, 'Dirección de Tránsito')
+        self.assertEqual(at1.get_codigo_tubo(), f'TUB-{at1.id:05d}')
+
+        # 2. Crear nueva JJVV inline dentro de la atención
+        resp_new = self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'crear_nueva_org': '1',
+            'nueva_org_nombre': 'JJVV Terrazas del Brillador',
+            'nueva_org_tipo': 'Junta de Vecinos',
+            'nueva_org_representante': 'Carlos Pérez',
+            'nueva_org_telefono': '+56 9 8765 4321',
+            'nueva_org_email_contacto': 'terrazas@brillador.test',
+            'nueva_org_direccion': 'Av. El Brillador 450',
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Solicitud de poda',
+            'va_a_tubo': '0',
+        })
+        self.assertRedirects(resp_new, reverse('gestion_atenciones'))
+        nueva_org = OrganizacionComunitaria.objects.filter(nombre='JJVV Terrazas del Brillador').first()
+        self.assertIsNotNone(nueva_org)
+        at2 = AtencionCiudadana.objects.filter(organizacion=nueva_org).first()
+        self.assertIsNotNone(at2)
+        self.assertFalse(at2.va_a_tubo)
+
+        # 3. Una JJVV de otra delegación NO se expone ni puede vincularse
+        resp_get = self.client.get(reverse('gestion_atenciones'))
+        org_ids = [o['id'] for o in resp_get.context['organizaciones']]
+        self.assertIn(self.org_local.id, org_ids)
+        self.assertNotIn(self.org_externa.id, org_ids)
+
+    def test_regla_estricta_no_crear_tubo_sin_atencion_ni_sector(self):
+        self.client.force_login(self.user)
+
+        # 1. POST directo en /gestion/tubo/ sin sector_id NO crea registros
+        total_antes = AtencionCiudadana.objects.count()
+        resp_tubo_post = self.client.post(reverse('gestion_tubo'), {
+            'descripcion': 'Intento suelto',
+            'va_a_tubo': '1',
+        })
+        self.assertRedirects(resp_tubo_post, reverse('gestion_tubo'))
+        self.assertEqual(AtencionCiudadana.objects.count(), total_antes)
+        self.assertEqual(CompromisoAgenda.objects.count(), 0)
+
+        # 2. POST en /gestion/agenda/ redirige al Tubo sin crear CompromisoAgenda independiente
+        resp_agenda_post = self.client.post(reverse('gestion_agenda'), {
+            'solicitante': 'Alguien sin atención',
+            'fecha_comprometida': '2026-12-10',
+        })
+        self.assertRedirects(resp_agenda_post, reverse('gestion_tubo'))
+        self.assertEqual(CompromisoAgenda.objects.count(), 0)
+
+        # 3. En atenciones: marcar va_a_tubo='1' SIN fecha_compromiso es rechazado
+        self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'organizacion_id': self.org_local.id,
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Compromiso sin fecha',
+            'va_a_tubo': '1',
+            'fecha_compromiso': '',
+        })
+        self.assertEqual(AtencionCiudadana.objects.filter(descripcion='Compromiso sin fecha').count(), 0)
+
+        # 4. Con va_a_tubo='0', incluso si envían fecha_compromiso/area_apoyo, NO entra al Tubo
+        self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'organizacion_id': self.org_local.id,
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Atención regular limpia',
+            'va_a_tubo': '0',
+            'fecha_compromiso': '2026-12-05',
+            'area_apoyo': 'Tránsito',
+        })
+        at_reg = AtencionCiudadana.objects.get(descripcion='Atención regular limpia')
+        self.assertFalse(at_reg.va_a_tubo)
+        self.assertIsNone(at_reg.fecha_compromiso)
+        self.assertEqual(at_reg.area_apoyo, '')
+
+    def test_tubo_vistas_tabla_y_canvas_y_transicion_estado(self):
+        self.client.force_login(self.user)
+
+        at_ing = AtencionCiudadana.objects.create(
+            solicitante='Marta Henríquez',
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Revisión de luminarias en Pasaje Las Rosas',
+            usuario_responsable=self.user,
+            estado='Registrada',
+            va_a_tubo=True,
+            fecha_compromiso=datetime.date(2026, 12, 1),
+            area_apoyo='Alumbrado',
+        )
+        at_pend = AtencionCiudadana.objects.create(
+            solicitante='JJVV El Brillador',
+            organizacion=self.org_local,
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Salida a terreno y catastro con dirigentes',
+            usuario_responsable=self.user,
+            estado='Pendiente',
+            va_a_tubo=True,
+            fecha_compromiso=datetime.date(2026, 12, 2),
+            area_apoyo='Obras Municipales',
+        )
+        at_real = AtencionCiudadana.objects.create(
+            solicitante='Beatriz Ossa',
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Evaluación social urgente',
+            usuario_responsable=self.user,
+            estado='Resuelta',
+            va_a_tubo=True,
+            fecha_compromiso=datetime.date(2026, 11, 20),
+        )
+
+        # Vista Tabla
+        resp_tabla = self.client.get(reverse('gestion_tubo') + '?vista=tabla')
+        self.assertEqual(resp_tabla.status_code, 200)
+        self.assertEqual(resp_tabla.context['vista'], 'tabla')
+        self.assertContains(resp_tabla, 'Tubo de Compromiso')
+        self.assertNotContains(resp_tabla, 'Tubo de Compromiso SGR')
+        self.assertContains(resp_tabla, at_ing.get_codigo_tubo())
+
+        # Vista Canvas (Kanban 4 columnas + mismas 6 tarjetas KPI que Tabla)
+        resp_canvas = self.client.get(reverse('gestion_tubo') + '?vista=canvas')
+        self.assertEqual(resp_canvas.status_code, 200)
+        self.assertEqual(resp_canvas.context['vista'], 'canvas')
+        self.assertContains(resp_canvas, '1. INGRESADOS')
+        self.assertContains(resp_canvas, '2. PENDIENTES')
+        self.assertContains(resp_canvas, '3. EN PROCESO')
+        self.assertContains(resp_canvas, '4. REALIZADOS')
+        for kpi in ('Total Tubo', 'Ingresados', 'En Proceso', 'Pendientes', 'Realizados', '% Cumplimiento'):
+            self.assertContains(resp_canvas, kpi)
+        self.assertContains(resp_canvas, at_ing.get_codigo_tubo())
+        self.assertContains(resp_canvas, at_pend.get_codigo_tubo())
+        self.assertContains(resp_canvas, at_real.get_codigo_tubo())
+
+        # Sesión recuerda vista=canvas si se omite parámetro
+        resp_persist = self.client.get(reverse('gestion_tubo'))
+        self.assertEqual(resp_persist.context['vista'], 'canvas')
+
+        # Transición AJAX en Canvas (Ingresado -> En proceso -> Realizado)
+        resp_ajax = self.client.post(
+            reverse('gestion_tubo_cambiar_estado', args=[at_ing.id]),
+            {'nuevo_estado': 'En proceso'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(resp_ajax.status_code, 200)
+        self.assertEqual(resp_ajax.json()['estado'], 'En proceso')
+        at_ing.refresh_from_db()
+        self.assertEqual(at_ing.estado, 'En proceso')
+
+        resp_realizar = self.client.post(
+            reverse('gestion_tubo_cambiar_estado', args=[at_ing.id]),
+            {'nuevo_estado': 'Realizado'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(resp_realizar.status_code, 200)
+        self.assertEqual(resp_realizar.json()['estado'], 'Resuelta')
+        at_ing.refresh_from_db()
+        self.assertEqual(at_ing.estado, 'Resuelta')
+
+    def test_compromiso_sectorial_directo_en_tubo(self):
+        self.client.force_login(self.user)
+        sector = Sector.objects.create(nombre='Sector Las Rosas', delegacion=self.delegacion, estado='Activo')
+
+        resp = self.client.post(reverse('gestion_tubo'), {
+            'sector_id': sector.id,
+            'organizacion_id': self.org_local.id,
+            'solicitante': 'Mesa Territorial Las Rosas',
+            'origen': 'INT',
+            'descripcion': 'Operativo de limpieza y bacheo sectorial',
+            'fecha_compromiso': '2026-12-15',
+            'area_apoyo': 'OOCC Municipal',
+            'avance_observaciones': 'Coordinado con cuadrilla norte',
+        })
+        self.assertRedirects(resp, reverse('gestion_tubo'))
+        self.assertEqual(AtencionCiudadana.objects.count(), 0)
+        comp = CompromisoAgenda.objects.filter(sector=sector).first()
+        self.assertIsNotNone(comp)
+        self.assertEqual(comp.delegacion, self.delegacion)
+        self.assertEqual(comp.estado, 'Registrada')
+        self.assertEqual(comp.get_codigo_tubo(), f'TUB-S{comp.id:04d}')
+
+        # Se visualiza en Tabla y Canvas junto con botones de edición
+        resp_tabla = self.client.get(reverse('gestion_tubo') + '?vista=tabla')
+        self.assertContains(resp_tabla, comp.get_codigo_tubo())
+        self.assertContains(resp_tabla, 'Sector Las Rosas')
+
+        resp_canvas = self.client.get(reverse('gestion_tubo') + '?vista=canvas')
+        self.assertContains(resp_canvas, comp.get_codigo_tubo())
+        self.assertContains(resp_canvas, 'Mesa Territorial Las Rosas')
+
+        # Transición AJAX en Canvas para compromiso sectorial
+        resp_proc = self.client.post(
+            reverse('gestion_tubo_sector_cambiar_estado', args=[comp.id]),
+            {'nuevo_estado': 'En proceso'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(resp_proc.status_code, 200)
+        self.assertEqual(resp_proc.json()['estado'], 'En proceso')
+
+        resp_done = self.client.post(
+            reverse('gestion_tubo_sector_cambiar_estado', args=[comp.id]),
+            {'nuevo_estado': 'Realizado'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(resp_done.status_code, 200)
+        self.assertEqual(resp_done.json()['estado'], 'Resuelta')
+        comp.refresh_from_db()
+        self.assertEqual(comp.estado, 'Resuelta')
+
+        # Edición del compromiso sectorial
+        resp_edit = self.client.post(reverse('gestion_tubo_sector_editar', args=[comp.id]), {
+            'descripcion': 'Operativo ampliado con áreas verdes',
+            'estado': 'Pendiente',
+            'responsable_id': self.user.id,
+            'fecha_compromiso': '2026-12-20',
+            'area_apoyo': 'Parques y Jardines',
+            'avance_observaciones': 'Pendiente camión aljibe',
+        })
+        self.assertRedirects(resp_edit, reverse('gestion_tubo'))
+        comp.refresh_from_db()
+        self.assertIsNone(comp.organizacion)
+        self.assertEqual(comp.observacion, 'Operativo ampliado con áreas verdes')
+        self.assertEqual(comp.estado, 'Pendiente')
+        self.assertEqual(comp.area_apoyo, 'Parques y Jardines')
+        self.assertIsNotNone(comp.actividad_origen)
+
+        # Eliminación lógica por usuario con permiso de eliminación (superuser/admin)
+        admin = User.objects.create_superuser('admin_tubo_del', 'admin_t@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        resp_del = self.client.post(reverse('gestion_tubo_sector_eliminar', args=[comp.id]))
+        self.assertRedirects(resp_del, reverse('gestion_tubo'))
+        self.assertFalse(CompromisoAgenda.objects.filter(id=comp.id).exists())
+
+    def test_compromiso_sectorial_solo_delegacion_evidencia_y_modulo_areas_apoyo(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from configuration.models import AreaApoyo
+
+        admin = User.objects.create_superuser('admin_aa', 'admin_aa@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        sess = self.client.session
+        sess['delegacion_activa_id'] = self.delegacion.id
+        sess.save()
+
+        # 1. Módulo CRUD Áreas / Personas / Cuadrillas de Apoyo
+        resp_create_aa = self.client.post(reverse('gestion_areas_apoyo'), {
+            'nombre': 'Cuadrilla Hidrolavado Sur',
+            'tipo': 'Cuadrilla',
+            'descripcion': 'Limpieza de espacios públicos',
+            'estado': 'Activo',
+        })
+        self.assertRedirects(resp_create_aa, reverse('gestion_areas_apoyo'))
+        aa = AreaApoyo.objects.get(nombre='Cuadrilla Hidrolavado Sur')
+        self.assertEqual(aa.tipo, 'Cuadrilla')
+
+        # Editar área de apoyo
+        resp_edit_aa = self.client.post(reverse('gestion_areas_apoyo_editar', args=[aa.id]), {
+            'codigo': aa.get_codigo(),
+            'nombre': 'Cuadrilla Hidrolavado Centro',
+            'tipo': 'Cuadrilla',
+            'descripcion': 'Actualizada',
+            'estado': 'Activo',
+        })
+        self.assertRedirects(resp_edit_aa, reverse('gestion_areas_apoyo'))
+        aa.refresh_from_db()
+        self.assertEqual(aa.nombre, 'Cuadrilla Hidrolavado Centro')
+
+        # Aparece como opción en Atenciones y Tubo
+        resp_at = self.client.get(reverse('gestion_atenciones'))
+        self.assertContains(resp_at, '<option value="Cuadrilla Hidrolavado Centro"')
+        resp_tubo_get = self.client.get(reverse('gestion_tubo'))
+        self.assertContains(resp_tubo_get, '<option value="Cuadrilla Hidrolavado Centro"')
+        # En el modal de Compromiso Sectorial no se vincula a Vecino ni Organización
+        self.assertContains(resp_tubo_get, 'vinculado directamente a tu delegación activa, sin vecino ni organización')
+
+        # Operador no puede gestionar el catálogo de áreas de apoyo
+        self.client.force_login(self.user)
+        resp_op_aa = self.client.get(reverse('gestion_areas_apoyo'))
+        self.assertRedirects(resp_op_aa, reverse('gestion_inicio'))
+
+        # 2. Compromiso Sectorial vinculado directamente a la Delegación (sin sector ni organización) + evidencia Antes/Después
+        self.client.force_login(self.user)
+        archivo_antes = SimpleUploadedFile('antes_sector.txt', b'Antes del operativo', content_type='text/plain')
+        resp_comp = self.client.post(reverse('gestion_tubo'), {
+            'organizacion_id': self.org_local.id,
+            'fecha_compromiso': '2026-12-22',
+            'origen': 'INT',
+            'area_apoyo': aa.nombre,
+            'descripcion': 'Mejoramiento directo en delegación sin organización',
+            'momento_evidencia': 'antes',
+            'archivos_evidencia': archivo_antes,
+        })
+        self.assertRedirects(resp_comp, reverse('gestion_tubo'))
+
+        comp = CompromisoAgenda.objects.filter(observacion='Mejoramiento directo en delegación sin organización').first()
+        self.assertIsNotNone(comp)
+        self.assertEqual(comp.delegacion, self.delegacion)
+        self.assertIsNone(comp.organizacion)
+        self.assertIsNone(comp.sector)
+        self.assertEqual(comp.area_apoyo, aa.nombre)
+        self.assertIsNotNone(comp.actividad_origen)
+        self.assertEqual(comp.actividad_origen.evidencias.filter(momento='antes').count(), 1)
+
+        # No permite aprobar solo con evidencia Antes
+        resp_val_fail = self.client.post(
+            reverse('gestion_tubo_sector_validar_evidencia', args=[comp.id]),
+            {'resultado_evidencia': 'Aprobado'},
+        )
+        self.assertRedirects(resp_val_fail, reverse('gestion_tubo'))
+        comp.refresh_from_db()
+        self.assertEqual(comp.estado, 'Registrada')
+
+        # Subir evidencia Después y aprobar
+        archivo_despues = SimpleUploadedFile('despues_sector.txt', b'Trabajo terminado', content_type='text/plain')
+        resp_subir_despues = self.client.post(
+            reverse('gestion_tubo_sector_subir_evidencia', args=[comp.id]),
+            {'momento': 'despues', 'archivos': archivo_despues},
+        )
+        self.assertRedirects(resp_subir_despues, reverse('gestion_tubo'))
+        self.assertEqual(comp.actividad_origen.evidencias.filter(momento='despues').count(), 1)
+
+        resp_val_ok = self.client.post(
+            reverse('gestion_tubo_sector_validar_evidencia', args=[comp.id]),
+            {'resultado_evidencia': 'Aprobado'},
+        )
+        self.assertRedirects(resp_val_ok, reverse('gestion_tubo'))
+        comp.refresh_from_db()
+        self.assertEqual(comp.estado, 'Resuelta')
+        self.assertEqual(comp.actividad_origen.estado_validacion(), 'Aprobado')
+
+        # Eliminar área de apoyo desde admin
+        self.client.force_login(admin)
+        resp_del_aa = self.client.post(reverse('gestion_areas_apoyo_eliminar', args=[aa.id]))
+        self.assertRedirects(resp_del_aa, reverse('gestion_areas_apoyo'))
+        self.assertFalse(AreaApoyo.objects.filter(id=aa.id).exists())
+
+    def test_directiva_jjvv_presidente_tesorero_secretario_crud_y_atencion(self):
+        self.client.force_login(self.user)
+
+        # 1. Rechaza RUT o correo inválido en directiva
+        antes = OrganizacionComunitaria.objects.count()
+        self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV RUT Inválido',
+            'tipo_organizacion': 'Junta de Vecinos',
+            'presidente_nombre': 'Ana Pérez',
+            'presidente_rut': '12.345.678-0',
+            'presidente_correo': 'ana@jjvv.cl',
+        })
+        self.assertEqual(OrganizacionComunitaria.objects.count(), antes)
+
+        # 2. Crea JJVV con Presidente, Tesorero y Secretario válidos
+        resp_create = self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV Vista Hermosa',
+            'tipo_organizacion': 'Junta de Vecinos',
+            'representante_legal': 'Ana Pérez',
+            'presidente_nombre': 'Ana Pérez Soto',
+            'presidente_rut': '11111111-1',
+            'presidente_correo': 'presidencia@vistahermosa.cl',
+            'tesorero_nombre': 'Luis Rojas Moya',
+            'tesorero_rut': '12345678-5',
+            'tesorero_correo': 'tesoreria@vistahermosa.cl',
+            'secretario_nombre': 'Sofía Díaz Vera',
+            'secretario_rut': '8765432-K',
+            'secretario_correo': 'secretaria@vistahermosa.cl',
+            'estado': 'Activa',
+        })
+        self.assertRedirects(resp_create, reverse('gestion_organizaciones'))
+        org = OrganizacionComunitaria.objects.get(nombre='JJVV Vista Hermosa')
+        self.assertEqual(org.presidente_nombre, 'Ana Pérez Soto')
+        self.assertEqual(org.presidente_rut, '11.111.111-1')
+        self.assertEqual(org.presidente_correo, 'presidencia@vistahermosa.cl')
+        self.assertEqual(org.tesorero_nombre, 'Luis Rojas Moya')
+        self.assertEqual(org.tesorero_rut, '12.345.678-5')
+        self.assertEqual(org.secretario_rut, '8.765.432-K')
+        self.assertEqual(org.secretario_correo, 'secretaria@vistahermosa.cl')
+
+        # 3. Edita directiva existente
+        resp_edit = self.client.post(reverse('gestion_organizaciones_editar', args=[org.id]), {
+            'nombre': 'JJVV Vista Hermosa Sur',
+            'tipo_organizacion': 'Junta de Vecinos',
+            'presidente_nombre': 'Ana Pérez Soto',
+            'presidente_rut': '111111111',
+            'presidente_correo': 'ana@vistahermosa.cl',
+            'tesorero_nombre': 'Mario Lagos',
+            'tesorero_rut': '',
+            'tesorero_correo': 'mario@vistahermosa.cl',
+            'secretario_nombre': 'Sofía Díaz Vera',
+            'secretario_rut': '8765432k',
+            'secretario_correo': 'sofia@vistahermosa.cl',
+            'estado': 'Activa',
+        })
+        self.assertRedirects(resp_edit, reverse('gestion_organizaciones'))
+        org.refresh_from_db()
+        self.assertEqual(org.nombre, 'JJVV Vista Hermosa Sur')
+        self.assertEqual(org.presidente_correo, 'ana@vistahermosa.cl')
+        self.assertEqual(org.tesorero_nombre, 'Mario Lagos')
+        self.assertEqual(org.secretario_rut, '8.765.432-K')
+
+        # 4. Crear nueva JJVV inline en Atención Ciudadana con directiva completa
+        resp_at = self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'crear_nueva_org': '1',
+            'nueva_org_nombre': 'Club Adulto Mayor Sol Naciente',
+            'nueva_org_tipo': 'Club Adulto Mayor',
+            'nueva_org_presidente_nombre': 'Rosa Muñoz',
+            'nueva_org_presidente_rut': '11111111-1',
+            'nueva_org_presidente_correo': 'rosa@solnaciente.cl',
+            'nueva_org_tesorero_nombre': 'Pedro Jara',
+            'nueva_org_tesorero_rut': '12345678-5',
+            'nueva_org_tesorero_correo': 'pedro@solnaciente.cl',
+            'nueva_org_secretario_nombre': 'Elena Paredes',
+            'nueva_org_secretario_rut': '8765432-K',
+            'nueva_org_secretario_correo': 'elena@solnaciente.cl',
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Atención inline con directiva completa',
+            'va_a_tubo': '0',
+        })
+        self.assertRedirects(resp_at, reverse('gestion_atenciones'))
+        club = OrganizacionComunitaria.objects.get(nombre='Club Adulto Mayor Sol Naciente')
+        self.assertEqual(club.presidente_rut, '11.111.111-1')
+        self.assertEqual(club.tesorero_correo, 'pedro@solnaciente.cl')
+        self.assertEqual(club.secretario_nombre, 'Elena Paredes')
+
+    def test_editar_atencion_sube_evidencias_al_guardar_y_eliminar_en_tubo(self):
+        from io import BytesIO
+        from PIL import Image
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        admin = User.objects.create_superuser('admin_evi_tubo', 'admin_et@example.test', 'Admin123!')
+        sector_norte = Sector.objects.create(nombre='Sector Las Compañías', delegacion=self.delegacion, estado='Activo')
+        vecino_tel = Vecino.objects.create(
+            nombre='Carlos Muñoz',
+            rut='15.555.555-5',
+            telefono='+56 9 8877 6655',
+            delegacion=self.delegacion,
+            sector=sector_norte,
+            territorio='Sector Las Compañías',
+            estado='Activo',
+        )
+        at = AtencionCiudadana.objects.create(
+            delegacion=self.delegacion,
+            vecino=vecino_tel,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            usuario_responsable=self.user,
+            creado_por=self.user,
+            solicitante=f'{vecino_tel.nombre} ({vecino_tel.rut})',
+            descripcion='Revisión de luminaria LED en esquina',
+            va_a_tubo=True,
+            fecha_compromiso=datetime.date(2026, 12, 18),
+        )
+
+        self.client.force_login(self.user)
+        # Teléfono del vecino y sector elegido visibles en Atenciones y Tubo (Tabla y Canvas)
+        resp_at_list = self.client.get(reverse('gestion_atenciones'))
+        self.assertContains(resp_at_list, '+56 9 8877 6655')
+        self.assertContains(resp_at_list, 'Sector Las Compañías')
+
+        resp_tubo_canvas = self.client.get(reverse('gestion_tubo') + '?vista=canvas')
+        self.assertContains(resp_tubo_canvas, 'Sector Las Compañías')
+
+        # Al guardar edición con imagen/archivo adjunto, la evidencia se guarda aunque no se presione "Adjuntar Evidencia"
+        buf = BytesIO()
+        Image.new('RGB', (12, 12), color='red').save(buf, format='PNG')
+        img_file = SimpleUploadedFile('antes_obra.png', buf.getvalue(), content_type='image/png')
+        pdf_file = SimpleUploadedFile('respaldo_acta.txt', b'Acta respaldo SGR', content_type='text/plain')
+
+        tubo_url = reverse('gestion_tubo')
+        resp_save = self.client.post(
+            reverse('gestion_atenciones_editar', args=[at.id]),
+            {
+                'descripcion': 'Luminaria revisada con respaldo adjunto al guardar',
+                'responsable_id': self.user.id,
+                'estado': 'En proceso',
+                'va_a_tubo': 'true',
+                'fecha_compromiso': '2026-12-22',
+                'area_apoyo': 'Alumbrado Público',
+                'avance_observaciones': 'Se adjuntó respaldo al guardar',
+                'momento': 'antes',
+                'imagenes': [img_file],
+                'archivos': [pdf_file],
+            },
+            HTTP_REFERER=tubo_url,
+        )
+        self.assertRedirects(resp_save, tubo_url)
+        at.refresh_from_db()
+        self.assertEqual(at.descripcion, 'Luminaria revisada con respaldo adjunto al guardar')
+        self.assertIsNotNone(at.actividad)
+        self.assertEqual(at.actividad.evidencias.filter(momento='antes').count(), 2)
+
+        # Eliminación directa desde Tubo redirige de vuelta al Tubo cuando tiene HTTP_REFERER
+        self.client.force_login(admin)
+        resp_del_tubo = self.client.post(
+            reverse('gestion_atenciones_eliminar', args=[at.id]),
+            HTTP_REFERER=tubo_url,
+        )
+        self.assertRedirects(resp_del_tubo, tubo_url)
+        self.assertFalse(AtencionCiudadana.objects.filter(id=at.id).exists())
+
+    def test_compromiso_sectorial_solo_con_delegacion_activa_y_scoping_formularios(self):
+        from accounts.models import Cargo
+        admin = User.objects.create_superuser('admin_scope_check', 'admin_sc@example.test', 'Admin123!')
+        del_otra = Delegacion.objects.create(nombre='Delegación Sur', codigo='SUR')
+        sector_norte = Sector.objects.create(nombre='Sector Norte Activo', delegacion=self.delegacion, estado='Activo')
+        sector_sur = Sector.objects.create(nombre='Sector Sur Oculto', delegacion=del_otra, estado='Activo')
+        vecino_sur = Vecino.objects.create(
+            nombre='Vecino Sur Aislado',
+            rut='16.666.666-6',
+            delegacion=del_otra,
+            sector=sector_sur,
+            estado='Activo',
+        )
+        org_sur = OrganizacionComunitaria.objects.create(
+            nombre='JJVV Sur Oculta',
+            tipo_organizacion='Junta de Vecinos',
+            delegacion=del_otra,
+            sector=sector_sur,
+            estado='Activa',
+        )
+        user_sur = User.objects.create_user('func_sur_aislado', 'fsur@example.test', 'Pass123!', first_name='Pedro Sur')
+        cargo_test = Cargo.objects.create(nombre_cargo='Gestor Territorial')
+        Funcionario.objects.create(user=user_sur, delegacion=del_otra, cargo=cargo_test, estado='Activo')
+
+        # Admin sin delegación activa (modo Global) NO puede crear compromiso sectorial y los formularios no mezclan regiones
+        self.client.force_login(admin)
+        resp_tubo_global = self.client.get(reverse('gestion_tubo'))
+        self.assertFalse(resp_tubo_global.context['puede_crear_compromiso_sector'])
+        self.assertEqual(resp_tubo_global.context['sectores_tubo'].count(), 0)
+        self.assertEqual(len(resp_tubo_global.context['organizaciones_tubo']), 0)
+
+        resp_post_global = self.client.post(reverse('gestion_tubo'), {
+            'sector_id': sector_norte.id,
+            'descripcion': 'Intento sin delegación activa',
+            'fecha_compromiso': '2026-12-25',
+        })
+        self.assertRedirects(resp_post_global, reverse('gestion_tubo'))
+        self.assertEqual(CompromisoAgenda.objects.filter(observacion='Intento sin delegación activa').count(), 0)
+
+        # Seleccionando Delegación Norte como delegación activa para admin -> solo ve Norte y sí puede crear
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        resp_tubo_norte = self.client.get(reverse('gestion_tubo'))
+        self.assertTrue(resp_tubo_norte.context['puede_crear_compromiso_sector'])
+        sec_ids_tubo = set(resp_tubo_norte.context['sectores_tubo'].values_list('id', flat=True))
+        self.assertIn(sector_norte.id, sec_ids_tubo)
+        self.assertNotIn(sector_sur.id, sec_ids_tubo)
+        org_ids_tubo = {o['id'] for o in resp_tubo_norte.context['organizaciones_tubo']}
+        self.assertIn(self.org_local.id, org_ids_tubo)
+        self.assertNotIn(org_sur.id, org_ids_tubo)
+        rep_ids_tubo = {e['id'] for e in resp_tubo_norte.context['encargados_modal_tubo']}
+        self.assertNotIn(user_sur.id, rep_ids_tubo)
+
+        resp_at_norte = self.client.get(reverse('gestion_atenciones'))
+        self.assertNotIn(sector_sur.id, set(resp_at_norte.context['sectores'].values_list('id', flat=True)))
+        self.assertNotIn(vecino_sur.id, set(resp_at_norte.context['vecinos'].values_list('id', flat=True)))
+        self.assertNotIn(org_sur.id, {o['id'] for o in resp_at_norte.context['organizaciones']})
+        self.assertNotIn(user_sur.id, {r['id'] for r in resp_at_norte.context['representantes_disponibles']})
+
+        resp_vec_norte = self.client.get(reverse('gestion_vecinos'))
+        self.assertNotIn(sector_sur.id, set(resp_vec_norte.context['sectores'].values_list('id', flat=True)))
+
+        resp_org_norte = self.client.get(reverse('gestion_organizaciones'))
+        self.assertNotIn(sector_sur.id, set(resp_org_norte.context['sectores'].values_list('id', flat=True)))
+
+        resp_act_norte = self.client.get(reverse('gestion_actividades'))
+        self.assertNotIn(user_sur.id, set(resp_act_norte.context['funcionarios'].values_list('user_id', flat=True)))
+
+        # Verificar secciones organizadas de módulos en Inicio / Sidebar (Admin ve todas; Operador solo las suyas)
+        resp_inicio_admin = self.client.get(reverse('gestion_inicio'))
+        self.assertEqual(resp_inicio_admin.status_code, 200)
+        for sec_lbl in ('Gestión Territorial', 'Padrón y Comunidad', 'Metas y Catálogos', 'Administración', 'Cuenta y Comunicación'):
+            self.assertContains(resp_inicio_admin, sec_lbl)
+        self.assertContains(resp_inicio_admin, 'data-section-toggle')
+        self.assertContains(resp_inicio_admin, 'data-section-body')
+        self.assertContains(resp_inicio_admin, 'sgr_nav_sec_territorial')
+        self.assertContains(resp_inicio_admin, 'sgr_inicio_sec_territorial')
+        self.assertContains(resp_inicio_admin, 'id="btnToggleSidebar"')
+        self.assertContains(resp_inicio_admin, 'id="appSidebar"')
+        self.assertContains(resp_inicio_admin, 'sgr-sticky-actions')
+
+        resp_vec_html = self.client.get(reverse('gestion_vecinos'))
+        self.assertContains(resp_vec_html, 'overflow-x-auto')
+        resp_sec_html = self.client.get(reverse('gestion_sectores'))
+        self.assertContains(resp_sec_html, 'overflow-x-auto')
+
+        # Admin en Resumen por Colaborador usa delegación activa por defecto y puede filtrar por otra o Todas
+        resp_colab_def = self.client.get(reverse('gestion_tubo') + '?tab=colaboradores')
+        self.assertContains(resp_colab_def, '<select name="delegacion"')
+        colab_ids_def = {c['user_id'] for c in resp_colab_def.context['resumen_colaboradores']}
+        self.assertIn(self.user.id, colab_ids_def)
+        self.assertNotIn(user_sur.id, colab_ids_def)
+
+        resp_colab_sur = self.client.get(reverse('gestion_tubo') + f'?tab=colaboradores&delegacion={del_otra.id}')
+        colab_ids_sur = {c['user_id'] for c in resp_colab_sur.context['resumen_colaboradores']}
+        self.assertIn(user_sur.id, colab_ids_sur)
+        self.assertNotIn(self.user.id, colab_ids_sur)
+
+        resp_colab_todas = self.client.get(reverse('gestion_tubo') + '?tab=colaboradores&delegacion=todas')
+        colab_ids_todas = {c['user_id'] for c in resp_colab_todas.context['resumen_colaboradores']}
+        self.assertIn(self.user.id, colab_ids_todas)
+        self.assertIn(user_sur.id, colab_ids_todas)
+
+        self.client.force_login(self.user)
+        resp_colab_op = self.client.get(reverse('gestion_tubo') + f'?tab=colaboradores&delegacion={del_otra.id}')
+        self.assertNotContains(resp_colab_op, '<select name="delegacion"')
+        colab_ids_op = {c['user_id'] for c in resp_colab_op.context['resumen_colaboradores']}
+        self.assertIn(self.user.id, colab_ids_op)
+        self.assertNotIn(user_sur.id, colab_ids_op)
+
+        resp_inicio_op = self.client.get(reverse('gestion_inicio'))
+        self.assertContains(resp_inicio_op, 'Gestión Territorial')
+        self.assertContains(resp_inicio_op, 'Padrón y Comunidad')
+        self.assertNotContains(resp_inicio_op, 'CRUD Delegaciones')
+
+    def test_crear_vecino_crea_usuario_cliente_fuera_de_tabla_usuarios_y_overflow_perfil(self):
+        admin = User.objects.create_superuser('admin_vec_usr', 'avu@example.test', 'Admin123!')
+        sector = Sector.objects.create(nombre='Sector Prueba Usuario', delegacion=self.delegacion, estado='Activo')
+        rut_vec = '11.111.111-1'
+        rut_sin_puntos = '11111111-1'
+
+        self.client.force_login(admin)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        resp_post = self.client.post(reverse('gestion_vecinos'), {
+            'nombre': 'Ximena ' + ('x' * 130),
+            'rut': rut_vec,
+            'correo': 'ximena.vecina@example.test',
+            'direccion': 'Av. Balmaceda 1234',
+            'telefono': '+56 9 8123 4567',
+            'sector_id': sector.id,
+            'estado': 'Activo',
+        })
+        self.assertRedirects(resp_post, reverse('gestion_vecinos'))
+
+        vec_creado = Vecino.objects.get(rut=rut_vec)
+        user_vec = User.objects.get(username=rut_vec)
+        self.assertFalse(user_vec.is_staff)
+        self.assertEqual(user_vec.email, 'ximena.vecina@example.test')
+
+        # Aparece en la tabla de Vecinos, pero NO en la tabla de Usuarios ni en colaboradores del Tubo
+        resp_vec = self.client.get(reverse('gestion_vecinos'))
+        self.assertContains(resp_vec, rut_vec)
+        self.assertContains(resp_vec, 'ximena.vecina@example.test')
+
+        resp_usr = self.client.get(reverse('gestion_usuarios'))
+        uids_tabla_usuarios = {f.user_id for f in resp_usr.context['funcionarios']}
+        self.assertNotIn(user_vec.id, uids_tabla_usuarios)
+
+        resp_tubo_col = self.client.get(reverse('gestion_tubo') + '?tab=colaboradores&delegacion=todas')
+        colab_uids = {c['user_id'] for c in resp_tubo_col.context['resumen_colaboradores']}
+        self.assertNotIn(user_vec.id, colab_uids)
+
+        # El vecino puede acceder a su portal ciudadano y perfil tras cambio inicial de contraseña
+        from core.views import _obtener_vecino_de_cliente
+        self.assertEqual(_obtener_vecino_de_cliente(user_vec).id, vec_creado.id)
+        func_vec = Funcionario.objects.get(user=user_vec)
+        self.assertTrue(func_vec.debe_cambiar_contrasena)
+        func_vec.debe_cambiar_contrasena = False
+        func_vec.save(update_fields=['debe_cambiar_contrasena'])
+
+        self.client.force_login(user_vec)
+        resp_portal = self.client.get(reverse('portal_cliente'))
+        self.assertEqual(resp_portal.status_code, 200)
+        self.assertContains(resp_portal, '[overflow-wrap:anywhere]')
+
+        resp_perfil = self.client.get(reverse('perfil_usuario'))
+        self.assertEqual(resp_perfil.status_code, 200)
+        self.assertContains(resp_perfil, '[overflow-wrap:anywhere]')
+        self.assertContains(resp_perfil, 'truncate')
+
+        # Eliminar el vecino desactiva su usuario asociado
+        self.client.force_login(admin)
+        self.client.post(reverse('gestion_vecinos_eliminar', args=[vec_creado.id]))
+        user_vec.refresh_from_db()
+        self.assertFalse(user_vec.is_active)
+
+    def test_tubo_nueva_atencion_requiere_delegacion_activa_y_codigos_automaticos(self):
+        admin = User.objects.create_superuser('admin_cod_auto', 'aca@example.test', 'Admin123!')
+        self.client.force_login(admin)
+
+        # 1. Sin delegación activa: botón Nueva Atención al Tubo deshabilitado y abrir_tubo=False
+        resp_tubo_global = self.client.get(reverse('gestion_tubo'))
+        self.assertContains(resp_tubo_global, 'Nueva Atención al Tubo (Elige Delegación)')
+        self.assertNotContains(resp_tubo_global, 'href="/gestion/atenciones/?abrir_tubo=1"')
+        resp_atn_global = self.client.get(reverse('gestion_atenciones') + '?abrir_tubo=1')
+        self.assertFalse(resp_atn_global.context['abrir_tubo'])
+
+        # Con delegación activa: enlace habilitado y abrir_tubo=True
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+        resp_tubo_del = self.client.get(reverse('gestion_tubo'))
+        self.assertContains(resp_tubo_del, 'href="/gestion/atenciones/?abrir_tubo=1"')
+        resp_atn_del = self.client.get(reverse('gestion_atenciones') + '?abrir_tubo=1')
+        self.assertTrue(resp_atn_del.context['abrir_tubo'])
+
+        # 2. En los formularios de creación no existe campo de ingreso de código y se autogeneran
+        for url_name in (
+            'gestion_delegaciones',
+            'gestion_sectores',
+            'gestion_roles',
+            'gestion_tipo_atencion',
+            'gestion_sub_atencion',
+            'gestion_metas',
+        ):
+            html = self.client.get(reverse(url_name)).content.decode('utf-8')
+            self.assertNotIn('se genera automáticamente', html)
+            self.assertNotIn('placeholder="Autogenerado"', html)
+
+        self.client.post(reverse('gestion_delegaciones'), {'nombre': 'Delegación Auto', 'codigo': 'MANUAL', 'comuna': 'La Serena', 'estado': 'Activa'})
+        del_auto = Delegacion.objects.get(nombre='Delegación Auto')
+        self.assertTrue(del_auto.codigo.startswith('DEL'))
+
+        self.client.post(reverse('gestion_roles'), {'nombre_rol': 'Rol Auto', 'codigo': 'MANUAL', 'alcance': 'Delegación', 'estado': 'Activo'})
+        rol_auto = Rol.objects.get(nombre_rol='Rol Auto')
+        self.assertTrue(rol_auto.codigo.startswith('ROL'))
+
+        self.client.post(reverse('gestion_tipo_atencion'), {'nombre': 'Tipo Auto', 'codigo': 'MANUAL', 'estado': 'Activo'})
+        ta_auto = TipoAtencion.objects.get(nombre='Tipo Auto')
+        self.assertTrue(ta_auto.codigo.startswith('TA'))
+
+        self.client.post(reverse('gestion_sub_atencion'), {'nombre': 'Sub Auto', 'tipo_atencion_id': ta_auto.id, 'codigo': 'MANUAL', 'estado': 'Activa'})
+        sa_auto = SubAtencion.objects.get(nombre='Sub Auto')
+        self.assertTrue(sa_auto.codigo.startswith('SA'))
+
+        self.client.post(reverse('gestion_metas'), {'nombre_item': 'Ítem Auto', 'codigo': 'MANUAL', 'estado': 'Activo'})
+        it_auto = ItemMedicion.objects.get(nombre_item='Ítem Auto')
+        self.assertTrue(it_auto.codigo.startswith('IT'))
+
+        self.client.post(reverse('gestion_sectores'), {'nombre': 'Sector Auto', 'codigo': 'MANUAL', 'estado': 'Activo'})
+        sec_auto = Sector.objects.get(nombre='Sector Auto')
+        self.assertTrue(sec_auto.codigo.startswith('SEC'))
+
+    def test_periodo_formato_dmy_validacion_pasado_y_mini_calendario(self):
+        from django.utils import timezone
+        admin = User.objects.create_superuser('admin_per_dmy', 'apd@example.test', 'Admin123!')
+        self.client.force_login(admin)
+
+        hoy = timezone.localdate()
+        ayer = hoy - datetime.timedelta(days=1)
+        futuro = hoy + datetime.timedelta(days=10)
+        futuro_fin = hoy + datetime.timedelta(days=20)
+
+        url_periodos = reverse('gestion_metas') + '?tab=periodos'
+
+        # Rechazar creación de período con fecha pasada
+        resp_pasado = self.client.post(reverse('gestion_metas'), {
+            'accion': 'crear_periodo',
+            'fecha_inicio': ayer.isoformat(),
+            'fecha_termino': futuro.isoformat(),
+            'dias_computables': '12',
+            'estado': 'Abierto',
+        })
+        self.assertRedirects(resp_pasado, url_periodos)
+        self.assertFalse(Periodo.objects.filter(fecha_inicio=ayer).exists())
+
+        # Permitir creación desde hoy en adelante y verificar formato DD-MM-YYYY y mini-calendario
+        resp_ok = self.client.post(reverse('gestion_metas'), {
+            'accion': 'crear_periodo',
+            'fecha_inicio': futuro.isoformat(),
+            'fecha_termino': futuro_fin.isoformat(),
+            'dias_computables': '11',
+            'estado': 'Abierto',
+        })
+        self.assertRedirects(resp_ok, url_periodos)
+        p_creado = Periodo.objects.get(fecha_inicio=futuro, fecha_termino=futuro_fin)
+        texto_esperado = f"Período {futuro.strftime('%d-%m-%Y')} a {futuro_fin.strftime('%d-%m-%Y')}"
+        self.assertEqual(str(p_creado), texto_esperado)
+
+        resp_get = self.client.get(url_periodos)
+        self.assertContains(resp_get, texto_esperado)
+        self.assertContains(resp_get, 'mini-cal-new-dias')
+        self.assertContains(resp_get, 'mini-cal-edit-dias')
+        self.assertContains(resp_get, f'min="{hoy.isoformat()}"')
+
+        # Rechazar edición cambiando fecha a una pasada
+        resp_edit_bad = self.client.post(reverse('gestion_metas'), {
+            'accion': 'editar_periodo',
+            'periodo_id': p_creado.id,
+            'fecha_inicio': ayer.isoformat(),
+            'fecha_termino': futuro_fin.isoformat(),
+            'dias_computables': '15',
+            'estado': 'Abierto',
+        })
+        self.assertRedirects(resp_edit_bad, url_periodos)
+        p_creado.refresh_from_db()
+        self.assertEqual(p_creado.fecha_inicio, futuro)
+
+        # Verificar orden por fecha, paginación y exportación Excel en pestaña Fechas / Períodos
+        for idx in range(1, 6):
+            Periodo.objects.create(
+                fecha_inicio=hoy + datetime.timedelta(days=30 + idx * 10),
+                fecha_termino=hoy + datetime.timedelta(days=35 + idx * 10),
+                dias_computables=6,
+                estado='Abierto',
+            )
+        resp_ord_asc = self.client.get(url_periodos + '&orden_per=fecha_inicio&page_size=5&page_per=1')
+        inicios_asc = [p.fecha_inicio for p in resp_ord_asc.context['periodos']]
+        self.assertEqual(inicios_asc, sorted(inicios_asc))
+        self.assertEqual(len(inicios_asc), 5)
+        self.assertTrue(resp_ord_asc.context['page_obj_per'].has_next())
+
+        resp_ord_p2 = self.client.get(url_periodos + '&orden_per=fecha_inicio&page_size=5&page_per=2')
+        self.assertGreaterEqual(len(resp_ord_p2.context['periodos']), 1)
+
+        resp_excel = self.client.get(url_periodos + '&export=excel')
+        self.assertEqual(resp_excel.status_code, 200)
+        hoy_str = hoy.strftime('%d-%m-%Y')
+        self.assertEqual(
+            resp_excel['Content-Disposition'],
+            f'attachment; filename="Periodos_{hoy_str}.csv"',
+        )
+        csv_txt = resp_excel.content.decode('utf-8-sig')
+        self.assertIn('Fecha de Inicio', csv_txt)
+        self.assertIn(futuro.strftime('%d-%m-%Y'), csv_txt)
+
+        resp_xlsx = self.client.get(reverse('gestion_vecinos') + '?export=excel')
+        self.assertEqual(resp_xlsx.status_code, 200)
+        self.assertEqual(
+            resp_xlsx['Content-Disposition'],
+            f'attachment; filename="Vecinos_{hoy_str}.xlsx"',
+        )
+
+    def test_organizaciones_delegacion_bloqueada_sectores_fecha_y_boton_metas_eliminado(self):
+        from django.utils import timezone
+        admin = User.objects.create_superuser('admin_org_guard', 'aog@example.test', 'Admin123!')
+        self.client.force_login(admin)
+
+        # 1. En Ítems y Períodos, el botón duplicado "+ Agregar fecha de medición" fue eliminado
+        resp_per_tab = self.client.get(reverse('gestion_metas') + '?tab=periodos')
+        self.assertContains(resp_per_tab, 'Nueva Fecha de Medición')
+        self.assertNotContains(resp_per_tab, 'Agregar fecha de medición')
+
+        del_otra = Delegacion.objects.create(codigo='DEL-OT', nombre='Delegación Sur Test', estado='Activa')
+        sec_principal = Sector.objects.create(nombre='Sector Principal', delegacion=self.delegacion, estado='Activo')
+        sec_otra = Sector.objects.create(nombre='Sector Sur Oculto', delegacion=del_otra, estado='Activo')
+
+        hoy = timezone.localdate()
+        ayer = hoy - datetime.timedelta(days=1)
+        futuro = hoy + datetime.timedelta(days=5)
+
+        # 2. En modo Global (sin delegación activa) NO se permite crear organización
+        resp_org_global = self.client.get(reverse('gestion_organizaciones'))
+        self.assertContains(resp_org_global, 'Nueva Organización (Elige Delegación)')
+        self.assertNotContains(resp_org_global, 'onclick="abrirModalCrearOrg()"')
+        self.assertEqual(resp_org_global.context['sectores'].count(), 0)
+
+        antes = OrganizacionComunitaria.objects.count()
+        self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'Org Sin Delegacion Activa',
+            'delegacion_id': self.delegacion.id,
+        })
+        self.assertEqual(OrganizacionComunitaria.objects.count(), antes)
+
+        # 3. Con delegación activa: delegación bloqueada, sectores solo de delegación activa y fecha inscripción >= hoy
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        resp_org_activa = self.client.get(reverse('gestion_organizaciones'))
+        self.assertContains(resp_org_activa, 'onclick="abrirModalCrearOrg()"')
+        sectores_ids = set(resp_org_activa.context['sectores'].values_list('id', flat=True))
+        self.assertIn(sec_principal.id, sectores_ids)
+        self.assertNotIn(sec_otra.id, sectores_ids)
+
+        # Rechazar fecha de inscripción anterior a hoy
+        self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'Org Fecha Pasada',
+            'delegacion_id': del_otra.id,
+            'fecha_inscripcion_registro': ayer.isoformat(),
+        })
+        self.assertFalse(OrganizacionComunitaria.objects.filter(nombre='Org Fecha Pasada').exists())
+
+        # Crear con fecha válida usa obligatoriamente la delegación activa (ignora delegacion_id manipulada)
+        self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'Org Delegacion Bloqueada',
+            'email_contacto': 'delbloq@organizacion.test',
+            'delegacion_id': del_otra.id,
+            'sector_id': sec_principal.id,
+            'fecha_inscripcion_registro': futuro.isoformat(),
+        })
+        org = OrganizacionComunitaria.objects.get(nombre='Org Delegacion Bloqueada')
+        self.assertEqual(org.delegacion_id, self.delegacion.id)
+        self.assertEqual(org.sector_id, sec_principal.id)
+        self.assertEqual(org.fecha_inscripcion_registro, futuro)
+
+        # Al editar no puede cambiar delegación ni asignar fecha de inscripción pasada
+        self.client.post(reverse('gestion_organizaciones_editar', args=[org.id]), {
+            'nombre': 'Org Delegacion Bloqueada Edit',
+            'delegacion_id': del_otra.id,
+            'fecha_inscripcion_registro': ayer.isoformat(),
+        })
+        org.refresh_from_db()
+        self.assertEqual(org.nombre, 'Org Delegacion Bloqueada')
+        self.assertEqual(org.delegacion_id, self.delegacion.id)
+        self.assertEqual(org.fecha_inscripcion_registro, futuro)
+
+        self.client.post(reverse('gestion_organizaciones_editar', args=[org.id]), {
+            'nombre': 'Org Delegacion Bloqueada Edit',
+            'delegacion_id': del_otra.id,
+            'fecha_inscripcion_registro': hoy.isoformat(),
+        })
+        org.refresh_from_db()
+        self.assertEqual(org.nombre, 'Org Delegacion Bloqueada Edit')
+        self.assertEqual(org.delegacion_id, self.delegacion.id)
+        self.assertEqual(org.fecha_inscripcion_registro, hoy)
+
+        # Verificar etiqueta "Juntas de Vecinos y Organizaciones", sin candado en formularios y calendario clicable
+        resp_ini = self.client.get(reverse('gestion_inicio'))
+        self.assertContains(resp_ini, 'Juntas de Vecinos y Organizaciones')
+        self.assertNotContains(resp_ini, 'JJVV y Organizaciones')
+        self.assertContains(resp_org_activa, 'Juntas de Vecinos y Organizaciones')
+        self.assertContains(resp_org_activa, 'this.showPicker')
+
+        for mod_url in ('gestion_atenciones', 'gestion_sectores', 'gestion_vecinos', 'gestion_organizaciones'):
+            resp_mod = self.client.get(reverse(mod_url))
+            self.assertNotContains(resp_mod, 'data-lucide="lock"')
+
+        # En Sectores el administrador siempre puede filtrar por delegación incluso con delegación activa
+        resp_sec_con_activa = self.client.get(reverse('gestion_sectores'))
+        self.assertContains(resp_sec_con_activa, 'id="filtro-del"')
+        resp_sec_filtro = self.client.get(reverse('gestion_sectores') + f'?delegacion={del_otra.id}')
+        self.assertContains(resp_sec_filtro, sec_otra.nombre)
+        self.assertNotContains(resp_sec_filtro, sec_principal.nombre)
+
+    def test_organizaciones_telefonos_por_cargo_y_contacto_prioritario(self):
+        admin = User.objects.create_superuser('admin_prio_org', 'apo@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        # Rechazar teléfono inválido en un cargo
+        self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV Tel Malo',
+            'contacto_prioritario': 'tesorero',
+            'tesorero_nombre': 'Luis Rojas',
+            'tesorero_telefono': '123',
+        })
+        self.assertFalse(OrganizacionComunitaria.objects.filter(nombre='JJVV Tel Malo').exists())
+
+        # Crear con teléfonos en los 3 cargos y Tesorero como contacto prioritario
+        resp_cre = self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV Prioridad Tesorero',
+            'contacto_prioritario': 'tesorero',
+            'presidente_nombre': 'Ana Presidente',
+            'presidente_telefono': '911112222',
+            'presidente_correo': 'pres@jjvv.test',
+            'tesorero_nombre': 'Luis Tesorero',
+            'tesorero_telefono': '933334444',
+            'tesorero_correo': 'tes@jjvv.test',
+            'secretario_nombre': 'Rosa Secretaria',
+            'secretario_telefono': '955556666',
+            'secretario_correo': 'sec@jjvv.test',
+        })
+        self.assertRedirects(resp_cre, reverse('gestion_organizaciones'))
+        org = OrganizacionComunitaria.objects.get(nombre='JJVV Prioridad Tesorero')
+        self.assertEqual(org.contacto_prioritario, 'tesorero')
+        self.assertEqual(org.representante_legal, 'Luis Tesorero')
+        self.assertEqual(org.telefono_contacto, '+56 9 3333 4444')
+        self.assertEqual(org.email_contacto, 'tes@jjvv.test')
+        self.assertEqual(org.presidente_telefono, '+56 9 1111 2222')
+        self.assertEqual(org.tesorero_telefono, '+56 9 3333 4444')
+        self.assertEqual(org.secretario_telefono, '+56 9 5555 6666')
+
+        # Al editar cambiando prioridad a Secretario, se actualiza automáticamente representante/teléfono
+        resp_ed = self.client.post(reverse('gestion_organizaciones_editar', args=[org.id]), {
+            'nombre': 'JJVV Prioridad Tesorero',
+            'contacto_prioritario': 'secretario',
+            'presidente_nombre': 'Ana Presidente',
+            'presidente_telefono': '911112222',
+            'presidente_correo': 'pres@jjvv.test',
+            'tesorero_nombre': 'Luis Tesorero',
+            'tesorero_telefono': '933334444',
+            'tesorero_correo': 'tes@jjvv.test',
+            'secretario_nombre': 'Rosa Secretaria',
+            'secretario_telefono': '955556666',
+            'secretario_correo': 'sec@jjvv.test',
+        })
+        self.assertRedirects(resp_ed, reverse('gestion_organizaciones'))
+        org.refresh_from_db()
+        self.assertEqual(org.contacto_prioritario, 'secretario')
+        self.assertEqual(org.representante_legal, 'Rosa Secretaria')
+        self.assertEqual(org.telefono_contacto, '+56 9 5555 6666')
+        self.assertEqual(org.email_contacto, 'sec@jjvv.test')
+
+        # Crear inline desde Atención Ciudadana con prioridad Secretario
+        resp_at = self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'crear_nueva_org': '1',
+            'nueva_org_nombre': 'JJVV Inline Prioridad',
+            'nueva_org_tipo': 'Junta de Vecinos',
+            'nueva_org_contacto_prioritario': 'secretario',
+            'nueva_org_secretario_nombre': 'Carla Secretaria',
+            'nueva_org_secretario_telefono': '977778888',
+            'nueva_org_secretario_correo': 'carla.inline@jjvv.test',
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Prueba prioridad contacto inline',
+        })
+        self.assertRedirects(resp_at, reverse('gestion_atenciones'))
+        org_inline = OrganizacionComunitaria.objects.get(nombre='JJVV Inline Prioridad')
+        self.assertEqual(org_inline.contacto_prioritario, 'secretario')
+        self.assertEqual(org_inline.representante_legal, 'Carla Secretaria')
+        self.assertEqual(org_inline.telefono_contacto, '+56 9 7777 8888')
+
+    def test_listas_desplegables_buscables_con_rut_cargo_y_metadata(self):
+        admin = User.objects.create_superuser('admin_combo', 'aco@example.test', 'Admin123!')
+        cargo = Cargo.objects.create(nombre_cargo='Gestor Social Senior')
+        rol = Rol.objects.create(nombre_rol='Operador', alcance='Delegación', estado='Activo')
+        func_user = User.objects.create_user(
+            username='op_combo', first_name='Mateo', last_name='Ríos', email='mr@example.test', password='User123!'
+        )
+        func = Funcionario.objects.create(
+            user=func_user,
+            identificador_institucional='12.345.678-5',
+            delegacion=self.delegacion,
+            cargo=cargo,
+            estado='Activo',
+        )
+        FuncionarioRol.objects.create(funcionario=func, rol=rol)
+        sector = Sector.objects.create(nombre='Sector Combo', delegacion=self.delegacion, estado='Activo')
+        Vecino.objects.create(
+            nombre='Vecina Lista', rut='11.111.111-1', delegacion=self.delegacion, sector=sector, estado='Activo'
+        )
+        OrganizacionComunitaria.objects.create(
+            nombre='JJVV Lista Buscable', rut='65.123.456-7',
+            numero_registro_pj='PJ-9081', registro_directiva_numero='DIR-314',
+            delegacion=self.delegacion, sector=sector,
+            representante_legal='Laura Dirigente', estado='Activa',
+        )
+
+        self.client.force_login(admin)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        resp_atn = self.client.get(reverse('gestion_atenciones'))
+        self.assertContains(resp_atn, 'sgr-combo-menu')
+        self.assertContains(resp_atn, 'data-search="Vecina Lista 11.111.111-1')
+        self.assertContains(resp_atn, 'data-search="JJVV Lista Buscable 65.123.456-7 PJ-9081')
+        self.assertContains(resp_atn, 'DIR-314')
+        self.assertContains(resp_atn, 'Gestor Social Senior')
+        # La línea principal del dropdown muestra solo el nombre corto (sin username ni cargo grande al lado)
+        self.assertContains(resp_atn, 'value="Mateo Ríos"')
+        self.assertNotContains(resp_atn, 'op_combo')
+
+        resp_tubo = self.client.get(reverse('gestion_tubo'))
+        self.assertContains(resp_tubo, 'data-search-select="true"')
+        self.assertContains(resp_tubo, 'Sector Combo')
+        self.assertNotContains(resp_tubo, 'JJVV Lista Buscable 65.123.456-7 PJ-9081')
+        self.assertNotContains(resp_tubo, 'op_combo')
+        self.assertNotContains(resp_tubo, 'Mateo Ríos · Gestor Social Senior')
+
+        resp_rep = self.client.get(reverse('gestion_reportes'))
+        self.assertContains(resp_rep, '12.345.678-5')
+        self.assertContains(resp_rep, 'value="Mateo Ríos"')
+        self.assertNotContains(resp_rep, 'op_combo')
+        self.assertNotContains(resp_rep, 'value="Mateo Ríos (Gestor Social Senior)"')
+
+    def test_custom_404_page_renders_with_debug_true_and_preserves_append_slash(self):
+        admin = User.objects.create_superuser('admin_404', 'admin404@example.test', 'Admin123!')
+        with self.settings(DEBUG=True):
+            # Usuario anónimo y autenticado reciben la plantilla personalizada 404
+            resp_anon = self.client.get('/gestion/atenciones/fgdgfdgdf')
+            self.assertEqual(resp_anon.status_code, 404)
+            self.assertContains(resp_anon, 'Página no encontrada', status_code=404)
+            self.assertNotContains(resp_anon, 'Using the URLconf defined in', status_code=404)
+
+            self.client.force_login(admin)
+            resp_auth = self.client.get('/gestion/atenciones/fgdgfdgdf')
+            self.assertEqual(resp_auth.status_code, 404)
+            self.assertContains(resp_auth, 'Página no encontrada', status_code=404)
+            self.assertNotContains(resp_auth, 'Using the URLconf defined in', status_code=404)
+
+            # APPEND_SLASH sigue redirigiendo rutas válidas sin slash final
+            resp_slash = self.client.get('/gestion/atenciones')
+            self.assertEqual(resp_slash.status_code, 301)
+            self.assertTrue(resp_slash['Location'].endswith('/gestion/atenciones/'))
+
+    def test_custom_400_403_500_error_pages_render_with_debug_true(self):
+        from django.http import HttpResponse, JsonResponse
+        from django.test import Client, RequestFactory
+        from core.middleware import CustomErrorPagesMiddleware
+
+        rf = RequestFactory()
+        with self.settings(DEBUG=True):
+            # 400, 403 y 500 renderizan sus plantillas personalizadas
+            for code, expected_text in (
+                (400, 'Solicitud inválida'),
+                (403, 'Acceso denegado'),
+                (500, 'Error interno del servidor'),
+            ):
+                mw = CustomErrorPagesMiddleware(lambda req, c=code: HttpResponse('debug', status=c))
+                resp = mw(rf.get('/gestion/'))
+                self.assertEqual(resp.status_code, code)
+                self.assertIn(expected_text, resp.content.decode('utf-8'))
+
+            # Las respuestas JSON de error no se reemplazan por HTML
+            mw_json = CustomErrorPagesMiddleware(lambda req: JsonResponse({'ok': False}, status=403))
+            resp_json = mw_json(rf.post('/gestion/tubo/1/cambiar-estado/'))
+            self.assertEqual(resp_json.status_code, 403)
+            self.assertEqual(resp_json['Content-Type'], 'application/json')
+
+            # CSRF 403 real en cliente HTTP muestra plantilla personalizada 403
+            csrf_client = Client(enforce_csrf_checks=True)
+            resp_csrf = csrf_client.post('/login/', {'username': 'x', 'password': 'y'})
+            self.assertEqual(resp_csrf.status_code, 403)
+            self.assertContains(resp_csrf, 'Acceso denegado', status_code=403)
+            self.assertNotContains(resp_csrf, 'CSRF verification failed', status_code=403)
+
+    def test_formulario_unico_atencion_checkboxes_y_combobox_autorestaurable(self):
+        admin = User.objects.create_superuser('admin_uniq_at', 'uniq@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        resp_get = self.client.get(reverse('gestion_atenciones'))
+        self.assertEqual(resp_get.status_code, 200)
+        # No deben existir las 3 pestañas anteriores
+        self.assertNotContains(resp_get, 'id="tab-vecino-existente"')
+        self.assertNotContains(resp_get, 'id="tab-vecino-organizacion"')
+        self.assertNotContains(resp_get, 'id="tab-vecino-nuevo"')
+        # Deben existir las dos opciones pequeñas en el formulario único + opción anidada de nueva organización
+        self.assertContains(resp_get, 'id="chk_nuevo_vecino"')
+        self.assertContains(resp_get, 'Registrar nuevo vecino')
+        self.assertContains(resp_get, 'id="chk_representa_org"')
+        self.assertContains(resp_get, 'Representa JJVV o Organización')
+        self.assertContains(resp_get, 'id="crear_nueva_org_chk"')
+        self.assertContains(resp_get, 'Registrar nueva organización')
+        # Lógica JS para limpiar al empezar a escribir y restaurar al salir sin cambio
+        self.assertContains(resp_get, 'beginEditSession')
+        self.assertContains(resp_get, 'restorePreviousValue')
+        self.assertContains(resp_get, 'stripPrevFromIME')
+        # Formularios embebidos idénticos a los módulos de Vecinos y Organizaciones (correo obligatorio y sin tipo de gestión inicial)
+        self.assertContains(resp_get, 'name="nuevo_vecino_correo"')
+        self.assertNotContains(resp_get, 'name="nuevo_vecino_tipo_gestion_id"')
+        self.assertNotContains(resp_get, 'Tipo de Gestión Inicial')
+        self.assertContains(resp_get, 'name="nuevo_vecino_estado"')
+        resp_vec_get = self.client.get(reverse('gestion_vecinos'))
+        self.assertEqual(resp_vec_get.status_code, 200)
+        self.assertNotContains(resp_vec_get, 'Tipo de Gestión Inicial')
+        self.assertContains(resp_get, 'name="nueva_org_domicilio_legal"')
+        self.assertContains(resp_get, 'name="nueva_org_socios_activos"')
+        self.assertContains(resp_get, 'name="nueva_org_fecha_constitucion"')
+        self.assertContains(resp_get, 'name="nueva_org_numero_registro_pj"')
+        self.assertContains(resp_get, 'name="nueva_org_fecha_inscripcion_registro"')
+        self.assertContains(resp_get, 'name="nueva_org_registro_directiva_numero"')
+        self.assertContains(resp_get, 'name="nueva_org_rut"')
+        self.assertContains(resp_get, 'name="nueva_org_email_contacto"')
+        self.assertContains(resp_get, 'name="nueva_org_directiva_actual"')
+        self.assertContains(resp_get, 'name="nueva_org_observaciones"')
+
+        org_sector = Sector.objects.create(
+            nombre='Sector Unificado',
+            delegacion=self.delegacion,
+            estado='Activo',
+        )
+
+        # Rechazar creación de vecino sin correo (tanto en módulo Vecinos como en Atención)
+        resp_vec_no_email = self.client.post(reverse('gestion_vecinos'), {
+            'nombre': 'Vecino Sin Correo',
+            'rut': '19.111.222-4',
+            'sector_id': org_sector.id,
+            'estado': 'Activo',
+        })
+        self.assertRedirects(resp_vec_no_email, reverse('gestion_vecinos'))
+        self.assertFalse(Vecino.objects.filter(rut='19.111.222-4').exists())
+
+        # Lógica JS para ocultar vecino al marcar JJVV y exigir exclusividad mutua
+        self.assertContains(resp_get, 'JJVV u Organización solicitante')
+        self.assertContains(resp_get, "actualizarModoSolicitante('org')")
+
+        # POST 1: Registrar nuevo vecino con correo obligatorio mediante chk_nuevo_vecino
+        resp_post_vec = self.client.post(reverse('gestion_atenciones'), {
+            'chk_nuevo_vecino': '1',
+            'nuevo_vecino_nombre': 'Rosa Dirigente',
+            'nuevo_vecino_rut': '12.345.678-5',
+            'nuevo_vecino_correo': 'rosa.dirigente@example.test',
+            'nuevo_vecino_sector_id': org_sector.id,
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Solicitud de vecino nuevo en formulario único',
+            'origen': 'EXT',
+            'responsable_id': admin.id,
+        })
+        self.assertRedirects(resp_post_vec, reverse('gestion_atenciones'))
+        at_vec = AtencionCiudadana.objects.filter(descripcion__icontains='Solicitud de vecino nuevo').first()
+        self.assertIsNotNone(at_vec)
+        self.assertIsNotNone(at_vec.vecino)
+        self.assertIsNone(at_vec.organizacion)
+        self.assertEqual(at_vec.vecino.nombre, 'Rosa Dirigente')
+        self.assertTrue(User.objects.filter(username='12.345.678-5', email='rosa.dirigente@example.test').exists())
+
+        # POST 2: Al marcar Representa JJVV o Organización se ignora/elimina cualquier vecino previo y solo vincula la JJVV
+        resp_post_org = self.client.post(reverse('gestion_atenciones'), {
+            'chk_representa_org': '1',
+            'crear_nueva_org': '1',
+            'vecino_id': at_vec.vecino.id,  # Residual que debe ser ignorado
+            'nueva_org_nombre': 'JJVV Unificada',
+            'nueva_org_tipo_organizacion': 'Junta de Vecinos',
+            'nueva_org_domicilio_legal': 'Calle Central 100',
+            'nueva_org_socios_activos': '42',
+            'nueva_org_numero_registro_pj': 'PJ-7788',
+            'nueva_org_registro_directiva_numero': 'DIR-990',
+            'nueva_org_email_contacto': 'jjvv.unificada@example.test',
+            'nueva_org_sector_id': org_sector.id,
+            'tipo_atencion_id': self.tipo.id,
+            'sub_atencion_id': self.sub.id,
+            'descripcion': 'Solicitud exclusiva de JJVV en formulario único',
+            'origen': 'EXT',
+            'responsable_id': admin.id,
+        })
+        self.assertRedirects(resp_post_org, reverse('gestion_atenciones'))
+        at_org = AtencionCiudadana.objects.filter(descripcion__icontains='Solicitud exclusiva de JJVV').first()
+        self.assertIsNotNone(at_org)
+        self.assertIsNone(at_org.vecino)
+        self.assertIsNotNone(at_org.organizacion)
+        self.assertEqual(at_org.organizacion.nombre, 'JJVV Unificada')
+        self.assertEqual(at_org.organizacion.socios_activos, 42)
+        self.assertEqual(at_org.organizacion.numero_registro_pj, 'PJ-7788')
+
+        # Verificar tarjetas interactivas en inicio y reportes (todos los perfiles internos)
+        resp_inicio = self.client.get(reverse('gestion_inicio'))
+        self.assertContains(resp_inicio, f'href="{reverse("gestion_atenciones")}?estado=Resuelta"')
+        resp_rep = self.client.get(reverse('gestion_reportes'))
+        self.assertContains(resp_rep, f'href="{reverse("gestion_atenciones")}?estado=Resuelta')
+        self.assertContains(resp_rep, f'href="{reverse("gestion_atenciones")}?estado=En+proceso')
+
+        # Verificar tarjetas interactivas en Portal Cliente (Total, Registradas, En Proceso, Resueltas)
+        vec_user = User.objects.get(username='12.345.678-5')
+        vec_user.funcionario.debe_cambiar_contrasena = False
+        vec_user.funcionario.save()
+        AtencionCiudadana.objects.create(
+            solicitante='Rosa Dirigente (12.345.678-5)',
+            vecino=at_vec.vecino,
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Atención en proceso del cliente',
+            estado='En proceso',
+            creado_por=admin,
+            usuario_responsable=admin,
+        )
+        AtencionCiudadana.objects.create(
+            solicitante='Rosa Dirigente (12.345.678-5)',
+            vecino=at_vec.vecino,
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Atención resuelta del cliente',
+            estado='Resuelta',
+            creado_por=admin,
+            usuario_responsable=admin,
+        )
+        self.client.force_login(vec_user)
+        resp_cli = self.client.get(reverse('portal_cliente'))
+        self.assertContains(resp_cli, 'href="?estado=Registrada"')
+        self.assertContains(resp_cli, 'href="?estado=En+proceso"')
+        self.assertContains(resp_cli, 'href="?estado=Resuelta"')
+
+        resp_cli_proc = self.client.get(reverse('portal_cliente') + '?estado=En+proceso')
+        self.assertContains(resp_cli_proc, 'Atención en proceso del cliente')
+        self.assertNotContains(resp_cli_proc, 'Atención resuelta del cliente')
+
+        resp_cli_res = self.client.get(reverse('portal_cliente') + '?estado=Resuelta')
+        self.assertContains(resp_cli_res, 'Atención resuelta del cliente')
+        self.assertNotContains(resp_cli_res, 'Atención en proceso del cliente')
+
+    def test_nombres_estructurados_vecino_y_login_con_rut_o_correo(self):
+        admin = User.objects.create_superuser('admin_nom4', 'nom4@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        sector = Sector.objects.create(nombre='Sector Nombres', delegacion=self.delegacion, estado='Activo')
+
+        # Verificar etiquetas "Funcionarios" en inicio/sidebar y 4 campos de nombre en Vecinos
+        resp_inicio = self.client.get(reverse('gestion_inicio'))
+        self.assertContains(resp_inicio, 'Funcionarios')
+        self.assertContains(resp_inicio, 'CRUD Funcionarios')
+
+        resp_vec_get = self.client.get(reverse('gestion_vecinos'))
+        self.assertContains(resp_vec_get, 'name="primer_nombre"')
+        self.assertContains(resp_vec_get, 'name="segundo_nombre"')
+        self.assertContains(resp_vec_get, 'name="apellido_paterno"')
+        self.assertContains(resp_vec_get, 'name="apellido_materno"')
+
+        # Crear vecino con los 4 campos de nombre + correo obligatorio
+        mail.outbox.clear()
+        resp_vec_post = self.client.post(reverse('gestion_vecinos'), {
+            'primer_nombre': 'Camila',
+            'segundo_nombre': 'Andrea',
+            'apellido_paterno': 'Pérez',
+            'apellido_materno': 'Muñoz',
+            'rut': '17.654.321-3',
+            'correo': 'camila.perez@example.test',
+            'sector_id': sector.id,
+            'estado': 'Activo',
+        })
+        self.assertRedirects(resp_vec_post, reverse('gestion_vecinos'))
+        vec = Vecino.objects.get(rut='17.654.321-3')
+        self.assertEqual(vec.nombre, 'Camila Andrea Pérez Muñoz')
+        self.assertEqual(vec.get_partes_nombre(), ('Camila', 'Andrea', 'Pérez', 'Muñoz'))
+
+        user_vec = User.objects.get(email='camila.perez@example.test')
+        user_vec.set_password('Vecina123!')
+        user_vec.save()
+        user_vec.funcionario.debe_cambiar_contrasena = False
+        user_vec.funcionario.save()
+
+        # Vecino puede ingresar con RUT formateado, RUT sin puntos/guion o correo
+        self.client.logout()
+        for ident in ('17.654.321-3', '176543213', 'camila.perez@example.test'):
+            resp_in = self.client.post(reverse('login'), {
+                'username': ident,
+                'password': 'Vecina123!',
+            })
+            self.assertRedirects(resp_in, reverse('portal_cliente'), fetch_redirect_response=False)
+            self.client.post(reverse('logout'))
+
+        # En Mi Perfil los 4 campos de nombre/apellido y RUT son solo lectura y no mutan por POST
+        self.client.force_login(user_vec)
+        resp_perfil_get = self.client.get(reverse('perfil_usuario'))
+        self.assertContains(resp_perfil_get, 'value="Camila"')
+        self.assertContains(resp_perfil_get, 'value="Andrea"')
+        self.assertContains(resp_perfil_get, 'value="Pérez"')
+        self.assertContains(resp_perfil_get, 'value="Muñoz"')
+        self.assertContains(resp_perfil_get, 'value="17.654.321-3"')
+        self.assertNotContains(resp_perfil_get, 'name="first_name"')
+        self.assertNotContains(resp_perfil_get, 'name="last_name"')
+
+        resp_perfil_post = self.client.post(reverse('perfil_usuario'), {
+            'accion': 'actualizar_datos',
+            'first_name': 'Hackeado',
+            'email': 'camila.nuevo@example.test',
+            'telefono': '+56 9 9988 7766',
+        })
+        self.assertRedirects(resp_perfil_post, reverse('perfil_usuario'))
+        user_vec.refresh_from_db()
+        vec.refresh_from_db()
+        self.assertEqual(user_vec.first_name, 'Camila Andrea Pérez Muñoz')
+        self.assertEqual(user_vec.email, 'camila.nuevo@example.test')
+        self.assertEqual(vec.telefono, '+56 9 9988 7766')
+        # Arriba en el perfil debe verse solo primer nombre + apellido paterno
+        self.assertContains(resp_perfil_get, 'Camila Pérez')
+        self.assertNotContains(resp_perfil_get, 'Camila Andrea Pérez Muñoz')
+
+        # Verificar que funcionario con 4 nombres muestre Primer Nombre + Apellido Paterno arriba y en tablas
+        func_u = User.objects.create_user(
+            username='mgonzalez',
+            first_name='María Isabel González Rojas',
+            email='mg@example.test',
+            password='User123!',
+            is_staff=True,
+        )
+        rol_op = Rol.objects.create(nombre_rol='Operador', alcance='Delegación', estado='Activo')
+        func_obj = Funcionario.objects.create(
+            user=func_u,
+            identificador_institucional='FUN-CORTO',
+            rut='16.777.888-1',
+            primer_nombre='María',
+            segundo_nombre='Isabel',
+            apellido_paterno='González',
+            apellido_materno='Rojas',
+            delegacion=self.delegacion,
+            cargo=self.cargo,
+            estado='Activo',
+        )
+        FuncionarioRol.objects.create(funcionario=func_obj, rol=rol_op)
+        AtencionCiudadana.objects.create(
+            solicitante='Camila Pérez (17.654.321-3)',
+            vecino=vec,
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Atención para verificar nombre corto en tabla',
+            creado_por=func_u,
+            usuario_responsable=func_u,
+            va_a_tubo=True,
+            fecha_compromiso=datetime.date.today(),
+        )
+
+        self.client.force_login(admin)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+        resp_usr_tbl = self.client.get(reverse('gestion_usuarios'))
+        self.assertContains(resp_usr_tbl, '>María González</span>')
+        for url in (
+            reverse('gestion_atenciones'),
+            reverse('gestion_inicio'),
+            reverse('gestion_tubo'),
+        ):
+            resp_tbl = self.client.get(url)
+            self.assertContains(resp_tbl, 'María González')
+            self.assertNotContains(resp_tbl, 'María Isabel González Rojas')
+
+        self.client.force_login(func_u)
+        resp_func_home = self.client.get(reverse('gestion_atenciones'))
+        self.assertContains(resp_func_home, 'María González')
+
+    def test_database_tables_in_english(self):
+        from django.apps import apps
+        from django.db import connection
+
+        expected = {
+            ('accounts', 'Delegacion'): 'accounts_delegation',
+            ('accounts', 'Sector'): 'accounts_sector',
+            ('accounts', 'Cargo'): 'accounts_position',
+            ('accounts', 'Funcionario'): 'accounts_staff',
+            ('accounts', 'Rol'): 'accounts_role',
+            ('accounts', 'FuncionarioRol'): 'accounts_staff_role',
+            ('activities', 'Actividad'): 'activities_activity',
+            ('activities', 'Evidencia'): 'activities_evidence',
+            ('activities', 'ValidacionEvidencia'): 'activities_evidence_validation',
+            ('activities', 'AtencionSocialGestion'): 'activities_social_management',
+            ('activities', 'TipoGestion'): 'activities_management_type',
+            ('activities', 'OrganizacionComunitaria'): 'activities_community_organization',
+            ('activities', 'Vecino'): 'activities_neighbor',
+            ('activities', 'AtencionCiudadana'): 'activities_citizen_request',
+            ('agenda', 'CompromisoAgenda'): 'agenda_commitment',
+            ('agenda', 'AjusteDesempenio'): 'agenda_performance_adjustment',
+            ('configuration', 'Periodo'): 'configuration_period',
+            ('configuration', 'TipoAtencion'): 'configuration_request_type',
+            ('configuration', 'SubAtencion'): 'configuration_request_subtype',
+            ('configuration', 'CatalogoActividad'): 'configuration_activity_catalog',
+            ('configuration', 'ItemMedicion'): 'configuration_measurement_item',
+            ('configuration', 'ConfiguracionMeta'): 'configuration_goal_configuration',
+        }
+        actual_tables = set(connection.introspection.table_names())
+        for (app_label, model_name), table_name in expected.items():
+            model = apps.get_model(app_label, model_name)
+            self.assertEqual(model._meta.db_table, table_name)
+            self.assertIn(table_name, actual_tables)
+
+        admin = User.objects.create_superuser('admin_en', 'adminen@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        resp_admin = self.client.get('/admin/')
+        self.assertEqual(resp_admin.status_code, 200)
+        for en_label in (
+            'Delegations', 'Positions', 'Staff', 'Staff Roles', 'Roles',
+            'Sectors / Territories', 'Activities', 'Citizen Requests',
+            'Social Managements', 'Evidences', 'Management Types',
+            'Evidence Validations', 'Neighbors', 'Commitments',
+            'Performance Adjustments', 'Periods', 'Activity Catalogs',
+            'Measurement Items', 'Goal Configurations',
+        ):
+            self.assertContains(resp_admin, en_label)
+        for es_label in ('Delegacions', 'Actividads', 'Atencion ciudadanas', 'Cargos', 'Vecinos'):
+            self.assertNotContains(resp_admin, es_label)
+
+    def test_usuario_organizacion_provisoria_correo_y_portal(self):
+        from django.core import mail
+        from django.contrib.auth.models import User
+        from django.utils import timezone
+        from accounts.models import Delegacion, Sector, Cargo, Rol, Funcionario, FuncionarioRol
+        from agenda.models import CompromisoAgenda
+        import re
+
+        admin = User.objects.create_superuser('admin_org_usr', 'adminorgu@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        sec = Sector.objects.create(nombre='Sector Org Portal', delegacion=self.delegacion, estado='Activo')
+        vec_existente = Vecino.objects.create(
+            nombre='Raúl Andrés Gómez Tapia',
+            primer_nombre='Raúl',
+            segundo_nombre='Andrés',
+            apellido_paterno='Gómez',
+            apellido_materno='Tapia',
+            rut='8.765.432-K',
+            telefono='+56 9 4444 5555',
+            delegacion=self.delegacion,
+            sector=sec,
+            estado='Activo',
+        )
+
+        # GET Organizaciones verifica búsqueda de vecinos en directiva, opción "Registrar nuevo vecino" con formulario completo
+        # de vecinos y sin texto Opcional en editar
+        resp_org_get = self.client.get(reverse('gestion_organizaciones'))
+        self.assertEqual(resp_org_get.status_code, 200)
+        self.assertContains(resp_org_get, 'id="vecinos-directiva-list"')
+        self.assertContains(resp_org_get, 'value="Raúl Gómez"')
+        self.assertContains(resp_org_get, 'name="presidente_vecino_id"')
+        self.assertContains(resp_org_get, 'name="presidente_primer_nombre" data-rep-field="primer_nombre" readonly')
+        self.assertContains(resp_org_get, 'name="presidente_rut" data-rep-field="rut" readonly')
+        self.assertContains(resp_org_get, 'name="presidente_nuevo_vecino"')
+        self.assertContains(resp_org_get, 'name="presidente_vecino_primer_nombre"')
+        self.assertContains(resp_org_get, 'name="presidente_vecino_segundo_nombre"')
+        self.assertContains(resp_org_get, 'name="presidente_vecino_apellido_materno"')
+        self.assertContains(resp_org_get, 'name="presidente_vecino_direccion"')
+        self.assertNotContains(resp_org_get, '(Opcional — si se deja vacío usa el del contacto prioritario)')
+
+        # 1. Rechaza crear organización si no se ingresa correo institucional ni en directiva
+        antes = OrganizacionComunitaria.objects.count()
+        resp_no_mail = self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV Sin Correo',
+            'tipo_organizacion': 'Junta de Vecinos',
+            'sector_id': sec.id,
+        })
+        self.assertRedirects(resp_no_mail, reverse('gestion_organizaciones'))
+        self.assertEqual(OrganizacionComunitaria.objects.count(), antes)
+
+        # 2. Al crear organización usando el formulario completo de nuevo vecino para Presidente + Tesorero manual,
+        # crea usuario de la organización + envía provisoria + crea vecinos con datos completos en padrón
+        mail.outbox.clear()
+        resp_create = self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV Portal Las Compañías',
+            'tipo_organizacion': 'Junta de Vecinos',
+            'rut': '65.987.654-K',
+            'domicilio_legal': 'Av. Viña del Mar 123',
+            'socios_activos': '85',
+            'numero_registro_pj': 'PJ-5544',
+            'registro_directiva_numero': 'DIR-77',
+            'sector_id': sec.id,
+            'contacto_prioritario': 'presidente',
+            'presidente_nuevo_vecino': '1',
+            'presidente_vecino_primer_nombre': 'Carmen',
+            'presidente_vecino_segundo_nombre': 'Elena',
+            'presidente_vecino_apellido_paterno': 'Soto',
+            'presidente_vecino_apellido_materno': 'Rivas',
+            'presidente_vecino_rut': '11.111.111-1',
+            'presidente_vecino_telefono': '912345678',
+            'presidente_vecino_correo': 'contacto@jjvvcompanias.test',
+            'presidente_vecino_direccion': 'Los Cipreses 400',
+            'presidente_vecino_sector_id': sec.id,
+            'presidente_vecino_estado': 'Activo',
+            'tesorero_primer_nombre': 'Marta',
+            'tesorero_apellido_paterno': 'Rojas',
+            'tesorero_rut': '12.345.678-5',
+            'tesorero_telefono': '922223333',
+            'tesorero_correo': 'marta.tesorera@jjvvcompanias.test',
+            'secretario_primer_nombre': 'Raúl',
+            'secretario_apellido_paterno': 'Gómez',
+            'secretario_rut': '8.765.432-K',
+            'estado': 'Activa',
+        })
+        self.assertRedirects(resp_create, reverse('gestion_organizaciones'))
+        org = OrganizacionComunitaria.objects.get(nombre='JJVV Portal Las Compañías')
+        self.assertEqual(org.presidente_nombre, 'Carmen Soto')
+        self.assertEqual(org.tesorero_nombre, 'Marta Rojas')
+        self.assertEqual(org.secretario_nombre, 'Raúl Gómez')
+        self.assertEqual(org.telefono_contacto, '+56 9 1234 5678')
+
+        # Representantes que no existían fueron creados en Vecinos con sus campos completos; el existente se reutilizó sin duplicar
+        vec_pres = Vecino.objects.filter(rut='11.111.111-1').first()
+        self.assertIsNotNone(vec_pres)
+        self.assertEqual(vec_pres.primer_nombre, 'Carmen')
+        self.assertEqual(vec_pres.segundo_nombre, 'Elena')
+        self.assertEqual(vec_pres.apellido_paterno, 'Soto')
+        self.assertEqual(vec_pres.apellido_materno, 'Rivas')
+        self.assertEqual(vec_pres.direccion, 'Los Cipreses 400')
+        vec_tes = Vecino.objects.filter(rut='12.345.678-5').first()
+        self.assertIsNotNone(vec_tes)
+        self.assertEqual(vec_tes.primer_nombre, 'Marta')
+        self.assertEqual(vec_tes.apellido_paterno, 'Rojas')
+        self.assertEqual(Vecino.objects.filter(rut='8.765.432-K').count(), 1)
+        user_org = User.objects.filter(email='contacto@jjvvcompanias.test').first()
+        self.assertIsNotNone(user_org)
+        self.assertFalse(user_org.is_staff)
+        self.assertEqual(user_org.username, '65.987.654-K')
+
+        func_org = Funcionario.objects.get(user=user_org)
+        self.assertEqual(func_org.identificador_institucional, f'ORG-{org.id:05d}')
+        self.assertTrue(func_org.debe_cambiar_contrasena)
+
+        # No debe aparecer en la tabla administrativa de Funcionarios
+        resp_func = self.client.get(reverse('gestion_usuarios'))
+        self.assertNotContains(resp_func, '65.987.654-K')
+
+        # Correo enviado con contraseña provisoria (al correo de la organización y opcionalmente a nuevo vecino representante con correo propio)
+        emails_org = [e for e in mail.outbox if e.to == ['contacto@jjvvcompanias.test']]
+        self.assertEqual(len(emails_org), 1)
+        m = re.search(r'Contraseña provisoria:\s*(\S+)', emails_org[0].body)
+        self.assertIsNotNone(m)
+        prov_pwd = m.group(1)
+        self.assertTrue(user_org.check_password(prov_pwd))
+        self.assertTrue(any(e.to == ['marta.tesorera@jjvvcompanias.test'] for e in mail.outbox))
+
+        # Registrar una atención y un compromiso vinculados a la organización + una atención ajena
+        at_propia = AtencionCiudadana.objects.create(
+            solicitante=f"{org.nombre} ({org.tipo_organizacion})",
+            organizacion=org,
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Solicitud propia de sede comunitaria',
+            creado_por=admin,
+            usuario_responsable=admin,
+            estado='En proceso',
+        )
+        other_org = OrganizacionComunitaria.objects.create(
+            nombre='Otra JJVV Ajena',
+            tipo_organizacion='Junta de Vecinos',
+            delegacion=self.delegacion,
+            estado='Activa',
+        )
+        at_ajena = AtencionCiudadana.objects.create(
+            solicitante='Otra JJVV Ajena',
+            organizacion=other_org,
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Solicitud confidencial ajena',
+            creado_por=admin,
+            usuario_responsable=admin,
+            estado='Registrada',
+        )
+        cargo_m = Cargo.objects.create(nombre_cargo='Gestor')
+        u_resp = User.objects.create_user('resp_org_comp', 'respcomp@example.test', 'Resp123!')
+        func_resp = Funcionario.objects.create(
+            user=u_resp, identificador_institucional='FUN-9101', delegacion=self.delegacion, cargo=cargo_m
+        )
+        CompromisoAgenda.objects.create(
+            delegacion=self.delegacion,
+            sector=sec,
+            organizacion=org,
+            solicitante=org.nombre,
+            responsable=func_resp,
+            fecha_comprometida=timezone.localdate(),
+            estado='Registrada',
+            observacion='Compromiso territorial de luminarias',
+        )
+
+        # 3. Iniciar sesión por correo (o RUT) con la clave provisoria exige cambio obligatorio y luego entra al portal
+        self.client.logout()
+        resp_login = self.client.post(reverse('login'), {
+            'username': 'contacto@jjvvcompanias.test',
+            'password': prov_pwd,
+        })
+        self.assertRedirects(resp_login, reverse('cambiar_contrasena_inicial'))
+
+        resp_change = self.client.post(reverse('cambiar_contrasena_inicial'), {
+            'nueva_contrasena': 'NuevaClaveOrg!99',
+            'confirmar_contrasena': 'NuevaClaveOrg!99',
+        })
+        self.assertRedirects(resp_change, reverse('portal_cliente'))
+
+        # 4. Mis Registros NO duplica la ficha de organización y muestra exclusivamente sus solicitudes y compromisos propios
+        resp_portal = self.client.get(reverse('portal_cliente'))
+        self.assertEqual(resp_portal.status_code, 200)
+        self.assertContains(resp_portal, 'JJVV Portal Las Compañías')
+        self.assertNotContains(resp_portal, 'data-realtime-card="portal-datos-organizacion"')
+        self.assertNotContains(resp_portal, 'PJ-5544')
+        self.assertContains(resp_portal, 'Solicitud propia de sede comunitaria')
+        self.assertContains(resp_portal, 'Compromiso territorial de luminarias')
+        self.assertNotContains(resp_portal, 'Solicitud confidencial ajena')
+
+        # Detalle propio 200, detalle ajeno 404, ruta interna 403
+        self.assertEqual(self.client.get(reverse('portal_cliente_detalle', args=[at_propia.id])).status_code, 200)
+        self.assertEqual(self.client.get(reverse('portal_cliente_detalle', args=[at_ajena.id])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('gestion_organizaciones')).status_code, 403)
+
+        # Mis Datos y Perfil muestra UNA sola tarjeta, sin crear nuevos vecinos, solo prioridad y teléfono/correo
+        resp_perf = self.client.get(reverse('perfil_usuario'))
+        self.assertContains(resp_perf, 'Directiva de la Organización')
+        self.assertContains(resp_perf, 'Socios Activos')
+        self.assertContains(resp_perf, 'PJ-5544')
+        self.assertContains(resp_perf, 'Carmen Soto')
+        self.assertContains(resp_perf, 'Marta Rojas')
+        self.assertContains(resp_perf, 'abrirModalEditarRepPerfil')
+        self.assertNotContains(resp_perf, 'Editar Contacto de la Organización')
+        self.assertNotContains(resp_perf, 'Registrar nuevo vecino')
+        self.assertNotContains(resp_perf, 'vecinos-directiva-list')
+
+        # El cliente NO puede crear un nuevo vecino desde Mi Perfil
+        antes_vec_cli = Vecino.objects.count()
+        self.client.post(reverse('perfil_usuario'), {
+            'accion': 'editar_representante_org',
+            'cargo': 'tesorero',
+            'rep_nuevo_vecino': '1',
+            'rep_vecino_primer_nombre': 'Intruso',
+            'rep_vecino_apellido_paterno': 'Falso',
+            'rep_vecino_rut': '19.111.222-4',
+            'rep_vecino_correo': 'intruso@test.cl',
+        })
+        self.assertEqual(Vecino.objects.count(), antes_vec_cli)
+
+        # Editar correo de la organización conserva automáticamente el teléfono del contacto prioritario
+        self.client.post(reverse('perfil_usuario'), {
+            'accion': 'actualizar_datos',
+            'email': 'nuevo.correo@jjvvcompanias.test',
+        })
+        org.refresh_from_db()
+        self.assertEqual(org.email_contacto, 'nuevo.correo@jjvvcompanias.test')
+        self.assertEqual(org.telefono_contacto, '+56 9 1234 5678')
+        self.assertEqual(org.presidente_correo, 'nuevo.correo@jjvvcompanias.test')
+
+        # Editar representante (cambio de teléfono, correo y prioridad) actualiza org y también la tabla Vecinos
+        # e ignora cualquier intento de alterar nombre/apellido/RUT
+        self.client.post(reverse('perfil_usuario'), {
+            'accion': 'editar_representante_org',
+            'cargo': 'tesorero',
+            'primer_nombre': 'NombreAlterado',
+            'apellido_paterno': 'ApellidoAlterado',
+            'rut': '9.999.999-9',
+            'telefono': '988887777',
+            'correo': 'marta.nueva@jjvvcompanias.test',
+            'establecer_prioritario': '1',
+        })
+        org.refresh_from_db()
+        func_org.refresh_from_db()
+        vec_tes = Vecino.objects.get(rut='12.345.678-5')
+        func_tes = Funcionario.objects.get(identificador_institucional='VEC-123456785')
+        self.assertEqual(org.tesorero_nombre, 'Marta Rojas')
+        self.assertEqual(org.tesorero_rut, '12.345.678-5')
+        self.assertEqual(org.contacto_prioritario, 'tesorero')
+        self.assertEqual(org.representante_legal, 'Marta Rojas')
+        self.assertEqual(org.telefono_contacto, '+56 9 8888 7777')
+        self.assertEqual(func_org.telefono, '+56 9 8888 7777')
+        # Impacto reflejado directamente en la tabla y ficha de Vecinos
+        self.assertEqual(vec_tes.telefono, '+56 9 8888 7777')
+        self.assertEqual(func_tes.telefono, '+56 9 8888 7777')
+        self.assertEqual(func_tes.user.email, 'marta.nueva@jjvvcompanias.test')
+
+        # Verificar que en la vista /gestion/vecinos/ aparecen el teléfono y correo actualizados
+        self.client.force_login(admin)
+        session_adm = self.client.session
+        session_adm['delegacion_activa_id'] = self.delegacion.id
+        session_adm.save()
+        resp_vec_list = self.client.get(reverse('gestion_vecinos'))
+        self.assertContains(resp_vec_list, '+56 9 8888 7777')
+        self.assertContains(resp_vec_list, 'marta.nueva@jjvvcompanias.test')
+
+        # Volver a sesión de organización para validar login por RUT
+        self.client.logout()
+        resp_login_re = self.client.post(reverse('login'), {
+            'username': 'nuevo.correo@jjvvcompanias.test',
+            'password': 'NuevaClaveOrg!99',
+        })
+        self.assertRedirects(resp_login_re, reverse('portal_cliente'))
+
+        # También puede ingresar al Portal usando su RUT de organización
+        self.client.logout()
+        resp_login_rut = self.client.post(reverse('login'), {
+            'username': '65987654-k',
+            'password': 'NuevaClaveOrg!99',
+        })
+        self.assertRedirects(resp_login_rut, reverse('portal_cliente'))
+
+        # 5. Reutilizar el correo de un vecino existente al crear/editar una JJVV (mismos vecinos)
+        #    y viceversa (crear vecino con correo ya usado por una JJVV) funciona y autentica por clave
+        self.client.force_login(admin)
+        session_adm2 = self.client.session
+        session_adm2['delegacion_activa_id'] = self.delegacion.id
+        session_adm2.save()
+
+        mail.outbox.clear()
+        resp_vec_share = self.client.post(reverse('gestion_vecinos'), {
+            'primer_nombre': 'Camila',
+            'apellido_paterno': 'Fuentes',
+            'rut': '16.543.210-K',
+            'correo': 'camila.shared@example.test',
+            'sector_id': sec.id,
+            'estado': 'Activo',
+        })
+        self.assertRedirects(resp_vec_share, reverse('gestion_vecinos'))
+        vec_camila = Vecino.objects.get(rut='16.543.210-K')
+        u_camila = User.objects.get(username='16.543.210-K')
+        u_camila.set_password('ClaveCamila!22')
+        u_camila.save()
+        func_camila = Funcionario.objects.get(user=u_camila)
+        func_camila.debe_cambiar_contrasena = False
+        func_camila.save(update_fields=['debe_cambiar_contrasena'])
+
+        mail.outbox.clear()
+        resp_org_share = self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV Camila Compartida',
+            'tipo_organizacion': 'Junta de Vecinos',
+            'sector_id': sec.id,
+            'contacto_prioritario': 'presidente',
+            'presidente_vecino_id': vec_camila.id,
+            'presidente_correo': 'camila.shared@example.test',
+            'estado': 'Activa',
+        })
+        self.assertRedirects(resp_org_share, reverse('gestion_organizaciones'))
+        org_camila = OrganizacionComunitaria.objects.get(nombre='JJVV Camila Compartida')
+        self.assertEqual(org_camila.presidente_nombre, 'Camila Fuentes')
+        self.assertEqual(org_camila.email_contacto, 'camila.shared@example.test')
+        m_org_cam = re.search(r'Contraseña provisoria:\s*(\S+)', mail.outbox[0].body)
+        self.assertIsNotNone(m_org_cam)
+        pwd_org_cam = m_org_cam.group(1)
+
+        # Ambas cuentas (vecino y organización) con el mismo correo pueden iniciar sesión usando su respectiva clave
+        self.client.logout()
+        self.assertRedirects(
+            self.client.post(reverse('login'), {'username': 'camila.shared@example.test', 'password': 'ClaveCamila!22'}),
+            reverse('portal_cliente'),
+        )
+        self.client.logout()
+        self.assertRedirects(
+            self.client.post(reverse('login'), {'username': 'camila.shared@example.test', 'password': pwd_org_cam}),
+            reverse('cambiar_contrasena_inicial'),
+        )
+
+        # Y al crear el vecino después usando el correo ya asignado a una JJVV tampoco bloquea
+        self.client.force_login(admin)
+        session_adm3 = self.client.session
+        session_adm3['delegacion_activa_id'] = self.delegacion.id
+        session_adm3.save()
+        resp_vec_after = self.client.post(reverse('gestion_vecinos'), {
+            'primer_nombre': 'Diego',
+            'apellido_paterno': 'Muñoz',
+            'rut': '18.222.333-6',
+            'correo': 'nuevo.correo@jjvvcompanias.test',
+            'sector_id': sec.id,
+            'estado': 'Activo',
+        })
+        self.assertRedirects(resp_vec_after, reverse('gestion_vecinos'))
+        self.assertTrue(Vecino.objects.filter(rut='18.222.333-6').exists())
+
+        # 6. El editar a Inactiva o eliminar la organización desactiva su cuenta de acceso
+        self.client.force_login(admin)
+        self.client.post(reverse('gestion_organizaciones_eliminar', args=[org.id]))
+        user_org.refresh_from_db()
+        self.assertFalse(user_org.is_active)
+
+    def test_no_visible_sgr_and_no_visible_role_badges(self):
+        import re
+
+        admin = User.objects.create_user(
+            username='admin_sin_sgr_test',
+            password='Password123!',
+            first_name='Carla',
+            last_name='Torres',
+            email='carla.torres@example.test',
+            is_staff=True,
+            is_superuser=True,
+        )
+        rol_especial = Rol.objects.create(
+            nombre_rol='RolOcultoVisualCheck',
+            alcance='Global',
+            estado='Activo',
+        )
+        func = Funcionario.objects.create(
+            user=admin,
+            cargo=self.cargo,
+            delegacion=self.delegacion,
+            identificador_institucional='FUNC-VISUAL-01',
+            estado='Activo',
+        )
+        FuncionarioRol.objects.create(funcionario=func, rol=rol_especial)
+
+        at = AtencionCiudadana.objects.create(
+            codigo_atencion='AT-VIS-001',
+            solicitante='Juan Pérez',
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Revisión territorial sin siglas visibles',
+            usuario_responsable=admin,
+            estado='Registrada',
+            va_a_tubo=True,
+            fecha_compromiso=datetime.date(2026, 12, 1),
+        )
+
+        self.client.force_login(admin)
+        for url_name in (
+            'gestion_inicio',
+            'perfil_usuario',
+            'gestion_atenciones',
+            'gestion_tubo',
+            'gestion_reportes',
+            'gestion_metas',
+            'gestion_configuracion',
+        ):
+            resp = self.client.get(reverse(url_name))
+            self.assertEqual(resp.status_code, 200)
+            html = resp.content.decode('utf-8')
+            m = re.search(r'(?<![_-])\bSGR\b(?![_-])', html, flags=re.IGNORECASE)
+            self.assertIsNone(
+                m,
+                f'Se encontró SGR visible en {url_name}: {html[max(0, m.start()-80):m.end()+80] if m else ""}',
+            )
+            if url_name in ('gestion_inicio', 'perfil_usuario'):
+                self.assertNotIn('RolOcultoVisualCheck', html)
+                self.assertNotIn('Rol: <strong>', html)
+
+        # Tampoco aparece el rol del responsable en la columna de Atenciones ni Tubo
+        resp_at = self.client.get(reverse('gestion_atenciones'))
+        self.assertNotContains(resp_at, '<div class="text-[10px] text-slate-500">RolOcultoVisualCheck</div>')
+        # En barra superior y pie Creado por sí se ve Cargo/Rol para funcionarios
+        self.assertContains(resp_at, '<span>Delegado Territorial</span>')
+        self.assertContains(resp_at, '(Delegado Territorial)')
+
+        resp_tubo = self.client.get(reverse('gestion_tubo') + '?vista=tabla')
+        self.assertNotContains(resp_tubo, '<div class="text-[10px] text-slate-400">RolOcultoVisualCheck</div>')
+        self.assertContains(resp_tubo, 'Responsable / Creador')
+        self.assertContains(resp_tubo, 'Creado por: <strong class="text-slate-800">Carla Torres</strong> <span class="text-slate-400 font-semibold">(Delegado Territorial)</span>')
+        self.assertTrue(at.id)
+
+        # Para Cliente NO se muestra rol ni cargo en la cabecera ni en perfil
+        cli_user = User.objects.create_user(
+            username='cliente_vis_test',
+            password='Password123!',
+            first_name='Rosa',
+            last_name='Molina',
+            email='rosa.molina@example.test',
+        )
+        cargo_cli = Cargo.objects.create(nombre_cargo='Ciudadano')
+        rol_cli = Rol.objects.create(nombre_rol='Cliente', alcance='Personal', estado='Activo')
+        func_cli = Funcionario.objects.create(
+            user=cli_user,
+            cargo=cargo_cli,
+            delegacion=self.delegacion,
+            identificador_institucional='CLI-VISUAL-01',
+            rut='19.333.444-5',
+            estado='Activo',
+        )
+        FuncionarioRol.objects.create(funcionario=func_cli, rol=rol_cli)
+        Vecino.objects.create(
+            nombre='Rosa Molina',
+            primer_nombre='Rosa',
+            apellido_paterno='Molina',
+            rut='19.333.444-5',
+            telefono='+56 9 1234 0000',
+            delegacion=self.delegacion,
+            estado='Activo',
+        )
+        self.client.force_login(cli_user)
+        resp_cli = self.client.get(reverse('portal_cliente'))
+        self.assertEqual(resp_cli.status_code, 200)
+        self.assertNotContains(resp_cli, '<span>Ciudadano</span>')
+        self.assertNotContains(resp_cli, '<span>Cliente</span>')
+
+    def test_selects_universales_modal_tubo_y_tubo_cartas_excel(self):
+        import re
+        from cartas.models import Carta
+
+        # 1. Cliente no puede acceder a Tubo de Cartas (404)
+        cli_user = User.objects.create_user('cli_cartas_check', 'clicartas@example.test', 'Pass123!')
+        cargo_cli = Cargo.objects.create(nombre_cargo='Ciudadano')
+        rol_cli = Rol.objects.create(nombre_rol='Cliente', alcance='Personal', estado='Activo')
+        func_cli = Funcionario.objects.create(
+            user=cli_user,
+            cargo=cargo_cli,
+            delegacion=self.delegacion,
+            identificador_institucional='CLI-CARTA-01',
+            rut='17.654.321-7',
+            estado='Activo',
+        )
+        FuncionarioRol.objects.create(funcionario=func_cli, rol=rol_cli)
+        Vecino.objects.create(nombre='Vecino Carta', rut='17.654.321-7', delegacion=self.delegacion, estado='Activo')
+        self.client.force_login(cli_user)
+        self.assertIn(self.client.get(reverse('cartas_listado')).status_code, (403, 404))
+
+        # 2. Funcionario accede a selects buscables universales y modal Tubo sin recortes ni badge extra
+        self.client.force_login(self.user)
+        resp_tubo = self.client.get(reverse('gestion_tubo'))
+        self.assertEqual(resp_tubo.status_code, 200)
+        self.assertContains(resp_tubo, 'select:not([data-native-select="true"]):not([multiple])')
+        self.assertContains(resp_tubo, 'max-h-[92vh] overflow-y-auto')
+        self.assertNotContains(
+            resp_tubo,
+            '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 mt-0.5 rounded text-[9px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200">\n                  Compromiso Sectorial',
+        )
+
+        # 3. Tubo de Cartas según Excel TUBO CARTAS / CARTAS (PARA, PRONUNCIAMIENTO, UNIDAD, teléfono, Excel xlsx, sin SGR)
+        resp_new = self.client.post(reverse('cartas_nueva'), {
+            'fecha': '2026-07-02',
+            'numero': '10093',
+            'para': 'Otro',
+            'remite': 'ALICIA PADILLA',
+            'fono_contacto': '952316534',
+            'actividad_tema': 'AGUAS DEL VALLE INFORMA CORTE PROGRAMADO',
+            'fecha_actividad': '03/07/2026',
+            'encargado_seguimiento': 'JAVIER ROJAS',
+            'estado': 'FINALIZADA',
+            'pronunciamiento': 'DELEGADO',
+            'derivada_a': 'DORIS ÁLVAREZ',
+            'observacion': 'Socializada con vecinos',
+            'unidad': '1',
+        })
+        self.assertRedirects(resp_new, reverse('cartas_listado'))
+        carta = Carta.objects.get(numero='10093', remite='ALICIA PADILLA')
+        self.assertEqual(carta.delegacion, self.delegacion)
+        self.assertEqual(carta.fono_contacto, '+56 9 5231 6534')
+        self.assertEqual(carta.pronunciamiento, 'DELEGADO')
+        self.assertEqual(carta.unidad, '1')
+
+        # Listado, filtros y detalle sin SGR visible
+        for url in (
+            reverse('cartas_listado') + '?para=Otro&estado=FINALIZADA&pronunciamiento=DELEGADO',
+            reverse('cartas_nueva'),
+            reverse('cartas_detalle', args=[carta.id]),
+        ):
+            r = self.client.get(url)
+            self.assertEqual(r.status_code, 200)
+            html = r.content.decode('utf-8')
+            m = re.search(r'(?<![_-])\bSGR\b(?![_-])', html, flags=re.IGNORECASE)
+            self.assertIsNone(m, f'Se encontró SGR en {url}: {html[max(0, m.start()-60):m.end()+60] if m else ""}')
+
+        # Exportación Excel (.xlsx) sin SGR
+        resp_xlsx = self.client.get(reverse('cartas_listado') + '?export=excel')
+        self.assertEqual(resp_xlsx.status_code, 200)
+        self.assertEqual(
+            resp_xlsx['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        self.assertNotIn('sgr', resp_xlsx['Content-Disposition'].lower())
+
+        # Solo admin puede eliminar
+        resp_no_del = self.client.post(reverse('cartas_eliminar', args=[carta.id]))
+        self.assertRedirects(resp_no_del, reverse('cartas_listado'))
+        self.assertTrue(Carta.objects.filter(id=carta.id).exists())
+
+        admin = User.objects.create_superuser('adm_cartas', 'admcartas@example.test', 'Admin123!')
+        self.client.force_login(admin)
+        for view_name in (
+            'cartas_listado',
+            'gestion_atenciones',
+            'gestion_tubo',
+            'gestion_organizaciones',
+            'gestion_vecinos',
+            'gestion_sectores',
+            'gestion_reportes',
+            'gestion_usuarios',
+        ):
+            r_del = self.client.get(reverse(view_name))
+            self.assertEqual(r_del.status_code, 200)
+            self.assertContains(r_del, 'Filtrar Delegación: Todas')
+            self.assertContains(r_del, f'{self.delegacion.get_codigo()} — {self.delegacion.nombre}')
+
+        r_cartas_fmt = self.client.get(reverse('cartas_listado'))
+        self.assertContains(r_cartas_fmt, '>En proceso</option>')
+        self.assertContains(r_cartas_fmt, '>No aplica</option>')
+        self.assertContains(r_cartas_fmt, '>Delegado</option>')
+
+        resp_del = self.client.post(reverse('cartas_eliminar', args=[carta.id]))
+        self.assertRedirects(resp_del, reverse('cartas_listado'))
+        self.assertFalse(Carta.objects.filter(id=carta.id).exists())
+
+    def test_seed_cartas_idempotente_y_cobertura_delegaciones(self):
+        import os
+        from django.conf import settings
+        from cartas.models import Carta
+        from core.management.commands.seed_data import Command as SeedCommand
+
+        del_norte, _ = Delegacion.objects.get_or_create(
+            nombre='Delegación Norte', defaults={'codigo': 'DEL02', 'estado': 'Activa'}
+        )
+        del_sur, _ = Delegacion.objects.get_or_create(
+            nombre='Delegación Sur', defaults={'codigo': 'DEL03', 'estado': 'Activa'}
+        )
+        del_rural, _ = Delegacion.objects.get_or_create(
+            nombre='Delegación Rural', defaults={'codigo': 'DEL04', 'estado': 'Activa'}
+        )
+        xlsx_sgr = os.path.join(settings.BASE_DIR, 'fixtures', 'matriz_sgr.xlsx')
+
+        cmd = SeedCommand()
+        creadas_1 = cmd.seed_cartas(
+            self.delegacion, del_norte, del_sur, del_rural, self.user, xlsx_sgr,
+        )
+        self.assertGreaterEqual(creadas_1, 45)
+        for d in (self.delegacion, del_norte, del_sur, del_rural):
+            self.assertTrue(Carta.objects.filter(delegacion=d).exists())
+        for est, _ in Carta.ESTADOS:
+            self.assertTrue(Carta.objects.filter(estado=est).exists())
+
+        total_1 = Carta.objects.count()
+        creadas_2 = cmd.seed_cartas(
+            self.delegacion, del_norte, del_sur, del_rural, self.user, xlsx_sgr,
+        )
+        self.assertEqual(creadas_2, 0)
+        self.assertEqual(Carta.objects.count(), total_1)
+
+
+
+
+
+

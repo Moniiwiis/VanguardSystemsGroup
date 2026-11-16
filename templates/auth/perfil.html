@@ -3,7 +3,7 @@
 {% block title %}Mi Perfil de Usuario — Sistema Municipal La Serena{% endblock %}
 
 {% block extra_head %}
-<!-- Croppr.js CSS para recorte interactivo de foto de perfil (Evaluación Sumativa 3) -->
+<!-- Croppr.js CSS para recorte interactivo de foto de perfil-->
 <link href="https://cdn.jsdelivr.net/npm/croppr@2.3.1/dist/croppr.min.css" rel="stylesheet" />
 <style>
   .croppr-container {
@@ -36,17 +36,12 @@
         Edita tus datos personales, actualiza tu fotografía de perfil y gestiona tu contraseña de acceso.
       </p>
     </div>
-
-    <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-red-50 text-[#C41230] border border-red-200/90 text-xs font-bold shrink-0">
-      <i data-lucide="shield-check" class="w-4 h-4"></i>
-      <span>Rol: <strong>{{ user_rol_name }}</strong></span>
-    </div>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
     <!-- Tarjeta Izquierda: Fotografía de Perfil -->
-    <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-5 flex flex-col items-center text-center">
+    <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-5 flex flex-col items-center text-center min-w-0 overflow-hidden">
       <div class="space-y-2">
         <h2 class="text-base font-extrabold text-slate-900">Foto de Perfil</h2>
       </div>
@@ -58,17 +53,14 @@
                class="w-36 h-36 rounded-full object-cover ring-4 ring-[#C41230]/20 shadow-lg" />
         {% else %}
           <div id="avatar-placeholder" class="w-36 h-36 rounded-full bg-gradient-to-tr from-[#8B1D19] to-[#C41230] flex items-center justify-center text-white text-4xl font-extrabold ring-4 ring-[#C41230]/20 shadow-lg">
-            {{ request.user.first_name|default:request.user.username|make_list|first|upper }}
+            {{ usuario_nombre_corto|default:request.user.username|make_list|first|upper }}
           </div>
         {% endif %}
       </div>
 
-      <div class="text-xs space-y-1">
-        <p class="font-extrabold text-slate-900 text-sm">{{ request.user.get_full_name|default:request.user.username }}</p>
-        <p class="text-slate-500 font-mono">{{ request.user.email|default:"Sin correo electrónico" }}</p>
-        <span class="inline-block mt-1 px-3 py-1 rounded-full text-[10px] font-extrabold bg-red-50 text-[#C41230] border border-red-200">
-          {{ user_rol_name }}
-        </span>
+      <div class="text-xs space-y-1 w-full min-w-0">
+        <p class="font-extrabold text-slate-900 text-sm w-full break-words [overflow-wrap:anywhere]">{{ usuario_nombre_corto|default:request.user.username }}</p>
+        <p class="text-slate-500 font-mono w-full break-words [overflow-wrap:anywhere]">{{ request.user.email|default:"Sin correo electrónico" }}</p>
       </div>
 
       <!-- Botón para seleccionar nueva imagen -->
@@ -82,8 +74,11 @@
     </div>
 
     <!-- Tarjeta Derecha: Formularios de Datos y Contraseña -->
-    <div class="lg:col-span-2 space-y-6">
+    <div class="lg:col-span-2 space-y-6 min-w-0">
 
+      {% if org_perfil %}
+        {% include "portal/includes/org_datos_card.html" with organizacion=org_perfil editable_perfil=True %}
+      {% else %}
       <!-- Formulario 1: Datos Personales -->
       <div class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-4">
         <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
@@ -97,17 +92,33 @@
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="space-y-1">
-              <label class="block text-xs font-bold text-slate-700">Nombre <span class="text-[#C41230]">*</span></label>
-              <input type="text" name="first_name" required maxlength="150" value="{{ request.user.first_name }}"
-                     placeholder="Tu nombre (máx 150 caracteres)"
-                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              <label class="block text-xs font-bold text-slate-700">Primer Nombre</label>
+              <input type="text" readonly value="{{ perfil_primer_nombre|default:'' }}"
+                     class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
             </div>
 
             <div class="space-y-1">
-              <label class="block text-xs font-bold text-slate-700">Apellidos</label>
-              <input type="text" name="last_name" maxlength="150" value="{{ request.user.last_name }}"
-                     placeholder="Tus apellidos (máx 150 caracteres)"
-                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+              <label class="block text-xs font-bold text-slate-700">Segundo Nombre</label>
+              <input type="text" readonly value="{{ perfil_segundo_nombre|default:'' }}"
+                     class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-700">Apellido Paterno</label>
+              <input type="text" readonly value="{{ perfil_apellido_paterno|default:'' }}"
+                     class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-700">Apellido Materno</label>
+              <input type="text" readonly value="{{ perfil_apellido_materno|default:'' }}"
+                     class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
+            </div>
+
+            <div class="space-y-1 sm:col-span-2">
+              <label class="block text-xs font-bold text-slate-700">RUT</label>
+              <input type="text" readonly value="{{ perfil_rut|default:'Sin RUT registrado' }}"
+                     class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-mono font-bold text-slate-800 focus:outline-none select-none" />
             </div>
 
             <div class="space-y-1">
@@ -134,6 +145,7 @@
           </div>
         </form>
       </div>
+      {% endif %}
 
       <!-- Formulario 2: Cambio de Contraseña -->
       <div class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-4">
@@ -320,5 +332,97 @@
     };
     img.src = rawImageSrc;
   }
+
+  {% if org_perfil %}
+  function toggleEditarCorreoOrg(forceState) {
+    const f = document.getElementById('form-editar-correo-org');
+    if (!f) return;
+    if (typeof forceState === 'boolean') {
+      f.classList.toggle('hidden', !forceState);
+    } else {
+      f.classList.toggle('hidden');
+    }
+  }
+
+  function abrirModalEditarRepPerfil(btn) {
+    const d = btn.dataset;
+    const modal = document.getElementById('modal-editar-rep-org');
+    if (!modal) return;
+    document.getElementById('rep-perfil-cargo').value = d.cargo || '';
+    document.getElementById('rep-perfil-titulo').textContent = `Editar ${d.titulo || 'Representante'}`;
+    document.getElementById('rep-perfil-pn').value = d.pn || '';
+    document.getElementById('rep-perfil-ap').value = d.ap || '';
+    document.getElementById('rep-perfil-rut').value = d.rut || '';
+    document.getElementById('rep-perfil-tel').value = d.tel || '';
+    document.getElementById('rep-perfil-correo').value = d.correo || '';
+    document.getElementById('rep-perfil-prioritario').checked = (d.prioritario === '1');
+    modal.classList.remove('hidden');
+  }
+  {% endif %}
 </script>
+
+{% if org_perfil %}
+<div id="modal-editar-rep-org" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-xl max-h-[92vh] overflow-y-auto space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div>
+        <h3 id="rep-perfil-titulo" class="text-base font-extrabold text-slate-900">Editar Representante</h3>
+        <p class="text-[11px] text-slate-400">Actualiza teléfono, correo o define el contacto prioritario (sin alterar identidad ni RUT)</p>
+      </div>
+      <button type="button" onclick="document.getElementById('modal-editar-rep-org').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+    </div>
+
+    <form method="POST" action="{% url 'perfil_usuario' %}" class="space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="editar_representante_org">
+      <input type="hidden" id="rep-perfil-cargo" name="cargo" value="">
+
+      <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+        <label class="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+          <input type="checkbox" id="rep-perfil-prioritario" name="establecer_prioritario" value="1"
+                 class="rounded border-slate-300 text-[#C41230] focus:ring-[#C41230]">
+          <span>Establecer como contacto prioritario (su teléfono será automáticamente el de la organización)</span>
+        </label>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Primer Nombre</label>
+          <input type="text" id="rep-perfil-pn" readonly tabindex="-1"
+                 class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Apellido Paterno</label>
+          <input type="text" id="rep-perfil-ap" readonly tabindex="-1"
+                 class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
+        </div>
+        <div class="space-y-1 sm:col-span-2">
+          <label class="block text-xs font-bold text-slate-700">RUT</label>
+          <input type="text" id="rep-perfil-rut" readonly tabindex="-1"
+                 class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-mono font-bold text-slate-800 focus:outline-none select-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Teléfono Móvil</label>
+          <input type="text" id="rep-perfil-tel" name="telefono" maxlength="15" placeholder="+56 9 8765 4321"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+          <div class="tel-feedback"></div>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">Correo Electrónico</label>
+          <input type="email" id="rep-perfil-correo" name="correo" maxlength="100"
+                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+        <button type="button" onclick="document.getElementById('modal-editar-rep-org').classList.add('hidden')"
+                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">Cancelar</button>
+        <button type="submit" class="px-5 py-2 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-md transition-all">
+          Guardar Cambios
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

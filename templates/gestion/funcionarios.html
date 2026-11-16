@@ -8,7 +8,7 @@
   <div class="bg-white p-6 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
     <div>
       <h2 class="font-display text-xl font-extrabold text-[#8B1D19]">Módulo: Gestión de Funcionarios y Empleados</h2>
-      <p class="text-xs text-slate-500 mt-1">Administración de usuarios, cargos institucionales, delegaciones territoriales y roles SGR.</p>
+      <p class="text-xs text-slate-500 mt-1">Administración de usuarios, cargos institucionales y delegaciones territoriales.</p>
     </div>
     <button onclick="document.getElementById('modal-funcionario').showModal()" class="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-[#C41230] text-white hover:bg-[#8B1D19] shadow-md transition-all flex items-center gap-2 cursor-pointer">
       <i data-lucide="user-plus" class="w-4 h-4"></i>
@@ -107,7 +107,7 @@
   <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden">
     <div class="p-4 border-b border-red-100 bg-red-50/40 flex items-center justify-between">
       <h3 class="font-extrabold text-xs uppercase tracking-widest text-[#8B1D19]">Nómina de Funcionarios Registrados</h3>
-      <span class="text-[11px] font-bold text-slate-400">Control de Acceso y Roles SGR</span>
+      <span class="text-[11px] font-bold text-slate-400">Control de Acceso y Funcionarios</span>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full text-left text-xs text-slate-600">
@@ -117,7 +117,7 @@
             <th class="p-4">ID Institucional</th>
             <th class="p-4">Cargo</th>
             <th class="p-4">Delegación Municipal</th>
-            <th class="p-4">Roles SGR</th>
+            <th class="p-4">Roles</th>
             <th class="p-4">Estado</th>
             <th class="p-4 text-center">Acciones (CRUD)</th>
           </tr>
@@ -125,18 +125,14 @@
         <tbody class="divide-y divide-slate-100">
           {% for f in funcionarios %}
           <tr class="hover:bg-red-50/30 transition-colors">
-            <td class="p-4">
-              <div class="font-bold text-slate-900">{{ f.user.get_full_name|default:f.user.username }}</div>
-              <div class="text-[11px] text-slate-400 font-mono">{{ f.user.email|default:f.user.username }}</div>
+            <td class="p-4 min-w-[160px] max-w-[240px] [overflow-wrap:anywhere]">
+              <div class="font-bold text-slate-900 break-words [overflow-wrap:anywhere]">{{ f|nombre_corto }}</div>
+              <div class="text-[11px] text-slate-400 font-mono break-all">{{ f.user.email|default:f.user.username }}</div>
             </td>
             <td class="p-4 font-mono font-bold text-[#C41230]">{{ f.identificador_institucional }}</td>
             <td class="p-4 font-medium text-slate-800">{{ f.cargo.nombre_cargo }}</td>
-            <td class="p-4">
-              {% if f.delegacion %}
-                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">{{ f.delegacion.nombre }}</span>
-              {% else %}
-                <span class="italic text-slate-400">Transversal / Sin asignar</span>
-              {% endif %}
+            <td class="p-4 whitespace-nowrap">
+              {% include "gestion/includes/delegacion_cell.html" with nombre=f.delegacion.nombre fallback="Transversal / Sin asignar" %}
             </td>
             <td class="p-4">
               <div class="flex flex-wrap gap-1">
