@@ -2501,7 +2501,7 @@ def gestion_atenciones(request):
             estado__iexact='Activo',
             user__is_active=True,
         )
-    ).select_related('user', 'delegacion').order_by('user__first_name', 'user__username')
+    ).select_related('user', 'delegacion', 'cargo').order_by('user__first_name', 'user__username')
     funcionarios_ids = [funcionario.id for funcionario in funcionarios_edicion]
     roles_encargados = {}
     for funcionario_id, rol_nombre in FuncionarioRol.objects.filter(
@@ -2512,21 +2512,29 @@ def gestion_atenciones(request):
     for funcionario in funcionarios_edicion:
         nombre = funcionario.user.get_full_name() or funcionario.user.username
         roles = ', '.join(roles_encargados.get(funcionario.id, [])) or 'Sin rol registrado'
+        cargo_nom = funcionario.cargo.nombre_cargo if funcionario.cargo else ''
         encargados_edicion.append({
             'id': funcionario.user_id,
             'nombre': nombre,
+            'username': funcionario.user.username,
+            'cargo': cargo_nom,
+            'identificador': funcionario.identificador_institucional or '',
             'delegacion_id': funcionario.delegacion_id,
-            'delegacion_nombre': funcionario.delegacion.nombre,
+            'delegacion_nombre': funcionario.delegacion.nombre if funcionario.delegacion else '',
             'label': f"{nombre} · {roles}",
         })
 
     tipos_activos = TipoAtencion.objects.filter(estado='Activo')
-    vecinos_catalogo = _vecinos_activos_para_delegacion(del_activa).order_by('nombre')
-    vecinos_catalogo = vecinos_catalogo[:150]
+    vecinos_catalogo = _vecinos_activos_para_delegacion(del_activa).select_related('sector', 'delegacion').order_by('nombre')
+    vecinos_catalogo = vecinos_catalogo[:500]
     organizaciones_catalogo = list(
         _organizaciones_activas_para_delegacion(del_activa)
         .order_by('nombre')
-        .values('id', 'nombre', 'tipo_organizacion', 'territorio', 'telefono_contacto', 'representante_legal')
+        .values(
+            'id', 'nombre', 'tipo_organizacion', 'territorio', 'sector__nombre',
+            'rut', 'telefono_contacto', 'representante_legal',
+            'presidente_nombre', 'tesorero_nombre', 'secretario_nombre',
+        )
     )
 
     # Representantes / Funcionarios disponibles para asignación (filtrados exclusivamente por delegación activa)
@@ -2535,6 +2543,8 @@ def gestion_atenciones(request):
             'funcionario__delegacion', 'funcionario__cargo'
         ).filter(
             Q(funcionario__delegacion=del_activa) | Q(id=request.user.id)
+        ).exclude(
+            funcionario__identificador_institucional__startswith='VEC-'
         ).distinct().order_by('first_name', 'username')
     else:
         representantes_qs = User.objects.none()
@@ -2542,7 +2552,9 @@ def gestion_atenciones(request):
     for u in representantes_qs:
         cargo_nom = ""
         del_nom = ""
+        ident_nom = ""
         if hasattr(u, 'funcionario') and u.funcionario:
+            ident_nom = u.funcionario.identificador_institucional or ""
             if u.funcionario.cargo:
                 cargo_nom = u.funcionario.cargo.nombre_cargo
             if u.funcionario.delegacion:
@@ -2557,6 +2569,9 @@ def gestion_atenciones(request):
             'id': u.id,
             'nombre': nombre_completo,
             'username': u.username,
+            'cargo': cargo_nom,
+            'identificador': ident_nom,
+            'delegacion_nombre': del_nom,
             'label': label,
             'es_actual': (u.id == request.user.id)
         })
@@ -5437,7 +5452,7 @@ def gestion_tubo(request):
             estado__iexact='Activo',
             user__is_active=True,
         )
-    ).select_related('user', 'delegacion').order_by('user__first_name', 'user__username')
+    ).select_related('user', 'delegacion', 'cargo').order_by('user__first_name', 'user__username')
     funcionarios_ids = [funcionario.id for funcionario in funcionarios_edicion]
     roles_encargados = {}
     for funcionario_id, rol_nombre in FuncionarioRol.objects.filter(
@@ -5448,9 +5463,13 @@ def gestion_tubo(request):
     for funcionario in funcionarios_edicion:
         nombre = funcionario.user.get_full_name() or funcionario.user.username
         roles = ', '.join(roles_encargados.get(funcionario.id, [])) or 'Sin rol registrado'
+        cargo_nom = funcionario.cargo.nombre_cargo if funcionario.cargo else ''
         encargados_edicion.append({
             'id': funcionario.user_id,
             'nombre': nombre,
+            'username': funcionario.user.username,
+            'cargo': cargo_nom,
+            'identificador': funcionario.identificador_institucional or '',
             'delegacion_id': funcionario.delegacion_id,
             'delegacion_nombre': funcionario.delegacion.nombre if funcionario.delegacion else '',
             'label': f"{nombre} · {roles}",
@@ -5463,7 +5482,7 @@ def gestion_tubo(request):
         organizaciones_tubo = list(
             _organizaciones_activas_para_delegacion(del_activa)
             .order_by('nombre')
-            .values('id', 'nombre', 'tipo_organizacion', 'territorio')
+            .values('id', 'nombre', 'tipo_organizacion', 'territorio', 'sector__nombre', 'rut', 'representante_legal')
         )
         encargados_modal_tubo = [
             enc for enc in encargados_edicion if enc['delegacion_id'] == del_activa.id

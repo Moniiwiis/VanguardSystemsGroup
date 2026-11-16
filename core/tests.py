@@ -2070,3 +2070,45 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(org_inline.contacto_prioritario, 'secretario')
         self.assertEqual(org_inline.representante_legal, 'Carla Secretaria')
         self.assertEqual(org_inline.telefono_contacto, '+56 9 7777 8888')
+
+    def test_listas_desplegables_buscables_con_rut_cargo_y_metadata(self):
+        admin = User.objects.create_superuser('admin_combo', 'aco@example.test', 'Admin123!')
+        cargo = Cargo.objects.create(nombre_cargo='Gestor Social Senior')
+        rol = Rol.objects.create(nombre_rol='Operador', alcance='Delegación', estado='Activo')
+        func_user = User.objects.create_user(
+            username='op_combo', first_name='Mateo', last_name='Ríos', email='mr@example.test', password='User123!'
+        )
+        func = Funcionario.objects.create(
+            user=func_user,
+            identificador_institucional='12.345.678-5',
+            delegacion=self.delegacion,
+            cargo=cargo,
+            estado='Activo',
+        )
+        FuncionarioRol.objects.create(funcionario=func, rol=rol)
+        sector = Sector.objects.create(nombre='Sector Combo', delegacion=self.delegacion, estado='Activo')
+        Vecino.objects.create(
+            nombre='Vecina Lista', rut='11.111.111-1', delegacion=self.delegacion, sector=sector, estado='Activo'
+        )
+        OrganizacionComunitaria.objects.create(
+            nombre='JJVV Lista Buscable', rut='65.123.456-7', delegacion=self.delegacion, sector=sector,
+            representante_legal='Laura Dirigente', estado='Activa',
+        )
+
+        self.client.force_login(admin)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+
+        resp_atn = self.client.get(reverse('gestion_atenciones'))
+        self.assertContains(resp_atn, 'sgr-combo-menu')
+        self.assertContains(resp_atn, 'data-search="Vecina Lista 11.111.111-1')
+        self.assertContains(resp_atn, 'data-search="JJVV Lista Buscable 65.123.456-7')
+        self.assertContains(resp_atn, 'Gestor Social Senior')
+
+        resp_tubo = self.client.get(reverse('gestion_tubo'))
+        self.assertContains(resp_tubo, 'data-search-select="true"')
+        self.assertContains(resp_tubo, 'JJVV Lista Buscable 65.123.456-7')
+
+        resp_rep = self.client.get(reverse('gestion_reportes'))
+        self.assertContains(resp_rep, '12.345.678-5')

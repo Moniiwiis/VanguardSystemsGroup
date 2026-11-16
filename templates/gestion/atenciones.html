@@ -92,7 +92,8 @@
               <input type="hidden" id="vecino_id" name="vecino_id" value="">
               <datalist id="vecinos-list">
                 {% for v in vecinos %}
-                  <option value="{{ v.nombre }} ({{ v.rut }})" data-id="{{ v.id }}">{% if v.territorio %}{{ v.territorio }}{% elif v.delegacion %}{{ v.delegacion.nombre }}{% else %}Vecino Activo{% endif %}</option>
+                  <option value="{{ v.nombre }} ({{ v.rut }})" data-id="{{ v.id }}"
+                          data-search="{{ v.nombre }} {{ v.rut }} {{ v.sector.nombre|default:'' }} {{ v.territorio|default:'' }} {{ v.telefono|default:'' }} {{ v.delegacion.nombre|default:'' }}">{% if v.sector %}{{ v.sector.nombre }}{% elif v.territorio %}{{ v.territorio }}{% elif v.delegacion %}{{ v.delegacion.nombre }}{% else %}Vecino Activo{% endif %}{% if v.telefono %} · Tel: {{ v.telefono }}{% endif %}</option>
                 {% endfor %}
               </datalist>
             </div>
@@ -124,7 +125,8 @@
               <input type="hidden" id="organizacion_id" name="organizacion_id" value="">
               <datalist id="organizaciones-list">
                 {% for o in organizaciones %}
-                  <option value="{{ o.nombre }} ({{ o.tipo_organizacion }})" data-id="{{ o.id }}" data-tel="{{ o.telefono_contacto|default:'' }}">{{ o.territorio|default:'Organización Activa' }}{% if o.representante_legal %} · Dir: {{ o.representante_legal }}{% endif %}</option>
+                  <option value="{{ o.nombre }} ({{ o.tipo_organizacion }})" data-id="{{ o.id }}" data-tel="{{ o.telefono_contacto|default:'' }}"
+                          data-search="{{ o.nombre }} {{ o.rut|default:'' }} {{ o.tipo_organizacion }} {{ o.sector__nombre|default:o.territorio|default:'' }} {{ o.representante_legal|default:'' }} {{ o.presidente_nombre|default:'' }} {{ o.tesorero_nombre|default:'' }} {{ o.secretario_nombre|default:'' }} {{ o.telefono_contacto|default:'' }}">{{ o.sector__nombre|default:o.territorio|default:'Organización Activa' }}{% if o.rut %} · RUT: {{ o.rut }}{% endif %}{% if o.representante_legal %} · Dir: {{ o.representante_legal }}{% endif %}</option>
                 {% endfor %}
               </datalist>
               {% if not organizaciones %}
@@ -295,7 +297,8 @@
               <input type="hidden" id="responsable_id" name="responsable_id" value="{% for rep in representantes_disponibles %}{% if rep.es_actual %}{{ rep.id }}{% endif %}{% endfor %}" required>
               <datalist id="representantes-list">
                 {% for rep in representantes_disponibles %}
-                  <option value="{{ rep.label }}" data-id="{{ rep.id }}">{% if rep.delegacion_nombre %}{{ rep.delegacion_nombre }}{% else %}Funcionario Asignado{% endif %}</option>
+                  <option value="{{ rep.label }}" data-id="{{ rep.id }}"
+                          data-search="{{ rep.nombre }} {{ rep.username }} {{ rep.cargo|default:'' }} {{ rep.identificador|default:'' }} {{ rep.delegacion_nombre|default:'' }}">{% if rep.cargo %}{{ rep.cargo }} · {% endif %}{{ rep.delegacion_nombre|default:'Funcionario Asignado' }}</option>
                 {% endfor %}
               </datalist>
             </div>
@@ -906,8 +909,9 @@
             <input type="hidden" id="at-edit-responsable" name="responsable_id" value="" required>
             <datalist id="encargados-edicion-list">
               {% for encargado in encargados_edicion %}
-                <option value="{{ encargado.label }}" data-id="{{ encargado.id }}">
-                  {{ encargado.delegacion_nombre|default:'Funcionario Municipal' }}
+                <option value="{{ encargado.label }}" data-id="{{ encargado.id }}"
+                        data-search="{{ encargado.nombre }} {{ encargado.username|default:'' }} {{ encargado.cargo|default:'' }} {{ encargado.identificador|default:'' }} {{ encargado.delegacion_nombre|default:'' }}">
+                  {% if encargado.cargo %}{{ encargado.cargo }} · {% endif %}{{ encargado.delegacion_nombre|default:'Funcionario Municipal' }}
                 </option>
               {% endfor %}
             </datalist>

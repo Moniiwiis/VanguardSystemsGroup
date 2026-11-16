@@ -1484,6 +1484,301 @@
           table.classList.add('sgr-sticky-actions');
         }
       });
+
+      // Listas desplegables buscables (reemplaza datalist nativo y <select data-search-select="true">)
+      const normSearch = (txt) => (txt || '')
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+      const compactSearch = (txt) => normSearch(txt).replace(/[.\-\s_]+/g, '');
+
+      const matchesTokens = (itemSearchNorm, itemSearchCompact, query) => {
+        const qNorm = normSearch(query);
+        if (!qNorm) return true;
+        const tokens = qNorm.split(/\s+/).filter(Boolean);
+        return tokens.every((tok) => {
+          const tokComp = tok.replace(/[.\-\s_]+/g, '');
+          return itemSearchNorm.includes(tok) || (tokComp && itemSearchCompact.includes(tokComp));
+        });
+      };
+
+      let openComboCloser = null;
+      document.addEventListener('click', (ev) => {
+        if (openComboCloser && !ev.target.closest('.sgr-combo-wrap')) {
+          openComboCloser();
+          openComboCloser = null;
+        }
+      });
+
+      const attachSearchCombo = (input, getItems, onSelect, placeholderText) => {
+        if (!input || input.dataset.sgrCombo === '1') return;
+        input.dataset.sgrCombo = '1';
+        input.setAttribute('autocomplete', 'off');
+        if (placeholderText && !input.placeholder) input.placeholder = placeholderText;
+
+        let wrap = input.parentElement;
+        if (!wrap || !wrap.classList.contains('relative')) {
+          wrap = document.createElement('div');
+          wrap.className = 'relative w-full';
+          input.parentNode.insertBefore(wrap, input);
+          wrap.appendChild(input);
+        }
+        wrap.classList.add('sgr-combo-wrap');
+        input.classList.add('pr-14');
+
+        const controls = document.createElement('div');
+        controls.className = 'absolute inset-y-0 right-1.5 flex items-center gap-0.5';
+
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.title = 'Limpiar';
+        clearBtn.className = 'hidden w-6 h-6 rounded-lg text-slate-400 hover:text-[#C41230] hover:bg-red-50 flex items-center justify-center text-xs font-extrabold transition-colors';
+        clearBtn.innerHTML = '&times;';
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.title = 'Ver listado completo';
+        toggleBtn.className = 'w-6 h-6 rounded-lg text-slate-500 hover:text-[#C41230] hover:bg-slate-100 flex items-center justify-center transition-colors';
+        toggleBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+
+        controls.appendChild(clearBtn);
+        controls.appendChild(toggleBtn);
+        wrap.appendChild(controls);
+
+        const menu = document.createElement('div');
+        menu.className = 'sgr-combo-menu hidden absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto z-[80] py-1 divide-y divide-slate-100';
+        wrap.appendChild(menu);
+
+        let isOpen = false;
+        let activeIdx = -1;
+        let currentFiltered = [];
+        let showAllOnOpen = false;
+
+        const syncClearBtn = () => {
+          clearBtn.classList.toggle('hidden', !input.value);
+        };
+
+        const closeMenu = () => {
+          menu.classList.add('hidden');
+          isOpen = false;
+          activeIdx = -1;
+          if (openComboCloser === closeMenu) openComboCloser = null;
+        };
+
+        const renderMenu = (forceAll = false) => {
+          const allItems = getItems().map((it) => {
+            const rawSearch = `${it.label} ${it.meta || ''} ${it.search || ''}`;
+            return {
+              ...it,
+              _norm: normSearch(rawSearch),
+              _comp: compactSearch(rawSearch),
+            };
+          });
+          const q = (forceAll || showAllOnOpen) ? '' : input.value;
+          const matched = allItems.filter((it) => matchesTokens(it._norm, it._comp, q));
+          currentFiltered = matched.slice(0, 120);
+          activeIdx = -1;
+          menu.innerHTML = '';
+
+          if (!currentFiltered.length) {
+            const empty = document.createElement('div');
+            empty.className = 'px-3.5 py-3 text-xs text-slate-400 text-center font-medium';
+            empty.textContent = 'Sin coincidencias para tu búsqueda';
+            menu.appendChild(empty);
+          } else {
+            currentFiltered.forEach((it, idx) => {
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              const isSelected = input.value && it.label === input.value;
+              btn.className = `w-full text-left px-3.5 py-2 transition-colors flex flex-col gap-0.5 ${isSelected ? 'bg-red-50/80 text-[#C41230]' : 'hover:bg-slate-50 text-slate-800'}`;
+              btn.dataset.idx = String(idx);
+
+              const titleEl = document.createElement('span');
+              titleEl.className = `text-xs leading-snug ${isSelected ? 'font-extrabold text-[#C41230]' : 'font-bold text-slate-900'}`;
+              titleEl.textContent = it.label;
+              btn.appendChild(titleEl);
+
+              if (it.meta) {
+                const metaEl = document.createElement('span');
+                metaEl.className = 'text-[10px] text-slate-500 font-medium leading-tight';
+                metaEl.textContent = it.meta;
+                btn.appendChild(metaEl);
+              }
+
+              btn.addEventListener('mousedown', (ev) => {
+                ev.preventDefault();
+                showAllOnOpen = false;
+                onSelect(it);
+                closeMenu();
+                syncClearBtn();
+              });
+              menu.appendChild(btn);
+            });
+
+            if (matched.length > currentFiltered.length) {
+              const more = document.createElement('div');
+              more.className = 'px-3.5 py-1.5 text-[10px] text-slate-400 bg-slate-50 text-center font-semibold';
+              more.textContent = `Mostrando ${currentFiltered.length} de ${matched.length} resultados · escribe para acotar`;
+              menu.appendChild(more);
+            }
+          }
+
+          if (openComboCloser && openComboCloser !== closeMenu) openComboCloser();
+          menu.classList.remove('hidden');
+          isOpen = true;
+          openComboCloser = closeMenu;
+        };
+
+        const highlightItem = (nextIdx) => {
+          const buttons = menu.querySelectorAll('button[data-idx]');
+          if (!buttons.length) return;
+          activeIdx = Math.max(0, Math.min(nextIdx, buttons.length - 1));
+          buttons.forEach((b, i) => {
+            b.classList.toggle('bg-red-50', i === activeIdx);
+          });
+          buttons[activeIdx].scrollIntoView({ block: 'nearest' });
+        };
+
+        input.addEventListener('focus', () => {
+          showAllOnOpen = true;
+          renderMenu(true);
+        });
+        input.addEventListener('click', () => {
+          showAllOnOpen = true;
+          renderMenu(true);
+        });
+        input.addEventListener('input', () => {
+          showAllOnOpen = false;
+          syncClearBtn();
+          renderMenu(false);
+        });
+        input.addEventListener('keydown', (ev) => {
+          if (ev.key === 'ArrowDown') {
+            ev.preventDefault();
+            if (!isOpen) renderMenu(true);
+            else highlightItem(activeIdx + 1);
+          } else if (ev.key === 'ArrowUp') {
+            ev.preventDefault();
+            if (isOpen) highlightItem(activeIdx - 1);
+          } else if (ev.key === 'Enter' && isOpen && activeIdx >= 0 && currentFiltered[activeIdx]) {
+            ev.preventDefault();
+            showAllOnOpen = false;
+            onSelect(currentFiltered[activeIdx]);
+            closeMenu();
+            syncClearBtn();
+          } else if (ev.key === 'Escape' && isOpen) {
+            closeMenu();
+          }
+        });
+
+        toggleBtn.addEventListener('mousedown', (ev) => {
+          ev.preventDefault();
+          if (isOpen) {
+            closeMenu();
+          } else {
+            showAllOnOpen = true;
+            input.focus();
+            renderMenu(true);
+          }
+        });
+
+        clearBtn.addEventListener('mousedown', (ev) => {
+          ev.preventDefault();
+          input.value = '';
+          showAllOnOpen = true;
+          onSelect({ label: '', value: '', cleared: true });
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          syncClearBtn();
+          input.focus();
+          renderMenu(true);
+        });
+
+        syncClearBtn();
+        input._sgrSyncUI = syncClearBtn;
+      };
+
+      // 1) Mejorar todos los inputs vinculados a <datalist>
+      document.querySelectorAll('input[list]').forEach((inp) => {
+        const listId = inp.getAttribute('list');
+        const dl = listId ? document.getElementById(listId) : null;
+        if (!dl) return;
+        inp.dataset.sourceList = listId;
+        inp.removeAttribute('list');
+
+        attachSearchCombo(
+          inp,
+          () => Array.from(dl.querySelectorAll('option')).map((opt) => ({
+            label: opt.value,
+            value: opt.value,
+            meta: (opt.textContent || '').trim(),
+            search: opt.dataset.search || '',
+          })),
+          (it) => {
+            inp.value = it.label || '';
+            inp.dispatchEvent(new Event('input', { bubbles: true }));
+            inp.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        );
+      });
+
+      // 2) Mejorar <select data-search-select="true"> con buscador + lista visible
+      document.querySelectorAll('select[data-search-select="true"]').forEach((sel) => {
+        if (sel.dataset.sgrSelectInit === '1') return;
+        sel.dataset.sgrSelectInit = '1';
+
+        const wrap = document.createElement('div');
+        wrap.className = 'relative w-full';
+        sel.parentNode.insertBefore(wrap, sel);
+
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = sel.className.replace('font-bold', 'font-semibold') || 'w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none';
+        inp.placeholder = sel.dataset.searchPlaceholder || 'Escribe o haz clic para buscar...';
+        if (sel.required) inp.required = true;
+
+        sel.classList.add('hidden');
+        wrap.appendChild(inp);
+        wrap.appendChild(sel);
+
+        const syncInputFromSelect = () => {
+          const cur = sel.options[sel.selectedIndex];
+          inp.value = (cur && cur.value !== '') ? cur.textContent.trim() : '';
+          if (inp._sgrSyncUI) inp._sgrSyncUI();
+        };
+        syncInputFromSelect();
+        sel.addEventListener('change', syncInputFromSelect);
+
+        attachSearchCombo(
+          inp,
+          () => Array.from(sel.options)
+            .filter((opt) => opt.value !== '')
+            .map((opt) => ({
+              label: opt.textContent.trim(),
+              value: opt.value,
+              meta: opt.dataset.meta || '',
+              search: opt.dataset.search || '',
+            })),
+          (it) => {
+            if (it.cleared) {
+              sel.value = '';
+              inp.value = '';
+            } else {
+              sel.value = it.value;
+              inp.value = it.label;
+            }
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        );
+
+        inp.addEventListener('input', () => {
+          if (!inp.value.trim()) {
+            sel.value = '';
+          }
+        });
+      });
     });
   </script>
   {% block extra_js %}{% endblock %}
