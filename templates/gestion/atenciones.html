@@ -43,7 +43,7 @@
   {% if not permisos.es_consultor %}
   <!-- Modal Nueva Atención Ciudadana (Creación mediante Modal) -->
   <div id="modal-nueva-atencion" class="fixed inset-0 !mt-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto space-y-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[90vh] overflow-y-auto space-y-4">
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
         <div>
           <h3 class="text-base font-extrabold text-slate-900">Ingreso de Atención Ciudadana</h3>
@@ -133,139 +133,18 @@
               {% endif %}
             </div>
 
-            <div id="bloque-org-nueva" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Nombre Organización / JJVV <span class="text-[#C41230]">*</span></label>
-                <input type="text" id="nueva_org_nombre" name="nueva_org_nombre" maxlength="200" placeholder="Ej: JJVV El Brillador"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium">
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Tipo de Organización</label>
-                <select id="nueva_org_tipo" name="nueva_org_tipo"
-                        class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
-                  {% for val, lbl in tipos_organizacion %}
-                    <option value="{{ val }}" {% if val == 'Junta de Vecinos' %}selected{% endif %}>{{ lbl }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Contacto Prioritario / Representante</label>
-                <select id="nueva_org_contacto_prioritario" name="nueva_org_contacto_prioritario"
-                        class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
-                  <option value="presidente" selected>Presidente/a</option>
-                  <option value="tesorero">Tesorero/a</option>
-                  <option value="secretario">Secretario/a</option>
-                </select>
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Dirección de Sede</label>
-                <input type="text" id="nueva_org_direccion" name="nueva_org_direccion" maxlength="250" placeholder="Calle / Pasaje y número"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium">
-              </div>
-              <div class="space-y-1 sm:col-span-2">
-                <label class="block text-[11px] font-bold text-slate-700">Sector / Territorio</label>
-                <select id="nueva_org_sector_id" name="nueva_org_sector_id"
-                        class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
-                  <option value="">Delegación general...</option>
-                  {% for s in sectores %}
-                    <option value="{{ s.id }}">{{ s.nombre }}{% if permisos.es_admin and not delegacion_activa %} ({{ s.delegacion.nombre }}){% endif %}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="sm:col-span-2 pt-2 border-t border-blue-200/70 space-y-2.5">
-                <p class="text-[10px] font-extrabold text-blue-900 uppercase tracking-wider">Directiva de la Organización (Presidente, Tesorero, Secretario — Opcional)</p>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <div class="p-2.5 rounded-xl bg-white border border-blue-100 space-y-1.5">
-                    <div class="text-[10px] font-black text-blue-900 uppercase">Presidente/a</div>
-                    <input type="text" name="nueva_org_presidente_nombre" maxlength="150" placeholder="Nombre y Apellido"
-                           class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-[11px] bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-                    <input type="text" name="nueva_org_presidente_rut" data-rut="true" maxlength="12" placeholder="RUT (12.345.678-5)"
-                           class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-[11px] font-mono bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-                    <div class="rut-feedback"></div>
-                    <input type="text" name="nueva_org_presidente_telefono" maxlength="15" placeholder="Teléfono (+56 9 ...)"
-                           class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-[11px] font-mono bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-                    <div class="tel-feedback"></div>
-                    <input type="email" name="nueva_org_presidente_correo" maxlength="254" placeholder="correo@ejemplo.cl"
-                           class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-[11px] bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-                  </div>
-                  <div class="p-2.5 rounded-xl bg-white border border-blue-100 space-y-1.5">
-                    <div class="text-[10px] font-black text-emerald-900 uppercase">Tesorero/a</div>
-                    <input type="text" name="nueva_org_tesorero_nombre" maxlength="150" placeholder="Nombre y Apellido"
-                           class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-[11px] bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-                    <input type="text" name="nueva_org_tesorero_rut" data-rut="true" maxlength="12" placeholder="RUT (12.345.678-5)"
-                           class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-[11px] font-mono bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-                    <div class="rut-feedback"></div>
-                    <input type="text" name="nueva_org_tesorero_telefono" maxlength="15" placeholder="Teléfono (+56 9 ...)"
-                           class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-[11px] font-mono bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-                    <div class="tel-feedback"></div>
-                    <input type="email" name="nueva_org_tesorero_correo" maxlength="254" placeholder="correo@ejemplo.cl"
-                           class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-[11px] bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-                  </div>
-                  <div class="p-2.5 rounded-xl bg-white border border-blue-100 space-y-1.5">
-                    <div class="text-[10px] font-black text-amber-900 uppercase">Secretario/a</div>
-                    <input type="text" name="nueva_org_secretario_nombre" maxlength="150" placeholder="Nombre y Apellido"
-                           class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-[11px] bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-                    <input type="text" name="nueva_org_secretario_rut" data-rut="true" maxlength="12" placeholder="RUT (12.345.678-5)"
-                           class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-[11px] font-mono bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-                    <div class="rut-feedback"></div>
-                    <input type="text" name="nueva_org_secretario_telefono" maxlength="15" placeholder="Teléfono (+56 9 ...)"
-                           class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-[11px] font-mono bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-                    <div class="tel-feedback"></div>
-                    <input type="email" name="nueva_org_secretario_correo" maxlength="254" placeholder="correo@ejemplo.cl"
-                           class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-[11px] bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none">
-                  </div>
-                </div>
-              </div>
+            <div id="bloque-org-nueva" class="hidden pt-1">
+              {% include 'gestion/includes/organizacion_form_fields.html' with p='nueva_org_' idp='nueva_org_' req='' incluir_delegacion_hidden=False %}
             </div>
           </div>
 
-          <!-- Opción 2: Registrar Nuevo Vecino -->
+          <!-- Opción 2: Registrar Nuevo Vecino (idéntico al formulario de Vecinos) -->
           <div id="seccion-vecino-nuevo" class="hidden space-y-3 p-3.5 bg-red-50/40 rounded-2xl border border-red-100">
             <div class="flex items-center gap-2 text-[#C41230] text-xs font-extrabold">
               <i data-lucide="user-plus" class="w-4 h-4"></i>
-              <span>Nuevo vecino (se creará en la base de datos y se vinculará a la solicitud)</span>
+              <span>Registrar Nuevo Vecino (Padrón territorial y Portal Ciudadano)</span>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Nombre completo <span class="text-[#C41230]">*</span></label>
-                <input type="text" id="nuevo_vecino_nombre" name="nuevo_vecino_nombre" placeholder="Ej: Patricia Morales Castro"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium">
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">RUT <span class="text-[#C41230]">*</span></label>
-                <input type="text" id="nuevo_vecino_rut" name="nuevo_vecino_rut" data-rut="true" maxlength="12" placeholder="Ej: 12.345.678-5"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium font-mono">
-                <div class="rut-feedback"></div>
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Teléfono</label>
-                <input type="text" id="nuevo_vecino_telefono" name="nuevo_vecino_telefono" maxlength="15" placeholder="+56 9 1234 5678"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium font-mono">
-                <div class="tel-feedback"></div>
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Dirección</label>
-                <input type="text" id="nuevo_vecino_direccion" name="nuevo_vecino_direccion" placeholder="Calle / Pasaje y número"
-                       class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium">
-              </div>
-              <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-slate-700">Delegación Asignada</label>
-                <input type="text" readonly 
-                       value="{% if delegacion_activa %}{{ delegacion_activa.nombre }}{% elif delegacion_seleccionada %}{{ delegacion_seleccionada.nombre }}{% else %}Delegación Territorial Activa{% endif %}" 
-                       class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none">
-              </div>
-              <div class="space-y-1 sm:col-span-2">
-                <label class="block text-[11px] font-bold text-slate-700">Sector / Territorio <span class="text-[#C41230]">*</span></label>
-                <select id="nuevo_vecino_sector_id" name="nuevo_vecino_sector_id"
-                        class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#C41230] focus:outline-none font-bold">
-                  <option value="">Seleccione sector / territorio...</option>
-                  {% for s in sectores %}
-                    <option value="{{ s.id }}">{{ s.nombre }}{% if permisos.es_admin and not delegacion_activa %} ({{ s.delegacion.nombre }}){% endif %}</option>
-                  {% endfor %}
-                </select>
-                <p class="text-[10px] text-slate-400">Sector territorial perteneciente a la delegación activa</p>
-              </div>
-            </div>
+            {% include 'gestion/includes/vecino_form_fields.html' with p='nuevo_vecino_' idp='nuevo_vecino_' req='' es_admin=permisos.es_admin incluir_delegacion_hidden=False %}
           </div>
         </div>
 
@@ -1141,6 +1020,7 @@
     const inputSolicitante = document.getElementById('solicitante');
     const inputNuevoNombre = document.getElementById('nuevo_vecino_nombre');
     const inputNuevoRut = document.getElementById('nuevo_vecino_rut');
+    const inputNuevoCorreo = document.getElementById('nuevo_vecino_correo');
     const selectNuevoSector = document.getElementById('nuevo_vecino_sector_id');
     const inputOrg = document.getElementById('organizacion_input');
     const chkNuevaOrg = document.getElementById('crear_nueva_org_chk');
@@ -1177,6 +1057,10 @@
     if (inputNuevoRut) {
       if (esNuevoVec) inputNuevoRut.setAttribute('required', 'required');
       else inputNuevoRut.removeAttribute('required');
+    }
+    if (inputNuevoCorreo) {
+      if (esNuevoVec) inputNuevoCorreo.setAttribute('required', 'required');
+      else inputNuevoCorreo.removeAttribute('required');
     }
     if (selectNuevoSector) {
       if (esNuevoVec) selectNuevoSector.setAttribute('required', 'required');

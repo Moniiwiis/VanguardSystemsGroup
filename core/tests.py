@@ -588,6 +588,7 @@ class AtencionCiudadanaEnhancementTests(TestCase):
             'modo_vecino': 'nuevo',
             'nuevo_vecino_nombre': 'Pedro Vecino Nuevo',
             'nuevo_vecino_rut': '12.345.678-5',
+            'nuevo_vecino_correo': 'pedro.vecino@example.test',
             'nuevo_vecino_telefono': '+56987654321',
             'nuevo_vecino_direccion': 'Pasaje Los Aromos 123',
             'tipo_atencion_id': self.tipo.id,
@@ -857,6 +858,7 @@ class SectorYTerritorioTests(TestCase):
         response = self.client.post(reverse('gestion_vecinos'), {
             'nombre': 'Mariana Valenzuela',
             'rut': '18.999.888-0',
+            'correo': 'mariana.valenzuela@example.test',
             'telefono': '+56911223344',
             'direccion': 'Avenida Central 456',
             'delegacion_id': self.delegacion2.id,  # Intento de bypass
@@ -942,6 +944,7 @@ class SectorYTerritorioTests(TestCase):
         response = self.client.post(reverse('gestion_vecinos'), {
             'nombre': 'Vecino en contexto activo',
             'rut': '13.345.678-3',
+            'correo': 'vecino.contexto@example.test',
             'delegacion_id': self.delegacion2.id,
             'sector_id': self.sector1.id,
             'estado': 'Activo',
@@ -958,6 +961,7 @@ class SectorYTerritorioTests(TestCase):
             'modo_vecino': 'nuevo',
             'nuevo_vecino_nombre': 'Rodrigo Tapia',
             'nuevo_vecino_rut': '15.444.333-9',
+            'nuevo_vecino_correo': 'rodrigo.tapia@example.test',
             'nuevo_vecino_telefono': '+56998877665',
             'nuevo_vecino_direccion': 'Calle del Sol 789',
             'nuevo_vecino_sector_id': self.sector1.id,
@@ -1095,6 +1099,7 @@ class SectorYTerritorioTests(TestCase):
         self.client.post(reverse('gestion_vecinos'), {
             'nombre': 'Vecino Dirección Completa',
             'rut': '18.999.888-0',
+            'correo': 'vecino.dir@example.test',
             'direccion': 'Avenida Francisco de Aguirre 123',
             'sector_id': self.sector1.id,
             'estado': 'Activo',
@@ -2191,22 +2196,52 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertContains(resp_get, 'beginEditSession')
         self.assertContains(resp_get, 'restorePreviousValue')
         self.assertContains(resp_get, 'stripPrevFromIME')
+        # Formularios embebidos idénticos a los módulos de Vecinos y Organizaciones (y correo obligatorio en vecino)
+        self.assertContains(resp_get, 'name="nuevo_vecino_correo"')
+        self.assertContains(resp_get, 'name="nuevo_vecino_tipo_gestion_id"')
+        self.assertContains(resp_get, 'name="nuevo_vecino_estado"')
+        self.assertContains(resp_get, 'name="nueva_org_domicilio_legal"')
+        self.assertContains(resp_get, 'name="nueva_org_socios_activos"')
+        self.assertContains(resp_get, 'name="nueva_org_fecha_constitucion"')
+        self.assertContains(resp_get, 'name="nueva_org_numero_registro_pj"')
+        self.assertContains(resp_get, 'name="nueva_org_fecha_inscripcion_registro"')
+        self.assertContains(resp_get, 'name="nueva_org_registro_directiva_numero"')
+        self.assertContains(resp_get, 'name="nueva_org_rut"')
+        self.assertContains(resp_get, 'name="nueva_org_email_contacto"')
+        self.assertContains(resp_get, 'name="nueva_org_directiva_actual"')
+        self.assertContains(resp_get, 'name="nueva_org_observaciones"')
 
-        # POST combinando ambos checkboxes: nuevo vecino + nueva JJVV vinculada
         org_sector = Sector.objects.create(
             nombre='Sector Unificado',
             delegacion=self.delegacion,
             estado='Activo',
         )
+
+        # Rechazar creación de vecino sin correo (tanto en módulo Vecinos como en Atención)
+        resp_vec_no_email = self.client.post(reverse('gestion_vecinos'), {
+            'nombre': 'Vecino Sin Correo',
+            'rut': '19.111.222-4',
+            'sector_id': org_sector.id,
+            'estado': 'Activo',
+        })
+        self.assertRedirects(resp_vec_no_email, reverse('gestion_vecinos'))
+        self.assertFalse(Vecino.objects.filter(rut='19.111.222-4').exists())
+
+        # POST combinando ambos checkboxes: nuevo vecino (con correo obligatorio) + nueva JJVV completa vinculada
         resp_post = self.client.post(reverse('gestion_atenciones'), {
             'chk_nuevo_vecino': '1',
             'chk_representa_org': '1',
             'crear_nueva_org': '1',
             'nuevo_vecino_nombre': 'Rosa Dirigente',
             'nuevo_vecino_rut': '12.345.678-5',
+            'nuevo_vecino_correo': 'rosa.dirigente@example.test',
             'nuevo_vecino_sector_id': org_sector.id,
             'nueva_org_nombre': 'JJVV Unificada',
-            'nueva_org_tipo': 'Junta de Vecinos',
+            'nueva_org_tipo_organizacion': 'Junta de Vecinos',
+            'nueva_org_domicilio_legal': 'Calle Central 100',
+            'nueva_org_socios_activos': '42',
+            'nueva_org_numero_registro_pj': 'PJ-7788',
+            'nueva_org_registro_directiva_numero': 'DIR-990',
             'nueva_org_sector_id': org_sector.id,
             'tipo_atencion_id': self.tipo.id,
             'sub_atencion_id': self.sub.id,
@@ -2221,6 +2256,9 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertIsNotNone(at.organizacion)
         self.assertEqual(at.vecino.nombre, 'Rosa Dirigente')
         self.assertEqual(at.organizacion.nombre, 'JJVV Unificada')
+        self.assertEqual(at.organizacion.socios_activos, 42)
+        self.assertEqual(at.organizacion.numero_registro_pj, 'PJ-7788')
+        self.assertTrue(User.objects.filter(username='12.345.678-5', email='rosa.dirigente@example.test').exists())
 
 
 

@@ -1011,6 +1011,313 @@ def _crear_o_sincronizar_usuario_vecino(vecino, correo='', anterior_rut='', crea
     return user_vec, provisional_password, True
 
 
+def _validar_y_crear_vecino_desde_post(request, del_activa, prefix='', allow_existing=False):
+    """Valida campos del formulario completo de Vecino (exigiendo correo) y crea/sincroniza el registro."""
+    nombre = request.POST.get(f'{prefix}nombre', '').strip()
+    rut = request.POST.get(f'{prefix}rut', '').strip()
+    correo = request.POST.get(f'{prefix}correo', '').strip()
+    direccion = request.POST.get(f'{prefix}direccion', '').strip()
+    telefono = request.POST.get(f'{prefix}telefono', '').strip()
+    sector_id = request.POST.get(f'{prefix}sector_id')
+    tipo_gestion_id = request.POST.get(f'{prefix}tipo_gestion_id')
+    estado = request.POST.get(f'{prefix}estado', 'Activo').strip()
+    if estado not in ('Activo', 'Inactivo'):
+        estado = 'Activo'
+
+    if not nombre or not rut or not correo:
+        return None, None, None, False, "El nombre completo, RUT y correo electrónico del vecino son obligatorios."
+
+    rut_ok, rut_fmt = validar_rut(rut)
+    if not rut_ok:
+        return None, None, None, False, f"RUT de vecino inválido: {rut_fmt}"
+    rut = rut_fmt
+
+    ok, err = validar_largo(nombre, 150, "Nombre Completo")
+    if not ok:
+        return None, None, None, False, err
+    ok, err = validar_largo(correo, 100, "Correo Electrónico")
+    if not ok:
+        return None, None, None, False, err
+    try:
+        validate_email(correo)
+    except ValidationError:
+        return None, None, None, False, "El correo electrónico ingresado para el vecino no es válido."
+
+    ok, err = validar_direccion(direccion, "Dirección", 200)
+    if not ok:
+        return None, None, None, False, err
+    ok, err = validar_telefono_chileno(telefono)
+    if not ok:
+        return None, None, None, False, err
+    if telefono:
+        telefono = formatear_telefono_chileno(telefono)
+
+    sector_obj = None
+    if sector_id and str(sector_id).isdigit():
+        sec_qs = Sector.objects.filter(id=int(sector_id), estado='Activo')
+        if del_activa:
+            sec_qs = sec_qs.filter(delegacion=del_activa)
+        sector_obj = sec_qs.first()
+
+    tg_id_clean = int(tipo_gestion_id) if tipo_gestion_id and str(tipo_gestion_id).isdigit() and TipoGestion.objects.filter(id=int(tipo_gestion_id)).exists() else None
+    territorio = sector_obj.nombre if sector_obj else (request.POST.get('territorio', '').strip() or (del_activa.nombre if del_activa else ''))
+
+    vecino_existente = Vecino.objects.filter(rut=rut).first()
+    if vecino_existente:
+        if not allow_existing:
+            return None, None, None, False, f"El RUT {rut} ya se encuentra registrado en el padrón vecinal."
+        if not _vecinos_activos_para_delegacion(del_activa).filter(id=vecino_existente.id).exists():
+            return None, None, None, False, "Ese RUT ya está registrado en otra delegación."
+
+        func_actual = _buscar_func_vecino(vecino_existente.rut)
+        uid_actual = func_actual.user_id if func_actual else None
+        if User.objects.filter(email__iexact=correo).exclude(id=uid_actual).exists():
+            return None, None, None, False, "Ese correo electrónico ya se encuentra asociado a otra cuenta."
+
+        actualizado = False
+        if nombre and vecino_existente.nombre != nombre:
+            vecino_existente.nombre = nombre
+            actualizado = True
+        if telefono and not vecino_existente.telefono:
+            vecino_existente.telefono = telefono
+            actualizado = True
+        if direccion and not vecino_existente.direccion:
+            vecino_existente.direccion = direccion
+            actualizado = True
+        if del_activa and not vecino_existente.delegacion:
+            vecino_existente.delegacion = del_activa
+            actualizado = True
+        if sector_obj and not vecino_existente.sector:
+            vecino_existente.sector = sector_obj
+            vecino_existente.territorio = sector_obj.nombre
+            actualizado = True
+        if tg_id_clean and not vecino_existente.tipo_gestion_id:
+            vecino_existente.tipo_gestion_id = tg_id_clean
+            actualizado = True
+        if actualizado:
+            vecino_existente.save()
+
+        user_vec, prov_pwd, creado = _crear_o_sincronizar_usuario_vecino(
+            vecino_existente, correo=correo, crear=True, actualizar_correo=True
+        )
+        correo_enviado = False
+        if creado and prov_pwd and user_vec:
+            try:
+                _send_welcome_provisional_password(
+                    user=user_vec,
+                    provisional_password=prov_pwd,
+                    rol_nombre='Cliente (Portal Ciudadano)',
+                    delegacion_nombre=del_activa.nombre if del_activa else 'Comuna',
+                )
+                correo_enviado = True
+            except (OSError, SMTPException, BadHeaderError):
+                logger.exception("No se pudo enviar correo de bienvenida al vecino existente sincronizado.")
+        return vecino_existente, user_vec, prov_pwd, correo_enviado, None
+
+    if User.objects.filter(email__iexact=correo).exists():
+        return None, None, None, False, "Ese correo electrónico ya se encuentra asociado a otra cuenta."
+
+    nuevo_v = Vecino.objects.create(
+        nombre=nombre,
+        rut=rut,
+        direccion=direccion,
+        telefono=telefono,
+        delegacion=del_activa,
+        sector=sector_obj,
+        territorio=territorio,
+        tipo_gestion_id=tg_id_clean,
+        estado=estado,
+    )
+    user_vec, provisional_password, _ = _crear_o_sincronizar_usuario_vecino(
+        nuevo_v, correo=correo, crear=True, actualizar_correo=True
+    )
+
+    del_id_ws = del_activa.id if del_activa else "global"
+    def notificar_ws_vecino():
+        publish_module_changed("vecinos", del_id_ws, "create", nuevo_v.id)
+    transaction.on_commit(notificar_ws_vecino)
+
+    correo_enviado = False
+    if correo and user_vec and provisional_password:
+        try:
+            _send_welcome_provisional_password(
+                user=user_vec,
+                provisional_password=provisional_password,
+                rol_nombre='Cliente (Portal Ciudadano)',
+                delegacion_nombre=del_activa.nombre if del_activa else 'Comuna',
+            )
+            correo_enviado = True
+        except (OSError, SMTPException, BadHeaderError):
+            logger.exception("No se pudo enviar correo de bienvenida al vecino creado.")
+
+    return nuevo_v, user_vec, provisional_password, correo_enviado, None
+
+
+def _validar_y_crear_organizacion_desde_post(request, del_activa, prefix='', allow_existing=False):
+    """Valida campos del formulario completo de JJVV/Organización y crea (o reutiliza) el registro."""
+    nombre = request.POST.get(f'{prefix}nombre', '').strip()
+    tipo_org = (
+        request.POST.get(f'{prefix}tipo_organizacion', '').strip()
+        or request.POST.get(f'{prefix}tipo', '').strip()
+        or 'Junta de Vecinos'
+    )
+    domicilio = (
+        request.POST.get(f'{prefix}domicilio_legal', '').strip()
+        or request.POST.get(f'{prefix}direccion', '').strip()
+    )
+    rut_org = request.POST.get(f'{prefix}rut', '').strip()
+    personalidad_jur = request.POST.get(f'{prefix}personalidad_juridica', '').strip()
+    representante = (
+        request.POST.get(f'{prefix}representante_legal', '').strip()
+        or request.POST.get(f'{prefix}representante', '').strip()
+    )
+    tel_contacto = (
+        request.POST.get(f'{prefix}telefono_contacto', '').strip()
+        or request.POST.get(f'{prefix}telefono', '').strip()
+    )
+    email_contacto = request.POST.get(f'{prefix}email_contacto', '').strip()
+    direccion_sede = request.POST.get(f'{prefix}direccion_sede', '').strip()
+    directiva = request.POST.get(f'{prefix}directiva_actual', '').strip()
+    observaciones = request.POST.get(f'{prefix}observaciones', '').strip()
+    sector_id = request.POST.get(f'{prefix}sector_id')
+    socios_activos = request.POST.get(f'{prefix}socios_activos', '0').strip()
+    f_const = request.POST.get(f'{prefix}fecha_constitucion', '').strip()
+    num_pj = request.POST.get(f'{prefix}numero_registro_pj', '').strip()
+    f_insc = request.POST.get(f'{prefix}fecha_inscripcion_registro', '').strip()
+    reg_dir = request.POST.get(f'{prefix}registro_directiva_numero', '').strip()
+    estado = request.POST.get(f'{prefix}estado', 'Activa').strip()
+    if estado not in ('Activa', 'En tramite', 'Inactiva'):
+        estado = 'Activa'
+
+    if not nombre:
+        return None, "El nombre de la organización es obligatorio."
+
+    ok, err = validar_largo(nombre, 200, "Nombre de la Organización")
+    if not ok: return None, err
+    ok, err = validar_direccion(domicilio, "Domicilio Legal", 250)
+    if not ok: return None, err
+    ok, err = validar_direccion(direccion_sede, "Dirección Sede", 250)
+    if not ok: return None, err
+    ok, err = validar_largo(rut_org, 20, "RUT Organización")
+    if not ok: return None, err
+    if rut_org:
+        ok_rut, res_rut = validar_rut(rut_org)
+        if not ok_rut:
+            return None, f"RUT de la organización inválido: {res_rut}"
+        rut_org = res_rut
+    ok, err = validar_largo(representante, 150, "Representante Legal")
+    if not ok: return None, err
+    ok, err = validar_largo(tel_contacto, 20, "Teléfono Contacto")
+    if not ok: return None, err
+    if tel_contacto:
+        ok, err = validar_telefono_chileno(tel_contacto)
+        if not ok: return None, err
+        tel_contacto = formatear_telefono_chileno(tel_contacto)
+    ok, err = validar_largo(num_pj, 50, "N° Reg. Personalidad Jurídica")
+    if not ok: return None, err
+    ok, err = validar_largo(reg_dir, 50, "Registro Directiva N°")
+    if not ok: return None, err
+    ok, err = validar_largo(directiva, 1000, "Directiva Actual")
+    if not ok: return None, err
+    ok, err = validar_largo(observaciones, 1000, "Observaciones")
+    if not ok: return None, err
+    if email_contacto:
+        ok, err = validar_largo(email_contacto, 100, "Correo Institucional")
+        if not ok: return None, err
+        try:
+            validate_email(email_contacto)
+        except ValidationError:
+            return None, "El correo electrónico institucional de la organización no es válido."
+
+    directiva_data, err_dir = _extraer_y_validar_directiva(request, field_prefix=prefix)
+    if err_dir:
+        return None, err_dir
+
+    tipos_org_validos = {t[0] for t in OrganizacionComunitaria.TIPO_CHOICES}
+    if tipo_org not in tipos_org_validos:
+        tipo_org = 'Junta de Vecinos'
+
+    sector_obj = None
+    if sector_id and str(sector_id).isdigit():
+        sec_qs = Sector.objects.filter(id=int(sector_id), estado='Activo')
+        if del_activa:
+            sec_qs = sec_qs.filter(delegacion=del_activa)
+        sector_obj = sec_qs.first()
+
+    territorio = sector_obj.nombre if sector_obj else (del_activa.nombre if del_activa else 'General')
+
+    socios_num = max(0, int(socios_activos)) if socios_activos.isdigit() else 0
+
+    fecha_constitucion_val = None
+    if f_const:
+        try:
+            fecha_constitucion_val = datetime.date.fromisoformat(f_const)
+        except ValueError:
+            pass
+
+    fecha_inscripcion_val = None
+    if f_insc:
+        try:
+            fecha_inscripcion_val = datetime.date.fromisoformat(f_insc)
+        except ValueError:
+            return None, "La fecha de inscripción en registro no tiene un formato válido."
+        if fecha_inscripcion_val < timezone.localdate():
+            return None, "La fecha de inscripción en registro no puede ser anterior a la fecha actual."
+
+    if not domicilio and direccion_sede:
+        domicilio = direccion_sede
+    if not num_pj and personalidad_jur:
+        num_pj = personalidad_jur
+
+    prioridad_raw = request.POST.get(f'{prefix}contacto_prioritario', 'presidente').strip()
+    prioridad_val, rep_val, tel_val, email_val = _resolver_contacto_prioritario_org(
+        directiva_data,
+        prioridad=prioridad_raw,
+        fallback_rep=representante,
+        fallback_tel=tel_contacto,
+        fallback_email=email_contacto,
+    )
+
+    if allow_existing:
+        org_existente = _organizaciones_activas_para_delegacion(del_activa).filter(
+            nombre__iexact=nombre
+        ).first()
+        if org_existente:
+            return org_existente, None
+
+    nueva_org = OrganizacionComunitaria.objects.create(
+        nombre=nombre,
+        tipo_organizacion=tipo_org,
+        domicilio_legal=domicilio,
+        delegacion=del_activa,
+        sector=sector_obj,
+        territorio=territorio,
+        socios_activos=socios_num,
+        fecha_constitucion=fecha_constitucion_val,
+        numero_registro_pj=num_pj,
+        fecha_inscripcion_registro=fecha_inscripcion_val,
+        registro_directiva_numero=reg_dir,
+        estado=estado,
+        rut=rut_org or None,
+        personalidad_juridica=personalidad_jur or num_pj or None,
+        contacto_prioritario=prioridad_val,
+        representante_legal=rep_val,
+        telefono_contacto=tel_val,
+        email_contacto=email_val,
+        direccion_sede=direccion_sede or domicilio or None,
+        directiva_actual=directiva or None,
+        observaciones=observaciones or None,
+        **directiva_data,
+    )
+
+    del_id_ws = del_activa.id if del_activa else "global"
+    def notificar_ws_org():
+        publish_module_changed("organizaciones", del_id_ws, "create", nueva_org.id)
+    transaction.on_commit(notificar_ws_org)
+
+    return nueva_org, None
+
+
 # --- 3. CRUD USUARIOS (Wireframe C4) ---
 
 @login_required
@@ -2091,9 +2398,6 @@ def gestion_atenciones(request):
         # Manejo de vecino u organización comunitaria (JJVV / ONG / Club, etc.)
         nuevo_nombre = request.POST.get('nuevo_vecino_nombre', '').strip()
         nuevo_rut = request.POST.get('nuevo_vecino_rut', '').strip()
-        nuevo_tel = request.POST.get('nuevo_vecino_telefono', '').strip()
-        nuevo_dir = request.POST.get('nuevo_vecino_direccion', '').strip()
-        nuevo_sec_id = request.POST.get('nuevo_vecino_sector_id')
 
         chk_nuevo_vecino = request.POST.get('chk_nuevo_vecino', '').strip() == '1'
         chk_representa_org = request.POST.get('chk_representa_org', '').strip() == '1'
@@ -2106,70 +2410,12 @@ def gestion_atenciones(request):
             organizacion_id = request.POST.get('organizacion_id', '').strip()
             crear_nueva_org = request.POST.get('crear_nueva_org', '').strip() == '1'
             if crear_nueva_org:
-                nueva_org_nombre = request.POST.get('nueva_org_nombre', '').strip()
-                nueva_org_tipo = request.POST.get('nueva_org_tipo', 'Junta de Vecinos').strip()
-                nueva_org_rep = request.POST.get('nueva_org_representante', '').strip()
-                nueva_org_tel = request.POST.get('nueva_org_telefono', '').strip()
-                nueva_org_dir = request.POST.get('nueva_org_direccion', '').strip()
-                nueva_org_sec_id = request.POST.get('nueva_org_sector_id')
-
-                if not nueva_org_nombre:
-                    messages.error(request, "Para registrar una nueva JJVV u organización debe ingresar su nombre.")
-                    return redirect('gestion_atenciones')
-
-                ok, err = validar_largo(nueva_org_nombre, 200, "Nombre de la organización")
-                if not ok: messages.error(request, err); return redirect('gestion_atenciones')
-                ok, err = validar_largo(nueva_org_rep, 150, "Representante legal / dirigente")
-                if not ok: messages.error(request, err); return redirect('gestion_atenciones')
-                ok, err = validar_direccion(nueva_org_dir, "Dirección de sede", 250)
-                if not ok: messages.error(request, err); return redirect('gestion_atenciones')
-                ok, err = validar_telefono_chileno(nueva_org_tel)
-                if not ok: messages.error(request, err); return redirect('gestion_atenciones')
-                if nueva_org_tel:
-                    nueva_org_tel = formatear_telefono_chileno(nueva_org_tel)
-
-                tipos_org_validos = {t[0] for t in OrganizacionComunitaria.TIPO_CHOICES}
-                if nueva_org_tipo not in tipos_org_validos:
-                    nueva_org_tipo = 'Junta de Vecinos'
-
-                directiva_org, err_dir_org = _extraer_y_validar_directiva(request, field_prefix='nueva_org_')
-                if err_dir_org:
-                    messages.error(request, err_dir_org)
-                    return redirect('gestion_atenciones')
-
-                prioridad_org = request.POST.get('nueva_org_contacto_prioritario', 'presidente').strip()
-                prioridad_org, rep_org_val, tel_org_val, email_org_val = _resolver_contacto_prioritario_org(
-                    directiva_org,
-                    prioridad=prioridad_org,
-                    fallback_rep=nueva_org_rep,
-                    fallback_tel=nueva_org_tel,
+                organizacion_obj, err_org = _validar_y_crear_organizacion_desde_post(
+                    request, del_activa, prefix='nueva_org_', allow_existing=True
                 )
-
-                sector_org = None
-                if nueva_org_sec_id and nueva_org_sec_id.isdigit():
-                    sector_org = Sector.objects.filter(
-                        id=int(nueva_org_sec_id), estado='Activo', delegacion=del_activa
-                    ).first()
-                territorio_org = sector_org.nombre if sector_org else (del_activa.nombre if del_activa else 'General')
-
-                organizacion_obj = _organizaciones_activas_para_delegacion(del_activa).filter(
-                    nombre__iexact=nueva_org_nombre
-                ).first()
-                if not organizacion_obj:
-                    organizacion_obj = OrganizacionComunitaria.objects.create(
-                        nombre=nueva_org_nombre,
-                        tipo_organizacion=nueva_org_tipo,
-                        delegacion=del_activa,
-                        sector=sector_org,
-                        territorio=territorio_org,
-                        contacto_prioritario=prioridad_org,
-                        representante_legal=rep_org_val,
-                        telefono_contacto=tel_org_val,
-                        email_contacto=email_org_val,
-                        direccion_sede=nueva_org_dir,
-                        estado='Activa',
-                        **directiva_org,
-                    )
+                if err_org:
+                    messages.error(request, err_org)
+                    return redirect('gestion_atenciones')
             elif organizacion_id and organizacion_id.isdigit():
                 organizacion_obj = _organizaciones_activas_para_delegacion(del_activa).filter(
                     id=int(organizacion_id)
@@ -2182,71 +2428,12 @@ def gestion_atenciones(request):
                 return redirect('gestion_atenciones')
 
         if es_modo_nuevo_vec:
-            if not nuevo_nombre or not nuevo_rut:
-                messages.error(request, "Para registrar un nuevo vecino debe ingresar al menos el Nombre completo y el RUT.")
+            vecino_obj, _, _, _, err_vec = _validar_y_crear_vecino_desde_post(
+                request, del_activa, prefix='nuevo_vecino_', allow_existing=True
+            )
+            if err_vec:
+                messages.error(request, err_vec)
                 return redirect('gestion_atenciones')
-
-            # Validación matemática rigurosa de RUT chileno (Módulo 11)
-            rut_valido, rut_formateado_o_err = validar_rut(nuevo_rut)
-            if not rut_valido:
-                messages.error(request, f"RUT de nuevo vecino inválido: {rut_formateado_o_err}")
-                return redirect('gestion_atenciones')
-            nuevo_rut = rut_formateado_o_err
-
-            ok, err = validar_largo(nuevo_nombre, 150, "Nombre completo")
-            if not ok: messages.error(request, err); return redirect('gestion_atenciones')
-            ok, err = validar_direccion(nuevo_dir, "Dirección", 200)
-            if not ok: messages.error(request, err); return redirect('gestion_atenciones')
-            ok, err = validar_telefono_chileno(nuevo_tel)
-            if not ok: messages.error(request, err); return redirect('gestion_atenciones')
-            if nuevo_tel:
-                nuevo_tel = formatear_telefono_chileno(nuevo_tel)
-
-            sector_obj = None
-            if nuevo_sec_id and nuevo_sec_id.isdigit():
-                sec_filter = Sector.objects.filter(id=int(nuevo_sec_id), estado='Activo')
-                if del_activa:
-                    sec_filter = sec_filter.filter(delegacion=del_activa)
-                sector_obj = sec_filter.first()
-
-            territorio_val = sector_obj.nombre if sector_obj else (del_activa.nombre if del_activa else 'General')
-
-            # Buscar si ya existe por RUT o crearlo en el padrón
-            vecino_obj = Vecino.objects.filter(rut=nuevo_rut).first()
-            if not vecino_obj:
-                vecino_obj = Vecino.objects.create(
-                    nombre=nuevo_nombre,
-                    rut=nuevo_rut,
-                    telefono=nuevo_tel,
-                    direccion=nuevo_dir,
-                    delegacion=del_activa,
-                    sector=sector_obj,
-                    territorio=territorio_val,
-                    estado='Activo'
-                )
-            else:
-                if not _vecinos_activos_para_delegacion(del_activa).filter(id=vecino_obj.id).exists():
-                    messages.error(request, "Ese RUT ya está registrado en otra delegación.")
-                    return redirect('gestion_atenciones')
-                actualizado = False
-                if nuevo_nombre and vecino_obj.nombre != nuevo_nombre:
-                    vecino_obj.nombre = nuevo_nombre
-                    actualizado = True
-                if nuevo_tel and not vecino_obj.telefono:
-                    vecino_obj.telefono = nuevo_tel
-                    actualizado = True
-                if nuevo_dir and not vecino_obj.direccion:
-                    vecino_obj.direccion = nuevo_dir
-                    actualizado = True
-                if del_activa and not vecino_obj.delegacion:
-                    vecino_obj.delegacion = del_activa
-                    actualizado = True
-                if sector_obj and not vecino_obj.sector:
-                    vecino_obj.sector = sector_obj
-                    vecino_obj.territorio = sector_obj.nombre
-                    actualizado = True
-                if actualizado:
-                    vecino_obj.save()
             solicitante = f"{vecino_obj.nombre} ({vecino_obj.rut})"
         elif vecino_id and vecino_id.isdigit():
             vecino_obj = _vecinos_activos_para_delegacion(del_activa).filter(
@@ -2598,6 +2785,9 @@ def gestion_atenciones(request):
         'vecinos': vecinos_catalogo,
         'organizaciones': organizaciones_catalogo,
         'tipos_organizacion': OrganizacionComunitaria.TIPO_CHOICES,
+        'tipos_organizaciones': [t[0] for t in OrganizacionComunitaria.TIPO_CHOICES],
+        'tipos_gestion': TipoGestion.objects.all(),
+        'hoy_iso': timezone.localdate().isoformat(),
         'abrir_tubo': request.GET.get('abrir_tubo') == '1' and bool(del_activa),
         'sectores': sectores_disponibles,
         'representantes_disponibles': representantes_disponibles,
@@ -3075,115 +3265,30 @@ def gestion_vecinos(request):
         if not ctx['permisos'].get('puede_crear', True):
             messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para realizar esta acción.")
             return redirect('gestion_vecinos')
-        nombre = request.POST.get('nombre', '').strip()
-        rut = request.POST.get('rut', '').strip()
-        correo = request.POST.get('correo', '').strip()
-        direccion = request.POST.get('direccion', '').strip()
-        telefono = request.POST.get('telefono', '').strip()
-        sector_id = request.POST.get('sector_id')
-        tipo_gestion_id = request.POST.get('tipo_gestion_id')
-        estado = request.POST.get('estado', 'Activo')
-
         if not del_activa:
             messages.error(request, "Selecciona una delegación activa antes de registrar un vecino.")
             return redirect('gestion_vecinos')
 
-        if not nombre or not rut:
-            messages.error(request, "El nombre y RUT son obligatorios.")
-            return redirect('gestion_vecinos')
-
-        # Validación matemática rigurosa de RUT chileno (Módulo 11)
-        rut_ok, rut_fmt = validar_rut(rut)
-        if not rut_ok:
-            messages.error(request, f"RUT inválido: {rut_fmt}")
-            return redirect('gestion_vecinos')
-        rut = rut_fmt
-
-        # Validaciones de límites de caracteres (Poner límite de caracteres en todo)
-        ok, err = validar_largo(nombre, 150, "Nombre Completo")
-        if not ok: messages.error(request, err); return redirect('gestion_vecinos')
-        if correo:
-            ok, err = validar_largo(correo, 100, "Correo Electrónico")
-            if not ok: messages.error(request, err); return redirect('gestion_vecinos')
-            try:
-                validate_email(correo)
-            except ValidationError:
-                messages.error(request, "El correo electrónico ingresado no es válido.")
-                return redirect('gestion_vecinos')
-            if User.objects.filter(email__iexact=correo).exists():
-                messages.error(request, "Ese correo electrónico ya se encuentra asociado a otra cuenta.")
-                return redirect('gestion_vecinos')
-        ok, err = validar_direccion(direccion, "Dirección", 200)
-        if not ok: messages.error(request, err); return redirect('gestion_vecinos')
-        ok, err = validar_telefono_chileno(telefono)
-        if not ok: messages.error(request, err); return redirect('gestion_vecinos')
-        if telefono:
-            telefono = formatear_telefono_chileno(telefono)
-
-        # Control de unicidad de RUT en padrón
-        if Vecino.objects.filter(rut=rut).exists():
-            messages.error(request, f"El RUT {rut} ya se encuentra registrado en el padrón vecinal.")
-            return redirect('gestion_vecinos')
-
-        # Los vecinos nuevos siempre se registran en el contexto territorial activo.
-        del_obj = del_activa
-
-        sector_obj = None
-        if sector_id and sector_id.isdigit():
-            sec_qs = Sector.objects.filter(id=int(sector_id), estado='Activo')
-            if del_obj:
-                sec_qs = sec_qs.filter(delegacion=del_obj)
-            sector_obj = sec_qs.first()
-
-        territorio = sector_obj.nombre if sector_obj else (request.POST.get('territorio', '').strip() or (del_obj.nombre if del_obj else ''))
-
-        nuevo_v = Vecino.objects.create(
-            nombre=nombre,
-            rut=rut,
-            direccion=direccion,
-            telefono=telefono,
-            delegacion=del_obj,
-            sector=sector_obj,
-            territorio=territorio,
-            tipo_gestion_id=tipo_gestion_id if tipo_gestion_id else None,
-            estado=estado
+        nuevo_v, user_vec, provisional_password, correo_enviado, err_vec = _validar_y_crear_vecino_desde_post(
+            request, del_activa, prefix='', allow_existing=False
         )
+        if err_vec:
+            messages.error(request, err_vec)
+            return redirect('gestion_vecinos')
 
-        user_vec, provisional_password, _ = _crear_o_sincronizar_usuario_vecino(
-            nuevo_v, correo=correo, crear=True, actualizar_correo=bool(correo)
-        )
-
-        # Notificación WebSocket en tiempo real
-        del_id_ws = del_obj.id if del_obj else "global"
-        def notificar_ws_vecino():
-            publish_module_changed("vecinos", del_id_ws, "create", nuevo_v.id)
-        transaction.on_commit(notificar_ws_vecino)
-
-        correo_enviado = False
-        if correo and user_vec and provisional_password:
-            try:
-                _send_welcome_provisional_password(
-                    user=user_vec,
-                    provisional_password=provisional_password,
-                    rol_nombre='Cliente (Portal Ciudadano)',
-                    delegacion_nombre=del_obj.nombre if del_obj else 'Comuna',
-                )
-                correo_enviado = True
-            except (OSError, SMTPException, BadHeaderError):
-                logger.exception("No se pudo enviar correo de bienvenida al vecino creado.")
-
+        correo_reg = user_vec.email if user_vec else ''
         if correo_enviado:
             messages.success(
                 request,
-                f"Vecino/a '{nombre}' ({rut}) registrado con cuenta de acceso '{user_vec.username}'. Credenciales enviadas a '{correo}'.",
+                f"Vecino/a '{nuevo_v.nombre}' ({nuevo_v.rut}) registrado con cuenta de acceso '{user_vec.username}'. Credenciales enviadas a '{correo_reg}'.",
             )
         elif user_vec and provisional_password:
             messages.success(
                 request,
-                f"Vecino/a '{nombre}' ({rut}) registrado exitosamente. Usuario Portal Ciudadano: '{user_vec.username}' · Clave provisional: {provisional_password}",
+                f"Vecino/a '{nuevo_v.nombre}' ({nuevo_v.rut}) registrado exitosamente. Usuario Portal Ciudadano: '{user_vec.username}' · Clave provisional: {provisional_password}",
             )
         else:
-            messages.success(request, f"Vecino/a '{nombre}' ({rut}) registrado exitosamente en {del_obj.nombre if del_obj else 'el padrón'}.")
+            messages.success(request, f"Vecino/a '{nuevo_v.nombre}' ({nuevo_v.rut}) registrado exitosamente en {del_activa.nombre if del_activa else 'el padrón'}.")
         return redirect('gestion_vecinos')
 
     q = request.GET.get('q', '').strip()
@@ -3355,6 +3460,9 @@ def gestion_vecinos_editar(request, vecino_id):
 
         ok, err = validar_largo(nuevo_nombre, 150, "Nombre Completo")
         if not ok: messages.error(request, err); return redirect('gestion_vecinos')
+        if correo_presente and not nuevo_correo:
+            messages.error(request, "El correo electrónico del vecino es obligatorio.")
+            return redirect('gestion_vecinos')
         if correo_presente and nuevo_correo:
             ok, err = validar_largo(nuevo_correo, 100, "Correo Electrónico")
             if not ok: messages.error(request, err); return redirect('gestion_vecinos')
@@ -4249,151 +4357,18 @@ def gestion_organizaciones(request):
         if not ctx['permisos'].get('puede_crear', True):
             messages.error(request, "Acceso denegado: Tu perfil no tiene permisos para realizar esta acción.")
             return redirect('gestion_organizaciones')
-        nombre = request.POST.get('nombre', '').strip()
-        tipo_org = request.POST.get('tipo_organizacion', 'Junta de Vecinos').strip()
-        domicilio = request.POST.get('domicilio_legal', '').strip()
-        # Nuevos campos del template
-        rut_org = request.POST.get('rut', '').strip()
-        personalidad_jur = request.POST.get('personalidad_juridica', '').strip()
-        representante = request.POST.get('representante_legal', '').strip()
-        tel_contacto = request.POST.get('telefono_contacto', '').strip()
-        email_contacto = request.POST.get('email_contacto', '').strip()
-        direccion_sede = request.POST.get('direccion_sede', '').strip()
-        directiva = request.POST.get('directiva_actual', '').strip()
-        observaciones = request.POST.get('observaciones', '').strip()
-        delegacion_id_post = request.POST.get('delegacion_id')
-        sector_id = request.POST.get('sector_id')
-        socios_activos = request.POST.get('socios_activos', '0').strip()
-        f_const = request.POST.get('fecha_constitucion', '').strip()
-        num_pj = request.POST.get('numero_registro_pj', '').strip()
-        f_insc = request.POST.get('fecha_inscripcion_registro', '').strip()
-        reg_dir = request.POST.get('registro_directiva_numero', '').strip()
-        estado = request.POST.get('estado', 'Activa')
-
-        # Determinar delegación a usar: obligatoriamente la delegación activa (sin cambio manual)
         if not del_activa:
             messages.error(request, "Selecciona una delegación activa antes de registrar una organización.")
             return redirect('gestion_organizaciones')
-        del_a_usar = del_activa
 
-        if not nombre:
-            messages.error(request, "El nombre de la organización es obligatorio.")
+        nueva_org, err_org = _validar_y_crear_organizacion_desde_post(
+            request, del_activa, prefix='', allow_existing=False
+        )
+        if err_org:
+            messages.error(request, err_org)
             return redirect('gestion_organizaciones')
 
-        # Validaciones de longitud en servidor (Poner límite de caracteres en todo)
-        ok, err = validar_largo(nombre, 200, "Nombre de la Organización")
-        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        ok, err = validar_direccion(domicilio, "Domicilio Legal", 250)
-        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        ok, err = validar_direccion(direccion_sede, "Dirección Sede", 250)
-        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        ok, err = validar_largo(rut_org, 20, "RUT Organización")
-        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        if rut_org:
-            ok_rut, res_rut = validar_rut(rut_org)
-            if not ok_rut:
-                messages.error(request, f"RUT de la organización inválido: {res_rut}")
-                return redirect('gestion_organizaciones')
-            rut_org = res_rut
-        ok, err = validar_largo(representante, 150, "Representante Legal")
-        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        ok, err = validar_largo(tel_contacto, 20, "Teléfono Contacto")
-        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        if tel_contacto:
-            ok, err = validar_telefono_chileno(tel_contacto)
-            if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-            tel_contacto = formatear_telefono_chileno(tel_contacto)
-        ok, err = validar_largo(num_pj, 50, "N° Reg. Personalidad Jurídica")
-        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        ok, err = validar_largo(reg_dir, 50, "Registro Directiva N°")
-        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        ok, err = validar_largo(directiva, 1000, "Directiva Actual")
-        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-        ok, err = validar_largo(observaciones, 1000, "Observaciones")
-        if not ok: messages.error(request, err); return redirect('gestion_organizaciones')
-
-        directiva_data, err_dir = _extraer_y_validar_directiva(request)
-        if err_dir:
-            messages.error(request, err_dir)
-            return redirect('gestion_organizaciones')
-
-        sector_obj = None
-        if sector_id and sector_id.isdigit():
-            sec_qs = Sector.objects.filter(id=int(sector_id), estado='Activo')
-            if del_a_usar:
-                sec_qs = sec_qs.filter(delegacion=del_a_usar)
-            sector_obj = sec_qs.first()
-
-        territorio = sector_obj.nombre if sector_obj else (del_a_usar.nombre if del_a_usar else '')
-
-        socios_num = 0
-        if socios_activos.isdigit():
-            socios_num = max(0, int(socios_activos))
-
-        fecha_constitucion_val = None
-        if f_const:
-            try:
-                fecha_constitucion_val = datetime.date.fromisoformat(f_const)
-            except ValueError:
-                pass
-
-        fecha_inscripcion_val = None
-        if f_insc:
-            try:
-                fecha_inscripcion_val = datetime.date.fromisoformat(f_insc)
-            except ValueError:
-                messages.error(request, "La fecha de inscripción en registro no tiene un formato válido.")
-                return redirect('gestion_organizaciones')
-            if fecha_inscripcion_val < timezone.localdate():
-                messages.error(request, "La fecha de inscripción en registro no puede ser anterior a la fecha actual.")
-                return redirect('gestion_organizaciones')
-
-        if not domicilio and direccion_sede:
-            domicilio = direccion_sede
-        if not num_pj and personalidad_jur:
-            num_pj = personalidad_jur
-
-        prioridad_raw = request.POST.get('contacto_prioritario', 'presidente').strip()
-        prioridad_val, rep_val, tel_val, email_val = _resolver_contacto_prioritario_org(
-            directiva_data,
-            prioridad=prioridad_raw,
-            fallback_rep=representante,
-            fallback_tel=tel_contacto,
-            fallback_email=email_contacto,
-        )
-
-        nueva_org = OrganizacionComunitaria.objects.create(
-            nombre=nombre,
-            tipo_organizacion=tipo_org,
-            domicilio_legal=domicilio,
-            delegacion=del_a_usar,
-            sector=sector_obj,
-            territorio=territorio,
-            socios_activos=socios_num,
-            fecha_constitucion=fecha_constitucion_val,
-            numero_registro_pj=num_pj,
-            fecha_inscripcion_registro=fecha_inscripcion_val,
-            registro_directiva_numero=reg_dir,
-            estado=estado,
-            rut=rut_org or None,
-            personalidad_juridica=personalidad_jur or num_pj or None,
-            contacto_prioritario=prioridad_val,
-            representante_legal=rep_val,
-            telefono_contacto=tel_val,
-            email_contacto=email_val,
-            direccion_sede=direccion_sede or domicilio or None,
-            directiva_actual=directiva or None,
-            observaciones=observaciones or None,
-            **directiva_data,
-        )
-
-        # Notificación en tiempo real por WebSocket
-        del_id_ws = del_a_usar.id if del_a_usar else "global"
-        def notificar_ws_org():
-            publish_module_changed("organizaciones", del_id_ws, "create", nueva_org.id)
-        transaction.on_commit(notificar_ws_org)
-
-        messages.success(request, f"Organización '{nombre}' registrada exitosamente en {del_a_usar.nombre}.")
+        messages.success(request, f"Organización '{nueva_org.nombre}' registrada exitosamente en {del_activa.nombre}.")
         return redirect('gestion_organizaciones')
 
     q = request.GET.get('q', '').strip()
