@@ -275,19 +275,19 @@
 
       <!-- Derecha: Identificación de Usuario, Rol y Salir (Wireframe C3-C6) -->
       <div class="flex items-center gap-3 shrink-0 min-w-0 text-xs">
-        <a href="{% url 'perfil_usuario' %}" title="{{ request.user.get_full_name|default:request.user.username }}" class="flex items-center gap-2 min-w-0 group hover:opacity-90 transition-opacity">
+        <a href="{% url 'perfil_usuario' %}" title="{{ usuario_nombre_corto|default:request.user.username }}" class="flex items-center gap-2 min-w-0 group hover:opacity-90 transition-opacity">
           {% if funcionario_actual and funcionario_actual.foto %}
             <img src="{{ funcionario_actual.foto.url }}" alt="{{ request.user.username }}" class="w-8 h-8 rounded-full object-cover ring-2 ring-white/40 shadow-sm shrink-0" />
           {% elif request.user.funcionario.foto %}
             <img src="{{ request.user.funcionario.foto.url }}" alt="{{ request.user.username }}" class="w-8 h-8 rounded-full object-cover ring-2 ring-white/40 shadow-sm shrink-0" />
           {% else %}
             <div class="w-8 h-8 rounded-full bg-white/20 ring-2 ring-white/30 flex items-center justify-center font-bold text-white text-xs shrink-0">
-              {{ request.user.first_name|default:request.user.username|make_list|first|upper }}
+              {{ usuario_nombre_corto|default:request.user.username|make_list|first|upper }}
             </div>
           {% endif %}
           <div class="text-right hidden sm:block min-w-0 max-w-[160px] md:max-w-[200px]">
             <div class="font-bold text-white text-xs leading-tight group-hover:underline truncate">
-              {{ request.user.first_name|default:request.user.username }}
+              {{ usuario_nombre_corto|default:request.user.username }}
             </div>
             <div class="text-[11px] text-white/80 leading-tight truncate">
               <span>{{ user_rol_name }}</span>

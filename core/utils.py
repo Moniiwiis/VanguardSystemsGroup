@@ -385,6 +385,60 @@ def separar_nombre_completo(nombre_completo):
     return tokens[0], ' '.join(tokens[1:-2]), tokens[-2], tokens[-1]
 
 
+def separar_nombre_usuario(first_name, last_name=''):
+    """Divide first_name + last_name de Django User sin duplicar apellidos ya incluidos en first_name."""
+    fn = ' '.join((first_name or '').split())
+    ln = ' '.join((last_name or '').split())
+    if not fn and not ln:
+        return '', '', '', ''
+    if ln and fn and not fn.lower().endswith(ln.lower()):
+        ft = fn.split()
+        lt = ln.split()
+        pn = ft[0] if ft else ''
+        sn = ' '.join(ft[1:])
+        ap = lt[0] if lt else ''
+        am = ' '.join(lt[1:])
+        return pn, sn, ap, am
+    return separar_nombre_completo(fn or ln)
+
+
+def obtener_partes_nombre_objeto(obj):
+    """Retorna (primer_nombre, segundo_nombre, apellido_paterno, apellido_materno) para Funcionario, Vecino o User."""
+    if not obj:
+        return '', '', '', ''
+    if hasattr(obj, 'get_partes_nombre'):
+        return obj.get_partes_nombre()
+    if hasattr(obj, 'username'):
+        try:
+            func = obj.funcionario
+        except Exception:
+            func = None
+        if func is not None and (func.primer_nombre or func.apellido_paterno):
+            return (
+                func.primer_nombre,
+                func.segundo_nombre,
+                func.apellido_paterno,
+                func.apellido_materno,
+            )
+        return separar_nombre_usuario(getattr(obj, 'first_name', ''), getattr(obj, 'last_name', ''))
+    return separar_nombre_completo(str(obj))
+
+
+def obtener_nombre_corto(obj):
+    """Retorna 'PrimerNombre ApellidoPaterno' (o fallback legible/username si faltan partes)."""
+    if not obj:
+        return ''
+    pn, _sn, ap, _am = obtener_partes_nombre_objeto(obj)
+    corto = ' '.join(p for p in (pn, ap) if p).strip()
+    if corto:
+        return corto
+    if hasattr(obj, 'user'):
+        return getattr(obj.user, 'username', '')
+    if hasattr(obj, 'username'):
+        return obj.username
+    return str(obj)
+
+
 def extraer_partes_persona_desde_post(post_data, prefix='', exigir_estructurado=True):
     """
     Extrae primer_nombre, segundo_nombre, apellido_paterno y apellido_materno desde POST.

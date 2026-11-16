@@ -12,7 +12,7 @@
         Portal Ciudadano · Consulta Personal
       </span>
       <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight break-words [overflow-wrap:anywhere]">
-        Bienvenido(a), {{ request.user.get_full_name|default:request.user.username }}
+        Bienvenido(a), {{ usuario_nombre_corto|default:request.user.username }}
       </h1>
       <p class="text-xs sm:text-sm text-red-100 max-w-2xl leading-relaxed">
         Consulta exclusivamente tu información personal y el historial de tus registros y solicitudes vinculadas a tu cuenta en tiempo real.

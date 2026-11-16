@@ -2451,6 +2451,63 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(user_vec.first_name, 'Camila Andrea Pérez Muñoz')
         self.assertEqual(user_vec.email, 'camila.nuevo@example.test')
         self.assertEqual(vec.telefono, '+56 9 9988 7766')
+        # Arriba en el perfil debe verse solo primer nombre + apellido paterno
+        self.assertContains(resp_perfil_get, 'Camila Pérez')
+        self.assertNotContains(resp_perfil_get, 'Camila Andrea Pérez Muñoz')
+
+        # Verificar que funcionario con 4 nombres muestre Primer Nombre + Apellido Paterno arriba y en tablas
+        func_u = User.objects.create_user(
+            username='mgonzalez',
+            first_name='María Isabel González Rojas',
+            email='mg@example.test',
+            password='User123!',
+            is_staff=True,
+        )
+        rol_op = Rol.objects.create(nombre_rol='Operador', alcance='Delegación', estado='Activo')
+        func_obj = Funcionario.objects.create(
+            user=func_u,
+            identificador_institucional='FUN-CORTO',
+            rut='16.777.888-1',
+            primer_nombre='María',
+            segundo_nombre='Isabel',
+            apellido_paterno='González',
+            apellido_materno='Rojas',
+            delegacion=self.delegacion,
+            cargo=self.cargo,
+            estado='Activo',
+        )
+        FuncionarioRol.objects.create(funcionario=func_obj, rol=rol_op)
+        AtencionCiudadana.objects.create(
+            solicitante='Camila Pérez (17.654.321-3)',
+            vecino=vec,
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Atención para verificar nombre corto en tabla',
+            creado_por=func_u,
+            usuario_responsable=func_u,
+            va_a_tubo=True,
+            fecha_compromiso=datetime.date.today(),
+        )
+
+        self.client.force_login(admin)
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+        resp_usr_tbl = self.client.get(reverse('gestion_usuarios'))
+        self.assertContains(resp_usr_tbl, '>María González</span>')
+        for url in (
+            reverse('gestion_atenciones'),
+            reverse('gestion_inicio'),
+            reverse('gestion_tubo'),
+        ):
+            resp_tbl = self.client.get(url)
+            self.assertContains(resp_tbl, 'María González')
+            self.assertNotContains(resp_tbl, 'María Isabel González Rojas')
+
+        self.client.force_login(func_u)
+        resp_func_home = self.client.get(reverse('gestion_atenciones'))
+        self.assertContains(resp_func_home, 'María González')
 
 
 

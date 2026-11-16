@@ -26,6 +26,7 @@ from core.utils import (
     validar_rut, formatear_rut, validar_largo, validar_direccion,
     validar_telefono_chileno, formatear_telefono_chileno, validar_imagen_subida,
     extraer_partes_persona_desde_post, generar_username_funcionario,
+    obtener_nombre_corto,
 )
 from activities.models import (
     Actividad, Evidencia, ValidacionEvidencia, TipoGestion, Vecino,
@@ -273,7 +274,7 @@ def login_view(request):
             if func and func.debe_cambiar_contrasena:
                 return redirect('cambiar_contrasena_inicial')
 
-            messages.success(request, f"Bienvenido/a al Sistema Municipal, {user.first_name or user.username}.")
+            messages.success(request, f"Bienvenido/a al Sistema Municipal, {obtener_nombre_corto(user)}.")
             
             # Si es cliente, redirigir exclusivamente a su portal de consulta personal
             ctx = global_context(request)
@@ -1533,7 +1534,7 @@ def gestion_usuarios(request):
             del_txt = f.delegacion.nombre if f.delegacion else 'Sin delegación'
             rows.append([
                 f.user.username,
-                f.user.first_name or f.user.username,
+                f.get_nombre_corto(),
                 f.get_rut() or '—',
                 f.user.email,
                 f.cargo.nombre_cargo,
@@ -2723,8 +2724,8 @@ def gestion_atenciones(request):
         ]
         rows = []
         for a in qs:
-            creador_nombre = a.creado_por.get_full_name() or a.creado_por.username if a.creado_por else 'Sistema'
-            resp_nombre = a.usuario_responsable.get_full_name() or a.usuario_responsable.username
+            creador_nombre = obtener_nombre_corto(a.creado_por) if a.creado_por else 'Sistema'
+            resp_nombre = obtener_nombre_corto(a.usuario_responsable)
             f_comp = a.fecha_compromiso.strftime('%d/%m/%Y') if getattr(a, 'fecha_compromiso', None) else '—'
             rows.append([
                 a.codigo_atencion,
@@ -2779,7 +2780,7 @@ def gestion_atenciones(request):
     ).values_list('funcionario_id', 'rol__nombre_rol'):
         roles_encargados.setdefault(funcionario_id, []).append(rol_nombre)
     for funcionario in funcionarios_edicion:
-        nombre = funcionario.user.get_full_name() or funcionario.user.username
+        nombre = funcionario.get_nombre_corto()
         roles = ', '.join(roles_encargados.get(funcionario.id, [])) or 'Sin rol registrado'
         cargo_nom = funcionario.cargo.nombre_cargo if funcionario.cargo else ''
         encargados_edicion.append({
@@ -2829,7 +2830,7 @@ def gestion_atenciones(request):
                 cargo_nom = u.funcionario.cargo.nombre_cargo
             if u.funcionario.delegacion:
                 del_nom = u.funcionario.delegacion.nombre
-        nombre_completo = u.get_full_name() or u.username
+        nombre_completo = obtener_nombre_corto(u)
         label = f"{nombre_completo} ({u.username})"
         if cargo_nom:
             label += f" · {cargo_nom}"
@@ -5164,10 +5165,10 @@ def _construir_item_tubo(origen_tipo, obj):
             'estado_evidencia': obj.estado_evidencia(),
             'usuario_responsable': resp_user,
             'usuario_responsable_id': obj.usuario_responsable_id,
-            'responsable_nombre': (resp_user.get_full_name() or resp_user.username) if resp_user else 'Sin asignar',
+            'responsable_nombre': obtener_nombre_corto(resp_user) if resp_user else 'Sin asignar',
             'responsable_username': resp_user.username if resp_user else '',
             'responsable_rol': '',
-            'creado_por_nombre': (creador.get_full_name() or creador.username) if creador else 'Sistema',
+            'creado_por_nombre': obtener_nombre_corto(creador) if creador else 'Sistema',
             'fecha_compromiso': obj.fecha_compromiso,
             'area_apoyo': obj.area_apoyo or '',
             'avance_observaciones': obj.avance_observaciones or '',
@@ -5206,10 +5207,10 @@ def _construir_item_tubo(origen_tipo, obj):
         'estado_evidencia': 'Sin Atención',
         'usuario_responsable': resp_user,
         'usuario_responsable_id': resp_user.id if resp_user else None,
-        'responsable_nombre': (resp_user.get_full_name() or resp_user.username) if resp_user else 'Sin asignar',
+        'responsable_nombre': obtener_nombre_corto(resp_user) if resp_user else 'Sin asignar',
         'responsable_username': resp_user.username if resp_user else '',
         'responsable_rol': '',
-        'creado_por_nombre': (creador.get_full_name() or creador.username) if creador else 'Sistema',
+        'creado_por_nombre': obtener_nombre_corto(creador) if creador else 'Sistema',
         'fecha_compromiso': obj.fecha_comprometida,
         'area_apoyo': obj.area_apoyo or '',
         'avance_observaciones': obj.avance_observaciones or '',
@@ -5552,7 +5553,7 @@ def gestion_tubo(request):
     ).values_list('funcionario_id', 'rol__nombre_rol'):
         roles_encargados.setdefault(funcionario_id, []).append(rol_nombre)
     for funcionario in funcionarios_edicion:
-        nombre = funcionario.user.get_full_name() or funcionario.user.username
+        nombre = funcionario.get_nombre_corto()
         roles = ', '.join(roles_encargados.get(funcionario.id, [])) or 'Sin rol registrado'
         cargo_nom = funcionario.cargo.nombre_cargo if funcionario.cargo else ''
         encargados_edicion.append({
@@ -5623,7 +5624,7 @@ def gestion_tubo(request):
             'user_id': u.id,
             'funcionario_id': f.id,
             'usuario': u,
-            'nombre': u.get_full_name() or u.username,
+            'nombre': f.get_nombre_corto(),
             'username': u.username,
             'cargo': f.cargo.nombre_cargo if f.cargo else 'Funcionario Municipal',
             'delegacion_nombre': f.delegacion.nombre if f.delegacion else '',
@@ -5645,7 +5646,7 @@ def gestion_tubo(request):
             'user_id': u.id,
             'funcionario_id': f_extra.id if f_extra else None,
             'usuario': u,
-            'nombre': u.get_full_name() or u.username,
+            'nombre': f_extra.get_nombre_corto() if f_extra else obtener_nombre_corto(u),
             'username': u.username,
             'cargo': (f_extra.cargo.nombre_cargo if f_extra and f_extra.cargo else 'Encargado de Gestión'),
             'delegacion_nombre': (f_extra.delegacion.nombre if f_extra and f_extra.delegacion else 'Global'),

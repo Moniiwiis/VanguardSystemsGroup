@@ -58,13 +58,13 @@
                class="w-36 h-36 rounded-full object-cover ring-4 ring-[#C41230]/20 shadow-lg" />
         {% else %}
           <div id="avatar-placeholder" class="w-36 h-36 rounded-full bg-gradient-to-tr from-[#8B1D19] to-[#C41230] flex items-center justify-center text-white text-4xl font-extrabold ring-4 ring-[#C41230]/20 shadow-lg">
-            {{ request.user.first_name|default:request.user.username|make_list|first|upper }}
+            {{ usuario_nombre_corto|default:request.user.username|make_list|first|upper }}
           </div>
         {% endif %}
       </div>
 
       <div class="text-xs space-y-1 w-full min-w-0">
-        <p class="font-extrabold text-slate-900 text-sm w-full break-words [overflow-wrap:anywhere]">{{ request.user.get_full_name|default:request.user.username }}</p>
+        <p class="font-extrabold text-slate-900 text-sm w-full break-words [overflow-wrap:anywhere]">{{ usuario_nombre_corto|default:request.user.username }}</p>
         <p class="text-slate-500 font-mono w-full break-words [overflow-wrap:anywhere]">{{ request.user.email|default:"Sin correo electrónico" }}</p>
         <span class="inline-block mt-1 px-3 py-1 rounded-full text-[10px] font-extrabold bg-red-50 text-[#C41230] border border-red-200 max-w-full truncate">
           {{ user_rol_name }}

@@ -465,7 +465,7 @@
             <td class="py-3 px-4 whitespace-nowrap">
               {% include "gestion/includes/delegacion_cell.html" with nombre=atn.delegacion.nombre fallback="Sin delegación" %}
             </td>
-            <td class="py-3 px-4 text-slate-600">{{ atn.usuario_responsable.username }}</td>
+            <td class="py-3 px-4 text-slate-600">{{ atn.usuario_responsable|nombre_corto }}</td>
             <td class="py-3 px-4 text-slate-400 font-mono">{{ atn.fecha_registro|date:"d/m/Y H:i" }}</td>
           </tr>
           {% endfor %}

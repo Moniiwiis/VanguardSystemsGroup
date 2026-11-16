@@ -61,7 +61,7 @@ class Funcionario(BaseModel):
     telefono = models.CharField(max_length=20, null=True, blank=True, verbose_name='Teléfono de contacto')
 
     def get_partes_nombre(self):
-        from core.utils import separar_nombre_completo
+        from core.utils import separar_nombre_usuario
         if self.primer_nombre or self.apellido_paterno:
             return (
                 self.primer_nombre,
@@ -69,7 +69,16 @@ class Funcionario(BaseModel):
                 self.apellido_paterno,
                 self.apellido_materno,
             )
-        return separar_nombre_completo(self.user.get_full_name() or self.user.first_name)
+        return separar_nombre_usuario(self.user.first_name, self.user.last_name)
+
+    def get_nombre_corto(self):
+        pn, _sn, ap, _am = self.get_partes_nombre()
+        return ' '.join(p for p in (pn, ap) if p).strip() or self.user.username
+
+    def get_nombre_completo(self):
+        from core.utils import construir_nombre_completo
+        pn, sn, ap, am = self.get_partes_nombre()
+        return construir_nombre_completo(pn, sn, ap, am) or self.user.first_name or self.user.username
 
     def get_foto_url(self):
         if self.foto and hasattr(self.foto, 'url'):

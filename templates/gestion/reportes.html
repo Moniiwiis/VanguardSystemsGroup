@@ -253,7 +253,7 @@
             </td>
             <td class="p-4">
               {% if m.funcionario %}
-                <div class="font-bold text-slate-900">{{ m.funcionario.user.first_name|default:m.funcionario.user.username }}</div>
+                <div class="font-bold text-slate-900">{{ m.funcionario|nombre_corto }}</div>
                 <div class="text-[10px] text-slate-400 font-mono">{{ m.funcionario.identificador_institucional }}</div>
               {% else %}
                 <span class="italic text-slate-400">Global Cargo</span>

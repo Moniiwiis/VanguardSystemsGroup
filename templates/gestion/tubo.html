@@ -252,7 +252,7 @@
             <option value="">Responsable: Todos</option>
             {% for resp in responsables_filtro %}
               <option value="{{ resp.id }}" {% if filtro_responsable == resp.id|stringformat:"s" %}selected{% endif %}>
-                {{ resp.get_full_name|default:resp.username }}
+                {{ resp|nombre_corto }}
               </option>
             {% endfor %}
           </select>
