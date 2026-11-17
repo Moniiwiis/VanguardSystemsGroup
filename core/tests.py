@@ -2036,12 +2036,19 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(resp_excel.status_code, 200)
         hoy_str = hoy.strftime('%d-%m-%Y')
         self.assertEqual(
-            resp_excel['Content-Disposition'],
-            f'attachment; filename="Periodos_{hoy_str}.csv"',
+            resp_excel['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         )
-        csv_txt = resp_excel.content.decode('utf-8-sig')
-        self.assertIn('Fecha de Inicio', csv_txt)
-        self.assertIn(futuro.strftime('%d-%m-%Y'), csv_txt)
+        self.assertEqual(
+            resp_excel['Content-Disposition'],
+            f'attachment; filename="Periodos_{hoy_str}.xlsx"',
+        )
+        import openpyxl
+        wb_per = openpyxl.load_workbook(BytesIO(resp_excel.content))
+        ws_per = wb_per.active
+        valores_per = [[cell.value for cell in row] for row in ws_per.iter_rows()]
+        self.assertIn('Fecha de Inicio', valores_per[0])
+        self.assertTrue(any(futuro.strftime('%d-%m-%Y') in row for row in valores_per))
 
         resp_xlsx = self.client.get(reverse('gestion_vecinos') + '?export=excel')
         self.assertEqual(resp_xlsx.status_code, 200)
@@ -2049,6 +2056,30 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             resp_xlsx['Content-Disposition'],
             f'attachment; filename="Vecinos_{hoy_str}.xlsx"',
         )
+
+        # Todos los módulos con exportación Excel usan el mismo formato nativo .xlsx
+        for export_url in (
+            reverse('gestion_delegaciones') + '?export=excel',
+            reverse('gestion_roles') + '?export=excel',
+            reverse('gestion_usuarios') + '?export=excel',
+            reverse('gestion_metas') + '?tab=items&export=excel',
+            reverse('gestion_tipo_atencion') + '?export=excel',
+            reverse('gestion_areas_apoyo') + '?export=excel',
+            reverse('gestion_sub_atencion') + '?export=excel',
+            reverse('gestion_reportes') + '?export=excel',
+            reverse('gestion_tubo') + '?export=excel',
+            reverse('gestion_atenciones') + '?export=excel',
+            reverse('gestion_sectores') + '?export=excel',
+            reverse('gestion_organizaciones') + '?export=excel',
+        ):
+            r_exp = self.client.get(export_url)
+            self.assertEqual(r_exp.status_code, 200, f"Fallo exportando {export_url}")
+            self.assertEqual(
+                r_exp['Content-Type'],
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                f"Se esperaba .xlsx en {export_url}",
+            )
+            self.assertTrue(r_exp['Content-Disposition'].endswith('.xlsx"'))
 
     def test_organizaciones_delegacion_bloqueada_sectores_fecha_y_boton_metas_eliminado(self):
         from django.utils import timezone
