@@ -196,10 +196,8 @@ def chat_room(request):
         )
     )
     cargos_filtro = Cargo.objects.order_by('nombre_cargo')
-    secciones_filtro = Sector.objects.filter(estado='Activo').select_related('delegacion').order_by('nombre')
-    if not access['es_global'] and access['funcionario'] and access['funcionario'].delegacion_id:
-        secciones_filtro = secciones_filtro.filter(delegacion_id=access['funcionario'].delegacion_id)
-    delegaciones_filtro = Delegacion.objects.filter(estado='Activa').order_by('id') if access['es_global'] else []
+    can_filter_delegaciones = access['es_admin'] or access['es_global']
+    delegaciones_filtro = Delegacion.objects.filter(estado='Activa').order_by('id') if can_filter_delegaciones else []
 
     return render(request, 'websocket/chat.html', {
         'conversation_id': conversation_id,
@@ -217,8 +215,8 @@ def chat_room(request):
         'chat_contacts_url': reverse('websocket:contacts'),
         'can_manage_contacts': access['es_admin'],
         'is_chat_global': access['es_global'],
+        'can_filter_delegaciones': can_filter_delegaciones,
         'cargos_filtro': cargos_filtro,
-        'secciones_filtro': secciones_filtro,
         'delegaciones_filtro': delegaciones_filtro,
         'can_send_message': can_send_message,
         'chat_widget_mode': request.GET.get('widget') == '1',

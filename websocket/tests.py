@@ -169,7 +169,12 @@ class PrivateChatTests(TestCase):
         self.assertContains(response, 'chat-widget-mode')
         self.assertNotContains(response, 'id="chat-bubble"')
         self.assertContains(response, 'Filtrar Cargo: Todos')
-        self.assertContains(response, 'Filtrar Sección: Todas')
+        self.assertContains(response, 'Filtrar Estado: Activos')
+        self.assertNotContains(response, 'Filtrar Sección: Todas')
+        self.assertNotContains(response, 'Filtrar Delegación: Todas')
+        self.assertNotContains(response, 'name="rut"')
+        self.assertNotContains(response, 'name="nombre"')
+        self.assertNotContains(response, 'name="apellido"')
 
         global_user = self.create_employee(
             'global_filter_user',
@@ -183,6 +188,21 @@ class PrivateChatTests(TestCase):
         self.assertEqual(global_page.status_code, 200)
         self.assertContains(global_page, 'Filtrar Delegación: Todas')
         self.assertContains(global_page, f'{self.centro.get_codigo()} — {self.centro.nombre}')
+
+        # Verificar filtro de estado Activo/Inactivo para administrador
+        inactivo = self.create_employee(
+            'inactivo_chat',
+            '9.111.111-1',
+            self.centro,
+            self.operador,
+            first_name='Inactivo',
+        )
+        emp_inactivo = Funcionario.objects.get(user=inactivo)
+        emp_inactivo.estado = 'Inactivo'
+        emp_inactivo.save(update_fields=['estado'])
+        resp_inact = self.client.get(reverse('websocket:contacts'), {'estado': 'Inactivo'}).json()
+        self.assertTrue(any(c['id'] == inactivo.pk for c in resp_inact['contacts']))
+        self.assertFalse(any(c['id'] == self.trabajador.pk for c in resp_inact['contacts']))
 
     def test_aura_widget_is_hidden_until_a_provider_is_configured(self):
         employee = Funcionario.objects.get(user=self.trabajador)

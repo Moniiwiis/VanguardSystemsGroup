@@ -91,7 +91,7 @@
         <form id="contact-filters" class="space-y-2.5">
           <label class="relative block">
             <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"></i>
-            <input id="contact-search" name="q" placeholder="Buscar contacto, RUT, cargo…" autocomplete="off"
+            <input id="contact-search" name="q" placeholder="Buscar por nombre, apellido, RUT, cargo o sección…" autocomplete="off"
                    class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-100 border border-transparent text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-red-200 focus:outline-none focus:ring-2 focus:ring-red-50 transition-colors">
           </label>
           <div class="flex items-center justify-between">
@@ -103,25 +103,8 @@
             </button>
             <button type="button" id="clear-filters" class="text-[10px] font-semibold text-slate-400 hover:text-slate-700">Limpiar</button>
           </div>
-          <div id="advanced-filters" class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-            <input name="rut" placeholder="RUT / ID" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#C41230] bg-white">
-            <input name="nombre" placeholder="Nombre" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#C41230] bg-white">
-            <input name="apellido" placeholder="Apellido" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#C41230] bg-white">
-            <select name="cargo" data-search-placeholder="Filtrar Cargo: Todos"
-                    class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
-              <option value="">Filtrar Cargo: Todos</option>
-              {% for c in cargos_filtro %}
-                <option value="{{ c.nombre_cargo }}">{{ c.nombre_cargo }}</option>
-              {% endfor %}
-            </select>
-            <select name="seccion" data-search-placeholder="Filtrar Sección: Todas"
-                    class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white {% if not is_chat_global %}sm:col-span-2{% endif %}">
-              <option value="">Filtrar Sección: Todas</option>
-              {% for s in secciones_filtro %}
-                <option value="{{ s.nombre }}">{{ s.nombre }}{% if is_chat_global and s.delegacion %} — {{ s.delegacion.nombre }}{% endif %}</option>
-              {% endfor %}
-            </select>
-            {% if is_chat_global %}
+          <div id="advanced-filters" class="grid grid-cols-1 gap-2 pt-1">
+            {% if can_filter_delegaciones %}
             <select name="delegacion" data-search-placeholder="Filtrar Delegación: Todas"
                     class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
               <option value="">Filtrar Delegación: Todas</option>
@@ -130,6 +113,20 @@
               {% endfor %}
             </select>
             {% endif %}
+            <select name="cargo" data-search-placeholder="Filtrar Cargo: Todos"
+                    class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
+              <option value="">Filtrar Cargo: Todos</option>
+              {% for c in cargos_filtro %}
+                <option value="{{ c.nombre_cargo }}">{{ c.nombre_cargo }}</option>
+              {% endfor %}
+            </select>
+            <select name="estado" data-search-placeholder="Filtrar Estado: Activos"
+                    class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
+              <option value="">Filtrar Estado: Activos</option>
+              <option value="Activo">Activo</option>
+              <option value="Inactivo">Inactivo</option>
+              <option value="Todos">Todos</option>
+            </select>
           </div>
         </form>
       </div>
@@ -525,6 +522,12 @@ document.addEventListener('DOMContentLoaded', function() {
     name.className = 'min-w-0 flex-1 truncate text-xs font-extrabold text-slate-800 group-hover:text-[#C41230]';
     name.textContent = contact.display_name || fullName;
     link.append(avatar, name);
+    if (contact.activo && contact.activo.toLowerCase() !== 'activo') {
+      const inactiveBadge = document.createElement('span');
+      inactiveBadge.className = 'px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-bold shrink-0';
+      inactiveBadge.textContent = 'Inactivo';
+      link.appendChild(inactiveBadge);
+    }
     if (contact.unread_count > 0) link.appendChild(unreadBadge(contact.unread_count));
     item.appendChild(link);
     const options = document.createElement('button');

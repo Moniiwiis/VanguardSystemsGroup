@@ -262,10 +262,10 @@ def get_chat_contacts(user, filters=None):
         return []
 
     filters = filters or {}
-    contacts = Funcionario.objects.filter(
-        estado__iexact='Activo',
-        user__is_active=True,
-    ).select_related('user', 'cargo', 'sector', 'delegacion').prefetch_related(
+    estado_filtro = filters.get('estado', '').strip().casefold()
+    contacts = Funcionario.objects.select_related(
+        'user', 'cargo', 'sector', 'delegacion',
+    ).prefetch_related(
         'funcionariorol_set__rol',
     ).exclude(
         funcionariorol__rol__nombre_rol__icontains='cliente',
@@ -273,6 +273,11 @@ def get_chat_contacts(user, filters=None):
         user__chat_contact_preferences__owner=user,
         user__chat_contact_preferences__hidden_at__isnull=False,
     ).distinct()
+
+    if estado_filtro == 'inactivo':
+        contacts = contacts.filter(Q(estado__iexact='Inactivo') | Q(user__is_active=False))
+    elif estado_filtro != 'todos':
+        contacts = contacts.filter(estado__iexact='Activo', user__is_active=True)
 
     admin_contact = (
         Q(user__is_superuser=True)
@@ -308,6 +313,10 @@ def get_chat_contacts(user, filters=None):
     if query:
         contacts = contacts.filter(
             Q(identificador_institucional__icontains=query)
+            | Q(rut__icontains=query)
+            | Q(primer_nombre__icontains=query)
+            | Q(apellido_paterno__icontains=query)
+            | Q(apellido_materno__icontains=query)
             | Q(user__first_name__icontains=query)
             | Q(user__last_name__icontains=query)
             | Q(cargo__nombre_cargo__icontains=query)
@@ -328,7 +337,7 @@ def get_chat_contacts(user, filters=None):
         contacts = contacts.filter(cargo__nombre_cargo__icontains=cargo)
     if seccion:
         contacts = contacts.filter(sector__nombre__icontains=seccion)
-    if delegacion and access['es_global']:
+    if delegacion and (access['es_admin'] or access['es_global']):
         if delegacion.isdigit():
             contacts = contacts.filter(delegacion_id=int(delegacion))
         else:
