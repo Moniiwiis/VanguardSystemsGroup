@@ -201,6 +201,8 @@ class PrivateChatTests(TestCase):
         self.assertIsNone(override_page.context['delegacion_seleccionada_chat'])
         self.assertContains(override_page, 'id="btn-new-conversation"')
         self.assertContains(override_page, 'Conversaciones activas')
+        self.assertNotContains(override_page, 'id="global-conversations-section"')
+        self.assertContains(override_page, 'id="advanced-filters"\n               class="hidden absolute left-0 right-0 top-full')
 
         # scope=active devuelve solo contactos con mensajes previos; sin scope devuelve todos (Nueva conversación)
         self.client.force_login(self.trabajador)

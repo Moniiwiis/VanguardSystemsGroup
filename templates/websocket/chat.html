@@ -79,36 +79,28 @@
         </button>
       </header>
 
-      {% if is_chat_global %}
-      <section id="global-conversations-section" class="border-b border-slate-100">
-        <div class="px-5 py-3 flex items-center justify-between">
-          <h3 class="text-[10px] font-extrabold uppercase tracking-[.14em] text-slate-500">Conversaciones activas · Global</h3>
-          <span id="global-conversations-count" class="text-[10px] font-bold text-slate-400">—</span>
-        </div>
-        <div class="chat-scroll max-h-52 overflow-y-auto px-2 pb-2">
-          <ul id="global-conversations-list" class="space-y-1" aria-live="polite"></ul>
-          <p id="global-conversations-empty" class="hidden px-3 py-4 text-center text-[11px] text-slate-400">Aún no hay conversaciones activas.</p>
-        </div>
-      </section>
-      {% endif %}
-
-      <div class="px-4 py-3 border-b border-slate-100">
-        <form id="contact-filters" class="space-y-2.5">
+      <div class="px-4 py-3 border-b border-slate-100 relative">
+        <form id="contact-filters" class="relative space-y-2">
           <label class="relative block">
             <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"></i>
             <input id="contact-search" name="q" placeholder="Buscar por nombre, apellido, RUT, cargo o sección…" autocomplete="off"
                    class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-100 border border-transparent text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-red-200 focus:outline-none focus:ring-2 focus:ring-red-50 transition-colors">
           </label>
-          <div class="flex items-center justify-between">
-            <button type="button" id="toggle-filters" aria-expanded="true" aria-controls="advanced-filters"
-                    class="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-[#C41230]">
+          <div class="flex items-center justify-between gap-2">
+            <button type="button" id="toggle-filters" aria-expanded="false" aria-controls="advanced-filters"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 hover:bg-red-50 hover:border-red-200 text-[11px] font-bold text-slate-600 hover:text-[#C41230] transition-colors">
               <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
-              Filtros avanzados
+              Filtros
               <span id="active-filter-count" class="hidden min-w-4 h-4 px-1 rounded-full bg-red-100 text-[#C41230] text-[9px] items-center justify-center">0</span>
             </button>
             <button type="button" id="clear-filters" class="text-[10px] font-semibold text-slate-400 hover:text-slate-700">Limpiar</button>
           </div>
-          <div id="advanced-filters" class="grid grid-cols-1 gap-2 pt-1">
+          <div id="advanced-filters"
+               class="hidden absolute left-0 right-0 top-full mt-2 z-30 rounded-2xl bg-white p-3.5 shadow-2xl border border-slate-200 ring-1 ring-slate-900/5 space-y-2.5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Filtrar directorio</span>
+              <button type="button" id="close-filters-bubble" class="text-[11px] font-bold text-slate-500 hover:text-[#C41230]">Cerrar</button>
+            </div>
             {% if can_filter_delegaciones %}
             <select name="delegacion" data-search-placeholder="Filtrar Delegación: Todas"
                     class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
@@ -306,11 +298,9 @@ document.addEventListener('DOMContentLoaded', function() {
   const contactsList = document.getElementById('contacts-list');
   const contactsEmpty = document.getElementById('contacts-empty');
   const contactsCount = document.getElementById('contacts-count');
-  const globalConversationsList = document.getElementById('global-conversations-list');
-  const globalConversationsEmpty = document.getElementById('global-conversations-empty');
-  const globalConversationsCount = document.getElementById('global-conversations-count');
   const filters = document.getElementById('contact-filters');
   const advancedFilters = document.getElementById('advanced-filters');
+  const toggleFiltersBtn = document.getElementById('toggle-filters');
   const filterBadge = document.getElementById('active-filter-count');
   const form = document.getElementById('chat-form');
   const input = document.getElementById('message');
@@ -574,16 +564,16 @@ document.addEventListener('DOMContentLoaded', function() {
     link.className = 'flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-colors hover:bg-slate-50 ' +
       (item.chat_id === chatId ? 'bg-red-50 ring-1 ring-red-100' : '');
     const avatar = document.createElement('span');
-    avatar.className = 'w-9 h-9 shrink-0 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center';
-    avatar.innerHTML = '<i data-lucide="messages-square" class="w-4 h-4"></i>';
+    avatar.className = 'w-10 h-10 shrink-0 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center';
+    avatar.innerHTML = '<i data-lucide="eye" class="w-4 h-4"></i>';
     const detail = document.createElement('span');
     detail.className = 'min-w-0 flex-1';
     const label = document.createElement('span');
-    label.className = 'block truncate text-[10px] font-extrabold text-slate-800';
+    label.className = 'block truncate text-[11px] font-extrabold text-slate-800';
     label.textContent = item.label;
     const preview = document.createElement('span');
     preview.className = 'block truncate text-[10px] text-slate-500';
-    preview.textContent = (item.last_sender ? item.last_sender + ': ' : '') + (item.last_message || '');
+    preview.textContent = 'Solo lectura · ' + (item.last_sender ? item.last_sender + ': ' : '') + (item.last_message || '');
     detail.append(label, preview);
     link.append(avatar, detail);
     if (item.unread_count > 0) link.appendChild(unreadBadge(item.unread_count));
@@ -670,15 +660,20 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!response.ok) throw new Error('No fue posible cargar los contactos.');
       const payload = await response.json();
       const cards = payload.contacts.map(contactCard);
+      const thirdPartyGlobal = (directoryMode === 'active' && Array.isArray(payload.conversations))
+        ? payload.conversations.filter((item) => {
+            const parts = String(item.chat_id || '').split('_').slice(1);
+            return !parts.includes(String(currentUserId));
+          }).map(globalConversationCard)
+        : [];
       const qVal = (params.get('q') || '').trim().toLowerCase();
       const hasRoleOrStateFilter = Boolean((params.get('cargo') || '').trim() || (params.get('estado') || '').trim());
       const includeSupport = directoryMode === 'active' && !hasRoleOrStateFilter && (!qVal || 'soporte técnico tecnico'.includes(qVal));
-      if (includeSupport) {
-        contactsList.replaceChildren(supportChannelCard(), ...cards);
-      } else {
-        contactsList.replaceChildren(...cards);
-      }
-      const visibleCount = cards.length + (includeSupport ? 1 : 0);
+      const allItems = includeSupport
+        ? [supportChannelCard(), ...cards, ...thirdPartyGlobal]
+        : [...cards, ...thirdPartyGlobal];
+      contactsList.replaceChildren(...allItems);
+      const visibleCount = allItems.length;
       contactsCount.textContent = directoryMode === 'active'
         ? visibleCount + (visibleCount === 1 ? ' conversación' : ' conversaciones')
         : visibleCount + (visibleCount === 1 ? ' contacto' : ' contactos');
@@ -696,11 +691,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       } else {
         contactsEmpty.classList.add('hidden');
-      }
-      if (globalConversationsList) {
-        globalConversationsList.replaceChildren(...payload.conversations.map(globalConversationCard));
-        globalConversationsCount.textContent = payload.conversations.length + (payload.conversations.length === 1 ? ' chat' : ' chats');
-        globalConversationsEmpty.classList.toggle('hidden', payload.conversations.length > 0);
       }
       if (!chatId) setConnectionState(true);
       if (window.lucide) lucide.createIcons();
@@ -779,10 +769,32 @@ document.addEventListener('DOMContentLoaded', function() {
     };
   }
 
-  document.getElementById('toggle-filters').addEventListener('click', function() {
-    const opening = advancedFilters.classList.contains('hidden');
-    advancedFilters.classList.toggle('hidden', !opening);
-    this.setAttribute('aria-expanded', String(opening));
+  function setFiltersBubbleOpen(open) {
+    advancedFilters.classList.toggle('hidden', !open);
+    if (toggleFiltersBtn) toggleFiltersBtn.setAttribute('aria-expanded', String(open));
+  }
+  if (toggleFiltersBtn) {
+    toggleFiltersBtn.addEventListener('click', function() {
+      setFiltersBubbleOpen(advancedFilters.classList.contains('hidden'));
+    });
+  }
+  const closeFiltersBubbleBtn = document.getElementById('close-filters-bubble');
+  if (closeFiltersBubbleBtn) {
+    closeFiltersBubbleBtn.addEventListener('click', function() {
+      setFiltersBubbleOpen(false);
+    });
+  }
+  document.addEventListener('click', function(event) {
+    if (!advancedFilters.classList.contains('hidden')
+        && !advancedFilters.contains(event.target)
+        && !(toggleFiltersBtn && toggleFiltersBtn.contains(event.target))) {
+      setFiltersBubbleOpen(false);
+    }
+  });
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape' && !advancedFilters.classList.contains('hidden')) {
+      setFiltersBubbleOpen(false);
+    }
   });
   document.getElementById('clear-filters').addEventListener('click', function() {
     filters.querySelectorAll('[name]').forEach((item) => {
