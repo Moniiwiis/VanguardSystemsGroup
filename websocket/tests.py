@@ -213,6 +213,16 @@ class PrivateChatTests(TestCase):
         self.assertEqual([c['id'] for c in with_active['contacts']], [self.colega.pk])
         self.assertEqual(with_active['contacts'][0]['last_message'], 'Hola colega')
 
+        # Propio a la derecha en rojo (justify-end + bg-[#C41230]) y recibido a la izquierda en blanco (justify-start + bg-white)
+        self.make_message(self.colega, self.trabajador, 'Respuesta recibida')
+        chat_view = self.client.get(reverse('websocket:chat_index'), {'contact': self.colega.pk})
+        html_chat = chat_view.content.decode('utf-8')
+        self.assertIn('flex justify-end', html_chat)
+        self.assertIn('chat-message-own bg-[#C41230] text-white', html_chat)
+        self.assertIn('flex justify-start', html_chat)
+        self.assertIn('chat-message-other bg-white text-slate-800', html_chat)
+        self.assertIn("(ownMessage ? 'justify-end' : 'justify-start')", html_chat)
+
         # Verificar filtro de estado Activo/Inactivo para administrador
         inactivo = self.create_employee(
             'inactivo_chat',

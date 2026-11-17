@@ -12,8 +12,8 @@
     background-image: radial-gradient(rgba(127, 95, 78, .08) .7px, transparent .7px);
     background-size: 15px 15px;
   }
-  .chat-message-own { border-radius: 18px 18px 18px 5px; }
-  .chat-message-other { border-radius: 18px 18px 5px 18px; }
+  .chat-message-own { border-radius: 18px 18px 5px 18px; }
+  .chat-message-other { border-radius: 18px 18px 18px 5px; }
   @media (max-width: 1023px) {
     .chat-layout { height: auto !important; min-height: 0 !important; }
     .chat-contacts { max-height: 300px; }
@@ -236,7 +236,7 @@
         </div>
         <ul id="messages" class="space-y-2.5" aria-live="polite" aria-relevant="additions">
           {% for m in initial_messages %}
-          <li data-msg-id="{{ m.id }}" class="flex {% if m.sender_id == alignment_user_id %}justify-start{% else %}justify-end{% endif %}">
+          <li data-msg-id="{{ m.id }}" class="flex {% if m.sender_id == alignment_user_id %}justify-end{% else %}justify-start{% endif %}">
             <div class="max-w-[88%] sm:max-w-[72%] px-3.5 py-2.5 shadow-sm {% if m.sender_id == alignment_user_id %}chat-message-own bg-[#C41230] text-white{% else %}chat-message-other bg-white text-slate-800 border border-slate-200/80{% endif %}">
               {% if conversation_read_only or is_support_channel %}<div class="mb-1 text-[10px] font-extrabold {% if m.sender_id == alignment_user_id %}text-white/80{% else %}text-[#C41230]{% endif %}">{{ m.username }}</div>{% endif %}
               <p class="message-body whitespace-pre-wrap break-words text-[12px] leading-relaxed">{{ m.message }}</p>
@@ -402,7 +402,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const ownMessage = String(data.sender_id) === alignmentUserId;
     const li = document.createElement('li');
     li.dataset.msgId = String(data.id);
-    li.className = 'flex ' + (ownMessage ? 'justify-start' : 'justify-end');
+    li.className = 'flex ' + (ownMessage ? 'justify-end' : 'justify-start');
     const bubble = document.createElement('div');
     bubble.className = 'max-w-[88%] sm:max-w-[72%] px-3.5 py-2.5 shadow-sm ' +
       (ownMessage ? 'chat-message-own bg-[#C41230] text-white' : 'chat-message-other bg-white text-slate-800 border border-slate-200/80');
