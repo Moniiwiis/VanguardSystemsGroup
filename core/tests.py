@@ -1802,7 +1802,10 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertContains(resp_inicio_admin, 'sgr_nav_sec_territorial')
         self.assertContains(resp_inicio_admin, 'sgr_inicio_sec_territorial')
         self.assertContains(resp_inicio_admin, 'id="btnToggleSidebar"')
+        self.assertContains(resp_inicio_admin, 'id="btnShowSidebar"')
         self.assertContains(resp_inicio_admin, 'id="appSidebar"')
+        html_inicio = resp_inicio_admin.content.decode('utf-8')
+        self.assertGreater(html_inicio.index('id="btnToggleSidebar"'), html_inicio.index('id="appSidebar"'))
         self.assertContains(resp_inicio_admin, 'sgr-sticky-actions')
 
         resp_vec_html = self.client.get(reverse('gestion_vecinos'))

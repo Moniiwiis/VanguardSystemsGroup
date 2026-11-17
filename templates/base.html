@@ -60,6 +60,12 @@
     html.sgr-sidebar-collapsed [data-sidebar-icon-closed] {
       display: inline-flex !important;
     }
+    #btnShowSidebar {
+      display: none !important;
+    }
+    html.sgr-sidebar-collapsed #btnShowSidebar {
+      display: inline-flex !important;
+    }
     /* Tablas consistentes: al estar el menú desplegado mantienen su ancho legible con scroll horizontal */
     @media (min-width: 768px) {
       html:not(.sgr-sidebar-collapsed) .overflow-x-auto > table {
@@ -183,20 +189,8 @@
   <header class="sticky top-0 z-40 shadow-md text-white" style="background: linear-gradient(90deg, #8B1D19 0%, #C41230 60%, #DB3334 100%);">
     <div id="appHeaderInner" class="max-w-[1440px] mx-auto px-4 md:px-8 py-2.5 flex items-center justify-between gap-4">
       
-      <!-- Izquierda: Botón Ocultar/Mostrar Menú + Logo y Marca Institucional -->
+      <!-- Izquierda: Logo y Marca Institucional -->
       <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
-        <button type="button"
-                id="btnToggleSidebar"
-                data-sidebar-toggle
-                aria-expanded="true"
-                aria-controls="appSidebar"
-                title="Ocultar / mostrar menú lateral"
-                class="inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white border border-white/25 transition-all cursor-pointer shadow-sm">
-          <i data-lucide="panel-left-close" data-sidebar-icon-open class="w-4 h-4"></i>
-          <i data-lucide="panel-left-open" data-sidebar-icon-closed class="w-4 h-4 hidden"></i>
-          <span class="hidden lg:inline text-[11px] font-bold tracking-wide" data-sidebar-label>Ocultar menú</span>
-        </button>
-
         <a href="{% if permisos.es_cliente %}{% url 'portal_cliente' %}{% else %}{% url 'gestion_inicio' %}{% endif %}" class="flex items-center gap-3 shrink-0 group">
           <img src="{% static 'horizontal-blanco.svg' %}" 
                alt="La Serena — Ilustre Municipalidad" 
@@ -323,13 +317,40 @@
   </header>
 
   <!-- Contenedor Principal (Sidebar + Contenido) -->
-  <div id="appLayoutContainer" class="flex-1 max-w-[1440px] w-full mx-auto px-4 md:px-8 py-6 flex flex-col md:flex-row gap-6">
+  <div id="appLayoutContainer" class="flex-1 max-w-[1440px] w-full mx-auto px-4 md:px-8 py-6 flex flex-col md:flex-row gap-6 items-start">
+
+    <!-- Botón visible solo cuando el panel lateral está oculto para volver a mostrarlo -->
+    <button type="button"
+            id="btnShowSidebar"
+            data-sidebar-toggle
+            aria-expanded="false"
+            aria-controls="appSidebar"
+            title="Mostrar menú lateral"
+            class="shrink-0 items-center justify-center gap-1.5 px-3 py-2 rounded-2xl bg-white hover:bg-red-50 text-[#C41230] border border-[rgba(196,18,48,0.25)] shadow-sm text-xs font-extrabold transition-all cursor-pointer">
+      <i data-lucide="panel-left-open" class="w-4 h-4"></i>
+      <span>Mostrar menú</span>
+    </button>
     
     <!-- Sidebar Navegación de Módulos (Filtrado según Perfil del Usuario) -->
     <aside id="appSidebar" class="w-full md:w-60 shrink-0 flex flex-col gap-5">
       
       <!-- Menú de Módulos Organizado por Secciones -->
       <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-3 text-xs font-bold">
+
+        <!-- Cabecera del mismo panel con botón Ocultar menú -->
+        <div class="flex items-center justify-between px-2 pb-2 border-b border-slate-100">
+          <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Menú de módulos</span>
+          <button type="button"
+                  id="btnToggleSidebar"
+                  data-sidebar-toggle
+                  aria-expanded="true"
+                  aria-controls="appSidebar"
+                  title="Ocultar menú lateral"
+                  class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-[#C41230] border border-red-200/80 transition-all cursor-pointer text-[11px] font-bold">
+            <i data-lucide="panel-left-close" class="w-3.5 h-3.5"></i>
+            <span data-sidebar-label>Ocultar menú</span>
+          </button>
+        </div>
         
         <!-- Inicio (Oculto para rol Cliente) -->
         {% if permisos.ver_inicio %}

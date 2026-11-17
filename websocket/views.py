@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -424,8 +425,34 @@ def contacts_feed(request):
         request.user,
         [contact.user_id for contact in contacts],
     )
-    response_contacts = [
-        {
+    contact_user_ids = {contact.user_id for contact in contacts}
+    last_msg_by_contact = {}
+    if contact_user_ids:
+        user_messages = ChatMessage.objects.filter(
+            (Q(sender=request.user) & Q(recipient_id__in=contact_user_ids))
+            | (Q(recipient=request.user) & Q(sender_id__in=contact_user_ids))
+        ).order_by('-created_at', '-id')
+        for msg in user_messages.iterator():
+            if request.user.pk in (msg.oculto_para or []):
+                continue
+            other_id = msg.recipient_id if msg.sender_id == request.user.pk else msg.sender_id
+            if other_id not in last_msg_by_contact:
+                last_msg_by_contact[other_id] = {
+                    'message': msg.message,
+                    'time': timezone.localtime(msg.created_at).strftime('%H:%M'),
+                    'ts': msg.created_at.timestamp(),
+                    'sender_id': msg.sender_id,
+                }
+                if len(last_msg_by_contact) == len(contact_user_ids):
+                    break
+
+    scope = request.GET.get('scope', '').strip().lower()
+    response_contacts = []
+    for contact in contacts:
+        last_info = last_msg_by_contact.get(contact.user_id)
+        if scope == 'active' and not last_info:
+            continue
+        response_contacts.append({
             'id': contact.user_id,
             'rut': contact.identificador_institucional,
             'nombre': contact.user.first_name,
@@ -444,9 +471,15 @@ def contacts_feed(request):
             'activo': contact.estado,
             'unread_count': unread_counts.get(contact.user_id, 0),
             'display_name': display_names.get(contact.user_id, ''),
-        }
-        for contact in contacts
-    ]
+            'has_messages': bool(last_info),
+            'last_message': last_info['message'] if last_info else '',
+            'last_time': last_info['time'] if last_info else '',
+            'last_ts': last_info['ts'] if last_info else 0,
+        })
+
+    if scope == 'active':
+        response_contacts.sort(key=lambda item: (-item['last_ts'], item['nombre'], item['apellido']))
+
     return JsonResponse({
         'ok': True,
         'contacts': response_contacts,

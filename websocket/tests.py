@@ -199,6 +199,19 @@ class PrivateChatTests(TestCase):
         self.assertEqual(synced_page.context['delegacion_seleccionada_chat'].pk, self.norte.pk)
         override_page = self.client.get(reverse('websocket:chat_index'), {'delegacion': ''})
         self.assertIsNone(override_page.context['delegacion_seleccionada_chat'])
+        self.assertContains(override_page, 'id="btn-new-conversation"')
+        self.assertContains(override_page, 'Conversaciones activas')
+
+        # scope=active devuelve solo contactos con mensajes previos; sin scope devuelve todos (Nueva conversación)
+        self.client.force_login(self.trabajador)
+        empty_active = self.client.get(reverse('websocket:contacts'), {'scope': 'active'}).json()
+        self.assertEqual(empty_active['contacts'], [])
+        all_contacts = self.client.get(reverse('websocket:contacts')).json()
+        self.assertTrue(any(c['id'] == self.colega.pk for c in all_contacts['contacts']))
+        self.make_message(self.trabajador, self.colega, 'Hola colega')
+        with_active = self.client.get(reverse('websocket:contacts'), {'scope': 'active'}).json()
+        self.assertEqual([c['id'] for c in with_active['contacts']], [self.colega.pk])
+        self.assertEqual(with_active['contacts'][0]['last_message'], 'Hola colega')
 
         # Verificar filtro de estado Activo/Inactivo para administrador
         inactivo = self.create_employee(

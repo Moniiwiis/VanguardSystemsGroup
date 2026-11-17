@@ -54,7 +54,7 @@
 
   <section class="chat-layout h-[min(76vh,850px)] min-h-[620px] grid grid-cols-1 lg:grid-cols-[350px_minmax(0,1fr)] overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_18px_55px_rgba(30,41,59,.12)]">
     <aside class="min-h-0 flex flex-col border-b lg:border-b-0 lg:border-r border-slate-200 bg-white">
-      <header class="px-5 pt-5 pb-4 border-b border-slate-100">
+      <header class="px-5 pt-5 pb-4 border-b border-slate-100 space-y-3">
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-3">
             <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#C41230] to-[#8B1D19] text-white flex items-center justify-center shadow-md shadow-red-900/15">
@@ -72,6 +72,11 @@
           </a>
           {% endif %}
         </div>
+        <button type="button" id="btn-new-conversation" aria-pressed="false"
+                class="w-full inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer">
+          <i data-lucide="message-square-plus" class="w-4 h-4"></i>
+          <span id="btn-new-conversation-label">Nueva conversación</span>
+        </button>
       </header>
 
       {% if is_chat_global %}
@@ -132,7 +137,7 @@
       </div>
 
       <div class="px-5 py-3 flex items-center justify-between">
-        <h3 class="text-[10px] font-extrabold uppercase tracking-[.14em] text-slate-400">Chats y contactos</h3>
+        <h3 id="directory-section-title" class="text-[10px] font-extrabold uppercase tracking-[.14em] text-slate-400">Conversaciones activas</h3>
         <span id="contacts-count" class="text-[10px] font-bold text-slate-400">—</span>
       </div>
       <div id="contacts-container" class="chat-contacts chat-scroll flex-1 min-h-0 overflow-y-auto px-2 pb-3">
@@ -141,8 +146,8 @@
           <div class="mx-auto w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
             <i data-lucide="user-round-search" class="w-5 h-5"></i>
           </div>
-          <p class="mt-2 text-xs font-bold text-slate-600">No encontramos contactos</p>
-          <p class="mt-1 text-[10px] text-slate-400">Prueba con otros filtros.</p>
+          <p id="contacts-empty-title" class="mt-2 text-xs font-bold text-slate-600">No hay conversaciones activas</p>
+          <p id="contacts-empty-subtitle" class="mt-1 text-[10px] text-slate-400">Presiona Nueva conversación para elegir un contacto.</p>
         </div>
       </div>
       {% if can_manage_contacts %}
@@ -518,10 +523,25 @@ document.addEventListener('DOMContentLoaded', function() {
     const avatar = document.createElement('span');
     avatar.className = 'relative w-11 h-11 shrink-0 rounded-full bg-gradient-to-br from-rose-100 to-red-200 text-[#9f1239] flex items-center justify-center text-xs font-extrabold';
     avatar.textContent = fullName.trim().split(/\s+/).slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase();
+    const infoWrap = document.createElement('span');
+    infoWrap.className = 'min-w-0 flex-1';
+    const topRow = document.createElement('span');
+    topRow.className = 'flex items-center justify-between gap-2';
     const name = document.createElement('span');
-    name.className = 'min-w-0 flex-1 truncate text-xs font-extrabold text-slate-800 group-hover:text-[#C41230]';
+    name.className = 'min-w-0 truncate text-xs font-extrabold text-slate-800 group-hover:text-[#C41230]';
     name.textContent = contact.display_name || fullName;
-    link.append(avatar, name);
+    topRow.appendChild(name);
+    if (contact.last_time) {
+      const timeEl = document.createElement('span');
+      timeEl.className = 'text-[9px] font-semibold text-slate-400 shrink-0';
+      timeEl.textContent = contact.last_time;
+      topRow.appendChild(timeEl);
+    }
+    const sub = document.createElement('span');
+    sub.className = 'block truncate text-[10px] text-slate-500';
+    sub.textContent = contact.last_message || [contact.cargo, contact.delegacion].filter(Boolean).join(' · ') || 'Iniciar conversación';
+    infoWrap.append(topRow, sub);
+    link.append(avatar, infoWrap);
     if (contact.activo && contact.activo.toLowerCase() !== 'activo') {
       const inactiveBadge = document.createElement('span');
       inactiveBadge.className = 'px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-bold shrink-0';
@@ -605,8 +625,43 @@ document.addEventListener('DOMContentLoaded', function() {
     filterBadge.classList.toggle('inline-flex', advancedCount > 0);
   }
 
+  const btnNewConversation = document.getElementById('btn-new-conversation');
+  const btnNewConversationLabel = document.getElementById('btn-new-conversation-label');
+  const directorySectionTitle = document.getElementById('directory-section-title');
+  const contactsEmptyTitle = document.getElementById('contacts-empty-title');
+  const contactsEmptySubtitle = document.getElementById('contacts-empty-subtitle');
+  let directoryMode = 'active';
+
+  function syncDirectoryModeUI() {
+    const isContacts = directoryMode === 'contacts';
+    if (btnNewConversation) {
+      btnNewConversation.setAttribute('aria-pressed', isContacts ? 'true' : 'false');
+      btnNewConversation.className = isContacts
+        ? 'w-full inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold transition-all cursor-pointer'
+        : 'w-full inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer';
+    }
+    if (btnNewConversationLabel) {
+      btnNewConversationLabel.textContent = isContacts ? '← Volver a conversaciones activas' : 'Nueva conversación';
+    }
+    if (directorySectionTitle) {
+      directorySectionTitle.textContent = isContacts ? 'Contactos disponibles' : 'Conversaciones activas';
+    }
+  }
+
+  if (btnNewConversation) {
+    btnNewConversation.addEventListener('click', function() {
+      directoryMode = directoryMode === 'active' ? 'contacts' : 'active';
+      syncDirectoryModeUI();
+      loadContacts();
+    });
+  }
+  syncDirectoryModeUI();
+
   async function loadContacts() {
     const params = new URLSearchParams(new FormData(filters));
+    if (directoryMode === 'active') {
+      params.set('scope', 'active');
+    }
     updateFilterCount();
     try {
       const response = await fetch('{{ chat_contacts_url }}?' + params.toString(), {
@@ -614,10 +669,34 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       if (!response.ok) throw new Error('No fue posible cargar los contactos.');
       const payload = await response.json();
-      contactsList.replaceChildren(supportChannelCard(), ...payload.contacts.map(contactCard));
-      const visibleCount = payload.contacts.length + 1;
-      contactsCount.textContent = visibleCount + (visibleCount === 1 ? ' canal/contacto' : ' canales/contactos');
-      contactsEmpty.classList.add('hidden');
+      const cards = payload.contacts.map(contactCard);
+      const qVal = (params.get('q') || '').trim().toLowerCase();
+      const hasRoleOrStateFilter = Boolean((params.get('cargo') || '').trim() || (params.get('estado') || '').trim());
+      const includeSupport = directoryMode === 'active' && !hasRoleOrStateFilter && (!qVal || 'soporte técnico tecnico'.includes(qVal));
+      if (includeSupport) {
+        contactsList.replaceChildren(supportChannelCard(), ...cards);
+      } else {
+        contactsList.replaceChildren(...cards);
+      }
+      const visibleCount = cards.length + (includeSupport ? 1 : 0);
+      contactsCount.textContent = directoryMode === 'active'
+        ? visibleCount + (visibleCount === 1 ? ' conversación' : ' conversaciones')
+        : visibleCount + (visibleCount === 1 ? ' contacto' : ' contactos');
+      if (visibleCount === 0) {
+        contactsEmpty.classList.remove('hidden');
+        if (contactsEmptyTitle) {
+          contactsEmptyTitle.textContent = directoryMode === 'active'
+            ? 'No hay conversaciones activas'
+            : 'No encontramos contactos';
+        }
+        if (contactsEmptySubtitle) {
+          contactsEmptySubtitle.textContent = directoryMode === 'active'
+            ? 'Presiona Nueva conversación para iniciar un chat.'
+            : 'Prueba con otros filtros.';
+        }
+      } else {
+        contactsEmpty.classList.add('hidden');
+      }
       if (globalConversationsList) {
         globalConversationsList.replaceChildren(...payload.conversations.map(globalConversationCard));
         globalConversationsCount.textContent = payload.conversations.length + (payload.conversations.length === 1 ? ' chat' : ' chats');
@@ -629,7 +708,7 @@ document.addEventListener('DOMContentLoaded', function() {
       contactsList.replaceChildren();
       contactsCount.textContent = '—';
       contactsEmpty.classList.remove('hidden');
-      contactsEmpty.querySelector('p:last-child').textContent = error.message;
+      if (contactsEmptySubtitle) contactsEmptySubtitle.textContent = error.message;
     }
   }
 
