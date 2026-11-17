@@ -43,11 +43,14 @@ def _acceso(request):
 def _alcance(request, ctx):
     qs = Carta.objects.select_related('delegacion', 'creado_por')
     if ctx['permisos'].get('es_admin'):
-        id_del = request.GET.get('delegacion', '').strip()
-        if id_del:
-            if not id_del.isdigit():
-                return qs.none()
-            qs = qs.filter(delegacion_id=int(id_del))
+        if 'delegacion' in request.GET:
+            id_del = request.GET.get('delegacion', '').strip()
+            if id_del:
+                if not id_del.isdigit():
+                    return qs.none()
+                qs = qs.filter(delegacion_id=int(id_del))
+        elif ctx.get('delegacion_activa'):
+            qs = qs.filter(delegacion=ctx['delegacion_activa'])
     elif ctx.get('delegacion_activa'):
         qs = qs.filter(delegacion=ctx['delegacion_activa'])
     else:
@@ -175,12 +178,23 @@ def listado(request):
     page_size = _get_page_size(request)
     page_obj = Paginator(qs, page_size).get_page(request.GET.get('page', 1))
 
-    delegacion_filtro = request.GET.get('delegacion', '').strip()
-    delegacion_seleccionada = (
-        Delegacion.objects.filter(id=int(delegacion_filtro), estado='Activa').first()
-        if (ctx['permisos'].get('es_admin') and delegacion_filtro.isdigit())
-        else None
-    )
+    if ctx['permisos'].get('es_admin'):
+        if 'delegacion' in request.GET:
+            delegacion_filtro = request.GET.get('delegacion', '').strip()
+            delegacion_seleccionada = (
+                Delegacion.objects.filter(id=int(delegacion_filtro), estado='Activa').first()
+                if delegacion_filtro.isdigit()
+                else None
+            )
+        elif ctx.get('delegacion_activa'):
+            delegacion_seleccionada = ctx['delegacion_activa']
+            delegacion_filtro = str(delegacion_seleccionada.id)
+        else:
+            delegacion_filtro = ''
+            delegacion_seleccionada = None
+    else:
+        delegacion_filtro = ''
+        delegacion_seleccionada = None
 
     params = request.GET.copy()
     params.pop('page', None)

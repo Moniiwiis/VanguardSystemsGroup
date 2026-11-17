@@ -188,6 +188,17 @@ class PrivateChatTests(TestCase):
         self.assertEqual(global_page.status_code, 200)
         self.assertContains(global_page, 'Filtrar Delegación: Todas')
         self.assertContains(global_page, f'{self.centro.get_codigo()} — {self.centro.nombre}')
+        self.assertContains(global_page, '>En línea</span>')
+
+        # Si el admin/global cambia la delegación activa, el filtro del chat se sincroniza,
+        # y puede cambiarse independientemente por URL/selector
+        session = self.client.session
+        session['delegacion_activa_id'] = self.norte.pk
+        session.save()
+        synced_page = self.client.get(reverse('websocket:chat_index'))
+        self.assertEqual(synced_page.context['delegacion_seleccionada_chat'].pk, self.norte.pk)
+        override_page = self.client.get(reverse('websocket:chat_index'), {'delegacion': ''})
+        self.assertIsNone(override_page.context['delegacion_seleccionada_chat'])
 
         # Verificar filtro de estado Activo/Inactivo para administrador
         inactivo = self.create_employee(

@@ -3374,6 +3374,15 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertRedirects(resp_post, reverse('cartas_listado'))
         self.assertTrue(Carta.objects.filter(numero='MODAL-01', delegacion=self.delegacion).exists())
 
+        # Si admin cambia delegación activa, Cartas sincroniza el filtro y permite cambiarlo independientemente
+        session = self.client.session
+        session['delegacion_activa_id'] = self.delegacion.id
+        session.save()
+        r_sync = self.client.get(reverse('cartas_listado'))
+        self.assertEqual(r_sync.context['delegacion_seleccionada'], self.delegacion)
+        r_all = self.client.get(reverse('cartas_listado') + '?delegacion=')
+        self.assertIsNone(r_all.context['delegacion_seleccionada'])
+
 
 
 

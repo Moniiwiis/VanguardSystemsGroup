@@ -29,7 +29,7 @@ def global_context(request):
             rol_name = "Administrador"
 
     # Determinar alcance de delegaciones
-    es_admin = (rol_name.lower() in ['administrador', 'superadministrador']) or request.user.is_superuser
+    es_admin = (rol_name.lower() in ['administrador', 'superadministrador', 'delegación global', 'delegacion global']) or request.user.is_superuser
     todas_activas = list(Delegacion.objects.filter(estado='Activa').order_by('id'))
 
     delegacion_activa = None
