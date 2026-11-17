@@ -20,8 +20,13 @@
     .chat-conversation { min-height: 620px; }
   }
   {% if chat_widget_mode %}
-  body.chat-widget-mode .chat-layout { grid-template-columns: minmax(0, 1fr); border-radius: 0; }
+  body.chat-widget-mode .chat-layout { grid-template-columns: minmax(0, 1fr); border-radius: 0; height: calc(100vh - 1rem); }
+  {% if conversation_id %}
   body.chat-widget-mode .chat-layout > aside { display: none; }
+  {% else %}
+  body.chat-widget-mode .chat-layout > main { display: none; }
+  body.chat-widget-mode .chat-contacts { max-height: none; }
+  {% endif %}
   body.chat-widget-mode .chat-conversation { min-height: 0; }
   {% endif %}
 </style>
@@ -29,6 +34,7 @@
 
 {% block content %}
 <div class="space-y-4">
+  {% if not chat_widget_mode %}
   <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3 px-1">
     <div>
       <p class="text-[10px] font-extrabold uppercase tracking-[.18em] text-[#C41230]">{% if is_support_channel %}Canal compartido{% else %}Comunicación privada{% endif %}</p>
@@ -39,6 +45,12 @@
       <span id="chat-status" aria-live="polite">Conectando…</span>
     </div>
   </div>
+  {% else %}
+  <div class="hidden" aria-hidden="true">
+    <span id="chat-status-dot"></span>
+    <span id="chat-status"></span>
+  </div>
+  {% endif %}
 
   <section class="chat-layout h-[min(76vh,850px)] min-h-[620px] grid grid-cols-1 lg:grid-cols-[350px_minmax(0,1fr)] overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_18px_55px_rgba(30,41,59,.12)]">
     <aside class="min-h-0 flex flex-col border-b lg:border-b-0 lg:border-r border-slate-200 bg-white">
@@ -91,13 +103,33 @@
             </button>
             <button type="button" id="clear-filters" class="text-[10px] font-semibold text-slate-400 hover:text-slate-700">Limpiar</button>
           </div>
-          <div id="advanced-filters" class="grid grid-cols-2 gap-2 pt-1">
-            <input name="rut" placeholder="RUT / ID" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] focus:outline-none focus:border-[#C41230]">
-            <input name="nombre" placeholder="Nombre" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] focus:outline-none focus:border-[#C41230]">
-            <input name="apellido" placeholder="Apellido" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] focus:outline-none focus:border-[#C41230]">
-            <input name="cargo" placeholder="Cargo" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] focus:outline-none focus:border-[#C41230]">
-            <input name="seccion" placeholder="Sección" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] focus:outline-none focus:border-[#C41230]">
-            <input name="delegacion" placeholder="Delegación" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] focus:outline-none focus:border-[#C41230]">
+          <div id="advanced-filters" class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            <input name="rut" placeholder="RUT / ID" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#C41230] bg-white">
+            <input name="nombre" placeholder="Nombre" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#C41230] bg-white">
+            <input name="apellido" placeholder="Apellido" autocomplete="off" class="min-w-0 px-2.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#C41230] bg-white">
+            <select name="cargo" data-search-placeholder="Filtrar Cargo: Todos"
+                    class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
+              <option value="">Filtrar Cargo: Todos</option>
+              {% for c in cargos_filtro %}
+                <option value="{{ c.nombre_cargo }}">{{ c.nombre_cargo }}</option>
+              {% endfor %}
+            </select>
+            <select name="seccion" data-search-placeholder="Filtrar Sección: Todas"
+                    class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white {% if not is_chat_global %}sm:col-span-2{% endif %}">
+              <option value="">Filtrar Sección: Todas</option>
+              {% for s in secciones_filtro %}
+                <option value="{{ s.nombre }}">{{ s.nombre }}{% if is_chat_global and s.delegacion %} — {{ s.delegacion.nombre }}{% endif %}</option>
+              {% endfor %}
+            </select>
+            {% if is_chat_global %}
+            <select name="delegacion" data-search-placeholder="Filtrar Delegación: Todas"
+                    class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
+              <option value="">Filtrar Delegación: Todas</option>
+              {% for d in delegaciones_filtro %}
+                <option value="{{ d.id }}">{{ d.get_codigo }} — {{ d.nombre }}</option>
+              {% endfor %}
+            </select>
+            {% endif %}
           </div>
         </form>
       </div>
@@ -145,7 +177,7 @@
           </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          {% if conversation_id and direct_contact %}
+          {% if conversation_id %}
           <a href="{% url 'websocket:chat_index' %}{% if chat_widget_mode %}?widget=1{% endif %}" title="Volver a contactos"
              class="w-9 h-9 rounded-xl border border-slate-200 text-slate-500 hover:text-[#C41230] hover:bg-red-50 flex items-center justify-center transition-colors">
             <i data-lucide="arrow-left" class="w-4 h-4"></i>
@@ -564,7 +596,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function updateFilterCount() {
-    const advancedCount = Array.from(advancedFilters.querySelectorAll('input')).filter((item) => item.value.trim()).length;
+    const advancedCount = Array.from(advancedFilters.querySelectorAll('[name]')).filter((item) => item.value.trim()).length;
     filterBadge.textContent = String(advancedCount);
     filterBadge.classList.toggle('hidden', advancedCount === 0);
     filterBadge.classList.toggle('inline-flex', advancedCount > 0);
@@ -667,10 +699,20 @@ document.addEventListener('DOMContentLoaded', function() {
     this.setAttribute('aria-expanded', String(opening));
   });
   document.getElementById('clear-filters').addEventListener('click', function() {
-    filters.querySelectorAll('input').forEach((item) => { item.value = ''; });
+    filters.querySelectorAll('[name]').forEach((item) => {
+      item.value = '';
+      if (item.tagName === 'SELECT') item.dispatchEvent(new Event('change', { bubbles: false }));
+    });
     loadContacts();
   });
-  filters.addEventListener('input', function() {
+  filters.addEventListener('change', function(event) {
+    if (event.target && event.target.name) {
+      clearTimeout(contactTimer);
+      loadContacts();
+    }
+  });
+  filters.addEventListener('input', function(event) {
+    if (event.target && !event.target.name) return;
     clearTimeout(contactTimer);
     contactTimer = setTimeout(loadContacts, 250);
   });

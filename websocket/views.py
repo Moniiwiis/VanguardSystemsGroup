@@ -8,8 +8,9 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_GET, require_POST
-from accounts.models import Funcionario
+from accounts.models import Cargo, Delegacion, Funcionario, Sector
 from core.context_processors import global_context
 from .models import ChatContactPreference, ChatMessage
 from .services import (
@@ -52,6 +53,7 @@ def _chat_url_for_contact(contact_id):
 
 
 @login_required
+@xframe_options_sameorigin
 def chat_room(request):
     ctx = global_context(request)
     access = get_chat_access(request.user)
@@ -193,6 +195,12 @@ def chat_room(request):
             and can_contact_user(request.user, direct_contact, actor_access=access)
         )
     )
+    cargos_filtro = Cargo.objects.order_by('nombre_cargo')
+    secciones_filtro = Sector.objects.filter(estado='Activo').select_related('delegacion').order_by('nombre')
+    if not access['es_global'] and access['funcionario'] and access['funcionario'].delegacion_id:
+        secciones_filtro = secciones_filtro.filter(delegacion_id=access['funcionario'].delegacion_id)
+    delegaciones_filtro = Delegacion.objects.filter(estado='Activa').order_by('id') if access['es_global'] else []
+
     return render(request, 'websocket/chat.html', {
         'conversation_id': conversation_id,
         'is_support_channel': support_channel,
@@ -209,6 +217,9 @@ def chat_room(request):
         'chat_contacts_url': reverse('websocket:contacts'),
         'can_manage_contacts': access['es_admin'],
         'is_chat_global': access['es_global'],
+        'cargos_filtro': cargos_filtro,
+        'secciones_filtro': secciones_filtro,
+        'delegaciones_filtro': delegaciones_filtro,
         'can_send_message': can_send_message,
         'chat_widget_mode': request.GET.get('widget') == '1',
         'message_action_url': reverse('websocket:message_action'),

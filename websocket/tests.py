@@ -165,8 +165,24 @@ class PrivateChatTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('X-Frame-Options'), 'SAMEORIGIN')
         self.assertContains(response, 'chat-widget-mode')
         self.assertNotContains(response, 'id="chat-bubble"')
+        self.assertContains(response, 'Filtrar Cargo: Todos')
+        self.assertContains(response, 'Filtrar Sección: Todas')
+
+        global_user = self.create_employee(
+            'global_filter_user',
+            '8.888.888-8',
+            None,
+            self.global_role,
+            first_name='Global',
+        )
+        self.client.force_login(global_user)
+        global_page = self.client.get(reverse('websocket:chat_index'))
+        self.assertEqual(global_page.status_code, 200)
+        self.assertContains(global_page, 'Filtrar Delegación: Todas')
+        self.assertContains(global_page, f'{self.centro.get_codigo()} — {self.centro.nombre}')
 
     def test_aura_widget_is_hidden_until_a_provider_is_configured(self):
         employee = Funcionario.objects.get(user=self.trabajador)
