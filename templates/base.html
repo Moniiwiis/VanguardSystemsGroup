@@ -2542,6 +2542,38 @@
         });
       }, true);
 
+      // 3b) Protección global contra doble clic / envíos duplicados en formularios POST
+      document.addEventListener('submit', (ev) => {
+        if (ev.defaultPrevented) return;
+        const form = ev.target;
+        if (!form || form.tagName !== 'FORM') return;
+        if ((form.method || '').toUpperCase() !== 'POST') return;
+        if (form.target === '_blank' || form.dataset.allowMultiSubmit === 'true') return;
+        if (form.dataset.sgrSubmitting === '1') {
+          ev.preventDefault();
+          return;
+        }
+        form.dataset.sgrSubmitting = '1';
+        const btn = form.querySelector('button[type="submit"]:not([disabled])');
+        if (btn) {
+          btn.disabled = true;
+          btn.classList.add('opacity-70', 'cursor-not-allowed');
+          if (!btn.dataset.sgrOrigText) btn.dataset.sgrOrigText = btn.textContent || '';
+        }
+      });
+
+      window.addEventListener('pageshow', () => {
+        document.querySelectorAll('form[data-sgr-submitting="1"]').forEach((form) => {
+          delete form.dataset.sgrSubmitting;
+          form.querySelectorAll('button[type="submit"][disabled]').forEach((btn) => {
+            if (btn.dataset.sgrOrigText !== undefined) {
+              btn.disabled = false;
+              btn.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
+          });
+        });
+      });
+
       // 4) Calendario Universal Chileno: Feriados nacionales, fines de semana, Trimestre y respeto de min/max
       window.SGR_CALENDAR = (function () {
         const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];

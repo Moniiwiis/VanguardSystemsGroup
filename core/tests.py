@@ -3674,6 +3674,38 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(at_ok.vecino, vecino_pres)
         self.assertIn('Presidente', at_ok.solicitante)
 
+    def test_prevencion_duplicado_organizacion_y_aviso_correo_funcionario(self):
+        from activities.models import OrganizacionComunitaria
+
+        self.client.force_login(self.user)
+
+        # 1. Al usar el correo de un funcionario municipal interno debe indicar específicamente que pertenece a un funcionario
+        r_staff_mail = self.client.post(reverse('gestion_organizaciones'), {
+            'nombre': 'JJVV Correo Funcionario',
+            'tipo_organizacion': 'Junta de Vecinos',
+            'email_contacto': self.user.email,
+            'estado': 'Activa',
+        }, follow=True)
+        self.assertEqual(r_staff_mail.status_code, 200)
+        self.assertFalse(OrganizacionComunitaria.objects.filter(nombre='JJVV Correo Funcionario').exists())
+        self.assertContains(r_staff_mail, 'funcionario municipal')
+        self.assertContains(r_staff_mail, 'sgrSubmitting')
+
+        # 2. Al crear una organización con el mismo nombre dos veces en la misma delegación se bloquea el duplicado
+        for _ in range(2):
+            self.client.post(reverse('gestion_organizaciones'), {
+                'nombre': 'Los torreones',
+                'tipo_organizacion': 'Junta de Vecinos',
+                'email_contacto': 'torreones@jjvv.cl',
+                'socios_activos': '5',
+                'estado': 'Activa',
+            })
+        self.assertEqual(
+            OrganizacionComunitaria.objects.filter(nombre='Los torreones', delegacion=self.delegacion).count(),
+            1,
+        )
+
+
 
 
 

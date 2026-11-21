@@ -92,6 +92,50 @@ def _send_welcome_provisional_password(user, provisional_password, rol_nombre=''
         raise SMTPException("El backend de correo no confirmó el envío del mensaje.")
 
 
+def _despachar_correo_bienvenida(user, provisional_password, rol_nombre='', delegacion_nombre=''):
+    """Envía el correo de bienvenida en segundo plano cuando el backend es SMTP para no bloquear la UI."""
+    if not (user and user.email and provisional_password):
+        return False
+    backend = (getattr(settings, 'EMAIL_BACKEND', '') or '').lower()
+    if 'smtp' in backend:
+        import threading
+        user_id = user.id
+        email_addr = user.email
+        first_name = user.first_name
+        username = user.username
+
+        class _UserSnapshot:
+            pass
+
+        snap = _UserSnapshot()
+        snap.id = user_id
+        snap.email = email_addr
+        snap.first_name = first_name
+        snap.username = username
+
+        def _worker():
+            try:
+                _send_welcome_provisional_password(
+                    user=snap,
+                    provisional_password=provisional_password,
+                    rol_nombre=rol_nombre,
+                    delegacion_nombre=delegacion_nombre,
+                )
+            except (OSError, SMTPException, BadHeaderError):
+                logger.exception("No se pudo enviar correo de bienvenida en segundo plano.")
+
+        transaction.on_commit(lambda: threading.Thread(target=_worker, daemon=True).start())
+        return True
+
+    _send_welcome_provisional_password(
+        user=user,
+        provisional_password=provisional_password,
+        rol_nombre=rol_nombre,
+        delegacion_nombre=delegacion_nombre,
+    )
+    return True
+
+
 def _clear_recovery_session(request):
     for key in (
         'recovery_code',
@@ -987,6 +1031,43 @@ def _correo_en_uso_por_otra_cuenta(email, exclude_user_id=None, tipo_cuenta='sta
     return qs.exists()
 
 
+def _mensaje_colision_correo(email, exclude_user_id=None, tipo_cuenta='staff'):
+    """Retorna un mensaje descriptivo si el correo choca con otra cuenta (distinguiendo funcionarios municipales)."""
+    if not email:
+        return None
+    qs = User.objects.filter(email__iexact=email)
+    if exclude_user_id:
+        qs = qs.exclude(id=exclude_user_id)
+
+    q_vec_org = (
+        Q(funcionario__identificador_institucional__startswith='VEC-')
+        | Q(funcionario__identificador_institucional__startswith='ORG-')
+        | Q(funcionario__funcionariorol__rol__nombre_rol__icontains='cliente')
+    )
+    if tipo_cuenta == 'organizacion':
+        colisiones = qs.exclude(q_vec_org)
+        if not colisiones.exists():
+            return None
+        return (
+            "Este correo electrónico pertenece a la cuenta interna de un funcionario municipal. "
+            "Por seguridad y control de acceso, la Junta de Vecinos u organización debe registrarse con su propio correo electrónico."
+        )
+    if tipo_cuenta == 'vecino':
+        colisiones = qs.exclude(Q(funcionario__identificador_institucional__startswith='ORG-'))
+        if not colisiones.exists():
+            return None
+        if colisiones.exclude(q_vec_org).exists():
+            return (
+                "Este correo electrónico pertenece a la cuenta interna de un funcionario municipal. "
+                "Ingresa el correo personal del vecino o vecina."
+            )
+        return "Ese correo electrónico ya se encuentra asociado a otro vecino registrado en el sistema."
+
+    if qs.exists():
+        return "Ese correo electrónico ya se encuentra asociado a otra cuenta."
+    return None
+
+
 def _identificador_vecino(rut_str):
     clean = ''.join(c for c in (rut_str or '').upper() if c.isalnum())
     return f"VEC-{clean}"[:20]
@@ -1240,8 +1321,9 @@ def _validar_y_crear_vecino_desde_post(request, del_activa, prefix='', allow_exi
 
         func_actual = _buscar_func_vecino(vecino_existente.rut)
         uid_actual = func_actual.user_id if func_actual else None
-        if _correo_en_uso_por_otra_cuenta(correo, exclude_user_id=uid_actual, tipo_cuenta='vecino'):
-            return None, None, None, False, "Ese correo electrónico ya se encuentra asociado a otra cuenta."
+        err_mail = _mensaje_colision_correo(correo, exclude_user_id=uid_actual, tipo_cuenta='vecino')
+        if err_mail:
+            return None, None, None, False, err_mail
 
         actualizado = False
         if nombre and vecino_existente.nombre != nombre:
@@ -1288,8 +1370,9 @@ def _validar_y_crear_vecino_desde_post(request, del_activa, prefix='', allow_exi
                 logger.exception("No se pudo enviar correo de bienvenida al vecino existente sincronizado.")
         return vecino_existente, user_vec, prov_pwd, correo_enviado, None
 
-    if _correo_en_uso_por_otra_cuenta(correo, tipo_cuenta='vecino'):
-        return None, None, None, False, "Ese correo electrónico ya se encuentra asociado a otra cuenta."
+    err_mail = _mensaje_colision_correo(correo, tipo_cuenta='vecino')
+    if err_mail:
+        return None, None, None, False, err_mail
 
     nuevo_v = Vecino.objects.create(
         nombre=nombre,
@@ -1464,21 +1547,21 @@ def _validar_y_crear_organizacion_desde_post(request, del_activa, prefix='', all
             correo_sync = email_val or (org_existente.email_contacto or '').strip()
             func_actual = _buscar_func_organizacion(org_existente)
             uid_actual = func_actual.user_id if func_actual else None
-            if correo_sync and _correo_en_uso_por_otra_cuenta(correo_sync, exclude_user_id=uid_actual, tipo_cuenta='organizacion'):
-                return None, None, None, False, "Ese correo electrónico ya se encuentra asociado a otra cuenta."
+            err_mail = _mensaje_colision_correo(correo_sync, exclude_user_id=uid_actual, tipo_cuenta='organizacion') if correo_sync else None
+            if err_mail:
+                return None, None, None, False, err_mail
             user_org, prov_pwd, creado = _crear_o_sincronizar_usuario_organizacion(
                 org_existente, correo=correo_sync, crear=bool(correo_sync), actualizar_correo=bool(email_val)
             )
             correo_enviado = False
             if creado and prov_pwd and user_org:
                 try:
-                    _send_welcome_provisional_password(
+                    correo_enviado = _despachar_correo_bienvenida(
                         user=user_org,
                         provisional_password=prov_pwd,
                         rol_nombre=f"{org_existente.tipo_organizacion} (Portal Ciudadano)",
                         delegacion_nombre=del_activa.nombre if del_activa else 'Comuna',
                     )
-                    correo_enviado = True
                 except (OSError, SMTPException, BadHeaderError):
                     logger.exception("No se pudo enviar correo de bienvenida a la organización existente sincronizada.")
             return org_existente, user_org, prov_pwd, correo_enviado, None
@@ -1486,54 +1569,70 @@ def _validar_y_crear_organizacion_desde_post(request, del_activa, prefix='', all
     if not email_val:
         return None, None, None, False, "Debe ingresar un correo electrónico institucional o del contacto en la directiva para crear la cuenta de acceso de la organización."
 
-    if _correo_en_uso_por_otra_cuenta(email_val, tipo_cuenta='organizacion'):
-        return None, None, None, False, "Ese correo electrónico ya se encuentra asociado a otra cuenta."
+    err_mail = _mensaje_colision_correo(email_val, tipo_cuenta='organizacion')
+    if err_mail:
+        return None, None, None, False, err_mail
 
-    nueva_org = OrganizacionComunitaria.objects.create(
-        nombre=nombre,
-        tipo_organizacion=tipo_org,
-        domicilio_legal=domicilio,
-        delegacion=del_activa,
-        sector=sector_obj,
-        territorio=territorio,
-        socios_activos=socios_num,
-        fecha_constitucion=fecha_constitucion_val,
-        numero_registro_pj=num_pj,
-        fecha_inscripcion_registro=fecha_inscripcion_val,
-        registro_directiva_numero=reg_dir,
-        estado=estado,
-        rut=rut_org or None,
-        personalidad_juridica=personalidad_jur or num_pj or None,
-        contacto_prioritario=prioridad_val,
-        representante_legal=rep_val,
-        telefono_contacto=tel_val,
-        email_contacto=email_val,
-        direccion_sede=direccion_sede or domicilio or None,
-        directiva_actual=directiva or None,
-        observaciones=observaciones or None,
-        **directiva_data,
-    )
+    if not allow_existing:
+        dup_qs = OrganizacionComunitaria.objects.filter(nombre__iexact=nombre)
+        if del_activa:
+            dup_qs = dup_qs.filter(delegacion=del_activa)
+        else:
+            dup_qs = dup_qs.filter(delegacion__isnull=True)
+        if dup_qs.exists():
+            return (
+                None,
+                None,
+                None,
+                False,
+                f"Ya existe una organización registrada con el nombre '{nombre}' en {del_activa.nombre if del_activa else 'esta delegación'}.",
+            )
 
-    user_org, provisional_password, _ = _crear_o_sincronizar_usuario_organizacion(
-        nueva_org, correo=email_val, crear=True, actualizar_correo=True
-    )
-    _sincronizar_vecinos_directiva(request, nueva_org, del_activa, sector_obj, field_prefix=prefix)
+    with transaction.atomic():
+        nueva_org = OrganizacionComunitaria.objects.create(
+            nombre=nombre,
+            tipo_organizacion=tipo_org,
+            domicilio_legal=domicilio,
+            delegacion=del_activa,
+            sector=sector_obj,
+            territorio=territorio,
+            socios_activos=socios_num,
+            fecha_constitucion=fecha_constitucion_val,
+            numero_registro_pj=num_pj,
+            fecha_inscripcion_registro=fecha_inscripcion_val,
+            registro_directiva_numero=reg_dir,
+            estado=estado,
+            rut=rut_org or None,
+            personalidad_juridica=personalidad_jur or num_pj or None,
+            contacto_prioritario=prioridad_val,
+            representante_legal=rep_val,
+            telefono_contacto=tel_val,
+            email_contacto=email_val,
+            direccion_sede=direccion_sede or domicilio or None,
+            directiva_actual=directiva or None,
+            observaciones=observaciones or None,
+            **directiva_data,
+        )
 
-    del_id_ws = del_activa.id if del_activa else "global"
-    def notificar_ws_org():
-        publish_module_changed("organizaciones", del_id_ws, "create", nueva_org.id)
-    transaction.on_commit(notificar_ws_org)
+        user_org, provisional_password, _ = _crear_o_sincronizar_usuario_organizacion(
+            nueva_org, correo=email_val, crear=True, actualizar_correo=True
+        )
+        _sincronizar_vecinos_directiva(request, nueva_org, del_activa, sector_obj, field_prefix=prefix)
+
+        del_id_ws = del_activa.id if del_activa else "global"
+        def notificar_ws_org():
+            publish_module_changed("organizaciones", del_id_ws, "create", nueva_org.id)
+        transaction.on_commit(notificar_ws_org)
 
     correo_enviado = False
     if email_val and user_org and provisional_password:
         try:
-            _send_welcome_provisional_password(
+            correo_enviado = _despachar_correo_bienvenida(
                 user=user_org,
                 provisional_password=provisional_password,
                 rol_nombre=f"{nueva_org.tipo_organizacion} (Portal Ciudadano)",
                 delegacion_nombre=del_activa.nombre if del_activa else 'Comuna',
             )
-            correo_enviado = True
         except (OSError, SMTPException, BadHeaderError):
             logger.exception("No se pudo enviar correo de bienvenida a la organización creada.")
 
@@ -4453,8 +4552,9 @@ def gestion_vecinos_editar(request, vecino_id):
                 return redirect('gestion_vecinos')
             func_actual = _buscar_func_vecino(anterior_rut)
             uid_actual = func_actual.user_id if func_actual else None
-            if _correo_en_uso_por_otra_cuenta(nuevo_correo, exclude_user_id=uid_actual, tipo_cuenta='vecino'):
-                messages.error(request, "Ese correo electrónico ya pertenece a otro usuario.")
+            err_mail = _mensaje_colision_correo(nuevo_correo, exclude_user_id=uid_actual, tipo_cuenta='vecino')
+            if err_mail:
+                messages.error(request, err_mail)
                 return redirect('gestion_vecinos')
         ok, err = validar_direccion(nueva_dir, "Dirección", 200)
         if not ok: messages.error(request, err); return redirect('gestion_vecinos')
@@ -5691,8 +5791,9 @@ def gestion_organizaciones_editar(request, org_id):
                 return redirect('gestion_organizaciones')
         func_actual = _buscar_func_organizacion(org)
         uid_actual = func_actual.user_id if func_actual else None
-        if email_val and _correo_en_uso_por_otra_cuenta(email_val, exclude_user_id=uid_actual, tipo_cuenta='organizacion'):
-            messages.error(request, "Ese correo electrónico ya pertenece a otra cuenta.")
+        err_mail = _mensaje_colision_correo(email_val, exclude_user_id=uid_actual, tipo_cuenta='organizacion') if email_val else None
+        if err_mail:
+            messages.error(request, err_mail)
             return redirect('gestion_organizaciones')
 
         org.numero_registro_pj = num_pj
