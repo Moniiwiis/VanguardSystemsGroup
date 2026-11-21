@@ -470,20 +470,20 @@
 
     {% if ultimas_atenciones %}
     <div class="overflow-x-auto">
-      <table class="w-full text-left border-collapse text-xs">
-        <thead>
-          <tr class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider">
-            <th class="py-3 px-4">Código</th>
-            <th class="py-3 px-4">Solicitante</th>
-            <th class="py-3 px-4">Tipo / Subatención</th>
-            <th class="py-3 px-4">Delegación</th>
-            <th class="py-3 px-4">Responsable</th>
-            <th class="py-3 px-4">Fecha</th>
+      <table class="w-full text-left text-xs text-slate-700">
+        <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+          <tr>
+            <th class="py-2.5 px-3 whitespace-nowrap">Código</th>
+            <th class="py-2.5 px-3 whitespace-nowrap">Solicitante</th>
+            <th class="py-2.5 px-3 whitespace-nowrap">Tipo / Subatención</th>
+            <th class="py-2.5 px-3 whitespace-nowrap">Delegación</th>
+            <th class="py-2.5 px-3 whitespace-nowrap">Responsable</th>
+            <th class="py-2.5 px-3 whitespace-nowrap">Fecha</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-slate-100">
+        <tbody class="divide-y divide-slate-100 font-medium">
           {% for atn in ultimas_atenciones %}
-          <tr class="hover:bg-slate-50/70 transition-colors">
+          <tr class="group hover:bg-slate-50/70 transition-colors">
             <td class="py-3 px-4 font-mono font-bold text-[#C41230]">{{ atn.codigo_atencion }}</td>
             <td class="py-3 px-4 font-bold text-slate-900">{{ atn.solicitante }}</td>
             <td class="py-3 px-4 text-slate-600">

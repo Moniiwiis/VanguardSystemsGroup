@@ -103,28 +103,32 @@
     </div>
   </div>
 
-  <!-- Tabla de Funcionarios -->
-  <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden">
-    <div class="p-4 border-b border-red-100 bg-red-50/40 flex items-center justify-between">
-      <h3 class="font-extrabold text-xs uppercase tracking-widest text-[#8B1D19]">Nómina de Funcionarios Registrados</h3>
-      <span class="text-[11px] font-bold text-slate-400">Control de Acceso y Funcionarios</span>
+  <!-- Nómina de Funcionarios Registrados (Unificado) -->
+  <div class="space-y-4">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-extrabold text-slate-900">Nómina de Funcionarios Registrados</h2>
+        <p class="text-xs text-slate-500 font-medium">Control de acceso, cargos, roles y delegaciones asignadas</p>
+      </div>
     </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs text-slate-600">
-        <thead class="bg-slate-50 text-slate-700 font-extrabold border-b border-slate-200 uppercase tracking-wider">
-          <tr>
-            <th class="p-4">Funcionario / Usuario</th>
-            <th class="p-4">ID Institucional</th>
-            <th class="p-4">Cargo</th>
-            <th class="p-4">Delegación Municipal</th>
-            <th class="p-4">Roles</th>
-            <th class="p-4">Estado</th>
-            <th class="p-4 text-center">Acciones (CRUD)</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for f in funcionarios %}
-          <tr class="hover:bg-red-50/30 transition-colors">
+
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-700">
+          <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+            <tr>
+              <th class="py-2.5 px-3">Funcionario / Usuario</th>
+              <th class="py-2.5 px-3">ID Institucional</th>
+              <th class="py-2.5 px-3">Cargo</th>
+              <th class="py-2.5 px-3">Delegación Municipal</th>
+              <th class="py-2.5 px-3">Roles</th>
+              <th class="py-2.5 px-3">Estado</th>
+              <th class="py-2.5 px-3 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-medium">
+            {% for f in funcionarios %}
+            <tr class="group hover:bg-slate-50/70 transition-colors">
             <td class="p-4 min-w-[160px] max-w-[240px] [overflow-wrap:anywhere]">
               <div class="font-bold text-slate-900 break-words [overflow-wrap:anywhere]">{{ f|nombre_corto }}</div>
               <div class="text-[11px] text-slate-400 font-mono break-all">{{ f.user.email|default:f.user.username }}</div>
@@ -236,6 +240,7 @@
           {% endfor %}
         </tbody>
       </table>
+    </div>
     </div>
   </div>
 </div>

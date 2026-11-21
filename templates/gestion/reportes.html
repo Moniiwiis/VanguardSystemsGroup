@@ -162,13 +162,13 @@
 
   </div>
 
-  <!-- Detalle Consolidado de Metas y Reportes -->
-  <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden space-y-0">
-    
-    <!-- Encabezado de la Tabla -->
-    <div class="p-5 border-b border-red-100 bg-red-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+  <!-- Detalle Consolidado de Metas y Reportes (Unificado) -->
+  <div class="space-y-4">
+
+    <!-- Encabezado de Sección -->
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
       <div>
-        <h3 class="font-extrabold text-xs uppercase tracking-widest text-[#8B1D19]">
+        <h2 class="text-lg font-extrabold text-slate-900">
           {% if delegacion_seleccionada %}
             Metas y Desempeño Territorial — {{ delegacion_seleccionada.nombre }}
           {% elif es_admin %}
@@ -176,17 +176,17 @@
           {% else %}
             Metas y Desempeño Territorial — {{ delegacion_activa.nombre }}
           {% endif %}
-        </h3>
-        <p class="text-[11px] text-slate-500 mt-0.5">Indicadores evaluados con evidencias auditables y topes de cumplimiento</p>
+        </h2>
+        <p class="text-xs text-slate-500 font-medium">Indicadores evaluados con evidencias auditables y topes de cumplimiento</p>
       </div>
-      <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+      <div class="flex flex-wrap items-center gap-2 shrink-0">
         {% if trimestre_actual_label %}
         <span class="text-[11px] font-extrabold text-[#C41230] bg-red-50 px-3 py-1 rounded-xl border border-red-200/80">{{ trimestre_actual_label }}</span>
         {% endif %}
         {% if periodo_activo_global %}
         <span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200/80">Período: {{ periodo_activo_global }}</span>
         {% endif %}
-        <span class="text-[11px] font-bold text-slate-500 bg-white/80 px-3 py-1 rounded-xl border border-red-100">Total: {{ total_metas }} metas</span>
+        <span class="text-[11px] font-bold text-slate-500 bg-white px-3 py-1 rounded-xl border border-slate-200">Total: {{ total_metas }} metas</span>
         <a href="?export=excel&q={{ q|urlencode }}&trimestre={{ trimestre_filtro|urlencode }}&orden={{ orden|urlencode }}{% if delegacion_seleccionada %}&delegacion={{ delegacion_seleccionada.id }}{% elif es_admin %}&delegacion=todas{% endif %}"
            class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
           <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
@@ -195,15 +195,15 @@
       </div>
     </div>
 
-    <!-- Barra de Búsqueda y Filtros sobre la Tabla -->
-    <div class="p-4 bg-slate-50/60 border-b border-slate-200/80">
-      <form method="GET" action="{% url 'gestion_reportes' %}" class="flex flex-wrap items-center gap-3">
+    <!-- Barra de Búsqueda y Filtros (Tarjeta Separada) -->
+    <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <form method="GET" action="{% url 'gestion_reportes' %}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
         <div class="relative flex-1 min-w-[240px]">
           <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
             <i data-lucide="search" class="w-4 h-4"></i>
           </div>
           <input type="search" name="q" value="{{ q }}" placeholder="Buscar ítem de meta, funcionario o período..."
-                 class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white font-medium" />
+                 class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]" />
         </div>
 
         {% if es_admin %}
@@ -240,24 +240,26 @@
       </form>
     </div>
 
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs text-slate-600">
-        <thead class="bg-slate-50 text-slate-700 font-extrabold border-b border-slate-200 uppercase tracking-wider">
-          <tr>
-            <th class="p-4">Ítem de Medición</th>
-            <th class="p-4">Período</th>
-            <th class="p-4">Delegación</th>
-            <th class="p-4">Funcionario Asignado</th>
-            <th class="p-4 text-center">Meta Objetivo</th>
-            <th class="p-4 text-center">Ponderación</th>
-            <th class="p-4 text-center">% Cumplimiento</th>
-            <th class="p-4 text-center">Cumplimiento Ponderado</th>
-            <th class="p-4 text-center">Estado Semáforo</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for m in metas %}
-          <tr class="hover:bg-red-50/30 transition-colors">
+    <!-- Tabla de Metas y Desempeño (Tarjeta Separada) -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-700">
+          <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+            <tr>
+              <th class="py-2.5 px-3">Ítem de Medición</th>
+              <th class="py-2.5 px-3">Período</th>
+              <th class="py-2.5 px-3">Delegación</th>
+              <th class="py-2.5 px-3">Funcionario Asignado</th>
+              <th class="py-2.5 px-3 text-center">Meta Objetivo</th>
+              <th class="py-2.5 px-3 text-center">Ponderación</th>
+              <th class="py-2.5 px-3 text-center">% Cumplimiento</th>
+              <th class="py-2.5 px-3 text-center">Cumplimiento Ponderado</th>
+              <th class="py-2.5 px-3 text-center">Estado Semáforo</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-medium">
+            {% for m in metas %}
+            <tr class="group hover:bg-slate-50/70 transition-colors">
             <td class="p-4 font-bold text-slate-900">{{ m.item.nombre_item }}</td>
             <td class="p-4 font-medium">
               <div>{{ m.periodo }}</div>
@@ -334,21 +336,17 @@
       </table>
     </div>
     {% include "gestion/includes/paginator.html" with total_registros=total_metas %}
+    </div>
   </div>
 
-  <!-- Sección: Registro y Auditoría de Ajustes de Metas por el Delegado -->
-  <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm p-6 space-y-4">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
-          <i data-lucide="calendar-check" class="w-5 h-5"></i>
-        </div>
-        <div>
-          <h3 class="font-extrabold text-slate-900 text-sm">Ajustes de Desempeño Autorizados en Semáforo</h3>
-          <p class="text-[11px] text-slate-500">Días libres, vacaciones, días administrativos y licencias médicas ingresados por el Delegado</p>
-        </div>
+  <!-- Sección: Registro y Auditoría de Ajustes de Metas por el Delegado (Unificado) -->
+  <div class="space-y-4">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-extrabold text-slate-900">Ajustes de Desempeño Autorizados en Semáforo</h2>
+        <p class="text-xs text-slate-500 font-medium">Días libres, vacaciones, días administrativos y licencias médicas ingresados por el Delegado</p>
       </div>
-      <div class="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+      <div class="flex flex-wrap items-center gap-2.5 shrink-0">
         <a href="?export=excel_ajustes{% if delegacion_seleccionada %}&delegacion={{ delegacion_seleccionada.id }}{% elif es_admin %}&delegacion=todas{% endif %}"
            class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
           <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
@@ -363,9 +361,10 @@
     </div>
 
     {% if ajustes_desempenio %}
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
       <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs text-slate-600">
-          <thead class="bg-slate-50 text-slate-700 font-extrabold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+        <table class="w-full text-left text-xs text-slate-700">
+          <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
             <tr>
               <th class="py-2.5 px-3">Funcionario</th>
               <th class="py-2.5 px-3">Período</th>
@@ -376,9 +375,9 @@
               <th class="py-2.5 px-3 text-center">Fecha</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
+          <tbody class="divide-y divide-slate-100 font-medium">
             {% for aj in ajustes_desempenio %}
-            <tr class="hover:bg-slate-50/60">
+            <tr class="group hover:bg-slate-50/70 transition-colors">
               <td class="py-2.5 px-3 font-bold text-slate-900">{{ aj.funcionario }}</td>
               <td class="py-2.5 px-3">{{ aj.periodo }}</td>
               <td class="py-2.5 px-3">
@@ -395,12 +394,13 @@
           </tbody>
         </table>
       </div>
+    </div>
     {% else %}
-      <div class="p-6 text-center text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-        <i data-lucide="calendar" class="w-6 h-6 mx-auto mb-1 text-slate-300"></i>
-        <p class="text-xs font-semibold text-slate-600">No hay ajustes de desempeño registrados en este ámbito</p>
-        <p class="text-[11px] text-slate-400 mt-0.5">El Delegado puede registrar ajustes por vacaciones, licencias o días libres cuando corresponda.</p>
-      </div>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center text-slate-400">
+      <i data-lucide="calendar" class="w-6 h-6 mx-auto mb-1 text-slate-300"></i>
+      <p class="text-xs font-semibold text-slate-600">No hay ajustes de desempeño registrados en este ámbito</p>
+      <p class="text-[11px] text-slate-400 mt-0.5">El Delegado puede registrar ajustes por vacaciones, licencias o días libres cuando corresponda.</p>
+    </div>
     {% endif %}
   </div>
 

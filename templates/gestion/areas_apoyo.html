@@ -19,58 +19,66 @@
     </button>
   </div>
 
-  <!-- Barra de Búsqueda, Filtros, Orden y Excel -->
-  <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-    <form method="GET" action="{% url 'gestion_areas_apoyo' %}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
-      <div class="relative flex-1 min-w-[240px]">
-        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-          <i data-lucide="search" class="w-4 h-4"></i>
-        </div>
-        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por código, nombre, tipo o descripción..."
-               class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]" />
+  <!-- Listado de Áreas, Personas y Cuadrillas de Apoyo (Unificado) -->
+  <div class="space-y-4">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-extrabold text-slate-900">Catálogo de áreas y cuadrillas de apoyo</h2>
+        <p class="text-xs text-slate-500 font-medium">Equipos operativos disponibles para asignación en atenciones y tubo</p>
       </div>
+      <a href="?q={{ q }}&tipo={{ filtro_tipo }}&estado={{ filtro_estado }}&orden={{ orden }}&export=excel"
+         class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+        <span>Exportar a Excel</span>
+      </a>
+    </div>
 
-      <select name="tipo" onchange="this.form.submit()"
-              class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
-        <option value="">Tipo: Todos</option>
-        {% for val, lbl in tipo_choices %}
-          <option value="{{ val }}" {% if filtro_tipo == val %}selected{% endif %}>{{ lbl }}</option>
-        {% endfor %}
-      </select>
+    <!-- Barra de Búsqueda y Filtros -->
+    <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <form method="GET" action="{% url 'gestion_areas_apoyo' %}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+        <div class="relative flex-1 min-w-[240px]">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <i data-lucide="search" class="w-4 h-4"></i>
+          </div>
+          <input type="text" name="q" value="{{ q }}" placeholder="Buscar por código, nombre, tipo o descripción..."
+                 class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]" />
+        </div>
 
-      <select name="estado" onchange="this.form.submit()"
-              class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
-        <option value="">Filtrar estado: Todos</option>
-        <option value="Activo" {% if filtro_estado == 'Activo' %}selected{% endif %}>Activo</option>
-        <option value="Inactivo" {% if filtro_estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
-      </select>
-      {% include "gestion/includes/ordering_control.html" %}
-    </form>
+        <select name="tipo" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+          <option value="">Tipo: Todos</option>
+          {% for val, lbl in tipo_choices %}
+            <option value="{{ val }}" {% if filtro_tipo == val %}selected{% endif %}>{{ lbl }}</option>
+          {% endfor %}
+        </select>
 
-    <a href="?q={{ q }}&tipo={{ filtro_tipo }}&estado={{ filtro_estado }}&orden={{ orden }}&export=excel"
-       class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
-      <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
-      <span>Exportar a Excel</span>
-    </a>
-  </div>
+        <select name="estado" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+          <option value="">Filtrar estado: Todos</option>
+          <option value="Activo" {% if filtro_estado == 'Activo' %}selected{% endif %}>Activo</option>
+          <option value="Inactivo" {% if filtro_estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
+        </select>
+        {% include "gestion/includes/ordering_control.html" %}
+      </form>
+    </div>
 
-  <!-- Tabla de Áreas / Cuadrillas / Personas de Apoyo -->
-  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs text-slate-700">
-        <thead class="bg-slate-50/80 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
-          <tr>
-            <th class="py-3 px-6">Código</th>
-            <th class="py-3 px-6">Nombre</th>
-            <th class="py-3 px-6">Tipo</th>
-            <th class="py-3 px-6">Descripción / Detalle</th>
-            <th class="py-3 px-6">Estado</th>
-            <th class="py-3 px-6 text-center">Acciones</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100 font-medium">
-          {% for a in areas %}
-          <tr class="hover:bg-slate-50/70 transition-colors">
+    <!-- Tabla de Áreas / Cuadrillas / Personas de Apoyo -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-700">
+          <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+            <tr>
+              <th class="py-2.5 px-4">Código</th>
+              <th class="py-2.5 px-4">Nombre</th>
+              <th class="py-2.5 px-4">Tipo</th>
+              <th class="py-2.5 px-4">Descripción / Detalle</th>
+              <th class="py-2.5 px-4">Estado</th>
+              <th class="py-2.5 px-4 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-medium">
+            {% for a in areas %}
+            <tr class="group hover:bg-slate-50/70 transition-colors">
             <td class="py-3.5 px-6 font-mono font-bold text-slate-900">{{ a.get_codigo }}</td>
             <td class="py-3.5 px-6 font-bold text-slate-900">{{ a.nombre }}</td>
             <td class="py-3.5 px-6">
@@ -125,6 +133,7 @@
     </div>
 
     {% include "gestion/includes/paginator.html" %}
+    </div>
   </div>
 
 </div>

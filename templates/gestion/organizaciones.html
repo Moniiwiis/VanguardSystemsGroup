@@ -28,12 +28,6 @@
         <span>Delegación: <strong>{% if delegacion_seleccionada %}{{ delegacion_seleccionada.nombre }}{% elif delegacion_activa %}{{ delegacion_activa.nombre }}{% else %}Global (Todas){% endif %}</strong></span>
       </div>
 
-      <a href="?export=excel{% if q %}&q={{ q }}{% endif %}{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
-         class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
-        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
-        <span>Exportar a Excel</span>
-      </a>
-
       {% if not permisos.es_consultor %}
         {% if delegacion_activa %}
           <button type="button" onclick="abrirModalCrearOrg()"
@@ -127,94 +121,94 @@
     </a>
   </div>
 
-  <!-- Search, Filter & Table Card -->
-  <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden space-y-0">
-    <div class="p-4 sm:p-5 bg-slate-50/70 border-b border-slate-200/80 space-y-3">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 class="font-extrabold text-sm uppercase tracking-wider text-slate-800 flex items-center gap-2">
-            <i data-lucide="list-Checks" class="w-4 h-4 text-[#C41230]"></i>
-            <span>Registro Oficial de Juntas de Vecinos y Organizaciones</span>
-          </h2>
-          <p class="text-[11px] text-slate-400">Mostrando {{ organizaciones|length }} de {{ total_organizaciones }} registros filtrados</p>
-        </div>
+  <!-- Registro Oficial de Juntas de Vecinos y Organizaciones (Unificado) -->
+  <div class="space-y-4">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-extrabold text-slate-900">Registro Oficial de Juntas de Vecinos y Organizaciones</h2>
+        <p class="text-xs text-slate-500 font-medium">Mostrando {{ organizaciones|length }} de {{ total_organizaciones }} registros filtrados</p>
+      </div>
 
+      <div class="flex flex-wrap items-center gap-2.5 shrink-0">
         {% if q or filtro_tipo or filtro_estado or delegacion_seleccionada and es_admin %}
           <a href="{% url 'gestion_organizaciones' %}{% if es_admin %}?delegacion={% endif %}"
-             class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1 self-start sm:self-auto">
+             class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1">
             <i data-lucide="x" class="w-3.5 h-3.5"></i>
             <span>Limpiar todos los filtros</span>
           </a>
         {% endif %}
+        <a href="?export=excel{% if q %}&q={{ q }}{% endif %}{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+           class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+          <span>Exportar a Excel</span>
+        </a>
       </div>
+    </div>
 
-      <form method="GET" action="{% url 'gestion_organizaciones' %}" class="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5 pt-1 flex-wrap">
+    <!-- Barra de búsqueda y filtro (Tarjeta Separada) -->
+    <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <form method="GET" action="{% url 'gestion_organizaciones' %}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
         <div class="relative flex-1 min-w-[240px]">
           <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
             <i data-lucide="search" class="w-4 h-4"></i>
           </div>
-          <input type="text" name="q" value="{{ q }}" maxlength="100" placeholder="Buscar por organización, domicilio legal, territorio, N° Reg. P.J. o Reg. Dir..." 
-                 class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230] font-medium bg-white" />
+          <input type="text" name="q" value="{{ q }}" maxlength="100" placeholder="Buscar por organización, domicilio legal, territorio, N° Reg. P.J. o Reg. Dir..."
+                 class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]" />
         </div>
 
         {% if es_admin %}
-        <div>
-          <select name="delegacion" onchange="this.form.submit()"
-                  class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
-            <option value="" {% if not delegacion_seleccionada %}selected{% endif %}>Filtrar Delegación: Todas</option>
-            {% for d in todas_delegaciones %}
-              <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
-                {{ d.get_codigo }} — {{ d.nombre }}
-              </option>
-            {% endfor %}
-          </select>
-        </div>
+        <select name="delegacion" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
+          <option value="" {% if not delegacion_seleccionada %}selected{% endif %}>Filtrar Delegación: Todas</option>
+          {% for d in todas_delegaciones %}
+            <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
+              {{ d.get_codigo }} — {{ d.nombre }}
+            </option>
+          {% endfor %}
+        </select>
         {% endif %}
 
-        <div>
-          <select name="tipo" onchange="this.form.submit()"
-                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
-            <option value="">Tipo: Todos</option>
-            {% for tipo_val in tipos_organizaciones %}
-              <option value="{{ tipo_val }}" {% if filtro_tipo == tipo_val %}selected{% endif %}>{{ tipo_val }}</option>
-            {% endfor %}
-          </select>
-        </div>
+        <select name="tipo" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
+          <option value="">Tipo: Todos</option>
+          {% for tipo_val in tipos_organizaciones %}
+            <option value="{{ tipo_val }}" {% if filtro_tipo == tipo_val %}selected{% endif %}>{{ tipo_val }}</option>
+          {% endfor %}
+        </select>
 
-        <div>
-          <select name="estado" onchange="this.form.submit()"
-                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
-            <option value="">Estado: Todos</option>
-            <option value="Activa" {% if filtro_estado == 'Activa' %}selected{% endif %}>Activa</option>
-            <option value="En tramite" {% if filtro_estado == 'En tramite' %}selected{% endif %}>En trámite</option>
-            <option value="Inactiva" {% if filtro_estado == 'Inactiva' %}selected{% endif %}>Inactiva</option>
-          </select>
-        </div>
+        <select name="estado" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
+          <option value="">Estado: Todos</option>
+          <option value="Activa" {% if filtro_estado == 'Activa' %}selected{% endif %}>Activa</option>
+          <option value="En tramite" {% if filtro_estado == 'En tramite' %}selected{% endif %}>En trámite</option>
+          <option value="Inactiva" {% if filtro_estado == 'Inactiva' %}selected{% endif %}>Inactiva</option>
+        </select>
 
         {% include "gestion/includes/ordering_control.html" %}
       </form>
     </div>
 
-    <!-- Tabla Oficial de Organizaciones Comunitarias / JJVV -->
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs text-slate-700">
-        <thead class="bg-slate-50 text-slate-800 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200">
-          <tr>
-            <th class="py-3 px-3.5 min-w-[200px]">Organizaciones</th>
-            <th class="py-3 px-3.5 min-w-[170px]">Domicilio Legal</th>
-            <th class="py-3 px-3.5 whitespace-nowrap">Delegación</th>
-            <th class="py-3 px-3.5 text-center whitespace-nowrap">Socios Activos</th>
-            <th class="py-3 px-3.5 text-center whitespace-nowrap">Fecha de Constitución</th>
-            <th class="py-3 px-3.5 text-center whitespace-nowrap">N° Registro Personalidad Jurídica</th>
-            <th class="py-3 px-3.5 text-center whitespace-nowrap">Fecha de Inscripción en Registro</th>
-            <th class="py-3 px-3.5 text-center whitespace-nowrap">Registro de Directiva N°</th>
-            <th class="py-3 px-3.5 text-center whitespace-nowrap">Estado</th>
-            <th class="py-3 px-3.5 text-center whitespace-nowrap w-24 sticky right-0 bg-slate-50 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acciones</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100 font-medium">
-          {% for o in organizaciones %}
-          <tr class="hover:bg-red-50/20 transition-colors group">
+    <!-- Tabla Oficial de Organizaciones Comunitarias / JJVV (Tarjeta Separada) -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-700">
+          <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+            <tr>
+              <th class="py-2.5 px-3 min-w-[200px]">Organizaciones</th>
+              <th class="py-2.5 px-3 min-w-[170px]">Domicilio Legal</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Delegación</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap">Socios Activos</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap">Fecha de Constitución</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap">N° Registro Personalidad Jurídica</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap">Fecha de Inscripción en Registro</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap">Registro de Directiva N°</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap">Estado</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap w-24 sticky right-0 bg-slate-50/95 backdrop-blur-sm shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-medium">
+            {% for o in organizaciones %}
+            <tr class="group hover:bg-slate-50/70 transition-colors">
             <!-- ORGANIZACIONES -->
             <td class="py-3 px-3.5">
               <span class="font-bold text-slate-900 block leading-tight">{{ o.nombre }}</span>
@@ -472,6 +466,7 @@
           </span>
         {% endif %}
       </div>
+    </div>
     </div>
   </div>
 

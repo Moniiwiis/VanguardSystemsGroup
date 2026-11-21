@@ -102,40 +102,47 @@
     </form>
   </dialog>
 
-  <form method="GET" action="{% url 'gestion_actividades' %}" class="bg-white p-4 rounded-2xl border border-slate-200 flex flex-wrap items-center gap-3">
-    <input type="search" name="q" value="{{ q }}" placeholder="Buscar código, funcionario o descripción..."
-           class="flex-1 min-w-[220px] px-3 py-2 rounded-xl border border-slate-200 text-xs" />
-    <select name="validacion" onchange="this.form.submit()" class="px-3 py-2 rounded-xl border border-slate-200 text-xs">
-      <option value="">Todas las validaciones</option>
-      <option value="Pendiente" {% if filtro_validacion == 'Pendiente' %}selected{% endif %}>Pendiente</option>
-      <option value="Aprobado" {% if filtro_validacion == 'Aprobado' %}selected{% endif %}>Aprobado</option>
-      <option value="Rechazado" {% if filtro_validacion == 'Rechazado' %}selected{% endif %}>Rechazado</option>
-    </select>
-    {% include "gestion/includes/ordering_control.html" %}
-  </form>
-
-  <!-- Tabla de Actividades -->
-  <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden">
-    <div class="p-4 border-b border-red-100 bg-red-50/40 flex items-center justify-between">
-      <h3 class="font-extrabold text-xs uppercase tracking-widest text-[#8B1D19]">Registro de Actividades Recientes</h3>
-      <span class="text-[11px] font-bold text-slate-400">Protegido por auditoría</span>
+  <!-- Registro de Actividades Recientes (Unificado) -->
+  <div class="space-y-4">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-extrabold text-slate-900">Registro de Actividades Recientes</h2>
+        <p class="text-xs text-slate-500 font-medium">Historial de actividades y evidencias protegidas por auditoría</p>
+      </div>
     </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs text-slate-600">
-        <thead class="bg-slate-50 text-slate-700 font-extrabold border-b border-slate-200 uppercase tracking-wider">
-          <tr>
-            <th class="p-4">Código Evidencia</th>
-            <th class="p-4">Fecha</th>
-            <th class="p-4">Funcionario</th>
-            <th class="p-4">Ítem Medición</th>
-            <th class="p-4">Evidencias</th>
-            <th class="p-4">Validación</th>
-            <th class="p-4 text-center">Acciones (CRUD)</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for act in actividades %}
-          <tr class="hover:bg-red-50/30 transition-colors">
+
+    <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <form method="GET" action="{% url 'gestion_actividades' %}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+        <input type="search" name="q" value="{{ q }}" placeholder="Buscar código, funcionario o descripción..."
+               class="flex-1 min-w-[220px] px-3 py-2 rounded-xl border border-slate-200 text-xs" />
+        <select name="validacion" onchange="this.form.submit()" class="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700">
+          <option value="">Todas las validaciones</option>
+          <option value="Pendiente" {% if filtro_validacion == 'Pendiente' %}selected{% endif %}>Pendiente</option>
+          <option value="Aprobado" {% if filtro_validacion == 'Aprobado' %}selected{% endif %}>Aprobado</option>
+          <option value="Rechazado" {% if filtro_validacion == 'Rechazado' %}selected{% endif %}>Rechazado</option>
+        </select>
+        {% include "gestion/includes/ordering_control.html" %}
+      </form>
+    </div>
+
+    <!-- Tabla de Actividades -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-700">
+          <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+            <tr>
+              <th class="py-2.5 px-3">Código Evidencia</th>
+              <th class="py-2.5 px-3">Fecha</th>
+              <th class="py-2.5 px-3">Funcionario</th>
+              <th class="py-2.5 px-3">Ítem Medición</th>
+              <th class="py-2.5 px-3">Evidencias</th>
+              <th class="py-2.5 px-3">Validación</th>
+              <th class="py-2.5 px-3 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-medium">
+            {% for act in actividades %}
+            <tr class="group hover:bg-slate-50/70 transition-colors">
             <td class="p-4">
               <span class="font-mono font-bold text-[#C41230] block">{{ act.codigo_evidencia_unico }}</span>
               <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[9px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
@@ -278,6 +285,7 @@
       {% endif %}
     </nav>
     {% endif %}
+    </div>
   </div>
 </div>
 {% endblock %}

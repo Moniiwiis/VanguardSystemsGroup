@@ -47,67 +47,75 @@
     </div>
   </div>
 
-  <!-- Search & Filter Card -->
-  <div class="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-    <form method="GET" action="{% url 'gestion_vecinos' %}" class="flex-1 flex flex-wrap items-center gap-3">
-      <div class="relative flex-1 min-w-[240px]">
-        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-          <i data-lucide="search" class="w-4 h-4"></i>
-        </div>
-        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre, RUT, dirección o sector..." 
-               class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230] font-medium" />
+  <!-- Padrón de Vecinos y Vecinas (Unificado) -->
+  <div class="space-y-4">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-extrabold text-slate-900">Listado de vecinos registrados</h2>
+        <p class="text-xs text-slate-500 font-medium">Consulta, filtrado y administración del padrón territorial de vecinos</p>
       </div>
+      <a href="?q={{ q }}&estado={{ filtro_estado }}&orden={{ orden }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}&export=excel"
+         class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+        <span>Exportar a Excel</span>
+      </a>
+    </div>
 
-      {% if es_admin %}
-      <select id="filtro-del" name="delegacion" onchange="this.form.submit()"
-              class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
-        <option value="" {% if not delegacion_seleccionada %}selected{% endif %}>Filtrar Delegación: Todas</option>
-        {% for d in todas_delegaciones %}
-          <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
-            {{ d.get_codigo }} — {{ d.nombre }}
-          </option>
-        {% endfor %}
-      </select>
-      {% endif %}
+    <!-- Search & Filter Card -->
+    <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <form method="GET" action="{% url 'gestion_vecinos' %}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+        <div class="relative flex-1 min-w-[240px]">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <i data-lucide="search" class="w-4 h-4"></i>
+          </div>
+          <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre, RUT, dirección o sector..." 
+                 class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]" />
+        </div>
 
-      <select name="estado" onchange="this.form.submit()"
-              class="px-3 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
-        <option value="">Filtrar Estado: Todos</option>
-        <option value="Activo" {% if filtro_estado == 'Activo' %}selected{% endif %}>Activo</option>
-        <option value="Inactivo" {% if filtro_estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
-      </select>
-      {% include "gestion/includes/ordering_control.html" %}
+        {% if es_admin %}
+        <select id="filtro-del" name="delegacion" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
+          <option value="" {% if not delegacion_seleccionada %}selected{% endif %}>Filtrar Delegación: Todas</option>
+          {% for d in todas_delegaciones %}
+            <option value="{{ d.id }}" {% if delegacion_seleccionada and delegacion_seleccionada.id == d.id %}selected{% endif %}>
+              {{ d.get_codigo }} — {{ d.nombre }}
+            </option>
+          {% endfor %}
+        </select>
+        {% endif %}
 
-      {% if q or filtro_estado or delegacion_seleccionada and es_admin %}
-        <a href="{% url 'gestion_vecinos' %}" class="text-xs text-[#C41230] font-bold hover:underline py-2">Limpiar filtros</a>
-      {% endif %}
-    </form>
+        <select name="estado" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+          <option value="">Filtrar Estado: Todos</option>
+          <option value="Activo" {% if filtro_estado == 'Activo' %}selected{% endif %}>Activo</option>
+          <option value="Inactivo" {% if filtro_estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
+        </select>
+        {% include "gestion/includes/ordering_control.html" %}
 
-    <a href="?q={{ q }}&estado={{ filtro_estado }}&orden={{ orden }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}&export=excel"
-       class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
-      <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
-      <span>Exportar a Excel</span>
-    </a>
-  </div>
+        {% if q or filtro_estado or delegacion_seleccionada and es_admin %}
+          <a href="{% url 'gestion_vecinos' %}" class="text-xs text-[#C41230] font-bold hover:underline py-2">Limpiar filtros</a>
+        {% endif %}
+      </form>
+    </div>
 
-  <!-- Table Card -->
-  <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs text-slate-700">
-        <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
-          <tr>
-            <th class="py-3.5 px-4 w-10 text-center">#</th>
-            <th class="py-3.5 px-4">Vecino / RUT</th>
-            <th class="py-3.5 px-4">Dirección / Teléfono</th>
-            <th class="py-3.5 px-4">Delegación / Sector</th>
-            <th class="py-3.5 px-4">Tipo de Gestión</th>
-            <th class="py-3.5 px-4 text-center w-24">Estado</th>
-            <th class="py-3.5 px-4 text-center w-28">Acciones</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100 font-medium">
-          {% for v in vecinos %}
-          <tr class="hover:bg-red-50/20 transition-colors">
+    <!-- Table Card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-700">
+          <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+            <tr>
+              <th class="py-2.5 px-3 w-10 text-center">#</th>
+              <th class="py-2.5 px-3">Vecino / RUT</th>
+              <th class="py-2.5 px-3">Dirección / Teléfono</th>
+              <th class="py-2.5 px-3">Delegación / Sector</th>
+              <th class="py-2.5 px-3">Tipo de Gestión</th>
+              <th class="py-2.5 px-3 text-center w-24">Estado</th>
+              <th class="py-2.5 px-3 text-center w-28 sticky right-0 bg-slate-50/95 backdrop-blur-sm shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-medium">
+            {% for v in vecinos %}
+            <tr class="group hover:bg-slate-50/70 transition-colors">
             <td class="py-3.5 px-4 font-semibold text-slate-400 text-center">{{ forloop.counter }}</td>
             <td class="py-3.5 px-4 min-w-[160px] max-w-[220px] [overflow-wrap:anywhere]">
               <span class="font-bold text-slate-900 block leading-tight">{{ v.nombre }}</span>
@@ -130,7 +138,7 @@
                 {{ v.tipo_gestion.nombre|default:"Solicitud" }}
               </span>
             </td>
-            <td class="py-3.5 px-4 text-center">
+            <td class="py-2.5 px-3 text-center sticky right-0 bg-white group-hover:bg-slate-50/95 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
               {% if v.estado == 'Activo' %}
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Activo
@@ -141,7 +149,7 @@
                 </span>
               {% endif %}
             </td>
-            <td class="py-3.5 px-4 text-center">
+            <td class="py-2.5 px-3 text-center sticky right-0 bg-white group-hover:bg-slate-50/95 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
               <div class="flex items-center justify-center gap-1">
                 <button type="button" 
                         onclick="verDetalleVecino('{{ v.nombre|escapejs }}', '{{ v.rut|escapejs }}', '{{ v.direccion|default:''|escapejs }}', '{{ v.telefono|default:''|escapejs }}', '{{ v.delegacion.nombre|default:'Sin asignar'|escapejs }}', '{% if v.sector %}{{ v.sector.nombre|escapejs }}{% else %}{{ v.territorio|default:''|escapejs }}{% endif %}', '{{ v.tipo_gestion.nombre|default:'Solicitud'|escapejs }}', '{{ v.estado|escapejs }}')"
@@ -191,6 +199,7 @@
       </table>
     </div>
     {% include "gestion/includes/paginator.html" with total_registros=total_vecinos %}
+    </div>
   </div>
 
 </div>

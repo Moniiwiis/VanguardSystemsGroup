@@ -18,49 +18,57 @@
     </button>
   </div>
 
-  <!-- Barra de Búsqueda Inteligente, Exportación y Filtro de Estado -->
-  <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-    <form method="GET" action="{% url 'gestion_sub_atencion' %}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-      <div class="relative flex-1">
-        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-          <i data-lucide="search" class="w-4 h-4"></i>
-        </div>
-        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre, código u otro campo..." 
-               class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]" />
+  <!-- Listado de Sub Atenciones (Unificado) -->
+  <div class="space-y-4">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-extrabold text-slate-900">Catálogo de sub atenciones</h2>
+        <p class="text-xs text-slate-500 font-medium">Subcategorías asociadas a los tipos de atención municipal</p>
       </div>
+      <a href="?q={{ q }}&estado={{ filtro_estado }}&orden={{ orden }}&export=excel"
+         class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+        <span>Exportar a Excel</span>
+      </a>
+    </div>
 
-      <select name="estado" onchange="this.form.submit()" 
-              class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
-        <option value="">Filtrar estado: Todos</option>
-        <option value="Activa" {% if filtro_estado == 'Activa' %}selected{% endif %}>Activa</option>
-        <option value="Inactiva" {% if filtro_estado == 'Inactiva' %}selected{% endif %}>Inactiva</option>
-      </select>
-      {% include "gestion/includes/ordering_control.html" %}
-    </form>
+    <!-- Barra de Búsqueda y Filtro -->
+    <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <form method="GET" action="{% url 'gestion_sub_atencion' %}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+        <div class="relative flex-1 min-w-[220px]">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <i data-lucide="search" class="w-4 h-4"></i>
+          </div>
+          <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre, código u otro campo..." 
+                 class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]" />
+        </div>
 
-    <a href="?q={{ q }}&estado={{ filtro_estado }}&orden={{ orden }}&export=excel"
-       class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
-      <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
-      <span>Exportar a Excel</span>
-    </a>
-  </div>
+        <select name="estado" onchange="this.form.submit()" 
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+          <option value="">Filtrar estado: Todos</option>
+          <option value="Activa" {% if filtro_estado == 'Activa' %}selected{% endif %}>Activa</option>
+          <option value="Inactiva" {% if filtro_estado == 'Inactiva' %}selected{% endif %}>Inactiva</option>
+        </select>
+        {% include "gestion/includes/ordering_control.html" %}
+      </form>
+    </div>
 
-  <!-- Tabla de Sub Atenciones (Wireframe C5 - Diseño 10) -->
-  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs text-slate-700">
-        <thead class="bg-slate-50/80 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
-          <tr>
-            <th class="py-3 px-6">Código</th>
-            <th class="py-3 px-6">Nombre</th>
-            <th class="py-3 px-6">Tipo asociado</th>
-            <th class="py-3 px-6">Estado</th>
-            <th class="py-3 px-6 text-center">Acciones</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100 font-medium">
-          {% for sa in subs %}
-          <tr class="hover:bg-slate-50/70 transition-colors">
+    <!-- Tabla de Sub Atenciones -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-700">
+          <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+            <tr>
+              <th class="py-2.5 px-4">Código</th>
+              <th class="py-2.5 px-4">Nombre</th>
+              <th class="py-2.5 px-4">Tipo asociado</th>
+              <th class="py-2.5 px-4">Estado</th>
+              <th class="py-2.5 px-4 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-medium">
+            {% for sa in subs %}
+            <tr class="group hover:bg-slate-50/70 transition-colors">
             <td class="py-3.5 px-6 font-mono font-bold text-slate-900">{{ sa.get_codigo }}</td>
             <td class="py-3.5 px-6 font-bold text-slate-900">{{ sa.nombre }}</td>
             <td class="py-3.5 px-6 font-semibold text-slate-800">{{ sa.tipo_atencion.nombre }}</td>
@@ -113,6 +121,7 @@
     </div>
 
     {% include "gestion/includes/paginator.html" %}
+    </div>
   </div>
 
 

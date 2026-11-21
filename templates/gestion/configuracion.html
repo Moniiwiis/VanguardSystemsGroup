@@ -80,35 +80,43 @@
     </form>
   </dialog>
 
-  <form method="GET" action="{% url 'gestion_configuracion' %}" class="bg-white p-4 rounded-2xl border border-slate-200 flex flex-wrap items-center gap-3">
-    <input type="search" name="q" value="{{ q }}" placeholder="Buscar ítem, período o funcionario..."
-           class="flex-1 min-w-[220px] px-3 py-2 rounded-xl border border-slate-200 text-xs" />
-    {% include "gestion/includes/ordering_control.html" %}
-  </form>
-
-  <!-- Tabla de Metas -->
-  <div class="bg-white rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden">
-    <div class="p-4 border-b border-red-100 bg-red-50/40 flex items-center justify-between">
-      <h3 class="font-extrabold text-xs uppercase tracking-widest text-[#8B1D19]">Configuración de Metas Activas</h3>
+  <!-- Configuración de Metas Activas (Unificado) -->
+  <div class="space-y-4">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-extrabold text-slate-900">Configuración de Metas Activas</h2>
+        <p class="text-xs text-slate-500 font-medium">Asignación de metas, ponderaciones y cumplimiento por funcionario</p>
+      </div>
     </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs text-slate-600">
-        <thead class="bg-slate-50 text-slate-700 font-extrabold border-b border-slate-200 uppercase tracking-wider">
-          <tr>
-            <th class="p-4">Ítem Medición</th>
-            <th class="p-4">Período</th>
-            <th class="p-4">Funcionario Asignado</th>
-            <th class="p-4">Objetivo</th>
-            <th class="p-4">Ponderación</th>
-            <th class="p-4">% Cumplimiento</th>
-            <th class="p-4">Ponderado</th>
-            <th class="p-4">Semáforo</th>
-            <th class="p-4 text-center">Acciones (CRUD)</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for meta in metas %}
-          <tr class="hover:bg-red-50/30 transition-colors">
+
+    <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <form method="GET" action="{% url 'gestion_configuracion' %}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+        <input type="search" name="q" value="{{ q }}" placeholder="Buscar ítem, período o funcionario..."
+               class="flex-1 min-w-[220px] px-3 py-2 rounded-xl border border-slate-200 text-xs" />
+        {% include "gestion/includes/ordering_control.html" %}
+      </form>
+    </div>
+
+    <!-- Tabla de Metas -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-700">
+          <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+            <tr>
+              <th class="py-2.5 px-3">Ítem Medición</th>
+              <th class="py-2.5 px-3">Período</th>
+              <th class="py-2.5 px-3">Funcionario Asignado</th>
+              <th class="py-2.5 px-3">Objetivo</th>
+              <th class="py-2.5 px-3">Ponderación</th>
+              <th class="py-2.5 px-3">% Cumplimiento</th>
+              <th class="py-2.5 px-3">Ponderado</th>
+              <th class="py-2.5 px-3">Semáforo</th>
+              <th class="py-2.5 px-3 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-medium">
+            {% for meta in metas %}
+            <tr class="group hover:bg-slate-50/70 transition-colors">
             <td class="p-4 font-bold text-slate-900">{{ meta.item }}</td>
             <td class="p-4">{{ meta.periodo }}</td>
             <td class="p-4">
@@ -212,5 +220,6 @@
     {% endif %}
   </nav>
   {% endif %}
+  </div>
 </div>
 {% endblock %}

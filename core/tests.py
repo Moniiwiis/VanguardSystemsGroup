@@ -3769,6 +3769,21 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             self.assertContains(r, 'file-spreadsheet', msg_prefix=f'Falta icono spreadsheet en {url}')
             self.assertContains(r, 'text-emerald-600', msg_prefix=f'Falta icono verde en {url}')
             self.assertNotContains(r, '<span>Exportar Excel</span>', msg_prefix=f'Etiqueta antigua en {url}')
+            self.assertContains(
+                r,
+                'bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden',
+                msg_prefix=f'Tarjeta de tabla no unificada en {url}',
+            )
+            self.assertContains(
+                r,
+                'bg-slate-50/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]',
+                msg_prefix=f'Encabezado thead no unificado en {url}',
+            )
+            self.assertNotContains(
+                r,
+                'border-[rgba(196,18,48,0.18)] shadow-sm overflow-hidden',
+                msg_prefix=f'Quedó tarjeta unida antigua en {url}',
+            )
 
         # 2. Tubo de Compromiso: exportaciones independientes para Requerimientos y Resumen por Colaborador
         r_tubo_req = self.client.get(reverse('gestion_tubo') + '?tab=requerimientos')
