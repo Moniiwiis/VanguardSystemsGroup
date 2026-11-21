@@ -3941,6 +3941,31 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertEqual(vec.direccion, 'Av. Balmaceda 120, La Serena')
         self.assertEqual(vec.rut, '12.345.678-5')
 
+        # 4. Buscador en tiempo real (tarjetas del portal) y filtro por Tipo de Atención en /portal-cliente/
+        tipo_alt = TipoAtencion.objects.create(nombre='Seguridad Vecinal Test', estado='Activo')
+        sub_alt = SubAtencion.objects.create(tipo_atencion=tipo_alt, nombre='Ronda Preventiva Test', estado='Activa')
+        at_alt = AtencionCiudadana.objects.create(
+            solicitante='María González Pérez',
+            vecino=vec,
+            delegacion=self.delegacion,
+            tipo_atencion=tipo_alt,
+            sub_atencion=sub_alt,
+            descripcion='Solicitud de patrullaje nocturno en pasaje',
+            estado='Registrada',
+            creado_por=admin,
+            usuario_responsable=admin,
+        )
+        r_busq = self.client.get(reverse('portal_cliente'), {'q': 'luminaria'})
+        self.assertContains(r_busq, at_cli.codigo_atencion)
+        self.assertNotContains(r_busq, at_alt.codigo_atencion)
+        self.assertContains(r_busq, 'data-realtime-card="portal-solicitudes"')
+        self.assertContains(r_busq, 'newPortalSolicitudes')
+
+        r_tipo = self.client.get(reverse('portal_cliente'), {'tipo': str(tipo_alt.id)})
+        self.assertContains(r_tipo, at_alt.codigo_atencion)
+        self.assertNotContains(r_tipo, at_cli.codigo_atencion)
+        self.assertContains(r_tipo, 'name="tipo"')
+
 
 
 

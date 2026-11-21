@@ -1181,11 +1181,42 @@
         // Normalización para coincidencias sin tildes y case-insensitive
         const normalize = (txt) => (txt || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
-        // 1. Filtrado instantáneo (0ms) en la tabla actualmente visible
+        // 1. Filtrado instantáneo (0ms) en tabla o tarjetas del Portal Ciudadano
         const filterClientTable = (term) => {
           const normTerm = normalize(term);
           const table = document.querySelector('table');
-          if (!table) return;
+          if (!table) {
+            const portalWrap = document.querySelector('[data-realtime-card="portal-solicitudes"]');
+            if (!portalWrap) return;
+            const cards = portalWrap.querySelectorAll('[data-portal-card]');
+            let visibleCards = 0;
+            cards.forEach(card => {
+              const cardText = normalize(card.textContent);
+              if (!normTerm || cardText.includes(normTerm)) {
+                card.style.display = '';
+                visibleCards++;
+              } else {
+                card.style.display = 'none';
+              }
+            });
+            let emptyLiveBox = portalWrap.querySelector('.live-no-results-cards');
+            if (cards.length > 0 && visibleCards === 0 && normTerm) {
+              if (!emptyLiveBox) {
+                emptyLiveBox = document.createElement('div');
+                emptyLiveBox.className = 'live-no-results-cards text-center py-10 text-slate-400 space-y-2';
+                emptyLiveBox.innerHTML = `<i data-lucide="search-x" class="w-8 h-8 mx-auto text-slate-300"></i><p class="text-xs font-semibold">No se encontraron solicitudes que coincidan con "<strong>${term}</strong>".</p>`;
+                portalWrap.appendChild(emptyLiveBox);
+                if (window.lucide) lucide.createIcons();
+              } else {
+                emptyLiveBox.style.display = '';
+                const strong = emptyLiveBox.querySelector('strong');
+                if (strong) strong.textContent = term;
+              }
+            } else if (emptyLiveBox) {
+              emptyLiveBox.style.display = 'none';
+            }
+            return;
+          }
 
           const tbody = table.querySelector('tbody');
           if (!tbody) return;
@@ -1256,7 +1287,7 @@
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
 
-            // Actualizar tabla
+            // Actualizar tabla y su barra de paginador
             const newTable = doc.querySelector('table');
             const currentTable = document.querySelector('table');
             if (newTable && currentTable) {
@@ -1265,13 +1296,13 @@
               if (currentTbody && newTbody) {
                 currentTbody.innerHTML = newTbody.innerHTML;
               }
-            }
-
-            // Actualizar barra de paginador
-            const newPagination = doc.querySelector('.overflow-hidden > div:last-child');
-            const currentPagination = document.querySelector('.overflow-hidden > div:last-child');
-            if (newPagination && currentPagination) {
-              currentPagination.innerHTML = newPagination.innerHTML;
+              const newCard = newTable.closest('.overflow-hidden');
+              const currentCard = currentTable.closest('.overflow-hidden');
+              const newPagination = newCard ? newCard.querySelector(':scope > div:last-child') : doc.querySelector('.overflow-hidden > div:last-child');
+              const currentPagination = currentCard ? currentCard.querySelector(':scope > div:last-child') : document.querySelector('.overflow-hidden > div:last-child');
+              if (newPagination && currentPagination && newPagination !== newTable.parentElement && currentPagination !== currentTable.parentElement) {
+                currentPagination.innerHTML = newPagination.innerHTML;
+              }
             }
 
             // Actualizar enlace a Excel con el nuevo filtro
@@ -1279,6 +1310,18 @@
             const currentExcel = document.querySelector('a[href*="export=excel"]');
             if (newExcel && currentExcel) {
               currentExcel.href = newExcel.href;
+            }
+
+            // Actualizar tarjetas del Portal Ciudadano cuando corresponda
+            const newPortalSolicitudes = doc.querySelector('[data-realtime-card="portal-solicitudes"]');
+            const currentPortalSolicitudes = document.querySelector('[data-realtime-card="portal-solicitudes"]');
+            if (newPortalSolicitudes && currentPortalSolicitudes) {
+              currentPortalSolicitudes.innerHTML = newPortalSolicitudes.innerHTML;
+            }
+            const newPortalKpis = doc.querySelector('[data-realtime-card="portal-kpis"]');
+            const currentPortalKpis = document.querySelector('[data-realtime-card="portal-kpis"]');
+            if (newPortalKpis && currentPortalKpis) {
+              currentPortalKpis.innerHTML = newPortalKpis.innerHTML;
             }
 
             if (window.lucide) lucide.createIcons();

@@ -6342,6 +6342,7 @@ def portal_cliente(request):
 
     q = request.GET.get('q', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
+    filtro_tipo = request.GET.get('tipo', '').strip()
 
     solicitudes_qs = solicitudes_base
     if q:
@@ -6351,9 +6352,30 @@ def portal_cliente(request):
         ], q))
     if filtro_estado:
         solicitudes_qs = solicitudes_qs.filter(estado__iexact=filtro_estado)
+    if filtro_tipo:
+        if filtro_tipo.isdigit():
+            solicitudes_qs = solicitudes_qs.filter(tipo_atencion_id=int(filtro_tipo))
+        else:
+            solicitudes_qs = solicitudes_qs.filter(tipo_atencion__nombre__iexact=filtro_tipo)
+
+    tipos_disponibles = TipoAtencion.objects.filter(
+        Q(estado='Activo') | Q(id__in=solicitudes_base.values_list('tipo_atencion_id', flat=True))
+    ).distinct().order_by('nombre')
 
     page_size = _get_page_size(request)
     page_obj = Paginator(solicitudes_qs, page_size).get_page(request.GET.get('page', 1))
+
+    from urllib.parse import urlencode
+    qp_dict = {}
+    if q:
+        qp_dict['q'] = q
+    if filtro_estado:
+        qp_dict['estado'] = filtro_estado
+    if filtro_tipo:
+        qp_dict['tipo'] = filtro_tipo
+    if page_size:
+        qp_dict['page_size'] = page_size
+    query_params = urlencode(qp_dict)
 
     compromisos_org = []
     if organizacion:
@@ -6373,8 +6395,11 @@ def portal_cliente(request):
         'atenciones': page_obj.object_list,
         'page_obj': page_obj,
         'page_size': page_size,
+        'query_params': query_params,
         'q': q,
         'filtro_estado': filtro_estado,
+        'filtro_tipo': filtro_tipo,
+        'tipos_disponibles': tipos_disponibles,
         'total_propias': total_propias,
         'total_filtradas': solicitudes_qs.count(),
         'resueltas': resueltas,

@@ -38,7 +38,7 @@
 
   <!-- Tarjetas de Resumen de Registros Propios -->
   <div data-realtime-card="portal-kpis" class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-    <a href="?{% if q %}q={{ q|urlencode }}{% endif %}"
+    <a href="?{% if q %}q={{ q|urlencode }}{% endif %}{% if filtro_tipo %}{% if q %}&{% endif %}tipo={{ filtro_tipo|urlencode }}{% endif %}"
        class="bg-white rounded-2xl p-4 border {% if not filtro_estado %}border-[#C41230] ring-2 ring-red-100{% else %}border-slate-200 hover:border-red-300{% endif %} shadow-sm hover:shadow-md transition-all flex items-center justify-between group cursor-pointer">
       <div>
         <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Total Propios</span>
@@ -48,7 +48,7 @@
         <i data-lucide="layers" class="w-5 h-5"></i>
       </div>
     </a>
-    <a href="{% if filtro_estado == 'Registrada' %}?{% if q %}q={{ q|urlencode }}{% endif %}{% else %}?estado=Registrada{% if q %}&q={{ q|urlencode }}{% endif %}{% endif %}"
+    <a href="{% if filtro_estado == 'Registrada' %}?{% if q %}q={{ q|urlencode }}{% endif %}{% if filtro_tipo %}{% if q %}&{% endif %}tipo={{ filtro_tipo|urlencode }}{% endif %}{% else %}?estado=Registrada{% if q %}&q={{ q|urlencode }}{% endif %}{% if filtro_tipo %}&tipo={{ filtro_tipo|urlencode }}{% endif %}{% endif %}"
        class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'Registrada' %}border-blue-500 ring-2 ring-blue-100{% else %}border-blue-200/80 hover:border-blue-400{% endif %} shadow-sm hover:shadow-md transition-all flex items-center justify-between group cursor-pointer">
       <div>
         <span class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 block">Registradas</span>
@@ -58,7 +58,7 @@
         <i data-lucide="clock" class="w-5 h-5"></i>
       </div>
     </a>
-    <a href="{% if filtro_estado == 'En proceso' %}?{% if q %}q={{ q|urlencode }}{% endif %}{% else %}?estado=En+proceso{% if q %}&q={{ q|urlencode }}{% endif %}{% endif %}"
+    <a href="{% if filtro_estado == 'En proceso' %}?{% if q %}q={{ q|urlencode }}{% endif %}{% if filtro_tipo %}{% if q %}&{% endif %}tipo={{ filtro_tipo|urlencode }}{% endif %}{% else %}?estado=En+proceso{% if q %}&q={{ q|urlencode }}{% endif %}{% if filtro_tipo %}&tipo={{ filtro_tipo|urlencode }}{% endif %}{% endif %}"
        class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'En proceso' %}border-amber-500 ring-2 ring-amber-100{% else %}border-amber-200/80 hover:border-amber-400{% endif %} shadow-sm hover:shadow-md transition-all flex items-center justify-between group cursor-pointer">
       <div>
         <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 block">En Proceso</span>
@@ -68,7 +68,7 @@
         <i data-lucide="loader" class="w-5 h-5"></i>
       </div>
     </a>
-    <a href="{% if filtro_estado == 'Resuelta' %}?{% if q %}q={{ q|urlencode }}{% endif %}{% else %}?estado=Resuelta{% if q %}&q={{ q|urlencode }}{% endif %}{% endif %}"
+    <a href="{% if filtro_estado == 'Resuelta' %}?{% if q %}q={{ q|urlencode }}{% endif %}{% if filtro_tipo %}{% if q %}&{% endif %}tipo={{ filtro_tipo|urlencode }}{% endif %}{% else %}?estado=Resuelta{% if q %}&q={{ q|urlencode }}{% endif %}{% if filtro_tipo %}&tipo={{ filtro_tipo|urlencode }}{% endif %}{% endif %}"
        class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'Resuelta' %}border-emerald-500 ring-2 ring-emerald-100{% else %}border-emerald-200/80 hover:border-emerald-400{% endif %} shadow-sm hover:shadow-md transition-all flex items-center justify-between group cursor-pointer">
       <div>
         <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 block">Resueltas</span>
@@ -81,18 +81,28 @@
   </div>
 
   <!-- Buscador y Filtro de Registros Propios -->
-  <div class="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-    <form method="GET" action="{% url 'portal_cliente' %}" class="flex-1 flex flex-wrap items-center gap-3">
+  <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+    <form method="GET" action="{% url 'portal_cliente' %}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
       <div class="relative flex-1 min-w-[240px]">
         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
           <i data-lucide="search" class="w-4 h-4"></i>
         </div>
         <input type="text" name="q" value="{{ q }}" placeholder="Buscar en mis registros por código, tipo o descripción..."
-               class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230] font-medium" />
+               class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#C41230]" />
       </div>
 
+      <select name="tipo" onchange="this.form.submit()"
+              class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
+        <option value="">Filtrar Tipo: Todos</option>
+        {% for t in tipos_disponibles %}
+          <option value="{{ t.id }}" {% if filtro_tipo == t.id|stringformat:"s" or filtro_tipo|lower == t.nombre|lower %}selected{% endif %}>
+            {{ t.nombre }}
+          </option>
+        {% endfor %}
+      </select>
+
       <select name="estado" onchange="this.form.submit()"
-              class="px-3 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+              class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
         <option value="">Estado: Todos mis registros</option>
         <option value="Registrada" {% if filtro_estado == 'Registrada' %}selected{% endif %}>Registrada</option>
         <option value="En proceso" {% if filtro_estado == 'En proceso' %}selected{% endif %}>En proceso</option>
@@ -100,8 +110,14 @@
         <option value="Cancelada" {% if filtro_estado == 'Cancelada' %}selected{% endif %}>Cancelada</option>
       </select>
 
-      {% if q or filtro_estado %}
-        <a href="{% url 'portal_cliente' %}" class="text-xs text-[#C41230] font-bold hover:underline py-2">Limpiar filtros</a>
+      <button type="submit"
+              class="px-4 py-2 rounded-xl bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer">
+        <i data-lucide="search" class="w-3.5 h-3.5"></i>
+        <span>Buscar</span>
+      </button>
+
+      {% if q or filtro_estado or filtro_tipo %}
+        <a href="{% url 'portal_cliente' %}" class="text-xs text-[#C41230] font-bold hover:underline py-2 px-1">Limpiar filtros</a>
       {% endif %}
     </form>
   </div>
@@ -119,7 +135,7 @@
     {% if atenciones %}
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         {% for a in atenciones %}
-          <div class="rounded-2xl border border-slate-200 hover:border-red-300 p-4 transition-all hover:shadow-md bg-white flex flex-col justify-between space-y-3">
+          <div data-portal-card class="rounded-2xl border border-slate-200 hover:border-red-300 p-4 transition-all hover:shadow-md bg-white flex flex-col justify-between space-y-3">
             <div class="space-y-2">
               <div class="flex items-center justify-between">
                 <span class="font-mono text-xs font-black text-[#C41230] bg-red-50 px-2.5 py-1 rounded-lg">
