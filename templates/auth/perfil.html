@@ -33,7 +33,7 @@
         Configuración de Perfil y Credenciales
       </h1>
       <p class="text-xs text-slate-500 max-w-xl">
-        Edita tus datos personales, actualiza tu fotografía de perfil y gestiona tu contraseña de acceso.
+        Consulta tus datos personales, actualiza tu correo electrónico, teléfono y fotografía de perfil o gestiona tu contraseña de acceso.
       </p>
     </div>
   </div>
@@ -121,6 +121,28 @@
                      class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-mono font-bold text-slate-800 focus:outline-none select-none" />
             </div>
 
+            {% if vecino_perfil or perfil_delegacion %}
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-700">Delegación</label>
+              <input type="text" readonly value="{{ perfil_delegacion|default:'Comuna de La Serena' }}"
+                     class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-700">Sector / Territorio</label>
+              <input type="text" readonly value="{{ perfil_sector|default:'Sin sector asignado' }}"
+                     class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
+            </div>
+            {% endif %}
+
+            {% if vecino_perfil %}
+            <div class="space-y-1 sm:col-span-2">
+              <label class="block text-xs font-bold text-slate-700">Dirección</label>
+              <input type="text" readonly value="{{ perfil_direccion|default:'No informada' }}"
+                     class="w-full px-4 py-2 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-800 focus:outline-none select-none" />
+            </div>
+            {% endif %}
+
             <div class="space-y-1">
               <label class="block text-xs font-bold text-slate-700">Correo Electrónico <span class="text-[#C41230]">*</span></label>
               <input type="email" name="email" required maxlength="100" value="{{ request.user.email }}"
@@ -130,12 +152,16 @@
 
             <div class="space-y-1">
               <label class="block text-xs font-bold text-slate-700">Teléfono Móvil (Chile)</label>
-              <input type="text" name="telefono" maxlength="15" value="{{ funcionario.telefono|default:'' }}"
+              <input type="text" name="telefono" maxlength="15" value="{% if funcionario.telefono %}{{ funcionario.telefono }}{% elif vecino_perfil.telefono %}{{ vecino_perfil.telefono }}{% endif %}"
                      placeholder="+56 9 8765 4321"
                      class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none font-mono" />
               <div class="tel-feedback"></div>
             </div>
           </div>
+
+          <p class="text-[11px] text-slate-400 font-medium">
+            Solo el <strong>correo electrónico</strong> y el <strong>teléfono móvil</strong> son editables desde esta sección.
+          </p>
 
           <div class="flex justify-end pt-2">
             <button type="submit" class="px-5 py-2.5 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2">

@@ -16,9 +16,9 @@
       </h1>
       <p class="text-xs sm:text-sm text-red-100 max-w-2xl leading-relaxed">
         {% if organizacion %}
-          Consulta los datos registrados de tu junta de vecinos u organización y el historial de sus solicitudes y compromisos vinculados en tiempo real.
+          Consulta exclusivamente el estado de las solicitudes y compromisos vinculados a tu organización en tiempo real.
         {% else %}
-          Consulta exclusivamente tu información personal y el historial de tus registros y solicitudes vinculadas a tu cuenta en tiempo real.
+          Consulta exclusivamente el estado de las solicitudes y registros vinculados a tu cuenta en tiempo real.
         {% endif %}
       </p>
     </div>
@@ -31,49 +31,10 @@
       <a href="{% url 'perfil_usuario' %}"
          class="px-5 py-3 bg-white hover:bg-red-50 text-[#C41230] text-xs font-black rounded-2xl shadow-md transition-all flex items-center justify-center gap-2">
         <i data-lucide="user-cog" class="w-4 h-4"></i>
-        <span>Editar Mi Perfil y Foto</span>
+        <span>Mis Datos y Foto</span>
       </a>
     </div>
   </div>
-
-  {% if not organizacion %}
-  <div data-realtime-card="portal-datos-personales" class="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-    <div class="flex items-center gap-4 min-w-0">
-      {% if funcionario and funcionario.foto %}
-        <img src="{{ funcionario.foto.url }}" alt="{{ request.user.username }}" class="w-14 h-14 rounded-full object-cover ring-2 ring-[#C41230]/30 shadow-sm shrink-0" />
-      {% else %}
-        <div class="w-14 h-14 rounded-2xl bg-red-50 text-[#C41230] flex items-center justify-center shrink-0 border border-red-100 shadow-inner font-extrabold text-lg">
-          {{ request.user.first_name|default:request.user.username|make_list|first|upper }}
-        </div>
-      {% endif %}
-      <div class="text-xs space-y-1 min-w-0">
-        <div class="flex flex-wrap items-center gap-2 min-w-0">
-          <h3 class="font-extrabold text-slate-900 text-sm break-words [overflow-wrap:anywhere]">
-            {% if vecino %}{{ vecino.nombre }}{% else %}{{ request.user.get_full_name|default:request.user.username }}{% endif %}
-          </h3>
-          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-50 text-[#C41230] border border-red-200">
-            Mis Datos Personales
-          </span>
-        </div>
-        <p class="text-slate-600 font-mono break-words [overflow-wrap:anywhere]">
-          {% if vecino %}RUT: <strong class="text-slate-900">{{ vecino.rut }}</strong> · {% endif %}
-          Correo: <strong class="text-slate-900">{{ request.user.email|default:"No informado" }}</strong> ·
-          Tel: <strong class="text-slate-900">{{ funcionario.telefono|default:vecino.telefono|default:"No informado" }}</strong>
-        </p>
-        {% if vecino %}
-          <p class="text-slate-500">
-            Dirección: <strong class="text-slate-700">{{ vecino.direccion|default:"No informada" }}</strong>
-            {% if vecino.sector %} · Sector: <strong class="text-slate-700">{{ vecino.sector.nombre }}</strong>{% elif vecino.territorio %} · Sector: <strong class="text-slate-700">{{ vecino.territorio }}</strong>{% endif %}
-          </p>
-        {% endif %}
-      </div>
-    </div>
-    <div class="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 px-3.5 py-2.5 rounded-2xl border border-slate-200 shrink-0">
-      <i data-lucide="map-pin" class="w-4 h-4 text-[#C41230]"></i>
-      <span>Delegación: <strong>{% if vecino and vecino.delegacion %}{{ vecino.delegacion.nombre }}{% elif funcionario and funcionario.delegacion %}{{ funcionario.delegacion.nombre }}{% else %}Comuna de La Serena{% endif %}</strong></span>
-    </div>
-  </div>
-  {% endif %}
 
   <!-- Tarjetas de Resumen de Registros Propios -->
   <div data-realtime-card="portal-kpis" class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
@@ -191,19 +152,13 @@
               <div class="desc-roll text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs">
                 {{ a.descripcion }}
               </div>
-
-              {% if a.avance_observaciones %}
-                <div class="text-[11px] text-slate-500 bg-emerald-50/50 p-2 rounded-xl border border-emerald-100">
-                  <strong class="text-emerald-700 font-bold">Respuesta municipal:</strong> {{ a.avance_observaciones }}
-                </div>
-              {% endif %}
             </div>
 
             <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
               <span class="font-mono">{{ a.created_at|date:"d/m/Y H:i" }}</span>
               <a href="{% url 'portal_cliente_detalle' a.id %}" 
                  class="font-bold text-[#C41230] hover:underline flex items-center gap-1">
-                <span>Ver detalle y evidencias</span>
+                <span>Ver estado</span>
                 <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
               </a>
             </div>
@@ -239,9 +194,6 @@
           <p class="font-bold text-slate-900">{% if comp.sector %}{{ comp.sector.nombre }}{% elif comp.territorio %}{{ comp.territorio }}{% else %}General{% endif %} · {{ comp.delegacion.nombre|default:"Comuna" }}</p>
           {% if comp.observacion %}
             <p class="text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">{{ comp.observacion }}</p>
-          {% endif %}
-          {% if comp.avance_observaciones %}
-            <p class="text-emerald-900 bg-emerald-50/60 p-2 rounded-xl border border-emerald-100"><strong>Avance:</strong> {{ comp.avance_observaciones }}</p>
           {% endif %}
           <p class="text-[11px] text-slate-400 font-mono">Fecha comprometida: {{ comp.fecha_comprometida|date:"d/m/Y" }}</p>
         </div>

@@ -6204,10 +6204,23 @@ def perfil_usuario(request):
         pn, sn, ap, am = separar_nombre_completo(user.get_full_name() or user.first_name)
         perfil_rut = ''
 
+    perfil_direccion = vecino_perfil.direccion if vecino_perfil else ''
+    perfil_sector = ''
+    if vecino_perfil:
+        perfil_sector = vecino_perfil.sector.nombre if vecino_perfil.sector else (vecino_perfil.territorio or '')
+    elif funcionario and funcionario.sector:
+        perfil_sector = funcionario.sector.nombre
+    perfil_delegacion = ''
+    if vecino_perfil and vecino_perfil.delegacion:
+        perfil_delegacion = vecino_perfil.delegacion.nombre
+    elif funcionario and funcionario.delegacion:
+        perfil_delegacion = funcionario.delegacion.nombre
+
     return render(request, 'auth/perfil.html', {
         'funcionario': funcionario,
         'user': user,
         'org_perfil': org_perfil,
+        'vecino_perfil': vecino_perfil,
         'rep_cards_perfil': rep_cards_perfil,
         'vecinos_directiva': vecinos_directiva_perfil,
         'sectores': sectores_perfil,
@@ -6216,6 +6229,9 @@ def perfil_usuario(request):
         'perfil_apellido_paterno': ap,
         'perfil_apellido_materno': am,
         'perfil_rut': perfil_rut,
+        'perfil_direccion': perfil_direccion,
+        'perfil_sector': perfil_sector,
+        'perfil_delegacion': perfil_delegacion,
     })
 
 
@@ -6317,7 +6333,7 @@ def portal_cliente(request):
 
     solicitudes_base = AtencionCiudadana.objects.filter(
         filtro_cliente
-    ).select_related('delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'actividad', 'organizacion').order_by('-created_at')
+    ).select_related('delegacion', 'tipo_atencion', 'sub_atencion', 'organizacion').order_by('-created_at')
 
     total_propias = solicitudes_base.count()
     resueltas = solicitudes_base.filter(estado__iexact='Resuelta').count()
@@ -6330,7 +6346,7 @@ def portal_cliente(request):
     solicitudes_qs = solicitudes_base
     if q:
         solicitudes_qs = solicitudes_qs.filter(build_accent_query([
-            'codigo_atencion', 'descripcion', 'avance_observaciones',
+            'codigo_atencion', 'descripcion',
             'tipo_atencion__nombre', 'sub_atencion__nombre', 'delegacion__nombre'
         ], q))
     if filtro_estado:
@@ -6344,7 +6360,7 @@ def portal_cliente(request):
         from agenda.models import CompromisoAgenda
         compromisos_org = list(
             CompromisoAgenda.objects.filter(organizacion=organizacion)
-            .select_related('delegacion', 'sector', 'responsable__user')
+            .select_related('delegacion', 'sector')
             .order_by('-fecha_comprometida', '-id')
         )
 
@@ -6388,7 +6404,7 @@ def portal_cliente_detalle(request, atencion_id):
         id=atencion_id
     ).filter(
         filtro_cliente
-    ).select_related('delegacion', 'tipo_atencion', 'sub_atencion', 'usuario_responsable', 'organizacion').first()
+    ).select_related('delegacion', 'tipo_atencion', 'sub_atencion', 'organizacion').first()
 
     if not atencion:
         # Responder 404 sin revelar si la solicitud de otro usuario existe

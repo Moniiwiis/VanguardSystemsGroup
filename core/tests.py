@@ -3821,6 +3821,124 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertIn('Concepto', headers_aj)
         self.assertIn('% Ajuste', headers_aj)
 
+    def test_portal_cliente_solo_estado_y_datos_personales_solo_en_perfil(self):
+        from django.utils import timezone
+        from configuration.models import ItemMedicion, Periodo
+
+        admin = User.objects.create_superuser('admin_portal_clean', 'apc@example.test', 'Admin123!')
+        sector = Sector.objects.create(nombre='Sector Casco Test', delegacion=self.delegacion, estado='Activo')
+        vec = Vecino.objects.create(
+            nombre='María González Pérez',
+            primer_nombre='María',
+            apellido_paterno='González',
+            apellido_materno='Pérez',
+            rut='12.345.678-5',
+            direccion='Av. Balmaceda 120, La Serena',
+            telefono='+56 9 8765 4321',
+            sector=sector,
+            delegacion=self.delegacion,
+            estado='Activo',
+        )
+        cli_user = User.objects.create_user(
+            '12345678-5', 'maria.portal@example.test', 'Pass123!', first_name='María', last_name='González Pérez'
+        )
+        cargo_cli = Cargo.objects.create(nombre_cargo='Ciudadano')
+        rol_cli = Rol.objects.create(nombre_rol='Cliente', alcance='Personal', estado='Activo')
+        func_cli = Funcionario.objects.create(
+            user=cli_user,
+            cargo=cargo_cli,
+            delegacion=self.delegacion,
+            sector=sector,
+            identificador_institucional='VEC-123456785',
+            rut='12.345.678-5',
+            telefono='+56 9 8765 4321',
+            estado='Activo',
+        )
+        FuncionarioRol.objects.create(funcionario=func_cli, rol=rol_cli)
+
+        hoy = timezone.localdate()
+        periodo = Periodo.objects.create(
+            fecha_inicio=hoy, fecha_termino=hoy + datetime.timedelta(days=30), dias_computables=20, estado='Abierto'
+        )
+        item = ItemMedicion.objects.create(nombre_item='Atención Portal', estado='Activo')
+        func_admin = Funcionario.objects.filter(user=self.user).first() or Funcionario.objects.create(
+            user=admin, cargo=cargo_cli, delegacion=self.delegacion, identificador_institucional='FUN-APC'
+        )
+        actividad = Actividad.objects.create(
+            funcionario=func_admin,
+            item=item,
+            periodo=periodo,
+            fecha_actividad=hoy,
+            descripcion_solicitud='Gestión interna',
+            accion_ejecutada='Revisión técnica interna',
+            tipo_registro='accion',
+        )
+        Evidencia.objects.create(actividad=actividad, momento='antes', ruta_archivo_url='evidencias/secret.png')
+
+        at_cli = AtencionCiudadana.objects.create(
+            solicitante='María González Pérez',
+            vecino=vec,
+            delegacion=self.delegacion,
+            tipo_atencion=self.tipo,
+            sub_atencion=self.sub,
+            descripcion='Reparación de luminaria exterior',
+            avance_observaciones='NOTA INTERNA CONFIDENCIAL DEL EQUIPO',
+            estado='En proceso',
+            actividad=actividad,
+            creado_por=admin,
+            usuario_responsable=admin,
+        )
+
+        self.client.force_login(cli_user)
+
+        # 1. En /portal-cliente/ no se muestran datos personales duplicados, ni avances internos ni evidencias
+        resp_portal = self.client.get(reverse('portal_cliente'))
+        self.assertEqual(resp_portal.status_code, 200)
+        self.assertNotContains(resp_portal, 'portal-datos-personales')
+        self.assertNotContains(resp_portal, 'Mis Datos Personales')
+        self.assertNotContains(resp_portal, 'NOTA INTERNA CONFIDENCIAL DEL EQUIPO')
+        self.assertNotContains(resp_portal, 'Respuesta municipal')
+        self.assertNotContains(resp_portal, 'Ver detalle y evidencias')
+        self.assertContains(resp_portal, 'Ver estado')
+        self.assertContains(resp_portal, 'En proceso')
+
+        # 2. En /portal-cliente/atenciones/<id>/ solo estado y solicitud; sin evidencias ni notas internas
+        resp_det = self.client.get(reverse('portal_cliente_detalle', args=[at_cli.id]))
+        self.assertEqual(resp_det.status_code, 200)
+        self.assertContains(resp_det, at_cli.codigo_atencion)
+        self.assertContains(resp_det, 'En proceso')
+        self.assertNotContains(resp_det, 'Evidencias y Registros del Terreno')
+        self.assertNotContains(resp_det, 'Evidencia Validada')
+        self.assertNotContains(resp_det, 'Respuesta y Avance Municipal')
+        self.assertNotContains(resp_det, 'NOTA INTERNA CONFIDENCIAL DEL EQUIPO')
+
+        # 3. En /perfil/ (Mis Datos y Foto) se muestran sus datos completos en solo lectura salvo teléfono y correo
+        resp_perf = self.client.get(reverse('perfil_usuario'))
+        self.assertEqual(resp_perf.status_code, 200)
+        self.assertContains(resp_perf, 'Av. Balmaceda 120, La Serena')
+        self.assertContains(resp_perf, 'Sector Casco Test')
+        self.assertContains(resp_perf, self.delegacion.nombre)
+        self.assertContains(resp_perf, 'name="email"')
+        self.assertContains(resp_perf, 'name="telefono"')
+        self.assertNotContains(resp_perf, 'name="direccion"')
+        self.assertNotContains(resp_perf, 'name="rut"')
+
+        # POST solo actualiza correo y teléfono, nunca dirección ni RUT ni nombre
+        self.client.post(reverse('perfil_usuario'), {
+            'accion': 'actualizar_datos',
+            'email': 'maria.actualizada@example.test',
+            'telefono': '977776666',
+            'direccion': 'Calle Falsa 999',
+            'rut': '9.999.999-9',
+        })
+        cli_user.refresh_from_db()
+        vec.refresh_from_db()
+        self.assertEqual(cli_user.email, 'maria.actualizada@example.test')
+        self.assertEqual(vec.telefono, '+56 9 7777 6666')
+        self.assertEqual(vec.direccion, 'Av. Balmaceda 120, La Serena')
+        self.assertEqual(vec.rut, '12.345.678-5')
+
+
 
 
 

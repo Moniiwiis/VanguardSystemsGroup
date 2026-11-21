@@ -162,12 +162,10 @@ const ws = new WebSocket(`ws://${location.host}/ws/crud/vecinos/`);
 ## 🏘️ Portal Ciudadano (Rol Cliente)
 
 Los usuarios con rol **Cliente** ven exclusivamente:
-- Sus propias solicitudes ciudadanas
-- Estado de cada solicitud (Registrada / En proceso / Resuelta)
-- Formulario para nueva solicitud
-- Detalle de cada atención con evidencias
+- Estado de sus propias solicitudes ciudadanas (Registrada / En proceso / Resuelta / Cancelada)
+- Consulta de sus datos personales u organizacionales en **Mis Datos y Foto** (`/perfil/`), donde únicamente pueden editar teléfono y correo electrónico, fotografía y contraseña
 
-> Los clientes **no** tienen acceso a listados administrativos ni al **Chat en Vivo** (`/chat/`).
+> Los clientes **no** tienen acceso a creación de nuevas solicitudes desde el portal, evidencias internas, gestiones administrativas ni al **Chat en Vivo** (`/chat/`).
 
 ---
 
