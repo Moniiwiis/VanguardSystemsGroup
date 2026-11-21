@@ -2558,7 +2558,8 @@
         if (btn) {
           btn.disabled = true;
           btn.classList.add('opacity-70', 'cursor-not-allowed');
-          if (!btn.dataset.sgrOrigText) btn.dataset.sgrOrigText = btn.textContent || '';
+          if (!btn.dataset.sgrOrigHtml) btn.dataset.sgrOrigHtml = btn.innerHTML;
+          btn.textContent = 'Guardando...';
         }
       });
 
@@ -2566,7 +2567,8 @@
         document.querySelectorAll('form[data-sgr-submitting="1"]').forEach((form) => {
           delete form.dataset.sgrSubmitting;
           form.querySelectorAll('button[type="submit"][disabled]').forEach((btn) => {
-            if (btn.dataset.sgrOrigText !== undefined) {
+            if (btn.dataset.sgrOrigHtml !== undefined) {
+              btn.innerHTML = btn.dataset.sgrOrigHtml;
               btn.disabled = false;
               btn.classList.remove('opacity-70', 'cursor-not-allowed');
             }

@@ -1359,13 +1359,12 @@ def _validar_y_crear_vecino_desde_post(request, del_activa, prefix='', allow_exi
         correo_enviado = False
         if creado and prov_pwd and user_vec:
             try:
-                _send_welcome_provisional_password(
+                correo_enviado = _despachar_correo_bienvenida(
                     user=user_vec,
                     provisional_password=prov_pwd,
                     rol_nombre='Cliente (Portal Ciudadano)',
                     delegacion_nombre=del_activa.nombre if del_activa else 'Comuna',
                 )
-                correo_enviado = True
             except (OSError, SMTPException, BadHeaderError):
                 logger.exception("No se pudo enviar correo de bienvenida al vecino existente sincronizado.")
         return vecino_existente, user_vec, prov_pwd, correo_enviado, None
@@ -1401,13 +1400,12 @@ def _validar_y_crear_vecino_desde_post(request, del_activa, prefix='', allow_exi
     correo_enviado = False
     if correo and user_vec and provisional_password:
         try:
-            _send_welcome_provisional_password(
+            correo_enviado = _despachar_correo_bienvenida(
                 user=user_vec,
                 provisional_password=provisional_password,
                 rol_nombre='Cliente (Portal Ciudadano)',
                 delegacion_nombre=del_activa.nombre if del_activa else 'Comuna',
             )
-            correo_enviado = True
         except (OSError, SMTPException, BadHeaderError):
             logger.exception("No se pudo enviar correo de bienvenida al vecino creado.")
 
@@ -1783,13 +1781,12 @@ def gestion_usuarios(request):
 
             correo_enviado = False
             try:
-                _send_welcome_provisional_password(
+                correo_enviado = _despachar_correo_bienvenida(
                     user=user,
                     provisional_password=provisional_password,
                     rol_nombre=rol_obj.nombre_rol if rol_obj else '',
                     delegacion_nombre=del_obj.nombre if del_obj else 'Global',
                 )
-                correo_enviado = True
             except (OSError, SMTPException, BadHeaderError):
                 logger.exception("No se pudo enviar el correo con la contraseña provisoria al nuevo funcionario.")
 
@@ -2961,7 +2958,7 @@ def _crear_o_asegurar_vecino_representante(
             )
             if creado and prov_pwd and user_vec:
                 try:
-                    _send_welcome_provisional_password(
+                    _despachar_correo_bienvenida(
                         user=user_vec,
                         provisional_password=prov_pwd,
                         rol_nombre='Cliente (Portal Ciudadano)',
@@ -3005,7 +3002,7 @@ def _crear_o_asegurar_vecino_representante(
         )
         if creado and prov_pwd and user_vec:
             try:
-                _send_welcome_provisional_password(
+                _despachar_correo_bienvenida(
                     user=user_vec,
                     provisional_password=prov_pwd,
                     rol_nombre='Cliente (Portal Ciudadano)',
@@ -5822,7 +5819,7 @@ def gestion_organizaciones_editar(request, org_id):
         _sincronizar_vecinos_directiva(request, org, del_obj, org.sector, field_prefix='')
         if creado and prov_pwd and user_org:
             try:
-                _send_welcome_provisional_password(
+                _despachar_correo_bienvenida(
                     user=user_org,
                     provisional_password=prov_pwd,
                     rol_nombre=f"{org.tipo_organizacion} (Portal Ciudadano)",

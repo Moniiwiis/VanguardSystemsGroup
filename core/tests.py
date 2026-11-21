@@ -3690,6 +3690,7 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertFalse(OrganizacionComunitaria.objects.filter(nombre='JJVV Correo Funcionario').exists())
         self.assertContains(r_staff_mail, 'funcionario municipal')
         self.assertContains(r_staff_mail, 'sgrSubmitting')
+        self.assertContains(r_staff_mail, 'Guardando...')
 
         # 2. Al crear una organización con el mismo nombre dos veces en la misma delegación se bloquea el duplicado
         for _ in range(2):
