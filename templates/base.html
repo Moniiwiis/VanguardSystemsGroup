@@ -400,7 +400,7 @@
           {% if permisos.ver_atenciones or permisos.ver_reportes or permisos.es_admin %}
             <a href="{% url 'gestion_tubo' %}" 
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'gestion_tubo' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-              <i data-lucide="git-pull-request" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
+              <i data-lucide="git-pull-request" class="w-4 h-4 shrink-0"></i>
               <span>Tubo de Compromiso</span>
             </a>
           {% endif %}
@@ -408,7 +408,7 @@
           {% if permisos.ver_atenciones or permisos.es_admin %}
             <a href="{% url 'cartas_listado' %}"
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'cartas_listado' or request.resolver_match.url_name == 'cartas_nueva' or request.resolver_match.url_name == 'cartas_detalle' or request.resolver_match.url_name == 'cartas_editar' or request.resolver_match.url_name == 'cartas_eliminar' %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-              <i data-lucide="mail" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
+              <i data-lucide="mail" class="w-4 h-4 shrink-0"></i>
               <span>Tubo de Cartas</span>
             </a>
           {% endif %}
@@ -551,7 +551,7 @@
           {% if permisos.ver_portal_cliente or permisos.es_cliente %}
             <a href="{% url 'portal_cliente' %}" 
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'portal_cliente' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-              <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0 text-[#C41230]"></i>
+              <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0"></i>
               <span>Mis Registros</span>
             </a>
           {% endif %}
@@ -559,7 +559,7 @@
           {% if not permisos.es_cliente %}
           <a href="{% url 'websocket:chat_index' %}" 
              class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if 'chat' in request.resolver_match.url_name %}border-l-4 border-[#C41230] bg-red-50 text-[#C41230] font-extrabold{% else %}text-slate-700 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i data-lucide="messages-square" class="w-4 h-4 shrink-0 text-red-600"></i>
+            <i data-lucide="messages-square" class="w-4 h-4 shrink-0"></i>
             <span>Chat en Vivo</span>
           </a>
           {% endif %}

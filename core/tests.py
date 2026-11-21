@@ -3729,6 +3729,9 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         html_base = self.client.get(reverse('gestion_organizaciones')).content.decode('utf-8')
         self.assertNotIn('lg:overflow-y-auto lg:max-h-full', html_base)
         self.assertIn('overflow-x: clip;', html_base)
+        self.assertNotIn('<i data-lucide="git-pull-request" class="w-4 h-4 shrink-0 text-[#C41230]">', html_base)
+        self.assertNotIn('<i data-lucide="mail" class="w-4 h-4 shrink-0 text-[#C41230]">', html_base)
+        self.assertNotIn('<i data-lucide="messages-square" class="w-4 h-4 shrink-0 text-red-600">', html_base)
 
         r_widget = self.client.get(reverse('websocket:chat_index') + '?widget=1')
         self.assertEqual(r_widget.status_code, 200)
