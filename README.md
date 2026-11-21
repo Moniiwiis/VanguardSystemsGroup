@@ -138,15 +138,14 @@ const ws = new WebSocket(`ws://${location.host}/ws/crud/vecinos/`);
 
 - URL: `/chat/`
 - Namespaced: `websocket:chat_index`
-- Usa Django Channels sobre ASGI; los mensajes se envían en conversaciones estrictamente 1 a 1.
+- **Acceso:** exclusivo para funcionarios y roles municipales internos (**Consultor / Lector**, **Operador**, **Coordinador**, **Delegado** y **Administrador**). Los usuarios con rol **Cliente** (vecinos y organizaciones) **no** pueden acceder a `/chat/`, no visualizan la burbuja ni el acceso en el menú lateral y son redirigidos automáticamente a `/portal-cliente/`.
+- Usa Django Channels sobre ASGI; los mensajes se envían en conversaciones estrictamente 1 a 1 (además del canal compartido de Soporte Técnico para los roles habilitados).
 - Cada mensaje registra emisor, receptor y `leido`. Los participantes solo pueden consultar mensajes dirigidos a ellos o enviados por ellos. Delegación Global puede revisar todas las conversaciones activas; las conversaciones ajenas son de solo lectura.
 - Delegación Global puede iniciar un chat privado con cualquier funcionario; delegados pueden contactar a administración y los demás usuarios solo a personas autorizadas de su delegación.
 - Los mensajes entrantes actualizan las burbujas de no leídos por contacto. Abrir la conversación marca como leídos los mensajes recibidos. WebSockets notifican los mensajes nuevos en tiempo real.
 - El directorio permite filtrar contactos por RUT/ID, nombre, apellido, cargo, sección y delegación. Administración gestiona los contactos desde **Usuarios**.
 - El `chat_id` persistido se calcula como `direct_<menor user_id>_<mayor user_id>`; así es estable, no depende de quién inicia y distingue dos pares de usuarios incluso dentro de las mismas delegaciones. Mensajes, consultas y WebSockets usan exclusivamente ese identificador.
 - La migración `websocket.0002_private_messages` conserva el historial de salas compartidas en un archivo separado no expuesto por el chat, y `websocket.0003_chat_id` agrega y rellena el ID único de cada pareja privada.
-- Después de actualizar, ejecutar `python manage.py migrate`.
-- El directorio permite filtrar contactos por RUT/ID, nombre, apellido, cargo, sección y delegación. Administración gestiona los contactos desde **Usuarios**.
 - Después de actualizar, ejecutar `python manage.py migrate` para crear el historial de mensajes y asignación de sección a funcionarios.
 
 ---
@@ -168,7 +167,7 @@ Los usuarios con rol **Cliente** ven exclusivamente:
 - Formulario para nueva solicitud
 - Detalle de cada atención con evidencias
 
-> Los clientes **no** tienen acceso a listados administrativos.
+> Los clientes **no** tienen acceso a listados administrativos ni al **Chat en Vivo** (`/chat/`).
 
 ---
 
@@ -176,28 +175,30 @@ Los usuarios con rol **Cliente** ven exclusivamente:
 
 | Módulo | URL | Rol mínimo |
 |---|---|---|
-| Dashboard | `/inicio/` | Operador |
-| Atenciones Ciudadanas | `/atenciones/` | Operador |
-| Vecinos | `/vecinos/` | Operador |
-| Organizaciones / JJVV | `/organizaciones/` | Operador |
-| Metas | `/metas/` | Coordinador |
-| Tipos de Atención | `/tipo-atencion/` | Coordinador |
-| Delegaciones | `/delegaciones/` | Administrador |
-| Roles | `/roles/` | Administrador |
-| Usuarios | `/usuarios/` | Administrador |
-| Reportes | `/reportes/` | Delegado |
-| Portal Ciudadano | `/portal/` | Cliente |
-| Mi Perfil | `/perfil/` | Todos |
-| Chat en Vivo | `/chat/` | Todos |
+| Dashboard | `/` | Consultor (roles municipales) |
+| Atenciones Ciudadanas | `/gestion/atenciones/` | Consultor (lectura) / Operador (edición) |
+| Tubo de Compromiso | `/gestion/tubo/` | Consultor (lectura) / Operador (edición) |
+| Tubo de Cartas | `/gestion/tubo-cartas/` | Consultor (lectura) / Operador (edición) |
+| Vecinos | `/gestion/vecinos/` | Consultor (lectura) / Operador (edición) |
+| Organizaciones / JJVV | `/gestion/organizaciones/` | Consultor (lectura) / Operador (edición) |
+| Sectores / Territorio | `/gestion/sectores/` | Consultor (lectura) / Operador (edición) |
+| Metas (Ítems y Períodos) | `/gestion/metas/` | Coordinador / Administrador |
+| Tipos de Atención | `/gestion/tipo-atencion/` | Coordinador / Administrador |
+| Sub Atención | `/gestion/sub-atencion/` | Coordinador / Administrador |
+| Áreas y Cuadrillas de Apoyo | `/gestion/areas-apoyo/` | Coordinador / Administrador |
+| Delegaciones | `/gestion/delegaciones/` | Administrador |
+| Roles | `/gestion/roles/` | Administrador |
+| Funcionarios / Usuarios | `/gestion/usuarios/` | Delegado / Administrador |
+| Reportes | `/gestion/reportes/` | Delegado / Coordinador / Administrador |
+| Portal Ciudadano | `/portal-cliente/` | Cliente |
+| Mi Perfil | `/perfil/` | Todos (incluye Clientes) |
+| Chat en Vivo | `/chat/` | Roles internos municipales (Consultor / Operador+; **excluye Clientes**) |
 
 ---
 
 ## 📤 Exportación a Excel (.xlsx)
 
-Disponible en los módulos:
-- **Atenciones** → botón "Exportar Excel" → columnas Matriz Territorial
-- **Organizaciones** → botón "Exportar Excel" → coherente con `base_datos_JJVV.xlsx`
-- **Vecinos** → botón "Exportar Excel"
+Botón unificado **"Exportar a Excel"** disponible en todos los módulos de tablas del sistema (con exportaciones independientes por cada tabla en módulos con múltiples vistas/pestañas como **Tubo de Compromiso** — Requerimientos vs. Resumen por Colaborador, **Reportes** — Metas vs. Ajustes de Desempeño e **Ítems y Períodos**).
 
 ---
 
