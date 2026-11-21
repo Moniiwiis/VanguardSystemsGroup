@@ -3706,6 +3706,25 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             1,
         )
 
+        # 3. Tarjetas superiores con toggle (segundo clic en la tarjeta activa limpia el filtro de estado)
+        import re
+        for url_name, val, card_label in (
+            ('gestion_atenciones', 'Registrada', 'Registradas'),
+            ('gestion_tubo', 'Pendiente', 'Pendientes'),
+            ('cartas_listado', 'EN PROCESO', 'En Proceso'),
+            ('gestion_organizaciones', 'Activa', 'Activas'),
+        ):
+            r_active = self.client.get(reverse(url_name), {'estado': val})
+            self.assertEqual(r_active.status_code, 200)
+            html_act = r_active.content.decode('utf-8')
+            m_card = re.search(
+                rf'<a\s+href="([^"]+)"[^>]*>(?:(?!</a>).)*?{card_label}(?:(?!</a>).)*?</a>',
+                html_act,
+                flags=re.DOTALL,
+            )
+            self.assertIsNotNone(m_card, f'No se encontró tarjeta {card_label} en {url_name}')
+            self.assertNotIn('estado=', m_card.group(1), f'La tarjeta {card_label} en {url_name} debe quitar estado= al estar activa')
+
 
 
 

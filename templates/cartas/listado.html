@@ -78,7 +78,7 @@
     </a>
 
     <!-- En Proceso -->
-    <a href="?q={{ q_cartas|urlencode }}&para={{ para_filtro|urlencode }}&pronunciamiento={{ pron_filtro|urlencode }}&estado=EN+PROCESO{% if permisos.es_admin %}&delegacion={{ delegacion_filtro|urlencode }}{% endif %}"
+    <a href="?q={{ q_cartas|urlencode }}&para={{ para_filtro|urlencode }}&pronunciamiento={{ pron_filtro|urlencode }}{% if estado_filtro != 'EN PROCESO' %}&estado=EN+PROCESO{% endif %}{% if permisos.es_admin %}&delegacion={{ delegacion_filtro|urlencode }}{% endif %}"
        class="bg-white rounded-2xl p-4 border {% if estado_filtro == 'EN PROCESO' %}border-amber-500 ring-2 ring-amber-100{% else %}border-slate-200/80 hover:border-amber-300{% endif %} shadow-sm transition-all hover:shadow group block">
       <div class="flex items-center justify-between">
         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">En Proceso</span>
@@ -97,7 +97,7 @@
     </a>
 
     <!-- Aprobadas -->
-    <a href="?q={{ q_cartas|urlencode }}&para={{ para_filtro|urlencode }}&pronunciamiento={{ pron_filtro|urlencode }}&estado=APROBADA{% if permisos.es_admin %}&delegacion={{ delegacion_filtro|urlencode }}{% endif %}"
+    <a href="?q={{ q_cartas|urlencode }}&para={{ para_filtro|urlencode }}&pronunciamiento={{ pron_filtro|urlencode }}{% if estado_filtro != 'APROBADA' %}&estado=APROBADA{% endif %}{% if permisos.es_admin %}&delegacion={{ delegacion_filtro|urlencode }}{% endif %}"
        class="bg-white rounded-2xl p-4 border {% if estado_filtro == 'APROBADA' %}border-blue-500 ring-2 ring-blue-100{% else %}border-slate-200/80 hover:border-blue-300{% endif %} shadow-sm transition-all hover:shadow group block">
       <div class="flex items-center justify-between">
         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Aprobadas</span>
@@ -116,7 +116,7 @@
     </a>
 
     <!-- Finalizadas -->
-    <a href="?q={{ q_cartas|urlencode }}&para={{ para_filtro|urlencode }}&pronunciamiento={{ pron_filtro|urlencode }}&estado=FINALIZADA{% if permisos.es_admin %}&delegacion={{ delegacion_filtro|urlencode }}{% endif %}"
+    <a href="?q={{ q_cartas|urlencode }}&para={{ para_filtro|urlencode }}&pronunciamiento={{ pron_filtro|urlencode }}{% if estado_filtro != 'FINALIZADA' %}&estado=FINALIZADA{% endif %}{% if permisos.es_admin %}&delegacion={{ delegacion_filtro|urlencode }}{% endif %}"
        class="bg-white rounded-2xl p-4 border {% if estado_filtro == 'FINALIZADA' %}border-emerald-500 ring-2 ring-emerald-100{% else %}border-slate-200/80 hover:border-emerald-300{% endif %} shadow-sm transition-all hover:shadow group block">
       <div class="flex items-center justify-between">
         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Finalizadas</span>
@@ -135,7 +135,7 @@
     </a>
 
     <!-- No Aplica -->
-    <a href="?q={{ q_cartas|urlencode }}&para={{ para_filtro|urlencode }}&pronunciamiento={{ pron_filtro|urlencode }}&estado=NO+APLICA{% if permisos.es_admin %}&delegacion={{ delegacion_filtro|urlencode }}{% endif %}"
+    <a href="?q={{ q_cartas|urlencode }}&para={{ para_filtro|urlencode }}&pronunciamiento={{ pron_filtro|urlencode }}{% if estado_filtro != 'NO APLICA' %}&estado=NO+APLICA{% endif %}{% if permisos.es_admin %}&delegacion={{ delegacion_filtro|urlencode }}{% endif %}"
        class="bg-white rounded-2xl p-4 border {% if estado_filtro == 'NO APLICA' %}border-slate-500 ring-2 ring-slate-200{% else %}border-slate-200/80 hover:border-slate-300{% endif %} shadow-sm transition-all hover:shadow group block">
       <div class="flex items-center justify-between">
         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">No Aplica</span>

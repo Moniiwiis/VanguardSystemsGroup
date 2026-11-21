@@ -82,7 +82,7 @@
     </a>
 
     <!-- Ingresados -->
-    <a href="?tab={{ tab }}&vista={{ vista }}&q={{ q }}&estado=Registrada&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+    <a href="?tab={{ tab }}&vista={{ vista }}&q={{ q }}{% if filtro_estado != 'Registrada' %}&estado=Registrada{% endif %}&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if filtro_periodo %}&periodo={{ filtro_periodo }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
        class="bg-white p-4 rounded-3xl border {% if filtro_estado == 'Registrada' %}border-blue-500 ring-2 ring-blue-100 shadow-md{% else %}border-blue-100 hover:border-blue-300 shadow-sm{% endif %} bg-blue-50/20 transition-all hover:shadow block group">
       <div class="flex items-center justify-between">
         <span class="text-[10px] font-extrabold text-blue-700 uppercase tracking-wider block">Ingresados</span>
@@ -93,7 +93,7 @@
     </a>
 
     <!-- En Proceso -->
-    <a href="?tab={{ tab }}&vista={{ vista }}&q={{ q }}&estado=En+proceso&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+    <a href="?tab={{ tab }}&vista={{ vista }}&q={{ q }}{% if filtro_estado != 'En proceso' %}&estado=En+proceso{% endif %}&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if filtro_periodo %}&periodo={{ filtro_periodo }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
        class="bg-white p-4 rounded-3xl border {% if filtro_estado == 'En proceso' %}border-amber-500 ring-2 ring-amber-100 shadow-md{% else %}border-amber-100 hover:border-amber-300 shadow-sm{% endif %} bg-amber-50/20 transition-all hover:shadow block group">
       <div class="flex items-center justify-between">
         <span class="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider block">En Proceso</span>
@@ -104,7 +104,7 @@
     </a>
 
     <!-- Pendientes con Alerta del 10% -->
-    <a href="?tab={{ tab }}&vista={{ vista }}&q={{ q }}&estado=Pendiente&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+    <a href="?tab={{ tab }}&vista={{ vista }}&q={{ q }}{% if filtro_estado != 'Pendiente' %}&estado=Pendiente{% endif %}&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if filtro_periodo %}&periodo={{ filtro_periodo }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
        class="bg-white p-4 rounded-3xl border {% if filtro_estado == 'Pendiente' %}border-red-500 ring-2 ring-red-100 shadow-md{% elif alerta_pendientes_10 %}border-red-300 hover:border-red-400 bg-red-50/40{% else %}border-orange-100 hover:border-orange-300 bg-orange-50/20{% endif %} shadow-sm transition-all hover:shadow block group">
       <div class="flex items-center justify-between">
         <span class="text-[10px] font-extrabold text-red-700 uppercase tracking-wider">Pendientes</span>
@@ -123,7 +123,7 @@
     </a>
 
     <!-- Realizados -->
-    <a href="?tab={{ tab }}&vista={{ vista }}&q={{ q }}&estado=Resuelta&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
+    <a href="?tab={{ tab }}&vista={{ vista }}&q={{ q }}{% if filtro_estado != 'Resuelta' %}&estado=Resuelta{% endif %}&responsable={{ filtro_responsable }}&origen={{ filtro_origen }}{% if filtro_periodo %}&periodo={{ filtro_periodo }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
        class="bg-white p-4 rounded-3xl border {% if filtro_estado == 'Resuelta' %}border-emerald-500 ring-2 ring-emerald-100 shadow-md{% else %}border-emerald-100 hover:border-emerald-300 shadow-sm{% endif %} bg-emerald-50/20 transition-all hover:shadow block group">
       <div class="flex items-center justify-between">
         <span class="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider block">Realizados</span>

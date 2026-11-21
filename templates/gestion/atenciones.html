@@ -368,7 +368,7 @@
     </a>
 
     <!-- Registradas -->
-    <a href="?q={{ q }}&tipo={{ filtro_tipo }}&estado=Registrada{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
+    <a href="?q={{ q }}&tipo={{ filtro_tipo }}{% if filtro_estado != 'Registrada' %}&estado=Registrada{% endif %}{% if filtro_periodo %}&periodo={{ filtro_periodo }}{% endif %}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
        class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'Registrada' %}border-blue-500 ring-2 ring-blue-100{% else %}border-slate-200/80 hover:border-blue-300{% endif %} shadow-sm transition-all hover:shadow group block">
       <div class="flex items-center justify-between">
         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Registradas</span>
@@ -387,7 +387,7 @@
     </a>
 
     <!-- En proceso -->
-    <a href="?q={{ q }}&tipo={{ filtro_tipo }}&estado=En+proceso{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
+    <a href="?q={{ q }}&tipo={{ filtro_tipo }}{% if filtro_estado != 'En proceso' %}&estado=En+proceso{% endif %}{% if filtro_periodo %}&periodo={{ filtro_periodo }}{% endif %}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
        class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'En proceso' %}border-amber-500 ring-2 ring-amber-100{% else %}border-slate-200/80 hover:border-amber-300{% endif %} shadow-sm transition-all hover:shadow group block">
       <div class="flex items-center justify-between">
         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">En proceso</span>
@@ -406,7 +406,7 @@
     </a>
 
     <!-- Resueltas -->
-    <a href="?q={{ q }}&tipo={{ filtro_tipo }}&estado=Resuelta{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
+    <a href="?q={{ q }}&tipo={{ filtro_tipo }}{% if filtro_estado != 'Resuelta' %}&estado=Resuelta{% endif %}{% if filtro_periodo %}&periodo={{ filtro_periodo }}{% endif %}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
        class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'Resuelta' %}border-emerald-500 ring-2 ring-emerald-100{% else %}border-slate-200/80 hover:border-emerald-300{% endif %} shadow-sm transition-all hover:shadow group block">
       <div class="flex items-center justify-between">
         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Resueltas</span>
@@ -425,7 +425,7 @@
     </a>
 
     <!-- Canceladas -->
-    <a href="?q={{ q }}&tipo={{ filtro_tipo }}&estado=Cancelada{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
+    <a href="?q={{ q }}&tipo={{ filtro_tipo }}{% if filtro_estado != 'Cancelada' %}&estado=Cancelada{% endif %}{% if filtro_periodo %}&periodo={{ filtro_periodo }}{% endif %}{% if delegacion_seleccionada and permisos.es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}" 
        class="bg-white rounded-2xl p-4 border {% if filtro_estado == 'Cancelada' %}border-red-500 ring-2 ring-red-100{% else %}border-slate-200/80 hover:border-red-300{% endif %} shadow-sm transition-all hover:shadow group block">
       <div class="flex items-center justify-between">
         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Canceladas</span>
