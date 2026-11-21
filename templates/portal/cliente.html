@@ -156,11 +156,19 @@
 
             <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
               <span class="font-mono">{{ a.created_at|date:"d/m/Y H:i" }}</span>
-              <a href="{% url 'portal_cliente_detalle' a.id %}" 
-                 class="font-bold text-[#C41230] hover:underline flex items-center gap-1">
+              <button type="button"
+                      onclick="abrirModalEstadoSolicitud(this)"
+                      data-codigo="{{ a.codigo_atencion }}"
+                      data-estado="{{ a.estado }}"
+                      data-tipo="{{ a.tipo_atencion.nombre }}"
+                      data-subtipo="{{ a.sub_atencion.nombre }}"
+                      data-delegacion="{{ a.delegacion.nombre }}"
+                      data-fecha="{{ a.created_at|date:'d/m/Y H:i' }}"
+                      data-descripcion="{{ a.descripcion }}"
+                      class="font-bold text-[#C41230] hover:underline flex items-center gap-1 cursor-pointer">
                 <span>Ver estado</span>
                 <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
-              </a>
+              </button>
             </div>
           </div>
         {% endfor %}
@@ -203,4 +211,113 @@
   {% endif %}
 
 </div>
+
+<!-- Modal Estado de Solicitud en la misma página (sin navegación ni información interna) -->
+<div id="modal-estado-solicitud"
+     onclick="if (event.target === this) cerrarModalEstadoSolicitud();"
+     class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 w-full max-w-xl max-h-[90vh] overflow-y-auto space-y-5">
+    <div class="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+      <div class="space-y-1">
+        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Estado de Solicitud</span>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <h3 id="modal-estado-codigo" class="text-lg font-extrabold text-slate-900 font-mono"></h3>
+          <span id="modal-estado-badge" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold"></span>
+        </div>
+      </div>
+      <button type="button" onclick="cerrarModalEstadoSolicitud()" class="text-slate-400 hover:text-slate-600 font-bold text-2xl leading-none cursor-pointer">&times;</button>
+    </div>
+
+    <!-- Línea visual de progreso -->
+    <div id="modal-estado-pasos" class="grid grid-cols-3 gap-2 text-center text-[11px]"></div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 py-3 border-y border-slate-100 text-xs">
+      <div>
+        <span class="font-bold text-slate-400 block uppercase tracking-wider text-[10px]">Tipo de Atención</span>
+        <span id="modal-estado-tipo" class="font-extrabold text-slate-900 text-sm mt-0.5 block"></span>
+        <span id="modal-estado-subtipo" class="text-slate-500 font-medium"></span>
+      </div>
+      <div>
+        <span class="font-bold text-slate-400 block uppercase tracking-wider text-[10px]">Delegación / Fecha</span>
+        <span id="modal-estado-delegacion" class="font-bold text-[#C41230] text-sm mt-0.5 block"></span>
+        <span id="modal-estado-fecha" class="text-slate-500 font-mono"></span>
+      </div>
+    </div>
+
+    <div class="space-y-1.5">
+      <span class="font-bold text-slate-400 uppercase tracking-wider text-[10px] block">Descripción de la Solicitud</span>
+      <div id="modal-estado-descripcion" class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-800 text-xs leading-relaxed desc-roll max-h-44"></div>
+    </div>
+
+    <div class="flex justify-end pt-1">
+      <button type="button" onclick="cerrarModalEstadoSolicitud()"
+              class="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-2xl transition-all cursor-pointer">
+        Cerrar
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function abrirModalEstadoSolicitud(btn) {
+    const d = btn.dataset;
+    document.getElementById('modal-estado-codigo').textContent = 'Solicitud ' + (d.codigo || '');
+    document.getElementById('modal-estado-tipo').textContent = d.tipo || '';
+    document.getElementById('modal-estado-subtipo').textContent = d.subtipo || '';
+    document.getElementById('modal-estado-delegacion').textContent = d.delegacion || '';
+    document.getElementById('modal-estado-fecha').textContent = d.fecha || '';
+    document.getElementById('modal-estado-descripcion').textContent = d.descripcion || '';
+
+    const estado = (d.estado || 'Registrada').trim();
+    const estLower = estado.toLowerCase();
+    const badge = document.getElementById('modal-estado-badge');
+    const pasos = document.getElementById('modal-estado-pasos');
+
+    if (estLower === 'resuelta') {
+      badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200';
+      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span>Resuelta</span>';
+    } else if (estLower === 'en proceso') {
+      badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200';
+      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span><span>En proceso</span>';
+    } else if (estLower === 'cancelada') {
+      badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-red-50 text-red-700 border border-red-200';
+      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-red-500"></span><span>Cancelada</span>';
+    } else {
+      badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200';
+      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span><span>Registrada</span>';
+    }
+
+    if (estLower === 'cancelada') {
+      pasos.className = 'p-3 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold text-center';
+      pasos.textContent = 'Esta solicitud se encuentra en estado Cancelada.';
+    } else {
+      pasos.className = 'grid grid-cols-3 gap-2 text-center text-[11px]';
+      const stepIdx = estLower === 'resuelta' ? 3 : (estLower === 'en proceso' ? 2 : 1);
+      const etapas = [
+        { num: 1, label: 'Registrada' },
+        { num: 2, label: 'En proceso' },
+        { num: 3, label: 'Resuelta' },
+      ];
+      pasos.innerHTML = etapas.map((et) => {
+        const activo = et.num <= stepIdx;
+        const cls = activo
+          ? (stepIdx === 3
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+              : 'bg-red-50 border-[#C41230]/40 text-[#C41230]')
+          : 'bg-slate-50 border-slate-200 text-slate-400';
+        return `<div class="p-2.5 rounded-2xl border ${cls} font-bold">${et.num}. ${et.label}</div>`;
+      }).join('');
+    }
+
+    document.getElementById('modal-estado-solicitud').classList.remove('hidden');
+  }
+
+  function cerrarModalEstadoSolicitud() {
+    document.getElementById('modal-estado-solicitud').classList.add('hidden');
+  }
+
+  document.addEventListener('keydown', function(ev) {
+    if (ev.key === 'Escape') cerrarModalEstadoSolicitud();
+  });
+</script>
 {% endblock %}

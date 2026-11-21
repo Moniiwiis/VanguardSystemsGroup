@@ -3900,6 +3900,9 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertNotContains(resp_portal, 'Respuesta municipal')
         self.assertNotContains(resp_portal, 'Ver detalle y evidencias')
         self.assertContains(resp_portal, 'Ver estado')
+        self.assertContains(resp_portal, 'abrirModalEstadoSolicitud')
+        self.assertContains(resp_portal, 'id="modal-estado-solicitud"')
+        self.assertNotContains(resp_portal, reverse('portal_cliente_detalle', args=[at_cli.id]))
         self.assertContains(resp_portal, 'En proceso')
 
         # 2. En /portal-cliente/atenciones/<id>/ solo estado y solicitud; sin evidencias ni notas internas
