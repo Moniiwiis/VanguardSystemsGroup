@@ -77,7 +77,7 @@
     /* Tablas adaptables a cualquier ancho con desplazamiento horizontal limpio sin desbordar tarjetas */
     html, body {
       max-width: 100%;
-      overflow-x: hidden;
+      overflow-x: clip;
     }
     main, aside, header, footer {
       min-width: 0;
@@ -197,13 +197,20 @@
       margin-top: 0 !important;
       margin-bottom: 0 !important;
     }
-    .chat-widget-mode { overflow: hidden; }
+    .chat-widget-mode { overflow: hidden !important; background: #ffffff !important; }
     .chat-widget-mode > header,
-    .chat-widget-mode > footer { display: none; }
-    .chat-widget-mode > div.flex-1 { height: 100vh; padding: 0; }
-    .chat-widget-mode > div.flex-1 > aside { display: none; }
-    .chat-widget-mode > div.flex-1 > main { padding: .5rem; }
-    .chat-widget-mode .chat-layout { height: calc(100vh - 1rem); min-height: 0; }
+    .chat-widget-mode > footer { display: none !important; }
+    .chat-widget-mode > div.flex-1 { height: 100vh !important; max-width: 100% !important; padding: 0 !important; gap: 0 !important; }
+    .chat-widget-mode > div.flex-1 > aside { display: none !important; }
+    .chat-widget-mode > div.flex-1 > main { padding: 0 !important; gap: 0 !important; height: 100vh !important; min-height: 0 !important; }
+    .chat-widget-mode .chat-layout { height: 100vh !important; min-height: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+    #appSidebar nav {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(196, 18, 48, 0.28) transparent;
+    }
+    #appSidebar nav::-webkit-scrollbar { width: 5px; }
+    #appSidebar nav::-webkit-scrollbar-thumb { background: rgba(196, 18, 48, 0.28); border-radius: 9999px; }
+    #appSidebar nav::-webkit-scrollbar-thumb:hover { background: rgba(196, 18, 48, 0.55); }
   </style>
   {% block extra_head %}{% endblock %}
 </head>
@@ -349,13 +356,13 @@
   <div id="appLayoutContainer" class="flex-1 max-w-[1920px] w-full mx-auto px-3 sm:px-5 lg:px-8 py-5 sm:py-6 flex flex-col lg:flex-row gap-5 lg:gap-6 items-start">
 
     <!-- Sidebar Navegación de Módulos (Filtrado según Perfil del Usuario) -->
-    <aside id="appSidebar" class="w-full lg:w-60 shrink-0 flex flex-col gap-5">
+    <aside id="appSidebar" class="w-full lg:w-60 shrink-0 flex flex-col gap-5 lg:sticky lg:top-[5.25rem] lg:max-h-[calc(100vh-6.25rem)]">
       
-      <!-- Menú de Módulos Organizado por Secciones -->
-      <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-3 text-xs font-bold">
+      <!-- Menú de Módulos Organizado por Secciones (scroll interno cuando excede la altura visible) -->
+      <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-3 text-xs font-bold lg:overflow-y-auto lg:max-h-full">
 
         <!-- Cabecera del mismo panel con botón Ocultar menú -->
-        <div class="flex items-center justify-between px-2 pb-2 border-b border-slate-100">
+        <div class="flex items-center justify-between gap-2 px-2 pb-2 border-b border-slate-100 sticky top-0 bg-white z-10">
           <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Menú de módulos</span>
           <button type="button"
                   id="btnToggleSidebar"
@@ -363,7 +370,7 @@
                   aria-expanded="true"
                   aria-controls="appSidebar"
                   title="Ocultar menú lateral"
-                  class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-[#C41230] border border-red-200/80 transition-all cursor-pointer text-[11px] font-bold">
+                  class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-[#C41230] border border-red-200/80 transition-all cursor-pointer text-[11px] font-bold whitespace-nowrap shrink-0">
             <i data-lucide="panel-left-close" class="w-3.5 h-3.5"></i>
             <span data-sidebar-label>Ocultar menú</span>
           </button>
@@ -616,7 +623,7 @@
     <i data-lucide="message-circle" class="w-6 h-6"></i>
     <span id="chat-unread-badge" class="hidden absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-amber-400 text-red-950 text-[10px] font-extrabold items-center justify-center border-2 border-white">0</span>
   </button>
-  <section id="chat-widget-panel" class="hidden fixed bottom-24 right-5 z-50 w-[min(430px,calc(100vw-2.5rem))] h-[min(650px,calc(100vh-8rem))] overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200" aria-label="Ventana de chat">
+  <section id="chat-widget-panel" class="hidden fixed bottom-24 right-5 z-50 w-[min(450px,calc(100vw-2rem))] h-[min(680px,calc(100vh-7rem))] overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200" aria-label="Ventana de chat">
     <header class="h-12 px-4 flex items-center justify-between bg-[#C41230] text-white">
       <span class="text-xs font-extrabold">Chat privado</span>
       <div class="flex items-center gap-2">

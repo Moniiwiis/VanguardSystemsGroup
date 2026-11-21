@@ -15,25 +15,48 @@
   .chat-message-own { border-radius: 18px 18px 5px 18px; }
   .chat-message-other { border-radius: 18px 18px 18px 5px; }
   @media (max-width: 1023px) {
-    .chat-layout { height: auto !important; min-height: 0 !important; }
-    .chat-contacts { max-height: 300px; }
-    .chat-conversation { min-height: 620px; }
+    body:not(.chat-widget-mode) .chat-layout { height: auto !important; min-height: 0 !important; }
+    body:not(.chat-widget-mode) .chat-contacts { max-height: 300px; }
+    body:not(.chat-widget-mode) .chat-conversation { min-height: 620px; }
   }
   {% if chat_widget_mode %}
-  body.chat-widget-mode .chat-layout { grid-template-columns: minmax(0, 1fr); border-radius: 0; height: calc(100vh - 1rem); }
+  body.chat-widget-mode .chat-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+    border-radius: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    height: 100vh !important;
+    min-height: 0 !important;
+  }
+  body.chat-widget-mode .chat-layout > aside {
+    height: 100vh !important;
+    min-height: 0 !important;
+    border-right: 0 !important;
+    border-bottom: 0 !important;
+  }
+  body.chat-widget-mode .chat-layout > aside > header {
+    padding: 0.75rem 1rem !important;
+  }
   {% if conversation_id %}
-  body.chat-widget-mode .chat-layout > aside { display: none; }
+  body.chat-widget-mode .chat-layout > aside { display: none !important; }
   {% else %}
-  body.chat-widget-mode .chat-layout > main { display: none; }
-  body.chat-widget-mode .chat-contacts { max-height: none; }
+  body.chat-widget-mode .chat-layout > main { display: none !important; }
+  body.chat-widget-mode .chat-contacts { max-height: none !important; }
   {% endif %}
-  body.chat-widget-mode .chat-conversation { min-height: 0; }
+  body.chat-widget-mode .chat-conversation {
+    height: 100vh !important;
+    min-height: 0 !important;
+  }
+  body.chat-widget-mode #messages-container {
+    min-height: 0 !important;
+    padding: 0.875rem 1rem !important;
+  }
   {% endif %}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="space-y-4">
+<div class="{% if chat_widget_mode %}h-full{% else %}space-y-4{% endif %}">
   {% if not chat_widget_mode %}
   <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3 px-1">
     <div>

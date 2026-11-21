@@ -3725,6 +3725,18 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
             self.assertIsNotNone(m_card, f'No se encontró tarjeta {card_label} en {url_name}')
             self.assertNotIn('estado=', m_card.group(1), f'La tarjeta {card_label} en {url_name} debe quitar estado= al estar activa')
 
+        # 4. Scroll interno del menú de módulos y modo burbuja del chat limpio sin bordes duplicados
+        html_base = self.client.get(reverse('gestion_organizaciones')).content.decode('utf-8')
+        self.assertIn('lg:sticky lg:top-[5.25rem] lg:max-h-[calc(100vh-6.25rem)]', html_base)
+        self.assertIn('lg:overflow-y-auto lg:max-h-full', html_base)
+        self.assertIn('overflow-x: clip;', html_base)
+
+        r_widget = self.client.get(reverse('websocket:chat_index') + '?widget=1')
+        self.assertEqual(r_widget.status_code, 200)
+        html_widget = r_widget.content.decode('utf-8')
+        self.assertIn('body.chat-widget-mode .chat-layout > aside', html_widget)
+        self.assertIn('height: 100vh !important;', html_widget)
+
 
 
 
