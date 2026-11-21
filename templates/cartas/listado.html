@@ -161,13 +161,25 @@
         <h2 class="text-lg font-extrabold text-slate-900">Historial de cartas registradas</h2>
         <p class="text-xs text-slate-500 font-medium">Consulta y seguimiento de correspondencia en Oficina de Partes</p>
       </div>
-      <div class="flex items-center gap-2.5 shrink-0">
+      <div class="flex flex-wrap items-center gap-2.5 shrink-0">
         {% if q_cartas or estado_filtro or para_filtro or pron_filtro or delegacion_filtro %}
-          <a href="{% url 'cartas_listado' %}" class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1">
+          <a href="{% url 'cartas_listado' %}?vista={{ vista }}" class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1">
             <i data-lucide="x" class="w-3.5 h-3.5"></i>
             <span>Limpiar filtros</span>
           </a>
         {% endif %}
+        <div class="inline-flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200/80 shadow-xs">
+          <a href="?vista=tabla{% if query_export %}&{{ query_export }}{% endif %}"
+             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all {% if vista != 'canvas' %}bg-white text-[#C41230] shadow-sm border border-slate-200/80{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+            <i data-lucide="table-2" class="w-3.5 h-3.5"></i>
+            <span>Tabla</span>
+          </a>
+          <a href="?vista=canvas{% if query_export %}&{{ query_export }}{% endif %}"
+             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all {% if vista == 'canvas' %}bg-white text-[#C41230] shadow-sm border border-slate-200/80{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+            <i data-lucide="columns-4" class="w-3.5 h-3.5"></i>
+            <span>Canva</span>
+          </a>
+        </div>
         <a href="?{{ query_export }}{% if query_export %}&{% endif %}export=excel"
            class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-sm shrink-0">
           <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
@@ -227,6 +239,238 @@
       </form>
     </div>
 
+    {% if vista == 'canvas' %}
+    <!-- Vista Canva (Tablero Kanban de Cartas por Estado) -->
+    <div class="bg-slate-50/70 rounded-2xl border border-slate-200 p-4 space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 font-semibold">
+        <span>Mostrando {{ canvas_total_count }} carta{{ canvas_total_count|pluralize }} agrupada{{ canvas_total_count|pluralize }} por estado</span>
+        {% if puede_editar_cartas %}
+        <span class="text-[11px] text-slate-500">Arrastra o usa los botones de estado para mover tarjetas entre columnas</span>
+        {% endif %}
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+        <!-- COLUMNA 1: EN PROCESO -->
+        <div class="bg-slate-100/80 rounded-2xl border border-slate-200/80 p-3 flex flex-col gap-3 min-h-[260px]"
+             {% if puede_editar_cartas %}ondragover="cartaAllowDrop(event)" ondragleave="cartaDragLeave(event)" ondrop="cartaDrop(event, 'EN PROCESO')"{% endif %}>
+          <div class="flex items-center justify-between px-1 pb-2 border-b border-slate-200/80">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-amber-700">1. En proceso</span>
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-white text-amber-700 border border-amber-200">{{ canvas_en_proceso|length }}</span>
+          </div>
+          {% for carta in canvas_en_proceso %}
+          <div class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-amber-500 p-3.5 shadow-xs hover:shadow-md transition-all space-y-2 {% if puede_editar_cartas %}cursor-grab active:cursor-grabbing{% endif %}"
+               {% if puede_editar_cartas %}draggable="true" ondragstart="cartaDragStart(event, '{% url 'cartas_cambiar_estado' carta.pk %}')"{% endif %}>
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono text-xs font-extrabold text-[#C41230]">N° {{ carta.numero|default:"S/N" }}</span>
+              <span class="font-mono text-[10px] font-bold text-slate-500">{{ carta.fecha|date:"d/m/Y" }}</span>
+            </div>
+            <p class="text-xs font-extrabold text-slate-900 leading-snug line-clamp-3">{{ carta.actividad_tema }}</p>
+            <div class="text-[11px] text-slate-600 space-y-0.5">
+              <div><strong>Para:</strong> {{ carta.para }}</div>
+              <div><strong>Remite:</strong> {{ carta.remite }}</div>
+              <div><strong>Encargado:</strong> {{ carta.encargado_seguimiento|default:"—" }}</div>
+              <div><strong>Derivada a:</strong> {{ carta.derivada_a|default:"—" }}</div>
+            </div>
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 flex-wrap">
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="abrirModalVerCarta(this)"
+                        data-numero="{{ carta.numero|default:'S/N' }}" data-fecha="{{ carta.fecha|date:'d/m/Y' }}"
+                        data-para="{{ carta.para }}" data-remite="{{ carta.remite }}" data-fono="{{ carta.fono_contacto|default:'—' }}"
+                        data-actividad="{{ carta.actividad_tema }}" data-fecha-actividad="{{ carta.fecha_actividad|default:'—' }}"
+                        data-encargado="{{ carta.encargado_seguimiento|default:'—' }}" data-estado="{{ carta.get_estado_display }}"
+                        data-pronunciamiento="{{ carta.get_pronunciamiento_display|default:'No aplica' }}" data-derivada="{{ carta.derivada_a|default:'—' }}"
+                        data-unidad="{{ carta.unidad|default:'1' }}" data-observacion="{{ carta.observacion|default:'—' }}"
+                        data-delegacion="{{ carta.delegacion.nombre|default:'—' }}"
+                        data-creador="{% if carta.creado_por %}{{ carta.creado_por.get_full_name|default:carta.creado_por.username }}{% else %}—{% endif %}"
+                        class="text-[11px] font-extrabold text-[#C41230] hover:underline px-1">Ver</button>
+                {% if puede_editar_cartas %}
+                <button type="button" onclick="abrirModalEditarCarta(this)"
+                        data-action="{% url 'cartas_editar' carta.pk %}" data-fecha="{{ carta.fecha|date:'Y-m-d' }}"
+                        data-numero="{{ carta.numero|default:'' }}" data-para="{{ carta.para }}" data-remite="{{ carta.remite }}"
+                        data-fono="{{ carta.fono_contacto|default:'' }}" data-actividad="{{ carta.actividad_tema }}"
+                        data-fecha-actividad="{{ carta.fecha_actividad|default:'' }}" data-encargado="{{ carta.encargado_seguimiento|default:'' }}"
+                        data-estado="{{ carta.estado }}" data-pronunciamiento="{{ carta.pronunciamiento|default:'NO APLICA' }}"
+                        data-derivada="{{ carta.derivada_a|default:'' }}" data-observacion="{{ carta.observacion|default:'' }}"
+                        data-unidad="{{ carta.unidad|default:'1' }}"
+                        class="text-[11px] font-bold text-blue-600 hover:underline px-1">Editar</button>
+                {% endif %}
+              </div>
+              {% if puede_editar_cartas %}
+              <button type="button" onclick="moverTarjetaCarta('{% url 'cartas_cambiar_estado' carta.pk %}', 'APROBADA')"
+                      class="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-[10px] font-extrabold">Aprobar</button>
+              {% endif %}
+            </div>
+          </div>
+          {% empty %}
+          <div class="py-8 text-center text-[11px] text-slate-400 font-medium">Sin cartas en proceso</div>
+          {% endfor %}
+        </div>
+
+        <!-- COLUMNA 2: APROBADA -->
+        <div class="bg-slate-100/80 rounded-2xl border border-slate-200/80 p-3 flex flex-col gap-3 min-h-[260px]"
+             {% if puede_editar_cartas %}ondragover="cartaAllowDrop(event)" ondragleave="cartaDragLeave(event)" ondrop="cartaDrop(event, 'APROBADA')"{% endif %}>
+          <div class="flex items-center justify-between px-1 pb-2 border-b border-slate-200/80">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-blue-700">2. Aprobada</span>
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-white text-blue-700 border border-blue-200">{{ canvas_aprobadas|length }}</span>
+          </div>
+          {% for carta in canvas_aprobadas %}
+          <div class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-blue-500 p-3.5 shadow-xs hover:shadow-md transition-all space-y-2 {% if puede_editar_cartas %}cursor-grab active:cursor-grabbing{% endif %}"
+               {% if puede_editar_cartas %}draggable="true" ondragstart="cartaDragStart(event, '{% url 'cartas_cambiar_estado' carta.pk %}')"{% endif %}>
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono text-xs font-extrabold text-[#C41230]">N° {{ carta.numero|default:"S/N" }}</span>
+              <span class="font-mono text-[10px] font-bold text-slate-500">{{ carta.fecha|date:"d/m/Y" }}</span>
+            </div>
+            <p class="text-xs font-extrabold text-slate-900 leading-snug line-clamp-3">{{ carta.actividad_tema }}</p>
+            <div class="text-[11px] text-slate-600 space-y-0.5">
+              <div><strong>Para:</strong> {{ carta.para }}</div>
+              <div><strong>Remite:</strong> {{ carta.remite }}</div>
+              <div><strong>Encargado:</strong> {{ carta.encargado_seguimiento|default:"—" }}</div>
+              <div><strong>Derivada a:</strong> {{ carta.derivada_a|default:"—" }}</div>
+            </div>
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 flex-wrap">
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="abrirModalVerCarta(this)"
+                        data-numero="{{ carta.numero|default:'S/N' }}" data-fecha="{{ carta.fecha|date:'d/m/Y' }}"
+                        data-para="{{ carta.para }}" data-remite="{{ carta.remite }}" data-fono="{{ carta.fono_contacto|default:'—' }}"
+                        data-actividad="{{ carta.actividad_tema }}" data-fecha-actividad="{{ carta.fecha_actividad|default:'—' }}"
+                        data-encargado="{{ carta.encargado_seguimiento|default:'—' }}" data-estado="{{ carta.get_estado_display }}"
+                        data-pronunciamiento="{{ carta.get_pronunciamiento_display|default:'No aplica' }}" data-derivada="{{ carta.derivada_a|default:'—' }}"
+                        data-unidad="{{ carta.unidad|default:'1' }}" data-observacion="{{ carta.observacion|default:'—' }}"
+                        data-delegacion="{{ carta.delegacion.nombre|default:'—' }}"
+                        data-creador="{% if carta.creado_por %}{{ carta.creado_por.get_full_name|default:carta.creado_por.username }}{% else %}—{% endif %}"
+                        class="text-[11px] font-extrabold text-[#C41230] hover:underline px-1">Ver</button>
+                {% if puede_editar_cartas %}
+                <button type="button" onclick="abrirModalEditarCarta(this)"
+                        data-action="{% url 'cartas_editar' carta.pk %}" data-fecha="{{ carta.fecha|date:'Y-m-d' }}"
+                        data-numero="{{ carta.numero|default:'' }}" data-para="{{ carta.para }}" data-remite="{{ carta.remite }}"
+                        data-fono="{{ carta.fono_contacto|default:'' }}" data-actividad="{{ carta.actividad_tema }}"
+                        data-fecha-actividad="{{ carta.fecha_actividad|default:'' }}" data-encargado="{{ carta.encargado_seguimiento|default:'' }}"
+                        data-estado="{{ carta.estado }}" data-pronunciamiento="{{ carta.pronunciamiento|default:'NO APLICA' }}"
+                        data-derivada="{{ carta.derivada_a|default:'' }}" data-observacion="{{ carta.observacion|default:'' }}"
+                        data-unidad="{{ carta.unidad|default:'1' }}"
+                        class="text-[11px] font-bold text-blue-600 hover:underline px-1">Editar</button>
+                {% endif %}
+              </div>
+              {% if puede_editar_cartas %}
+              <button type="button" onclick="moverTarjetaCarta('{% url 'cartas_cambiar_estado' carta.pk %}', 'FINALIZADA')"
+                      class="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-extrabold">Finalizar</button>
+              {% endif %}
+            </div>
+          </div>
+          {% empty %}
+          <div class="py-8 text-center text-[11px] text-slate-400 font-medium">Sin cartas aprobadas</div>
+          {% endfor %}
+        </div>
+
+        <!-- COLUMNA 3: FINALIZADA -->
+        <div class="bg-slate-100/80 rounded-2xl border border-slate-200/80 p-3 flex flex-col gap-3 min-h-[260px]"
+             {% if puede_editar_cartas %}ondragover="cartaAllowDrop(event)" ondragleave="cartaDragLeave(event)" ondrop="cartaDrop(event, 'FINALIZADA')"{% endif %}>
+          <div class="flex items-center justify-between px-1 pb-2 border-b border-slate-200/80">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-700">3. Finalizada</span>
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-white text-emerald-700 border border-emerald-200">{{ canvas_finalizadas|length }}</span>
+          </div>
+          {% for carta in canvas_finalizadas %}
+          <div class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-emerald-500 p-3.5 shadow-xs hover:shadow-md transition-all space-y-2 {% if puede_editar_cartas %}cursor-grab active:cursor-grabbing{% endif %}"
+               {% if puede_editar_cartas %}draggable="true" ondragstart="cartaDragStart(event, '{% url 'cartas_cambiar_estado' carta.pk %}')"{% endif %}>
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono text-xs font-extrabold text-[#C41230]">N° {{ carta.numero|default:"S/N" }}</span>
+              <span class="font-mono text-[10px] font-bold text-slate-500">{{ carta.fecha|date:"d/m/Y" }}</span>
+            </div>
+            <p class="text-xs font-extrabold text-slate-700 leading-snug line-clamp-3">{{ carta.actividad_tema }}</p>
+            <div class="text-[11px] text-slate-600 space-y-0.5">
+              <div><strong>Para:</strong> {{ carta.para }}</div>
+              <div><strong>Remite:</strong> {{ carta.remite }}</div>
+              <div><strong>Encargado:</strong> {{ carta.encargado_seguimiento|default:"—" }}</div>
+              <div><strong>Pronunciamiento:</strong> {{ carta.get_pronunciamiento_display|default:"No aplica" }}</div>
+            </div>
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 flex-wrap">
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="abrirModalVerCarta(this)"
+                        data-numero="{{ carta.numero|default:'S/N' }}" data-fecha="{{ carta.fecha|date:'d/m/Y' }}"
+                        data-para="{{ carta.para }}" data-remite="{{ carta.remite }}" data-fono="{{ carta.fono_contacto|default:'—' }}"
+                        data-actividad="{{ carta.actividad_tema }}" data-fecha-actividad="{{ carta.fecha_actividad|default:'—' }}"
+                        data-encargado="{{ carta.encargado_seguimiento|default:'—' }}" data-estado="{{ carta.get_estado_display }}"
+                        data-pronunciamiento="{{ carta.get_pronunciamiento_display|default:'No aplica' }}" data-derivada="{{ carta.derivada_a|default:'—' }}"
+                        data-unidad="{{ carta.unidad|default:'1' }}" data-observacion="{{ carta.observacion|default:'—' }}"
+                        data-delegacion="{{ carta.delegacion.nombre|default:'—' }}"
+                        data-creador="{% if carta.creado_por %}{{ carta.creado_por.get_full_name|default:carta.creado_por.username }}{% else %}—{% endif %}"
+                        class="text-[11px] font-extrabold text-[#C41230] hover:underline px-1">Ver</button>
+                {% if puede_editar_cartas %}
+                <button type="button" onclick="abrirModalEditarCarta(this)"
+                        data-action="{% url 'cartas_editar' carta.pk %}" data-fecha="{{ carta.fecha|date:'Y-m-d' }}"
+                        data-numero="{{ carta.numero|default:'' }}" data-para="{{ carta.para }}" data-remite="{{ carta.remite }}"
+                        data-fono="{{ carta.fono_contacto|default:'' }}" data-actividad="{{ carta.actividad_tema }}"
+                        data-fecha-actividad="{{ carta.fecha_actividad|default:'' }}" data-encargado="{{ carta.encargado_seguimiento|default:'' }}"
+                        data-estado="{{ carta.estado }}" data-pronunciamiento="{{ carta.pronunciamiento|default:'NO APLICA' }}"
+                        data-derivada="{{ carta.derivada_a|default:'' }}" data-observacion="{{ carta.observacion|default:'' }}"
+                        data-unidad="{{ carta.unidad|default:'1' }}"
+                        class="text-[11px] font-bold text-blue-600 hover:underline px-1">Editar</button>
+                {% endif %}
+              </div>
+              <span class="text-[10px] font-extrabold text-emerald-700">Concluida</span>
+            </div>
+          </div>
+          {% empty %}
+          <div class="py-8 text-center text-[11px] text-slate-400 font-medium">Sin cartas finalizadas</div>
+          {% endfor %}
+        </div>
+
+        <!-- COLUMNA 4: NO APLICA -->
+        <div class="bg-slate-100/80 rounded-2xl border border-slate-200/80 p-3 flex flex-col gap-3 min-h-[260px]"
+             {% if puede_editar_cartas %}ondragover="cartaAllowDrop(event)" ondragleave="cartaDragLeave(event)" ondrop="cartaDrop(event, 'NO APLICA')"{% endif %}>
+          <div class="flex items-center justify-between px-1 pb-2 border-b border-slate-200/80">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-slate-600">4. No aplica</span>
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-white text-slate-700 border border-slate-200">{{ canvas_no_aplica|length }}</span>
+          </div>
+          {% for carta in canvas_no_aplica %}
+          <div class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-slate-400 p-3.5 shadow-xs hover:shadow-md transition-all space-y-2 {% if puede_editar_cartas %}cursor-grab active:cursor-grabbing{% endif %}"
+               {% if puede_editar_cartas %}draggable="true" ondragstart="cartaDragStart(event, '{% url 'cartas_cambiar_estado' carta.pk %}')"{% endif %}>
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono text-xs font-extrabold text-[#C41230]">N° {{ carta.numero|default:"S/N" }}</span>
+              <span class="font-mono text-[10px] font-bold text-slate-500">{{ carta.fecha|date:"d/m/Y" }}</span>
+            </div>
+            <p class="text-xs font-extrabold text-slate-700 leading-snug line-clamp-3">{{ carta.actividad_tema }}</p>
+            <div class="text-[11px] text-slate-600 space-y-0.5">
+              <div><strong>Para:</strong> {{ carta.para }}</div>
+              <div><strong>Remite:</strong> {{ carta.remite }}</div>
+              <div><strong>Encargado:</strong> {{ carta.encargado_seguimiento|default:"—" }}</div>
+            </div>
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 flex-wrap">
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="abrirModalVerCarta(this)"
+                        data-numero="{{ carta.numero|default:'S/N' }}" data-fecha="{{ carta.fecha|date:'d/m/Y' }}"
+                        data-para="{{ carta.para }}" data-remite="{{ carta.remite }}" data-fono="{{ carta.fono_contacto|default:'—' }}"
+                        data-actividad="{{ carta.actividad_tema }}" data-fecha-actividad="{{ carta.fecha_actividad|default:'—' }}"
+                        data-encargado="{{ carta.encargado_seguimiento|default:'—' }}" data-estado="{{ carta.get_estado_display }}"
+                        data-pronunciamiento="{{ carta.get_pronunciamiento_display|default:'No aplica' }}" data-derivada="{{ carta.derivada_a|default:'—' }}"
+                        data-unidad="{{ carta.unidad|default:'1' }}" data-observacion="{{ carta.observacion|default:'—' }}"
+                        data-delegacion="{{ carta.delegacion.nombre|default:'—' }}"
+                        data-creador="{% if carta.creado_por %}{{ carta.creado_por.get_full_name|default:carta.creado_por.username }}{% else %}—{% endif %}"
+                        class="text-[11px] font-extrabold text-[#C41230] hover:underline px-1">Ver</button>
+                {% if puede_editar_cartas %}
+                <button type="button" onclick="abrirModalEditarCarta(this)"
+                        data-action="{% url 'cartas_editar' carta.pk %}" data-fecha="{{ carta.fecha|date:'Y-m-d' }}"
+                        data-numero="{{ carta.numero|default:'' }}" data-para="{{ carta.para }}" data-remite="{{ carta.remite }}"
+                        data-fono="{{ carta.fono_contacto|default:'' }}" data-actividad="{{ carta.actividad_tema }}"
+                        data-fecha-actividad="{{ carta.fecha_actividad|default:'' }}" data-encargado="{{ carta.encargado_seguimiento|default:'' }}"
+                        data-estado="{{ carta.estado }}" data-pronunciamiento="{{ carta.pronunciamiento|default:'NO APLICA' }}"
+                        data-derivada="{{ carta.derivada_a|default:'' }}" data-observacion="{{ carta.observacion|default:'' }}"
+                        data-unidad="{{ carta.unidad|default:'1' }}"
+                        class="text-[11px] font-bold text-blue-600 hover:underline px-1">Editar</button>
+                {% endif %}
+              </div>
+              {% if puede_editar_cartas %}
+              <button type="button" onclick="moverTarjetaCarta('{% url 'cartas_cambiar_estado' carta.pk %}', 'EN PROCESO')"
+                      class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-extrabold">Reabrir</button>
+              {% endif %}
+            </div>
+          </div>
+          {% empty %}
+          <div class="py-8 text-center text-[11px] text-slate-400 font-medium">Sin cartas no aplica</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% else %}
     <!-- Tabla -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
       <div class="overflow-x-auto">
@@ -327,6 +571,7 @@
 
       {% include "gestion/includes/paginator.html" %}
     </div>
+    {% endif %}
   </div>
 </div>
 
@@ -493,6 +738,65 @@
     document.getElementById('ver-carta-observacion').textContent = d.observacion || '—';
     document.getElementById('modal-ver-carta').classList.remove('hidden');
     if (window.lucide) lucide.createIcons();
+  }
+
+  function _getCookieCarta(name) {
+    let val = null;
+    if (document.cookie) {
+      for (const c of document.cookie.split(';')) {
+        const t = c.trim();
+        if (t.startsWith(name + '=')) {
+          val = decodeURIComponent(t.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return val;
+  }
+
+  let _cartaDragUrl = null;
+  function cartaDragStart(ev, urlEstado) {
+    _cartaDragUrl = urlEstado;
+    if (ev.dataTransfer) {
+      ev.dataTransfer.effectAllowed = 'move';
+      ev.dataTransfer.setData('text/plain', String(urlEstado || ''));
+    }
+  }
+  function cartaAllowDrop(ev) {
+    ev.preventDefault();
+    ev.currentTarget.classList.add('ring-2', 'ring-[#C41230]/40', 'bg-red-50/40');
+  }
+  function cartaDragLeave(ev) {
+    ev.currentTarget.classList.remove('ring-2', 'ring-[#C41230]/40', 'bg-red-50/40');
+  }
+  function cartaDrop(ev, nuevoEstado) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('ring-2', 'ring-[#C41230]/40', 'bg-red-50/40');
+    const urlEstado = (ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : '') || _cartaDragUrl;
+    if (urlEstado) moverTarjetaCarta(urlEstado, nuevoEstado);
+    _cartaDragUrl = null;
+  }
+  async function moverTarjetaCarta(urlEstado, nuevoEstado) {
+    const fd = new FormData();
+    fd.append('nuevo_estado', nuevoEstado);
+    try {
+      const resp = await fetch(urlEstado, {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRFToken': _getCookieCarta('csrftoken') || '',
+        },
+        body: fd,
+      });
+      const data = await resp.json();
+      if (resp.ok && data.ok) {
+        window.location.reload();
+      } else {
+        alert(data.error || 'No fue posible actualizar el estado de la carta.');
+      }
+    } catch (e) {
+      alert('Error de conexión al actualizar la carta.');
+    }
   }
 </script>
 {% endblock %}

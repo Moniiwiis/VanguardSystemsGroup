@@ -51,7 +51,7 @@
       </div>
       <div>
         <label class="block text-slate-700 mb-1">Fecha Comprometida *</label>
-        <input type="date" name="fecha_comprometida" required class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
+        <input type="date" name="fecha_comprometida" min="{{ hoy_iso }}" required class="w-full p-3 rounded-2xl border border-slate-200 focus:border-[#C41230] outline-none font-normal" />
       </div>
       <div>
         <label class="block text-slate-700 mb-1">Observaciones / Detalle</label>

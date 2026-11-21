@@ -175,8 +175,22 @@ def listado(request):
         ]
         return export_to_excel_xlsx("TuboCartas", "Tubo de Cartas", headers, rows)
 
+    vista = request.GET.get('vista', '').strip().lower()
+    if vista in ('tabla', 'canvas'):
+        request.session['cartas_vista'] = vista
+    else:
+        vista = request.session.get('cartas_vista', 'tabla')
+        if vista not in ('tabla', 'canvas'):
+            vista = 'tabla'
+
     page_size = _get_page_size(request)
+    qs_all = list(qs) if vista == 'canvas' else []
     page_obj = Paginator(qs, page_size).get_page(request.GET.get('page', 1))
+
+    canvas_en_proceso = [c for c in qs_all if c.estado == 'EN PROCESO']
+    canvas_aprobadas = [c for c in qs_all if c.estado == 'APROBADA']
+    canvas_finalizadas = [c for c in qs_all if c.estado == 'FINALIZADA']
+    canvas_no_aplica = [c for c in qs_all if c.estado == 'NO APLICA']
 
     if ctx['permisos'].get('es_admin'):
         if 'delegacion' in request.GET:
@@ -209,7 +223,13 @@ def listado(request):
     catalogo_personas_unidades = _catalogos_cartas(delegacion_form_ref)
 
     ctx.update({
+        'vista': vista,
         'page_obj': page_obj,
+        'canvas_en_proceso': canvas_en_proceso,
+        'canvas_aprobadas': canvas_aprobadas,
+        'canvas_finalizadas': canvas_finalizadas,
+        'canvas_no_aplica': canvas_no_aplica,
+        'canvas_total_count': len(qs_all),
         'q_cartas': q,
         'estado_filtro': estado,
         'para_filtro': para_filtro,
@@ -305,3 +325,40 @@ def eliminar(request, pk):
         return HttpResponseNotAllowed(['GET', 'POST'])
     ctx['carta'] = carta
     return render(request, 'cartas/confirmar_eliminar.html', ctx)
+
+
+@login_required
+def cambiar_estado(request, pk):
+    """Actualiza el estado de una carta desde la vista Canva o tabla."""
+    ctx = _acceso(request)
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+    if not ctx['permisos'].get('puede_editar'):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'ok': False, 'error': 'No tienes permiso para modificar cartas.'}, status=403)
+        messages.error(request, 'No tienes permiso para modificar cartas.')
+        return redirect('cartas_listado')
+
+    carta = _registro(request, ctx, pk)
+    nuevo_estado = request.POST.get('nuevo_estado', '').strip().upper()
+    estados_validos = {codigo for codigo, _ in Carta.ESTADOS}
+    if nuevo_estado not in estados_validos:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            return JsonResponse({'ok': False, 'error': 'Estado inválido para carta.'}, status=400)
+        messages.error(request, 'Estado inválido.')
+        return redirect('cartas_listado')
+
+    carta.estado = nuevo_estado
+    carta.save(update_fields=['estado', 'updated_at'])
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        from django.http import JsonResponse
+        return JsonResponse({
+            'ok': True,
+            'id': carta.pk,
+            'estado': carta.estado,
+            'estado_display': carta.get_estado_display(),
+        })
+    messages.success(request, f'Carta Nº {carta.numero or "S/N"} movida a {carta.get_estado_display()}.')
+    return redirect(request.META.get('HTTP_REFERER') or 'cartas_listado')

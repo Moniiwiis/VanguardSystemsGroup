@@ -24,6 +24,12 @@
 
     <!-- Panel de Acciones Superior -->
     <div class="flex flex-wrap items-center gap-3 shrink-0">
+      {% if trimestre_actual_label %}
+      <div class="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold">
+        <i data-lucide="calendar" class="w-3.5 h-3.5 text-[#C41230]"></i>
+        <span>{{ trimestre_actual_label }}{% if periodo_activo_global %} · <strong class="text-emerald-700">Período: {{ periodo_activo_global }}</strong>{% endif %}</span>
+      </div>
+      {% endif %}
       {% if not es_admin and delegacion_activa %}
         <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-red-50 text-[#C41230] border border-red-200/90 text-xs font-bold">
           <i data-lucide="shield-check" class="w-4 h-4 text-[#C41230]"></i>
@@ -253,6 +259,18 @@
             {% for resp in responsables_filtro %}
               <option value="{{ resp.id }}" {% if filtro_responsable == resp.id|stringformat:"s" %}selected{% endif %}>
                 {{ resp|nombre_corto }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <!-- Filtro Período -->
+        <div>
+          <select name="periodo" onchange="this.form.submit()"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-[#C41230] focus:outline-none bg-white">
+            <option value="">Período: Todos</option>
+            {% for per in periodos_disponibles %}
+              <option value="{{ per.id }}" {% if filtro_periodo == per.id|stringformat:"s" %}selected{% endif %}>
+                {{ per }} · {{ per.get_trimestre_label }}
               </option>
             {% endfor %}
           </select>
@@ -514,6 +532,7 @@
               <span class="font-mono text-[11px] font-extrabold text-amber-700">{{ at.codigo_tubo }}</span>
               <span class="px-2 py-0.5 rounded {% if at.es_atencion %}bg-sky-50 text-sky-700 border-sky-200/80{% else %}bg-purple-50 text-purple-700 border-purple-200/80{% endif %} border font-mono text-[10px] font-extrabold">{{ at.codigo_atencion }}</span>
             </div>
+            {% if at.trimestre_label %}<div class="text-[10px] font-bold text-slate-500">{{ at.trimestre_label }}{% if at.periodo_nombre %} · {{ at.periodo_nombre }}{% endif %}</div>{% endif %}
             <p class="text-xs font-extrabold text-slate-900 leading-snug line-clamp-3">{{ at.descripcion }}</p>
             <div class="text-[11px] text-slate-600 space-y-0.5">
               <div><strong class="text-slate-700">Solicitante:</strong> {{ at.solicitante }}{% if at.organizacion %} <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{{ at.organizacion.tipo_organizacion }}</span>{% endif %}</div>
@@ -616,6 +635,7 @@
               <span class="font-mono text-[11px] font-extrabold text-emerald-700">{{ at.codigo_tubo }}</span>
               <span class="px-2 py-0.5 rounded {% if at.es_atencion %}bg-sky-50 text-sky-700 border-sky-200/80{% else %}bg-purple-50 text-purple-700 border-purple-200/80{% endif %} border font-mono text-[10px] font-extrabold">{{ at.codigo_atencion }}</span>
             </div>
+            {% if at.trimestre_label %}<div class="text-[10px] font-bold text-slate-500">{{ at.trimestre_label }}{% if at.periodo_nombre %} · {{ at.periodo_nombre }}{% endif %}</div>{% endif %}
             <p class="text-xs font-extrabold text-slate-600 leading-snug line-clamp-3">{{ at.descripcion }}</p>
             <div class="text-[11px] text-slate-600 space-y-0.5">
               <div><strong class="text-slate-700">Solicitante:</strong> {{ at.solicitante }}{% if at.organizacion %} <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{{ at.organizacion.tipo_organizacion }}</span>{% endif %}</div>
@@ -693,7 +713,10 @@
             <!-- N° Tubo -->
             <td class="py-2.5 px-2 font-mono whitespace-nowrap">
               <span class="font-extrabold text-[#C41230] block">{{ at.codigo_tubo }}</span>
-              <span class="text-[10px] font-bold {% if at.es_atencion %}text-slate-500{% else %}text-purple-700{% endif %}">{{ at.codigo_atencion }} · {{ at.origen|default:"EXT" }}</span>
+              <span class="text-[10px] font-bold {% if at.es_atencion %}text-slate-500{% else %}text-purple-700{% endif %} block">{{ at.codigo_atencion }} · {{ at.origen|default:"EXT" }}</span>
+              {% if at.trimestre_label %}
+                <span class="inline-block px-1.5 py-0.5 mt-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200" title="{% if at.periodo_nombre %}Período: {{ at.periodo_nombre }}{% endif %}">{{ at.trimestre_label }}</span>
+              {% endif %}
             </td>
 
             <!-- Fecha Solicitud -->
@@ -1542,7 +1565,7 @@
 
         <div class="space-y-1">
           <label class="block text-xs font-extrabold text-slate-700">Fecha de Compromiso <span class="text-[#C41230]">*</span></label>
-          <input type="date" name="fecha_compromiso" required
+          <input type="date" name="fecha_compromiso" min="{{ hoy_iso }}" required
                  onclick="if (this.showPicker) { try { this.showPicker(); } catch(e) {} }"
                  class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono font-medium cursor-pointer bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>

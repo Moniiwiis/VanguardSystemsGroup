@@ -22,6 +22,12 @@
     </div>
 
     <div class="flex flex-wrap items-center gap-3 shrink-0">
+      {% if trimestre_actual_label %}
+      <div class="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold">
+        <i data-lucide="calendar" class="w-3.5 h-3.5 text-[#C41230]"></i>
+        <span>{{ trimestre_actual_label }}{% if periodo_activo_global %} · <strong class="text-emerald-700">Período: {{ periodo_activo_global }}</strong>{% endif %}</span>
+      </div>
+      {% endif %}
       <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl {% if delegacion_activa %}bg-red-50 text-[#C41230] border border-red-200/90{% elif delegacion_seleccionada %}bg-red-50 text-[#C41230] border border-red-200/90{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %} text-xs font-bold">
         <i data-lucide="{% if delegacion_activa or delegacion_seleccionada %}map-pin{% else %}globe{% endif %}" class="w-4 h-4"></i>
         <span>Delegación Activa: <strong>{% if delegacion_activa %}{{ delegacion_activa.nombre }}{% elif delegacion_seleccionada %}{{ delegacion_seleccionada.nombre }}{% else %}Global (Todas){% endif %}</strong></span>
@@ -146,6 +152,18 @@
             </div>
             {% include 'gestion/includes/vecino_form_fields.html' with p='nuevo_vecino_' idp='nuevo_vecino_' req='' es_admin=permisos.es_admin incluir_delegacion_hidden=False %}
           </div>
+
+          <!-- Alerta dinámica de solicitudes pendientes del solicitante (RUT / nombre / organización) -->
+          <div id="alerta-solicitudes-pendientes" class="hidden rounded-2xl border border-amber-300 bg-amber-50/90 p-3 text-xs space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5 font-extrabold text-amber-900">
+                <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 shrink-0"></i>
+                <span id="alerta-pendientes-titulo">El solicitante tiene solicitudes pendientes</span>
+              </div>
+              <span id="alerta-pendientes-count" class="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-200/80 text-amber-900">0</span>
+            </div>
+            <ul id="alerta-pendientes-lista" class="space-y-1.5 max-h-36 overflow-y-auto"></ul>
+          </div>
         </div>
 
         <!-- Delegación y Representante / Encargado -->
@@ -242,7 +260,7 @@
           <div id="seccion-campos-tubo" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2.5 border-t border-slate-200">
             <div class="space-y-1">
               <label class="block text-[11px] font-bold text-slate-700">Fecha Compromiso <span class="text-[#C41230]">*</span></label>
-              <input type="date" id="fecha_compromiso" name="fecha_compromiso"
+              <input type="date" id="fecha_compromiso" name="fecha_compromiso" min="{{ hoy_iso }}"
                      class="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs font-bold bg-white">
             </div>
             <div class="space-y-1">
@@ -467,6 +485,13 @@
           <option value="Resuelta" {% if filtro_estado == 'Resuelta' %}selected{% endif %}>Resuelta</option>
           <option value="Cancelada" {% if filtro_estado == 'Cancelada' %}selected{% endif %}>Cancelada</option>
         </select>
+        <select name="periodo" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+          <option value="">Período: Todos</option>
+          {% for per in periodos_disponibles %}
+            <option value="{{ per.id }}" {% if filtro_periodo == per.id|stringformat:"s" %}selected{% endif %}>{{ per }} · {{ per.get_trimestre_label }}</option>
+          {% endfor %}
+        </select>
         {% include "gestion/includes/ordering_control.html" %}
       </form>
     </div>
@@ -496,6 +521,11 @@
                 {% if a.va_a_tubo %}
                   <span class="inline-flex items-center gap-1 px-1.5 py-0.5 mt-0.5 rounded text-[9px] font-black bg-red-100 text-[#8B1D19] border border-red-200" title="Requerimiento en Tubo de Compromiso">
                     <i data-lucide="git-pull-request" class="w-2.5 h-2.5"></i> TUBO
+                  </span>
+                {% endif %}
+                {% if a.periodo %}
+                  <span class="inline-flex items-center px-1.5 py-0.5 mt-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200 block w-fit" title="Período vinculado: {{ a.periodo }}">
+                    {{ a.periodo.get_trimestre_label }}
                   </span>
                 {% endif %}
               </td>
@@ -1128,6 +1158,7 @@
         break;
       }
     }
+    programarBusquedaPendientes({ organizacion_id: hiddenId.value, q: val });
   }
 
   function toggleNuevaOrgAtencion(esNueva) {
@@ -1164,7 +1195,101 @@
         break;
       }
     }
+    programarBusquedaPendientes({ vecino_id: hiddenId.value, q: val });
   }
+
+  let _pendientesTimer = null;
+  function limpiarAlertaPendientes() {
+    const box = document.getElementById('alerta-solicitudes-pendientes');
+    const lista = document.getElementById('alerta-pendientes-lista');
+    if (box) box.classList.add('hidden');
+    if (lista) lista.innerHTML = '';
+  }
+
+  function programarBusquedaPendientes(extra = {}) {
+    clearTimeout(_pendientesTimer);
+    _pendientesTimer = setTimeout(() => buscarAtencionesPendientes(extra), 220);
+  }
+
+  async function buscarAtencionesPendientes(extra = {}) {
+    const modo = document.getElementById('modo_vecino')?.value || 'existente';
+    const params = new URLSearchParams();
+    if (extra.vecino_id) params.set('vecino_id', extra.vecino_id);
+    if (extra.organizacion_id) params.set('organizacion_id', extra.organizacion_id);
+
+    if (modo === 'nuevo') {
+      const rutVal = document.getElementById('nuevo_vecino_rut')?.value?.trim() || '';
+      const nomVal = [
+        document.getElementById('nuevo_vecino_primer_nombre')?.value?.trim() || '',
+        document.getElementById('nuevo_vecino_apellido_paterno')?.value?.trim() || '',
+      ].filter(Boolean).join(' ');
+      if (rutVal) params.set('rut', rutVal);
+      if (nomVal) params.set('q', nomVal);
+    } else if (modo === 'organizacion') {
+      const orgId = extra.organizacion_id || document.getElementById('organizacion_id')?.value || '';
+      const orgTxt = extra.q || document.getElementById('organizacion_input')?.value?.trim() || '';
+      if (orgId) params.set('organizacion_id', orgId);
+      if (orgTxt) params.set('q', orgTxt);
+    } else {
+      const vecId = extra.vecino_id || document.getElementById('vecino_id')?.value || '';
+      const solTxt = extra.q || document.getElementById('solicitante')?.value?.trim() || '';
+      if (vecId) params.set('vecino_id', vecId);
+      if (solTxt) params.set('q', solTxt);
+    }
+
+    if (!params.get('vecino_id') && !params.get('organizacion_id') && !params.get('rut') && (params.get('q') || '').length < 3) {
+      limpiarAlertaPendientes();
+      return;
+    }
+
+    try {
+      const resp = await fetch(`/gestion/api/atenciones-pendientes/?${params.toString()}`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const box = document.getElementById('alerta-solicitudes-pendientes');
+      const titulo = document.getElementById('alerta-pendientes-titulo');
+      const countEl = document.getElementById('alerta-pendientes-count');
+      const lista = document.getElementById('alerta-pendientes-lista');
+      if (!box || !lista) return;
+
+      if (!data.pendientes || !data.pendientes.length) {
+        limpiarAlertaPendientes();
+        return;
+      }
+      if (titulo) {
+        titulo.textContent = data.total === 1
+          ? 'Solicitante con 1 solicitud pendiente:'
+          : `Solicitante con ${data.total} solicitudes pendientes:`;
+      }
+      if (countEl) countEl.textContent = String(data.total);
+      lista.innerHTML = data.pendientes.map(p => `
+        <li class="rounded-xl bg-white/95 border border-amber-200 px-2.5 py-2 flex flex-col gap-0.5">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-mono font-extrabold text-[#C41230]">${p.codigo_atencion}</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">${p.estado}</span>
+          </div>
+          <div class="text-[11px] font-bold text-slate-800">${p.solicitante}${p.vecino_rut ? ' · ' + p.vecino_rut : ''}</div>
+          <div class="text-[11px] text-slate-600 line-clamp-2">${p.descripcion}</div>
+          <div class="text-[10px] text-slate-500 flex flex-wrap gap-2">
+            <span>Ingreso: ${p.fecha}</span>
+            ${p.fecha_compromiso ? `<span>Compromiso: ${p.fecha_compromiso}</span>` : ''}
+            ${p.va_a_tubo ? '<span class="font-bold text-[#8B1D19]">En Tubo</span>' : ''}
+          </div>
+        </li>
+      `).join('');
+      box.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    } catch (e) {}
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    ['nuevo_vecino_rut', 'nuevo_vecino_primer_nombre', 'nuevo_vecino_apellido_paterno'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', () => programarBusquedaPendientes());
+    });
+  });
 
   function sincronizarRepresentante(val) {
     const list = document.getElementById('representantes-list');
@@ -1283,6 +1408,7 @@
         if (result.isConfirmed) {
           form.dataset.sgrDirty = '';
           form.reset();
+          limpiarAlertaPendientes();
           cambiarModoVecino('existente');
           const sub = document.getElementById('sub_atencion_id');
           if (sub) sub.innerHTML = '<option value="">Primero seleccione un Tipo de Atención</option>';

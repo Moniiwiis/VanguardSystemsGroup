@@ -165,6 +165,15 @@
         <option value="Cerrado" {% if filtro_estado_per == 'Cerrado' %}selected{% endif %}>Cerrado</option>
       </select>
 
+      <select name="trimestre" onchange="this.form.submit()"
+              class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230]">
+        <option value="">Trimestre: Todos</option>
+        <option value="1" {% if trimestre_per == '1' %}selected{% endif %}>T1 (Ene–Mar)</option>
+        <option value="2" {% if trimestre_per == '2' %}selected{% endif %}>T2 (Abr–Jun)</option>
+        <option value="3" {% if trimestre_per == '3' %}selected{% endif %}>T3 (Jul–Sep)</option>
+        <option value="4" {% if trimestre_per == '4' %}selected{% endif %}>T4 (Oct–Dic)</option>
+      </select>
+
       <label class="flex items-center gap-2 text-xs font-semibold text-slate-600">
         <span>Ordenar:</span>
         <select name="orden_per" onchange="this.form.submit()"
@@ -186,7 +195,7 @@
       </label>
     </form>
 
-    <a href="?tab=periodos&q_per={{ q_per|urlencode }}&estado_per={{ filtro_estado_per|urlencode }}&orden_per={{ orden_per|urlencode }}&export=excel"
+    <a href="?tab=periodos&q_per={{ q_per|urlencode }}&estado_per={{ filtro_estado_per|urlencode }}&trimestre={{ trimestre_per|urlencode }}&orden_per={{ orden_per|urlencode }}&export=excel"
        class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
       <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
       <span>Exportar a Excel</span>
@@ -206,6 +215,7 @@
         <thead class="bg-slate-50/50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
           <tr>
             <th class="py-3 px-6">Período</th>
+            <th class="py-3 px-6">Trimestre</th>
             <th class="py-3 px-6">Fecha de Inicio</th>
             <th class="py-3 px-6">Fecha de Término</th>
             <th class="py-3 px-6">Días Computables</th>
@@ -217,6 +227,9 @@
           {% for p in periodos %}
           <tr class="hover:bg-slate-50/70 transition-colors">
             <td class="py-3 px-6 font-bold text-slate-900">{{ p }}</td>
+            <td class="py-3 px-6">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-50 text-[#C41230] border border-red-200/80">{{ p.get_trimestre_label }}</span>
+            </td>
             <td class="py-3 px-6 font-mono">{{ p.fecha_inicio|date:"d-m-Y" }}</td>
             <td class="py-3 px-6 font-mono">{{ p.fecha_termino|date:"d-m-Y" }}</td>
             <td class="py-3 px-6 font-mono font-bold">{{ p.dias_computables }} días</td>
@@ -248,7 +261,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="6" class="py-6 text-center text-slate-400">No hay fechas de medición registradas para los filtros aplicados.</td>
+            <td colspan="7" class="py-6 text-center text-slate-400">No hay fechas de medición registradas para los filtros aplicados.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -262,7 +275,7 @@
       </div>
       <div class="flex items-center gap-1.5 flex-nowrap whitespace-nowrap overflow-x-auto max-w-full">
         {% if page_obj_per.has_previous %}
-          <a href="?tab=periodos&page_per={{ page_obj_per.previous_page_number }}{% if q_per %}&q_per={{ q_per|urlencode }}{% endif %}{% if filtro_estado_per %}&estado_per={{ filtro_estado_per|urlencode }}{% endif %}{% if orden_per %}&orden_per={{ orden_per|urlencode }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}"
+          <a href="?tab=periodos&page_per={{ page_obj_per.previous_page_number }}{% if q_per %}&q_per={{ q_per|urlencode }}{% endif %}{% if filtro_estado_per %}&estado_per={{ filtro_estado_per|urlencode }}{% endif %}{% if trimestre_per %}&trimestre={{ trimestre_per|urlencode }}{% endif %}{% if orden_per %}&orden_per={{ orden_per|urlencode }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}"
              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold transition-all shadow-sm">
             Anterior
           </a>
@@ -277,7 +290,7 @@
             {% if p == page_obj_per.number %}
               <span class="px-3 py-1.5 rounded-lg bg-[#C41230] text-white font-bold shadow-sm">{{ p }}</span>
             {% else %}
-              <a href="?tab=periodos&page_per={{ p }}{% if q_per %}&q_per={{ q_per|urlencode }}{% endif %}{% if filtro_estado_per %}&estado_per={{ filtro_estado_per|urlencode }}{% endif %}{% if orden_per %}&orden_per={{ orden_per|urlencode }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}"
+              <a href="?tab=periodos&page_per={{ p }}{% if q_per %}&q_per={{ q_per|urlencode }}{% endif %}{% if filtro_estado_per %}&estado_per={{ filtro_estado_per|urlencode }}{% endif %}{% if trimestre_per %}&trimestre={{ trimestre_per|urlencode }}{% endif %}{% if orden_per %}&orden_per={{ orden_per|urlencode }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}"
                  class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all">{{ p }}</a>
             {% endif %}
           {% elif p == 2 and page_obj_per.number > 4 %}
@@ -288,7 +301,7 @@
         {% endfor %}
 
         {% if page_obj_per.has_next %}
-          <a href="?tab=periodos&page_per={{ page_obj_per.next_page_number }}{% if q_per %}&q_per={{ q_per|urlencode }}{% endif %}{% if filtro_estado_per %}&estado_per={{ filtro_estado_per|urlencode }}{% endif %}{% if orden_per %}&orden_per={{ orden_per|urlencode }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}"
+          <a href="?tab=periodos&page_per={{ page_obj_per.next_page_number }}{% if q_per %}&q_per={{ q_per|urlencode }}{% endif %}{% if filtro_estado_per %}&estado_per={{ filtro_estado_per|urlencode }}{% endif %}{% if trimestre_per %}&trimestre={{ trimestre_per|urlencode }}{% endif %}{% if orden_per %}&orden_per={{ orden_per|urlencode }}{% endif %}{% if page_size %}&page_size={{ page_size }}{% endif %}"
              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold transition-all shadow-sm">
             Siguiente
           </a>
@@ -320,14 +333,14 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Inicio *</label>
-          <input type="date" id="per-new-inicio" name="fecha_inicio" min="{{ hoy_iso }}" required
+          <input type="date" id="per-new-inicio" name="fecha_inicio" min="{{ hoy_iso }}" data-inline-cal="true" required
                  onclick="this.showPicker && this.showPicker()"
                  onchange="sincronizarDesdeInputs('new')"
                  class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Término *</label>
-          <input type="date" id="per-new-termino" name="fecha_termino" min="{{ hoy_iso }}" required
+          <input type="date" id="per-new-termino" name="fecha_termino" min="{{ hoy_iso }}" data-inline-cal="true" required
                  onclick="this.showPicker && this.showPicker()"
                  onchange="sincronizarDesdeInputs('new')"
                  class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
@@ -392,14 +405,14 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Inicio *</label>
-          <input type="date" id="per-edit-inicio" name="fecha_inicio" required
+          <input type="date" id="per-edit-inicio" name="fecha_inicio" data-inline-cal="true" required
                  onclick="this.showPicker && this.showPicker()"
                  onchange="sincronizarDesdeInputs('edit')"
                  class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Término *</label>
-          <input type="date" id="per-edit-termino" name="fecha_termino" required
+          <input type="date" id="per-edit-termino" name="fecha_termino" data-inline-cal="true" required
                  onclick="this.showPicker && this.showPicker()"
                  onchange="sincronizarDesdeInputs('edit')"
                  class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
@@ -592,14 +605,23 @@
   }
 
   function calcularDiasPeriodo(idInicio, idTermino, idDias) {
-    const p1 = parseIsoParts(document.getElementById(idInicio).value);
-    const p2 = parseIsoParts(document.getElementById(idTermino).value);
+    const inp1 = document.getElementById(idInicio);
+    const inp2 = document.getElementById(idTermino);
+    const f1 = inp1 ? inp1.value : '';
+    const f2 = inp2 ? inp2.value : '';
+    const p1 = parseIsoParts(f1);
+    const p2 = parseIsoParts(f2);
     if (p1 && p2) {
-      const d1 = Date.UTC(p1.y, p1.m - 1, p1.d);
-      const d2 = Date.UTC(p2.y, p2.m - 1, p2.d);
-      const diff = Math.round((d2 - d1) / 86400000) + 1;
-      if (diff > 0) {
-        document.getElementById(idDias).value = diff;
+      let habiles = 0;
+      if (window.SGR_CALENDAR && typeof window.SGR_CALENDAR.contarDiasHabiles === 'function') {
+        habiles = window.SGR_CALENDAR.contarDiasHabiles(f1, f2);
+      } else {
+        const d1 = Date.UTC(p1.y, p1.m - 1, p1.d);
+        const d2 = Date.UTC(p2.y, p2.m - 1, p2.d);
+        habiles = Math.round((d2 - d1) / 86400000) + 1;
+      }
+      if (habiles > 0) {
+        document.getElementById(idDias).value = habiles;
       }
     }
   }
@@ -610,9 +632,15 @@
     const box = document.getElementById(`mini-cal-${mode}-rango`);
     if (!box) return;
     if (f1 && f2) {
-      box.textContent = `Período: ${formatDmy(f1)} a ${formatDmy(f2)}`;
+      const p1 = parseIsoParts(f1);
+      const p2 = parseIsoParts(f2);
+      const corridos = (p1 && p2) ? (Math.round((Date.UTC(p2.y, p2.m - 1, p2.d) - Date.UTC(p1.y, p1.m - 1, p1.d)) / 86400000) + 1) : 0;
+      const habiles = (window.SGR_CALENDAR && window.SGR_CALENDAR.contarDiasHabiles) ? window.SGR_CALENDAR.contarDiasHabiles(f1, f2) : corridos;
+      const qLabel = (window.SGR_CALENDAR && window.SGR_CALENDAR.getTrimestre) ? window.SGR_CALENDAR.getTrimestre(f1).label : '';
+      box.textContent = `Período: ${formatDmy(f1)} a ${formatDmy(f2)} · ${habiles} hábiles (${corridos} corridos)${qLabel ? ' · ' + qLabel : ''}`;
     } else if (f1) {
-      box.textContent = `Inicio: ${formatDmy(f1)} · Ahora elige la fecha de término`;
+      const qLabel = (window.SGR_CALENDAR && window.SGR_CALENDAR.getTrimestre) ? window.SGR_CALENDAR.getTrimestre(f1).label : '';
+      box.textContent = `Inicio: ${formatDmy(f1)}${qLabel ? ' · ' + qLabel : ''} · Ahora elige la fecha de término`;
     } else {
       box.textContent = 'Selecciona fecha de inicio y término';
     }
@@ -624,31 +652,58 @@
     const grid = document.getElementById(`mini-cal-${mode}-dias`);
     if (!titulo || !grid) return;
 
-    titulo.textContent = `${MESES_ES[st.month]} ${st.year}`;
+    const qInfo = (window.SGR_CALENDAR && window.SGR_CALENDAR.getTrimestre)
+      ? window.SGR_CALENDAR.getTrimestre(new Date(st.year, st.month, 1)).label
+      : '';
+    titulo.textContent = `${MESES_ES[st.month]} ${st.year}${qInfo ? ' · ' + qInfo : ''}`;
     const firstWeekday = (new Date(st.year, st.month, 1).getDay() + 6) % 7;
     const daysInMonth = new Date(st.year, st.month + 1, 0).getDate();
     const f1 = document.getElementById(`per-${mode}-inicio`).value;
     const f2 = document.getElementById(`per-${mode}-termino`).value;
+    const feriadosAnio = (window.SGR_CALENDAR && window.SGR_CALENDAR.getFeriadosAnio)
+      ? window.SGR_CALENDAR.getFeriadosAnio(st.year)
+      : {};
 
     let html = '';
+    const feriadosDelMes = [];
     for (let i = 0; i < firstWeekday; i++) {
       html += '<span></span>';
     }
     for (let day = 1; day <= daysInMonth; day++) {
       const iso = toIso(st.year, st.month + 1, day);
+      const fechaObj = new Date(st.year, st.month, day);
+      const dow = fechaObj.getDay();
+      const esFinde = dow === 0 || dow === 6;
+      const nombreFeriado = feriadosAnio[iso] || '';
+      if (nombreFeriado) feriadosDelMes.push({ day, nombre: nombreFeriado });
+
       const esPasado = iso < HOY_ISO;
       const esInicio = iso === f1;
       const esTermino = iso === f2;
       const enRango = f1 && f2 && iso > f1 && iso < f2;
       const esHoy = iso === HOY_ISO;
 
-      let cls = 'h-7 w-full rounded-lg font-bold transition-all flex items-center justify-center ';
+      let cls = 'h-7 w-full rounded-lg font-bold transition-all flex items-center justify-center relative ';
       if (esPasado) {
-        cls += 'text-slate-300 cursor-not-allowed bg-transparent';
+        if (nombreFeriado) {
+          cls += 'text-amber-300 bg-amber-50/40 cursor-not-allowed';
+        } else if (esFinde) {
+          cls += 'text-slate-300 bg-slate-100/50 cursor-not-allowed';
+        } else {
+          cls += 'text-slate-300 cursor-not-allowed bg-transparent';
+        }
       } else if (esInicio || esTermino) {
         cls += 'bg-[#C41230] text-white shadow-sm cursor-pointer';
+      } else if (enRango && nombreFeriado) {
+        cls += 'bg-amber-200 text-amber-950 border border-amber-400 cursor-pointer';
+      } else if (enRango && esFinde) {
+        cls += 'bg-red-50 text-slate-500 border border-red-200 cursor-pointer';
       } else if (enRango) {
         cls += 'bg-red-100 text-[#8B1D19] cursor-pointer hover:bg-red-200';
+      } else if (nombreFeriado) {
+        cls += 'bg-amber-100 text-amber-900 border border-amber-300 font-extrabold hover:bg-amber-200 cursor-pointer';
+      } else if (esFinde) {
+        cls += 'bg-slate-100 text-slate-500 border border-slate-200/80 hover:bg-slate-200 cursor-pointer';
       } else {
         cls += 'text-slate-700 hover:bg-red-50 hover:text-[#C41230] cursor-pointer bg-white border border-slate-200/70';
       }
@@ -656,14 +711,29 @@
         cls += ' ring-1 ring-[#C41230]';
       }
 
+      const titleTag = nombreFeriado
+        ? `Feriado: ${nombreFeriado}`
+        : (esFinde ? 'Fin de semana' : 'Día hábil');
+
       if (esPasado) {
-        html += `<button type="button" disabled title="No se puede seleccionar una fecha pasada" class="${cls}">${day}</button>`;
+        html += `<button type="button" disabled title="${titleTag} (No se puede seleccionar una fecha pasada)" class="${cls}">${day}</button>`;
       } else {
-        html += `<button type="button" onclick="seleccionarDiaMiniCal('${mode}', '${iso}')" class="${cls}">${day}</button>`;
+        html += `<button type="button" title="${titleTag}" onclick="seleccionarDiaMiniCal('${mode}', '${iso}')" class="${cls}">${day}</button>`;
       }
     }
     grid.innerHTML = html;
     actualizarResumenRango(mode);
+    const box = document.getElementById(`mini-cal-${mode}-rango`);
+    if (box) {
+      const ferTxt = feriadosDelMes.length
+        ? ` · Feriados: ${feriadosDelMes.map(f => `${String(f.day).padStart(2, '0')} (${f.nombre})`).join(', ')}`
+        : '';
+      if (ferTxt) {
+        box.innerHTML = `${box.textContent}<div class="mt-1 text-[10px] font-semibold text-amber-800">${ferTxt.replace(' · ', '')}</div><div class="mt-1 flex items-center justify-center gap-3 text-[10px] text-slate-500"><span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded bg-slate-200 inline-block"></span>Fin de semana</span><span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded bg-amber-200 border border-amber-400 inline-block"></span>Feriado</span></div>`;
+      } else {
+        box.innerHTML = `${box.textContent}<div class="mt-1 flex items-center justify-center gap-3 text-[10px] text-slate-500"><span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded bg-slate-200 inline-block"></span>Fin de semana</span><span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded bg-amber-200 border border-amber-400 inline-block"></span>Feriado</span></div>`;
+      }
+    }
   }
 
   function seleccionarDiaMiniCal(mode, iso) {

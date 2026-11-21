@@ -1,8 +1,11 @@
 from django.conf import settings
+from django.utils import timezone
 from accounts.models import Delegacion, Funcionario, FuncionarioRol, Rol
-from core.utils import obtener_nombre_corto
+from core.utils import buscar_periodo_para_fecha, obtener_nombre_corto, obtener_trimestre
 
 def global_context(request):
+    hoy = timezone.localdate()
+    _, trimestre_actual_label = obtener_trimestre(hoy)
     if not request.user.is_authenticated:
         return {
             'user_rol_name': 'Invitado',
@@ -12,6 +15,9 @@ def global_context(request):
             'can_switch_delegacion': False,
             'permisos': {},
             'aura_enabled': getattr(settings, 'AURA_ENABLED', False),
+            'hoy_iso': hoy.isoformat(),
+            'trimestre_actual_label': trimestre_actual_label,
+            'periodo_activo_global': None,
         }
 
     # Obtener funcionario asociado
@@ -96,6 +102,7 @@ def global_context(request):
     }
 
     nombre_corto = obtener_nombre_corto(funcionario or request.user)
+    periodo_activo_global = buscar_periodo_para_fecha(hoy)
 
     return {
         'funcionario_actual': funcionario,
@@ -106,4 +113,7 @@ def global_context(request):
         'can_switch_delegacion': can_switch,
         'permisos': permisos,
         'aura_enabled': getattr(settings, 'AURA_ENABLED', False),
+        'hoy_iso': hoy.isoformat(),
+        'trimestre_actual_label': trimestre_actual_label,
+        'periodo_activo_global': periodo_activo_global,
     }

@@ -185,7 +185,15 @@
         </h3>
         <p class="text-[11px] text-slate-500 mt-0.5">Indicadores evaluados con evidencias auditables y topes de cumplimiento</p>
       </div>
-      <span class="text-[11px] font-bold text-slate-500 bg-white/80 px-3 py-1 rounded-xl border border-red-100 self-start sm:self-auto">Total: {{ total_metas }} metas</span>
+      <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+        {% if trimestre_actual_label %}
+        <span class="text-[11px] font-extrabold text-[#C41230] bg-red-50 px-3 py-1 rounded-xl border border-red-200/80">{{ trimestre_actual_label }}</span>
+        {% endif %}
+        {% if periodo_activo_global %}
+        <span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200/80">Período: {{ periodo_activo_global }}</span>
+        {% endif %}
+        <span class="text-[11px] font-bold text-slate-500 bg-white/80 px-3 py-1 rounded-xl border border-red-100">Total: {{ total_metas }} metas</span>
+      </div>
     </div>
 
     <!-- Barra de Búsqueda y Filtros sobre la Tabla -->
@@ -211,6 +219,15 @@
         </select>
         {% endif %}
 
+        <select name="trimestre" onchange="this.form.submit()"
+                class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#C41230] bg-white">
+          <option value="" {% if not trimestre_filtro %}selected{% endif %}>Trimestre: Todos</option>
+          <option value="1" {% if trimestre_filtro == '1' %}selected{% endif %}>T1 (Ene–Mar)</option>
+          <option value="2" {% if trimestre_filtro == '2' %}selected{% endif %}>T2 (Abr–Jun)</option>
+          <option value="3" {% if trimestre_filtro == '3' %}selected{% endif %}>T3 (Jul–Sep)</option>
+          <option value="4" {% if trimestre_filtro == '4' %}selected{% endif %}>T4 (Oct–Dic)</option>
+        </select>
+
         {% include "gestion/includes/ordering_control.html" %}
 
         <button type="submit" class="px-4 py-2 rounded-xl bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold shadow-sm transition-all flex items-center gap-1.5">
@@ -218,7 +235,7 @@
           <span>Buscar</span>
         </button>
 
-        {% if q or delegacion_seleccionada and es_admin %}
+        {% if q or trimestre_filtro or delegacion_seleccionada and es_admin %}
           <a href="{% url 'gestion_reportes' %}" class="text-xs text-[#C41230] font-bold hover:underline py-1.5 ml-1">Limpiar</a>
         {% endif %}
       </form>
@@ -243,7 +260,10 @@
           {% for m in metas %}
           <tr class="hover:bg-red-50/30 transition-colors">
             <td class="p-4 font-bold text-slate-900">{{ m.item.nombre_item }}</td>
-            <td class="p-4 font-medium">{{ m.periodo }}</td>
+            <td class="p-4 font-medium">
+              <div>{{ m.periodo }}</div>
+              <div class="text-[10px] font-bold text-[#C41230] mt-0.5">{{ m.periodo.get_trimestre_label }}</div>
+            </td>
             <td class="p-4 whitespace-nowrap">
               {% include "gestion/includes/delegacion_cell.html" with nombre=m.funcionario.delegacion.nombre fallback="Global Comunal" %}
             </td>

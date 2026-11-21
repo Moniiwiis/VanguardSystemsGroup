@@ -2513,6 +2513,381 @@
           }
         });
       }, true);
+
+      // 4) Calendario Universal Chileno: Feriados nacionales, fines de semana, Trimestre y respeto de min/max
+      window.SGR_CALENDAR = (function () {
+        const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        const DIAS_CORTO = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+        const TRIMESTRES_MESES = {
+          1: 'Ene–Mar',
+          2: 'Abr–Jun',
+          3: 'Jul–Sep',
+          4: 'Oct–Dic',
+        };
+        const feriadosCache = {};
+
+        function toIso(d) {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${y}-${m}-${day}`;
+        }
+
+        function parseIso(iso) {
+          if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+          const [y, m, d] = iso.split('-').map(Number);
+          return new Date(y, m - 1, d);
+        }
+
+        function calcularPascua(anio) {
+          const a = anio % 19;
+          const b = Math.floor(anio / 100);
+          const c = anio % 100;
+          const d = Math.floor(b / 4);
+          const e = b % 4;
+          const f = Math.floor((b + 8) / 25);
+          const g = Math.floor((b - f + 1) / 3);
+          const h = (19 * a + b - d - g + 15) % 30;
+          const i = Math.floor(c / 4);
+          const k = c % 4;
+          const l = (32 + 2 * e + 2 * i - h - k) % 7;
+          const m = Math.floor((a + 11 * h + 22 * l) / 451);
+          const mes = Math.floor((h + l - 7 * m + 114) / 31);
+          const dia = ((h + l - 7 * m + 114) % 31) + 1;
+          return new Date(anio, mes - 1, dia);
+        }
+
+        function trasladarLunesLey19668(fecha) {
+          const dow = fecha.getDay(); // 0=Dom,1=Lun,2=Mar,3=Mie,4=Jue,5=Vie,6=Sab
+          const res = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+          if (dow === 2 || dow === 3 || dow === 4) {
+            res.setDate(res.getDate() - (dow - 1));
+          } else if (dow === 5) {
+            res.setDate(res.getDate() + 3);
+          }
+          return res;
+        }
+
+        function getFeriadosAnio(anio) {
+          if (feriadosCache[anio]) return feriadosCache[anio];
+          const map = {};
+          const put = (d, nombre) => { map[toIso(d)] = nombre; };
+          put(new Date(anio, 0, 1), 'Año Nuevo');
+          const pascua = calcularPascua(anio);
+          const vs = new Date(pascua.getFullYear(), pascua.getMonth(), pascua.getDate() - 2);
+          const ss = new Date(pascua.getFullYear(), pascua.getMonth(), pascua.getDate() - 1);
+          put(vs, 'Viernes Santo');
+          put(ss, 'Sábado Santo');
+          put(new Date(anio, 4, 1), 'Día Internacional del Trabajo');
+          put(new Date(anio, 4, 21), 'Día de las Glorias Navales');
+          if (anio >= 2021) {
+            put(new Date(anio, 5, 21), 'Día Nacional de los Pueblos Indígenas');
+          }
+          put(trasladarLunesLey19668(new Date(anio, 5, 29)), 'San Pedro y San Pablo');
+          put(new Date(anio, 6, 16), 'Día de la Virgen del Carmen');
+          put(new Date(anio, 7, 15), 'Asunción de la Virgen');
+          put(new Date(anio, 8, 18), 'Independencia Nacional');
+          put(new Date(anio, 8, 19), 'Día de las Glorias del Ejército');
+          put(trasladarLunesLey19668(new Date(anio, 9, 12)), 'Encuentro de Dos Mundos');
+          put(new Date(anio, 9, 31), 'Día de las Iglesias Evangélicas');
+          put(new Date(anio, 10, 1), 'Día de Todos los Santos');
+          put(new Date(anio, 11, 8), 'Inmaculada Concepción');
+          put(new Date(anio, 11, 25), 'Navidad');
+          feriadosCache[anio] = map;
+          return map;
+        }
+
+        function getFeriado(isoOrDate) {
+          const d = typeof isoOrDate === 'string' ? parseIso(isoOrDate) : isoOrDate;
+          if (!d) return '';
+          const map = getFeriadosAnio(d.getFullYear());
+          return map[toIso(d)] || '';
+        }
+
+        function esFinde(isoOrDate) {
+          const d = typeof isoOrDate === 'string' ? parseIso(isoOrDate) : isoOrDate;
+          if (!d) return false;
+          const dow = d.getDay();
+          return dow === 0 || dow === 6;
+        }
+
+        function esDiaHabil(isoOrDate) {
+          const d = typeof isoOrDate === 'string' ? parseIso(isoOrDate) : isoOrDate;
+          if (!d) return false;
+          return !esFinde(d) && !getFeriado(d);
+        }
+
+        function contarDiasHabiles(inicioIso, terminoIso) {
+          const d1 = parseIso(inicioIso);
+          const d2 = parseIso(terminoIso);
+          if (!d1 || !d2 || d2 < d1) return 0;
+          let count = 0;
+          const cur = new Date(d1.getFullYear(), d1.getMonth(), d1.getDate());
+          while (cur <= d2) {
+            if (esDiaHabil(cur)) count++;
+            cur.setDate(cur.getDate() + 1);
+          }
+          return count;
+        }
+
+        function getTrimestre(isoOrDate) {
+          const d = typeof isoOrDate === 'string' ? parseIso(isoOrDate) : (isoOrDate || new Date());
+          if (!d) return { q: 1, label: '' };
+          const q = Math.floor(d.getMonth() / 3) + 1;
+          return { q, label: `T${q} (${TRIMESTRES_MESES[q]} ${d.getFullYear()})` };
+        }
+
+        // Popover compartido para cualquier <input type="date">
+        let popoverEl = null;
+        let activeInput = null;
+        let viewYear = new Date().getFullYear();
+        let viewMonth = new Date().getMonth();
+
+        function ensurePopover(targetHost = document.body) {
+          if (!popoverEl) {
+            popoverEl = document.createElement('div');
+            popoverEl.id = 'sgr-cal-popover';
+            popoverEl.className = 'hidden fixed z-[100] w-72 rounded-2xl border border-slate-200 bg-white shadow-2xl p-3 text-xs';
+
+            document.addEventListener('click', (ev) => {
+              if (!popoverEl || popoverEl.classList.contains('hidden')) return;
+              if (popoverEl.contains(ev.target)) return;
+              if (activeInput && (ev.target === activeInput || ev.target.closest('.sgr-cal-trigger') === activeInput._sgrTriggerBtn)) return;
+              popoverEl.classList.add('hidden');
+              activeInput = null;
+            });
+            document.addEventListener('keydown', (ev) => {
+              if (ev.key === 'Escape' && popoverEl && !popoverEl.classList.contains('hidden')) {
+                popoverEl.classList.add('hidden');
+                activeInput = null;
+              }
+            });
+          }
+          const host = targetHost || document.body;
+          if (popoverEl.parentElement !== host) {
+            host.appendChild(popoverEl);
+          }
+          return popoverEl;
+        }
+
+        function renderPopover() {
+          if (!activeInput) return;
+          const pop = ensurePopover(activeInput.closest('dialog') || document.body);
+          const minIso = activeInput.getAttribute('min') || '';
+          const maxIso = activeInput.getAttribute('max') || '';
+          const valIso = activeInput.value || '';
+          const hoyIso = toIso(new Date());
+          const feriadosAnio = getFeriadosAnio(viewYear);
+          const firstDay = new Date(viewYear, viewMonth, 1);
+          const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+          const offset = (firstDay.getDay() + 6) % 7; // 0=Lun .. 6=Dom
+          const qInfo = getTrimestre(firstDay);
+
+          const feriadosMes = [];
+          let gridHtml = '';
+          for (let i = 0; i < offset; i++) {
+            gridHtml += '<div class="h-8"></div>';
+          }
+          for (let d = 1; d <= daysInMonth; d++) {
+            const cur = new Date(viewYear, viewMonth, d);
+            const iso = toIso(cur);
+            const dow = cur.getDay();
+            const isWeekend = dow === 0 || dow === 6;
+            const holidayName = feriadosAnio[iso] || '';
+            if (holidayName) feriadosMes.push({ dia: d, nombre: holidayName });
+
+            const outOfMin = Boolean(minIso && iso < minIso);
+            const outOfMax = Boolean(maxIso && iso > maxIso);
+            const disabled = outOfMin || outOfMax;
+            const isSelected = iso === valIso;
+            const isToday = iso === hoyIso;
+
+            let cls = 'h-8 w-full rounded-lg flex flex-col items-center justify-center relative text-[11px] font-semibold transition-all ';
+            if (disabled) {
+              cls += 'text-slate-300 bg-slate-50/40 cursor-not-allowed line-through';
+            } else if (isSelected) {
+              cls += 'bg-[#C41230] text-white font-black shadow-sm cursor-pointer';
+            } else if (holidayName) {
+              cls += 'bg-amber-100 text-amber-900 border border-amber-300 font-extrabold hover:bg-amber-200 cursor-pointer';
+            } else if (isWeekend) {
+              cls += 'bg-slate-100 text-slate-500 hover:bg-slate-200 cursor-pointer';
+            } else {
+              cls += 'text-slate-800 hover:bg-red-50 hover:text-[#C41230] cursor-pointer';
+            }
+            if (isToday && !isSelected) {
+              cls += ' ring-1 ring-[#C41230]';
+            }
+            const titleAttr = [
+              holidayName ? `Feriado: ${holidayName}` : (isWeekend ? 'Fin de semana' : 'Día hábil'),
+              outOfMin ? `(Mínimo: ${minIso})` : '',
+            ].filter(Boolean).join(' ');
+
+            gridHtml += `<button type="button" ${disabled ? 'disabled' : ''} data-cal-iso="${iso}" title="${titleAttr}" class="${cls}">
+              <span>${d}</span>
+              ${holidayName && !isSelected ? '<span class="w-1 h-1 rounded-full bg-amber-600 -mt-0.5"></span>' : ''}
+            </button>`;
+          }
+
+          const reglaTexto = minIso
+            ? `<span class="text-emerald-700 font-bold">Solo desde ${minIso.split('-').reverse().join('/')} en adelante</span>`
+            : '<span class="text-slate-500 font-medium">Permite fechas anteriores y futuras</span>';
+
+          const feriadosHtml = feriadosMes.length
+            ? `<div class="mt-2 pt-2 border-t border-slate-100 space-y-0.5 max-h-20 overflow-y-auto">
+                ${feriadosMes.map(f => `<div class="text-[10px] text-amber-800 font-semibold flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span><span><strong>${String(f.dia).padStart(2, '0')}:</strong> ${f.nombre}</span></div>`).join('')}
+              </div>`
+            : '<div class="mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-400">Sin feriados nacionales este mes</div>';
+
+          pop.innerHTML = `
+            <div class="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+              <button type="button" data-cal-nav="-1" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600" aria-label="Mes anterior">◀</button>
+              <div class="text-center">
+                <div class="text-xs font-extrabold text-slate-900">${MESES[viewMonth]} ${viewYear}</div>
+                <div class="text-[10px] font-bold text-[#C41230]">${qInfo.label}</div>
+              </div>
+              <button type="button" data-cal-nav="1" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600" aria-label="Mes siguiente">▶</button>
+            </div>
+            <div class="grid grid-cols-7 gap-1 mt-2 text-center text-[10px] font-extrabold text-slate-400">
+              ${DIAS_CORTO.map((n, idx) => `<div class="${idx >= 5 ? 'text-[#C41230]' : ''}">${n}</div>`).join('')}
+            </div>
+            <div class="grid grid-cols-7 gap-1 mt-1">${gridHtml}</div>
+            <div class="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[10px]">
+              <div class="flex items-center gap-2 text-slate-600">
+                <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-slate-200 inline-block"></span>Fin de semana</span>
+                <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-amber-200 border border-amber-400 inline-block"></span>Feriado</span>
+              </div>
+              <button type="button" data-cal-iso="${hoyIso}" ${minIso && hoyIso < minIso ? 'disabled' : ''} class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 disabled:opacity-40">Hoy</button>
+            </div>
+            ${feriadosHtml}
+            <div class="mt-1.5 text-[10px] flex items-center justify-between">${reglaTexto}</div>
+          `;
+
+          pop.querySelectorAll('[data-cal-nav]').forEach(btn => {
+            btn.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              const delta = Number(btn.dataset.calNav);
+              viewMonth += delta;
+              if (viewMonth < 0) { viewMonth = 11; viewYear -= 1; }
+              if (viewMonth > 11) { viewMonth = 0; viewYear += 1; }
+              renderPopover();
+            });
+          });
+          pop.querySelectorAll('button[data-cal-iso]').forEach(btn => {
+            btn.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              if (btn.disabled || !activeInput) return;
+              activeInput.value = btn.dataset.calIso;
+              activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+              activeInput.dispatchEvent(new Event('change', { bubbles: true }));
+              const form = activeInput.closest('form');
+              if (form) form.dataset.sgrDirty = '1';
+              pop.classList.add('hidden');
+              activeInput = null;
+            });
+          });
+        }
+
+        function openForInput(input) {
+          const pop = ensurePopover(input.closest('dialog') || document.body);
+          activeInput = input;
+          const seed = parseIso(input.value) || parseIso(input.getAttribute('min')) || new Date();
+          viewYear = seed.getFullYear();
+          viewMonth = seed.getMonth();
+          renderPopover();
+          pop.classList.remove('hidden');
+
+          const rect = input.getBoundingClientRect();
+          const popW = 288;
+          const popH = pop.offsetHeight || 340;
+          let left = rect.left;
+          if (left + popW > window.innerWidth - 12) left = window.innerWidth - popW - 12;
+          if (left < 12) left = 12;
+          let top = rect.bottom + 6;
+          if (top + popH > window.innerHeight - 12 && rect.top - popH - 6 > 8) {
+            top = rect.top - popH - 6;
+          }
+          pop.style.left = `${left}px`;
+          pop.style.top = `${top}px`;
+        }
+
+        function initInputs(root = document) {
+          root.querySelectorAll('input[type="date"]:not([data-inline-cal="true"])').forEach((inp) => {
+            if (inp.dataset.sgrCalAttached === '1') return;
+            inp.dataset.sgrCalAttached = '1';
+            const parent = inp.parentElement;
+            if (!parent) return;
+
+            const outer = document.createElement('div');
+            outer.className = 'w-full';
+            const wrap = document.createElement('div');
+            wrap.className = 'relative flex items-center gap-1.5 w-full';
+            parent.insertBefore(outer, inp);
+            outer.appendChild(wrap);
+            wrap.appendChild(inp);
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'sgr-cal-trigger shrink-0 px-2.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-red-50 hover:border-red-200 text-slate-600 hover:text-[#C41230] text-[11px] font-bold transition-all flex items-center gap-1';
+            btn.title = 'Abrir calendario con feriados nacionales, fines de semana y trimestre';
+            btn.setAttribute('aria-label', 'Abrir calendario con feriados y fines de semana');
+            btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>';
+            btn.addEventListener('click', (ev) => {
+              ev.preventDefault();
+              ev.stopPropagation();
+              if (popoverEl && !popoverEl.classList.contains('hidden') && activeInput === inp) {
+                popoverEl.classList.add('hidden');
+                activeInput = null;
+              } else {
+                openForInput(inp);
+              }
+            });
+            inp._sgrTriggerBtn = btn;
+            wrap.appendChild(btn);
+
+            // Actualizar etiqueta informativa cuando cambia la fecha (si es fin de semana/feriado/trimestre)
+            const badge = document.createElement('div');
+            badge.className = 'text-[10px] font-semibold mt-1 hidden';
+            wrap.insertAdjacentElement('afterend', badge);
+
+            const updateDateNote = () => {
+              if (!inp.value) {
+                badge.classList.add('hidden');
+                badge.textContent = '';
+                return;
+              }
+              const q = getTrimestre(inp.value).label;
+              const fer = getFeriado(inp.value);
+              const fnd = esFinde(inp.value);
+              if (fer) {
+                badge.className = 'text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5 mt-1 inline-flex items-center gap-1';
+                badge.textContent = `Feriado: ${fer} · ${q}`;
+              } else if (fnd) {
+                badge.className = 'text-[10px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 mt-1 inline-flex items-center gap-1';
+                badge.textContent = `Fin de semana · ${q}`;
+              } else {
+                badge.className = 'text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-0.5 mt-1 inline-flex items-center gap-1';
+                badge.textContent = `Día hábil · ${q}`;
+              }
+            };
+            inp.addEventListener('change', updateDateNote);
+            updateDateNote();
+          });
+        }
+
+        return {
+          getFeriadosAnio,
+          getFeriado,
+          esFinde,
+          esDiaHabil,
+          contarDiasHabiles,
+          getTrimestre,
+          openForInput,
+          initInputs,
+          MESES,
+        };
+      })();
+
+      window.SGR_CALENDAR.initInputs(document);
     });
   </script>
   {% block extra_js %}{% endblock %}

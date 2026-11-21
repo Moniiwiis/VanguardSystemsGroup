@@ -4,6 +4,7 @@ from core.models import BaseModel
 class CompromisoAgenda(BaseModel):
     actividad_origen = models.ForeignKey("activities.Actividad", on_delete=models.SET_NULL, null=True, blank=True)
     delegacion = models.ForeignKey("accounts.Delegacion", on_delete=models.SET_NULL, null=True, blank=True, related_name='compromisos_sector')
+    periodo = models.ForeignKey("configuration.Periodo", on_delete=models.SET_NULL, null=True, blank=True, related_name='compromisos_tubo')
     sector = models.ForeignKey("accounts.Sector", on_delete=models.SET_NULL, null=True, blank=True, related_name='compromisos_tubo')
     organizacion = models.ForeignKey("activities.OrganizacionComunitaria", on_delete=models.SET_NULL, null=True, blank=True, related_name='compromisos_sector')
     origen = models.CharField(max_length=10, default='INT', verbose_name="Interno o Externo")
@@ -29,6 +30,11 @@ class CompromisoAgenda(BaseModel):
                 self.territorio = self.sector.nombre
             if not self.delegacion_id and self.sector.delegacion_id:
                 self.delegacion_id = self.sector.delegacion_id
+        if not self.periodo_id:
+            from django.utils import timezone
+            from core.utils import buscar_periodo_para_fecha
+            ref_fecha = self.fecha_comprometida or timezone.localdate()
+            self.periodo = buscar_periodo_para_fecha(ref_fecha)
         super().save(*args, **kwargs)
 
     def __str__(self):

@@ -390,6 +390,7 @@ class AtencionCiudadana(BaseModel):
     vecino = models.ForeignKey(Vecino, on_delete=models.SET_NULL, null=True, blank=True)
     organizacion = models.ForeignKey(OrganizacionComunitaria, on_delete=models.SET_NULL, null=True, blank=True, related_name='atenciones')
     delegacion = models.ForeignKey("accounts.Delegacion", on_delete=models.RESTRICT)
+    periodo = models.ForeignKey("configuration.Periodo", on_delete=models.SET_NULL, null=True, blank=True, related_name='atenciones')
     tipo_atencion = models.ForeignKey("configuration.TipoAtencion", on_delete=models.RESTRICT)
     sub_atencion = models.ForeignKey("configuration.SubAtencion", on_delete=models.RESTRICT)
     descripcion = models.TextField()
@@ -446,6 +447,10 @@ class AtencionCiudadana(BaseModel):
             self.codigo_atencion = f"AT-{year}-{next_num:04d}-{uid}"
         if not self.creado_por and self.usuario_responsable:
             self.creado_por = self.usuario_responsable
+        if not self.periodo_id:
+            from core.utils import buscar_periodo_para_fecha
+            ref_fecha = self.fecha_compromiso or timezone.localdate()
+            self.periodo = buscar_periodo_para_fecha(ref_fecha)
         super().save(*args, **kwargs)
 
         if not self.actividad_id:

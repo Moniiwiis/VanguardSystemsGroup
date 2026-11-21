@@ -72,6 +72,7 @@ urlpatterns = [
 
     # 7. Atenciones
     path('gestion/atenciones/', views.gestion_atenciones, name='gestion_atenciones'),
+    path('gestion/api/atenciones-pendientes/', views.api_atenciones_pendientes, name='api_atenciones_pendientes'),
     path('gestion/atenciones/<int:atencion_id>/editar/', views.gestion_atenciones_editar, name='gestion_atenciones_editar'),
     path('gestion/atenciones/<int:atencion_id>/eliminar/', views.gestion_atenciones_eliminar, name='gestion_atenciones_eliminar'),
     path('gestion/atenciones/<int:atencion_id>/estado/', views.gestion_atenciones_estado, name='gestion_atenciones_estado'),

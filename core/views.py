@@ -27,6 +27,8 @@ from core.utils import (
     validar_telefono_chileno, formatear_telefono_chileno, validar_imagen_subida,
     extraer_partes_persona_desde_post, generar_username_funcionario,
     obtener_nombre_corto,
+    feriados_chile_por_anio, es_dia_habil_chile, contar_dias_habiles_chile,
+    obtener_trimestre, buscar_periodo_para_fecha,
 )
 from activities.models import (
     Actividad, Evidencia, ValidacionEvidencia, TipoGestion, Vecino,
@@ -2151,12 +2153,23 @@ def gestion_metas(request):
     if filtro_estado_per:
         qs_per = qs_per.filter(estado__iexact=filtro_estado_per)
     periodos_list = list(qs_per)
+    trimestre_per = request.GET.get('trimestre', '').strip()
+    if trimestre_per in {'1', '2', '3', '4'}:
+        q_num = int(trimestre_per)
+        q_inicio_mes = (q_num - 1) * 3 + 1
+        q_fin_mes = q_num * 3
+        periodos_list = [
+            p for p in periodos_list
+            if (p.fecha_inicio.month <= q_fin_mes and p.fecha_termino.month >= q_inicio_mes)
+            or ((p.fecha_inicio.month - 1) // 3 + 1 == q_num)
+        ]
     if q_per:
         q_per_low = q_per.lower()
         periodos_list = [
             p for p in periodos_list
             if (
                 q_per_low in str(p).lower()
+                or q_per_low in p.get_trimestre_label().lower()
                 or q_per_low in p.fecha_inicio.strftime('%d-%m-%Y').lower()
                 or q_per_low in p.fecha_termino.strftime('%d-%m-%Y').lower()
                 or q_per_low in p.fecha_inicio.isoformat()
@@ -2168,10 +2181,11 @@ def gestion_metas(request):
 
     if request.GET.get('export') == 'excel':
         if tab == 'periodos':
-            headers = ['Período', 'Fecha de Inicio', 'Fecha de Término', 'Días Computables', 'Estado']
+            headers = ['Período', 'Trimestre', 'Fecha de Inicio', 'Fecha de Término', 'Días Computables', 'Estado']
             rows = [
                 [
                     str(p),
+                    p.get_trimestre_label(),
                     p.fecha_inicio.strftime('%d-%m-%Y'),
                     p.fecha_termino.strftime('%d-%m-%Y'),
                     p.dias_computables,
@@ -2218,6 +2232,7 @@ def gestion_metas(request):
         'query_params_items': query_params_items,
         'q_per': q_per,
         'filtro_estado_per': filtro_estado_per,
+        'trimestre_per': trimestre_per,
         'orden_per': orden_per,
         'orden_per_opciones': orden_per_opciones,
         'page_size': page_size,
@@ -3342,6 +3357,9 @@ def gestion_atenciones(request):
                 except ValueError:
                     messages.error(request, "La fecha de compromiso ingresada no es válida.")
                     return redirect('gestion_atenciones')
+                if fecha_comp < timezone.localdate():
+                    messages.error(request, "La fecha de compromiso no puede ser anterior al día de hoy.")
+                    return redirect('gestion_atenciones')
             else:
                 fecha_comp = None
                 area_apoyo = ''
@@ -3351,6 +3369,7 @@ def gestion_atenciones(request):
                 vecino=vecino_obj,
                 organizacion=organizacion_obj,
                 delegacion=del_activa,
+                periodo=buscar_periodo_para_fecha(fecha_comp or timezone.localdate()),
                 tipo_atencion=tipo_obj,
                 sub_atencion=sub_obj,
                 descripcion=descripcion,
@@ -3449,6 +3468,9 @@ def gestion_atenciones(request):
         qs = qs.filter(tipo_atencion__nombre__iexact=filtro_tipo)
     if filtro_estado:
         qs = qs.filter(estado__iexact=filtro_estado)
+    filtro_periodo = request.GET.get('periodo', '').strip()
+    if filtro_periodo.isdigit():
+        qs = qs.filter(periodo_id=int(filtro_periodo))
 
     orden_opciones = [
         ('-created_at', 'Más recientes'),
@@ -3609,6 +3631,8 @@ def gestion_atenciones(request):
         'tipos_gestion': TipoGestion.objects.all(),
         'areas_apoyo_catalogo': AreaApoyo.objects.filter(estado='Activo').order_by('nombre'),
         'hoy_iso': timezone.localdate().isoformat(),
+        'periodos_disponibles': Periodo.objects.order_by('-fecha_inicio'),
+        'filtro_periodo': filtro_periodo,
         'abrir_tubo': request.GET.get('abrir_tubo') == '1' and bool(del_activa),
         'sectores': sectores_disponibles,
         'representantes_disponibles': representantes_disponibles,
@@ -3726,11 +3750,14 @@ def gestion_atenciones_editar(request, atencion_id):
         f_comp_str = request.POST.get('fecha_compromiso', '').strip()
         if f_comp_str:
             try:
-                cambios_atencion['fecha_compromiso'] = datetime.date.fromisoformat(f_comp_str)
+                f_parsed = datetime.date.fromisoformat(f_comp_str)
+                cambios_atencion['fecha_compromiso'] = f_parsed
+                cambios_atencion['periodo'] = buscar_periodo_para_fecha(f_parsed)
             except ValueError:
                 pass
         else:
             cambios_atencion['fecha_compromiso'] = None
+            cambios_atencion['periodo'] = buscar_periodo_para_fecha(atencion.created_at.date() if atencion.created_at else timezone.localdate())
 
     if 'va_a_tubo' in request.POST:
         va_tubo_val = request.POST.get('va_a_tubo', '').strip().lower() in ['1', 'true', 'on', 'si', 's']
@@ -3738,6 +3765,7 @@ def gestion_atenciones_editar(request, atencion_id):
         if not va_tubo_val:
             cambios_atencion['fecha_compromiso'] = None
             cambios_atencion['area_apoyo'] = ''
+            cambios_atencion['periodo'] = buscar_periodo_para_fecha(atencion.created_at.date() if atencion.created_at else timezone.localdate())
         else:
             fecha_efectiva = cambios_atencion.get('fecha_compromiso') if 'fecha_compromiso' in cambios_atencion else atencion.fecha_compromiso
             if not fecha_efectiva:
@@ -4985,6 +5013,13 @@ def gestion_reportes(request):
             'item__nombre_item', 'item__descripcion', 'periodo__estado',
             'funcionario__user__first_name', 'funcionario__user__username',
         ], q))
+    trimestre_filtro = request.GET.get('trimestre', '').strip()
+    if trimestre_filtro in {'1', '2', '3', '4'}:
+        q_num = int(trimestre_filtro)
+        q_meses = [(q_num - 1) * 3 + 1, (q_num - 1) * 3 + 2, q_num * 3]
+        metas_qs = metas_qs.filter(
+            Q(periodo__fecha_inicio__month__in=q_meses) | Q(periodo__fecha_termino__month__in=q_meses)
+        )
     orden_opciones = [
         ('id', 'Más antiguas'),
         ('-id', 'Más recientes'),
@@ -5109,6 +5144,7 @@ def gestion_reportes(request):
         'es_admin': es_admin,
         'es_delegado': ctx['permisos'].get('es_delegado', False),
         'q': q,
+        'trimestre_filtro': trimestre_filtro,
         'orden': orden,
         'orden_opciones': orden_opciones,
         'page_size': page_size,
@@ -6239,6 +6275,13 @@ def _construir_item_tubo(origen_tipo, obj):
             'fecha_compromiso': obj.fecha_compromiso,
             'area_apoyo': obj.area_apoyo or '',
             'avance_observaciones': obj.avance_observaciones or '',
+            'periodo_id': obj.periodo_id,
+            'periodo_nombre': str(obj.periodo) if obj.periodo else '',
+            'trimestre_label': (
+                obj.periodo.get_trimestre_label()
+                if obj.periodo
+                else obtener_trimestre(obj.fecha_compromiso or (obj.created_at.date() if obj.created_at else None))[1]
+            ),
             'estado': estado_val,
             'estado_grupo': _estado_grupo_tubo(estado_val),
             'url_cambiar_estado': reverse('gestion_tubo_cambiar_estado', args=[obj.id]),
@@ -6289,6 +6332,13 @@ def _construir_item_tubo(origen_tipo, obj):
         'fecha_compromiso': obj.fecha_comprometida,
         'area_apoyo': obj.area_apoyo or '',
         'avance_observaciones': obj.avance_observaciones or '',
+        'periodo_id': obj.periodo_id,
+        'periodo_nombre': str(obj.periodo) if obj.periodo else '',
+        'trimestre_label': (
+            obj.periodo.get_trimestre_label()
+            if obj.periodo
+            else obtener_trimestre(obj.fecha_comprometida or (obj.created_at.date() if obj.created_at else None))[1]
+        ),
         'estado': estado_val,
         'estado_grupo': _estado_grupo_tubo(estado_val),
         'url_cambiar_estado': reverse('gestion_tubo_sector_cambiar_estado', args=[obj.id]),
@@ -6372,6 +6422,9 @@ def _crear_compromiso_sector_tubo(request, ctx):
         fecha_comp = datetime.date.fromisoformat(fecha_str)
     except ValueError:
         messages.error(request, "La fecha de compromiso ingresada no es válida.")
+        return redirect('gestion_tubo')
+    if fecha_comp < timezone.localdate():
+        messages.error(request, "La fecha de compromiso no puede ser anterior al día de hoy.")
         return redirect('gestion_tubo')
 
     delegacion_obj = del_activa
@@ -6505,8 +6558,11 @@ def gestion_tubo(request):
     filtro_estado = request.GET.get('estado', '').strip()
     filtro_origen = request.GET.get('origen', '').strip()
     filtro_responsable = request.GET.get('responsable', '').strip()
+    filtro_periodo = request.GET.get('periodo', '').strip()
 
     items_filtrados = list(items_base)
+    if filtro_periodo.isdigit():
+        items_filtrados = [it for it in items_filtrados if str(it.get('periodo_id') or '') == filtro_periodo]
     if q:
         q_low = q.lower()
         items_filtrados = [
@@ -6814,6 +6870,8 @@ def gestion_tubo(request):
         'filtro_cumplimiento': filtro_cumplimiento,
         'orden_colab': orden_colab,
         'responsables_filtro': responsables_filtro,
+        'periodos_disponibles': Periodo.objects.order_by('-fecha_inicio'),
+        'filtro_periodo': filtro_periodo,
         'todas_delegaciones': todas_delegaciones,
         'delegacion_seleccionada': delegacion_seleccionada,
         'es_admin': es_admin,
@@ -7062,5 +7120,89 @@ def gestion_tubo_sector_eliminar(request, compromiso_id):
     transaction.on_commit(lambda: publish_module_changed("atenciones", del_id_ws, "delete", compromiso_id))
     messages.success(request, f"Compromiso {codigo} archivado del Tubo de Compromiso.")
     return redirect('gestion_tubo')
+
+
+@login_required
+def api_atenciones_pendientes(request):
+    """Retorna solicitudes ciudadanas pendientes asociadas a un vecino (por ID, RUT o nombre) u organización."""
+    ctx = global_context(request)
+    vecino_id = request.GET.get('vecino_id', '').strip()
+    org_id = request.GET.get('organizacion_id', '').strip()
+    rut_q = request.GET.get('rut', '').strip()
+    q_txt = request.GET.get('q', '').strip()
+
+    estados_pendientes = ['Registrada', 'En proceso', 'Pendiente']
+    qs = AtencionCiudadana.objects.select_related('delegacion', 'vecino', 'organizacion', 'periodo').filter(
+        estado__in=estados_pendientes
+    )
+    es_admin = ctx['permisos'].get('es_admin', False)
+    del_activa = ctx.get('delegacion_activa')
+    if not es_admin:
+        if del_activa:
+            qs = qs.filter(delegacion=del_activa)
+        else:
+            qs = qs.none()
+    elif del_activa:
+        qs = qs.filter(delegacion=del_activa)
+
+    filtro = Q()
+    tiene_criterio = False
+
+    if vecino_id.isdigit():
+        filtro |= Q(vecino_id=int(vecino_id))
+        tiene_criterio = True
+    if org_id.isdigit():
+        filtro |= Q(organizacion_id=int(org_id))
+        tiene_criterio = True
+
+    def _variantes_rut(val):
+        limpio = ''.join(ch for ch in val if ch.isalnum()).upper()
+        if len(limpio) < 4:
+            return []
+        cuerpo, dv = limpio[:-1], limpio[-1]
+        variantes = {val.strip(), f"{cuerpo}-{dv}"}
+        if cuerpo.isdigit() and len(cuerpo) >= 4:
+            cuerpo_pts = f"{int(cuerpo):,}".replace(",", ".")
+            variantes.add(f"{cuerpo_pts}-{dv}")
+        return list(variantes)
+
+    for v_rut in _variantes_rut(rut_q or q_txt):
+        filtro |= Q(vecino__rut__iexact=v_rut) | Q(organizacion__rut__iexact=v_rut) | Q(solicitante__icontains=v_rut)
+        tiene_criterio = True
+
+    if len(q_txt) >= 3:
+        # Si viene en formato "Nombre Apellido (12.345.678-9)" desde el buscador, extrae texto y RUT
+        base_nom = q_txt.split('(')[0].split('·')[0].strip()
+        if '(' in q_txt and ')' in q_txt:
+            rut_parentesis = q_txt.split('(')[-1].replace(')', '').strip()
+            for v_rut in _variantes_rut(rut_parentesis):
+                filtro |= Q(vecino__rut__iexact=v_rut) | Q(organizacion__rut__iexact=v_rut) | Q(solicitante__icontains=v_rut)
+                tiene_criterio = True
+        if len(base_nom) >= 3:
+            filtro |= build_accent_query(['solicitante', 'vecino__nombre', 'organizacion__nombre'], base_nom)
+            tiene_criterio = True
+
+    if not tiene_criterio:
+        return JsonResponse({'total': 0, 'pendientes': []})
+
+    pendientes_qs = qs.filter(filtro).order_by('-created_at')
+    total = pendientes_qs.count()
+    items = []
+    for at in pendientes_qs[:10]:
+        items.append({
+            'id': at.id,
+            'codigo_atencion': at.codigo_atencion,
+            'solicitante': at.solicitante,
+            'estado': at.estado,
+            'descripcion': (at.descripcion or '')[:140],
+            'fecha': timezone.localtime(at.created_at).strftime('%d/%m/%Y') if at.created_at else '',
+            'fecha_compromiso': at.fecha_compromiso.strftime('%d/%m/%Y') if at.fecha_compromiso else '',
+            'va_a_tubo': bool(at.va_a_tubo),
+            'delegacion': at.delegacion.nombre if at.delegacion else '',
+            'periodo': str(at.periodo) if at.periodo else '',
+            'vecino_rut': at.vecino.rut if at.vecino else (at.organizacion.rut if at.organizacion else ''),
+        })
+    return JsonResponse({'total': total, 'pendientes': items})
+
 
 

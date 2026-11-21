@@ -32,6 +32,22 @@ class Periodo(BaseModel):
         pct = (self.dias_transcurridos() / float(self.dias_computables)) * 100.0
         return min(round(pct, 2), 100.0)
 
+    def get_trimestre_label(self):
+        from core.utils import obtener_trimestre
+        if not self.fecha_inicio:
+            return ''
+        q_ini, lbl_ini = obtener_trimestre(self.fecha_inicio)
+        if not self.fecha_termino:
+            return lbl_ini
+        q_fin, _ = obtener_trimestre(self.fecha_termino)
+        if q_ini == q_fin and self.fecha_inicio.year == self.fecha_termino.year:
+            return lbl_ini
+        return f"T{q_ini}–T{q_fin} ({self.fecha_inicio.year})"
+
+    def dias_habiles(self):
+        from core.utils import contar_dias_habiles_chile
+        return contar_dias_habiles_chile(self.fecha_inicio, self.fecha_termino)
+
     def __str__(self):
         inicio_fmt = self.fecha_inicio.strftime('%d-%m-%Y') if self.fecha_inicio else ''
         termino_fmt = self.fecha_termino.strftime('%d-%m-%Y') if self.fecha_termino else ''

@@ -111,6 +111,9 @@
       {% endif %}
         <div>
           <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Metas y Cumplimiento</p>
+          {% if trimestre_actual_label %}
+            <span class="inline-block text-[10px] font-extrabold text-[#C41230] mt-0.5">{{ trimestre_actual_label }}{% if periodo_activo_global %} · Período Activo{% endif %}</span>
+          {% endif %}
           <h3 class="text-2xl font-black text-slate-900 mt-1 font-display">{{ promedio_meta_del }}%</h3>
           <div class="flex items-center gap-2 mt-1 text-[11px] font-extrabold">
             <span class="text-emerald-700 flex items-center gap-0.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>{{ verdes_del }}</span>

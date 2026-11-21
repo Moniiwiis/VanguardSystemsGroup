@@ -1,5 +1,6 @@
-import io
 import csv
+import datetime
+import io
 import itertools
 import re
 import unicodedata
@@ -525,4 +526,126 @@ def generar_username_funcionario(primer_nombre, apellido_paterno, exclude_user_i
         candidato = f"{base[:140]}{sufijo}"
         sufijo += 1
     return candidato
+
+
+# =====================================================================
+# FERIADOS CHILE, DÍAS HÁBILES, TRIMESTRES Y PERÍODOS
+# =====================================================================
+
+_SOLSTICIO_PUEBLOS_INDIGENAS = {
+    2024: 20,
+    2025: 20,
+    2026: 21,
+    2027: 21,
+    2028: 20,
+    2029: 20,
+    2030: 21,
+}
+
+
+def calcular_pascua(anio):
+    """Calcula la fecha de Domingo de Resurrección según algoritmo gregoriano."""
+    a = anio % 19
+    b = anio // 100
+    c = anio % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    mes = (h + l - 7 * m + 114) // 31
+    dia = ((h + l - 7 * m + 114) % 31) + 1
+    return datetime.date(anio, mes, dia)
+
+
+def _trasladar_lunes_ley_19668(fecha):
+    """Traslada feriado al lunes correspondiente según Ley 19.668 (Chile)."""
+    wd = fecha.weekday()  # 0=Lu .. 6=Do
+    if wd in (1, 2, 3):  # Ma, Mi, Ju -> lunes anterior
+        return fecha - datetime.timedelta(days=wd)
+    if wd == 4:  # Vi -> lunes siguiente
+        return fecha + datetime.timedelta(days=3)
+    return fecha
+
+
+def feriados_chile_por_anio(anio):
+    """Retorna dict {date: nombre_feriado} con los feriados legales nacionales de Chile."""
+    anio = int(anio)
+    feriados = {
+        datetime.date(anio, 1, 1): 'Año Nuevo',
+        datetime.date(anio, 5, 1): 'Día Nacional del Trabajo',
+        datetime.date(anio, 5, 21): 'Día de las Glorias Navales',
+        datetime.date(anio, 6, _SOLSTICIO_PUEBLOS_INDIGENAS.get(anio, 21)): 'Día Nacional de los Pueblos Indígenas',
+        _trasladar_lunes_ley_19668(datetime.date(anio, 6, 29)): 'San Pedro y San Pablo',
+        datetime.date(anio, 7, 16): 'Día de la Virgen del Carmen',
+        datetime.date(anio, 8, 15): 'Asunción de la Virgen',
+        datetime.date(anio, 9, 18): 'Independencia Nacional',
+        datetime.date(anio, 9, 19): 'Día de las Glorias del Ejército',
+        _trasladar_lunes_ley_19668(datetime.date(anio, 10, 12)): 'Encuentro de Dos Mundos',
+        datetime.date(anio, 10, 31): 'Día de las Iglesias Evangélicas y Protestantes',
+        datetime.date(anio, 11, 1): 'Día de Todos los Santos',
+        datetime.date(anio, 12, 8): 'Inmaculada Concepción',
+        datetime.date(anio, 12, 25): 'Navidad',
+    }
+    pascua = calcular_pascua(anio)
+    feriados[pascua - datetime.timedelta(days=2)] = 'Viernes Santo'
+    feriados[pascua - datetime.timedelta(days=1)] = 'Sábado Santo'
+    # Ley 20.215: 17 sep si 18 es martes; 20 sep si 19 es jueves
+    sep18 = datetime.date(anio, 9, 18)
+    if sep18.weekday() == 1:
+        feriados[datetime.date(anio, 9, 17)] = 'Feriado Fiestas Patrias'
+    elif sep18.weekday() == 2:
+        feriados[datetime.date(anio, 9, 20)] = 'Feriado Fiestas Patrias'
+    return feriados
+
+
+def es_dia_habil_chile(fecha):
+    """Retorna True si la fecha es lunes a viernes y no es feriado legal de Chile."""
+    if not fecha or fecha.weekday() >= 5:
+        return False
+    return fecha not in feriados_chile_por_anio(fecha.year)
+
+
+def contar_dias_habiles_chile(inicio, termino):
+    """Cuenta días hábiles (lunes a viernes descontando feriados legales de Chile) en [inicio, termino]."""
+    if not inicio or not termino or termino < inicio:
+        return 0
+    cache_feriados = {}
+    habiles = 0
+    cur = inicio
+    while cur <= termino:
+        if cur.weekday() < 5:
+            if cur.year not in cache_feriados:
+                cache_feriados[cur.year] = feriados_chile_por_anio(cur.year)
+            if cur not in cache_feriados[cur.year]:
+                habiles += 1
+        cur += datetime.timedelta(days=1)
+    return habiles
+
+
+def obtener_trimestre(fecha=None):
+    """Retorna (numero_trimestre, etiqueta) ej. (4, 'T4 (Oct–Dic 2026)')."""
+    fecha = fecha or timezone.localdate()
+    q = ((fecha.month - 1) // 3) + 1
+    rango_meses = {1: 'Ene–Mar', 2: 'Abr–Jun', 3: 'Jul–Sep', 4: 'Oct–Dic'}[q]
+    return q, f"T{q} ({rango_meses} {fecha.year})"
+
+
+def buscar_periodo_para_fecha(fecha=None):
+    """Retorna el Período activo que contiene la fecha (o el período Abierto vigente más cercano)."""
+    from configuration.models import Periodo
+    ref = fecha or timezone.localdate()
+    return (
+        Periodo.objects.filter(estado__iexact='Abierto', fecha_inicio__lte=ref, fecha_termino__gte=ref)
+        .order_by('-fecha_inicio', '-id')
+        .first()
+        or Periodo.objects.filter(fecha_inicio__lte=ref, fecha_termino__gte=ref)
+        .order_by('-fecha_inicio', '-id')
+        .first()
+        or Periodo.objects.filter(estado__iexact='Abierto').order_by('-fecha_inicio', '-id').first()
+    )
 

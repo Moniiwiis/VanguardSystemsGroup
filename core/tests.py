@@ -3386,6 +3386,202 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         r_all = self.client.get(reverse('cartas_listado') + '?delegacion=')
         self.assertIsNone(r_all.context['delegacion_seleccionada'])
 
+    def test_feriados_trimestre_periodo_atenciones_pendientes_y_cartas_canva(self):
+        from datetime import date, timedelta
+        from django.utils import timezone
+        from configuration.models import Periodo, TipoAtencion, SubAtencion
+        from activities.models import Vecino, AtencionCiudadana
+        from agenda.models import CompromisoAgenda
+        from cartas.models import Carta
+        from core.utils import (
+            feriados_chile_por_anio,
+            es_dia_habil_chile,
+            contar_dias_habiles_chile,
+            obtener_trimestre,
+        )
+
+        # 1. Feriados chilenos, días hábiles y Trimestre
+        feriados_2026 = feriados_chile_por_anio(2026)
+        self.assertIn(date(2026, 1, 1), feriados_2026)
+        self.assertIn(date(2026, 4, 3), feriados_2026)  # Viernes Santo
+        self.assertIn(date(2026, 9, 18), feriados_2026)
+        self.assertIn(date(2026, 9, 19), feriados_2026)
+        self.assertIn(date(2026, 12, 25), feriados_2026)
+        self.assertFalse(es_dia_habil_chile(date(2026, 9, 18)))  # Feriado
+        self.assertFalse(es_dia_habil_chile(date(2026, 9, 20)))  # Domingo
+        self.assertTrue(es_dia_habil_chile(date(2026, 9, 17)))   # Jueves hábil
+        self.assertEqual(contar_dias_habiles_chile(date(2026, 9, 17), date(2026, 9, 21)), 2)
+
+        self.assertEqual(obtener_trimestre(date(2026, 2, 10)), (1, 'T1 (Ene–Mar 2026)'))
+        self.assertEqual(obtener_trimestre(date(2026, 5, 10)), (2, 'T2 (Abr–Jun 2026)'))
+        self.assertEqual(obtener_trimestre(date(2026, 8, 10)), (3, 'T3 (Jul–Sep 2026)'))
+        self.assertEqual(obtener_trimestre(date(2026, 11, 21)), (4, 'T4 (Oct–Dic 2026)'))
+
+        hoy = timezone.localdate()
+        maniana = hoy + timedelta(days=1)
+        ayer = hoy - timedelta(days=1)
+        fin_periodo = hoy + timedelta(days=20)
+        periodo = Periodo.objects.create(
+            fecha_inicio=ayer,
+            fecha_termino=fin_periodo,
+            dias_computables=contar_dias_habiles_chile(ayer, fin_periodo),
+            estado='Abierto',
+        )
+
+        # 2. Enlace de Período a Atenciones y Tubo + validación de fechas pasadas
+        self.client.force_login(self.user)
+        tipo_at = TipoAtencion.objects.create(nombre='Social Test', estado='Activo')
+        sub_at = SubAtencion.objects.create(tipo_atencion=tipo_at, nombre='Ayuda Directa', estado='Activo')
+        vecino = Vecino.objects.create(
+            nombre='Laura Rojas',
+            primer_nombre='Laura',
+            apellido_paterno='Rojas',
+            rut='18.111.222-3',
+            delegacion=self.delegacion,
+            estado='Activo',
+        )
+
+        # Atención al Tubo con fecha compromiso pasada debe rechazarse
+        self.client.post(reverse('gestion_atenciones'), {
+            'solicitante': 'Laura Rojas (18.111.222-3)',
+            'vecino_id': str(vecino.id),
+            'tipo_atencion_id': str(tipo_at.id),
+            'sub_atencion_id': str(sub_at.id),
+            'descripcion': 'Intento fecha pasada',
+            'va_a_tubo': '1',
+            'fecha_compromiso': ayer.isoformat(),
+        })
+        self.assertFalse(AtencionCiudadana.objects.filter(descripcion='Intento fecha pasada').exists())
+
+        # Atención válida al Tubo se enlaza automáticamente con el Período correspondiente
+        self.client.post(reverse('gestion_atenciones'), {
+            'solicitante': 'Laura Rojas (18.111.222-3)',
+            'vecino_id': str(vecino.id),
+            'tipo_atencion_id': str(tipo_at.id),
+            'sub_atencion_id': str(sub_at.id),
+            'descripcion': 'Solicitud válida en período',
+            'va_a_tubo': '1',
+            'fecha_compromiso': maniana.isoformat(),
+        })
+        at = AtencionCiudadana.objects.get(descripcion='Solicitud válida en período')
+        self.assertEqual(at.periodo, periodo)
+
+        # Compromiso sectorial en Tubo con fecha pasada también se rechaza; con fecha futura liga período
+        self.client.post(reverse('gestion_tubo'), {
+            'accion': 'crear_compromiso_sector',
+            'descripcion': 'Compromiso pasado rechazado',
+            'fecha_compromiso': ayer.isoformat(),
+        })
+        self.assertFalse(CompromisoAgenda.objects.filter(observacion='Compromiso pasado rechazado').exists())
+
+        self.client.post(reverse('gestion_tubo'), {
+            'accion': 'crear_compromiso_sector',
+            'descripcion': 'Compromiso futuro válido',
+            'fecha_compromiso': maniana.isoformat(),
+        })
+        comp = CompromisoAgenda.objects.get(observacion='Compromiso futuro válido')
+        self.assertEqual(comp.periodo, periodo)
+
+        # 3. API de solicitudes pendientes al ingresar RUT o nombre
+        at_resuelta = AtencionCiudadana.objects.create(
+            solicitante='Laura Rojas',
+            vecino=vecino,
+            delegacion=self.delegacion,
+            tipo_atencion=tipo_at,
+            sub_atencion=sub_at,
+            descripcion='Caso ya resuelto',
+            usuario_responsable=self.user,
+            creado_por=self.user,
+            estado='Resuelta',
+        )
+        self.assertIsNotNone(at_resuelta.id)
+        for query_str in ('?rut=18111222-3', '?q=Laura', f'?vecino_id={vecino.id}'):
+            r_api = self.client.get(reverse('api_atenciones_pendientes') + query_str)
+            self.assertEqual(r_api.status_code, 200)
+            payload = r_api.json()
+            self.assertEqual(payload['total'], 1)
+            self.assertEqual(payload['pendientes'][0]['codigo_atencion'], at.codigo_atencion)
+
+        # Scoping por delegación en API pendientes
+        del_otra = Delegacion.objects.create(codigo='DEL_API', nombre='Delegación Externa API', estado='Activa')
+        cargo_api = Cargo.objects.create(nombre_cargo='Gestor API')
+        otro_u = User.objects.create_user('otro_api', 'otroapi@example.test', 'Pass123!')
+        Funcionario.objects.create(user=otro_u, cargo=cargo_api, delegacion=del_otra, identificador_institucional='FUNC-API-2', estado='Activo')
+        self.client.force_login(otro_u)
+        r_api_otro = self.client.get(reverse('api_atenciones_pendientes') + '?rut=18111222-3')
+        self.assertEqual(r_api_otro.status_code, 200)
+        self.assertEqual(r_api_otro.json()['total'], 0)
+
+        # 4. Vistas de Metas (Trimestre + Calendario Feriados), Atenciones, Tubo y Reportes
+        admin_u = User.objects.create_superuser('adm_cal_test', 'admcal@example.test', 'Admin123!')
+        self.client.force_login(admin_u)
+        r_metas = self.client.get(reverse('gestion_metas') + f'?tab=periodos&trimestre={obtener_trimestre(hoy)[0]}')
+        self.assertEqual(r_metas.status_code, 200)
+        self.assertContains(r_metas, 'window.SGR_CALENDAR')
+        self.assertContains(r_metas, periodo.get_trimestre_label())
+
+        r_rep = self.client.get(reverse('gestion_reportes') + f'?trimestre={obtener_trimestre(hoy)[0]}')
+        self.assertEqual(r_rep.status_code, 200)
+        self.assertContains(r_rep, obtener_trimestre(hoy)[1])
+
+        r_at_per = self.client.get(reverse('gestion_atenciones') + f'?delegacion={self.delegacion.id}&periodo={periodo.id}')
+        self.assertEqual(r_at_per.status_code, 200)
+        self.assertContains(r_at_per, 'Solicitud válida en período')
+        self.assertContains(r_at_per, 'id="alerta-solicitudes-pendientes"')
+
+        r_tubo_per = self.client.get(reverse('gestion_tubo') + f'?delegacion={self.delegacion.id}&periodo={periodo.id}')
+        self.assertEqual(r_tubo_per.status_code, 200)
+        self.assertContains(r_tubo_per, 'Compromiso futuro válido')
+
+        # 5. Vistas y reglas de calendarios (fecha antigua vs hoy en adelante)
+        self.client.force_login(self.user)
+        r_at_func = self.client.get(reverse('gestion_atenciones') + f'?periodo={periodo.id}')
+        self.assertContains(r_at_func, f'id="fecha_compromiso" name="fecha_compromiso" min="{hoy.isoformat()}"')
+        self.assertContains(r_metas, f'id="per-new-inicio" name="fecha_inicio" min="{hoy.isoformat()}"')
+        r_org = self.client.get(reverse('gestion_organizaciones'))
+        self.assertEqual(r_org.status_code, 200)
+        self.assertContains(r_org, 'name="fecha_constitucion"')
+        self.assertContains(r_org, f'name="fecha_inscripcion_registro" min="{hoy.isoformat()}"')
+
+        # 6. Vista Canva y cambio de estado en Tubo de Cartas
+        carta_proc = Carta.objects.create(
+            delegacion=self.delegacion,
+            fecha=hoy,
+            numero='CANVA-01',
+            para='Alcaldesa',
+            remite='JJVV Norte',
+            actividad_tema='Solicitud reparación luminarias',
+            estado='EN PROCESO',
+            creado_por=self.user,
+        )
+        r_canva = self.client.get(reverse('cartas_listado') + '?vista=canvas')
+        self.assertEqual(r_canva.status_code, 200)
+        self.assertContains(r_canva, '1. En proceso')
+        self.assertContains(r_canva, '2. Aprobada')
+        self.assertContains(r_canva, '3. Finalizada')
+        self.assertContains(r_canva, '4. No aplica')
+        self.assertContains(r_canva, 'CANVA-01')
+
+        r_move = self.client.post(
+            reverse('cartas_cambiar_estado', args=[carta_proc.pk]),
+            {'nuevo_estado': 'APROBADA'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(r_move.status_code, 200)
+        self.assertTrue(r_move.json()['ok'])
+        carta_proc.refresh_from_db()
+        self.assertEqual(carta_proc.estado, 'APROBADA')
+
+        # Otro usuario de distinta delegación no puede mover carta ajena (404)
+        self.client.force_login(otro_u)
+        r_move_ext = self.client.post(
+            reverse('cartas_cambiar_estado', args=[carta_proc.pk]),
+            {'nuevo_estado': 'FINALIZADA'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertIn(r_move_ext.status_code, (403, 404))
+
+
 
 
 
