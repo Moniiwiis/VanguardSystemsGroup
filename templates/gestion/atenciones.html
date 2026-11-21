@@ -123,7 +123,10 @@
               <datalist id="organizaciones-list">
                 {% for o in organizaciones %}
                   <option value="{{ o.nombre }} ({{ o.tipo_organizacion }})" data-id="{{ o.id }}" data-tel="{{ o.telefono_contacto|default:'' }}"
-                          data-search="{{ o.nombre }} {{ o.rut|default:'' }} {{ o.numero_registro_pj|default:'' }} {{ o.personalidad_juridica|default:'' }} {{ o.registro_directiva_numero|default:'' }} {{ o.tipo_organizacion }} {{ o.sector__nombre|default:o.territorio|default:'' }} {{ o.representante_legal|default:'' }} {{ o.presidente_nombre|default:'' }} {{ o.tesorero_nombre|default:'' }} {{ o.secretario_nombre|default:'' }} {{ o.telefono_contacto|default:'' }}">{{ o.sector__nombre|default:o.territorio|default:'Organización Activa' }}{% if o.rut %} · RUT: {{ o.rut }}{% endif %}{% if o.numero_registro_pj or o.personalidad_juridica %} · P.J.: {{ o.numero_registro_pj|default:o.personalidad_juridica }}{% endif %}{% if o.registro_directiva_numero %} · Dir. N°: {{ o.registro_directiva_numero }}{% endif %}{% if o.representante_legal %} · {{ o.representante_legal }}{% endif %}</option>
+                          data-pres-nom="{{ o.presidente_nombre|default:'' }}" data-pres-rut="{{ o.presidente_rut|default:'' }}"
+                          data-tes-nom="{{ o.tesorero_nombre|default:'' }}" data-tes-rut="{{ o.tesorero_rut|default:'' }}"
+                          data-sec-nom="{{ o.secretario_nombre|default:'' }}" data-sec-rut="{{ o.secretario_rut|default:'' }}"
+                          data-search="{{ o.nombre }} {{ o.rut|default:'' }} {{ o.numero_registro_pj|default:'' }} {{ o.personalidad_juridica|default:'' }} {{ o.registro_directiva_numero|default:'' }} {{ o.tipo_organizacion }} {{ o.sector__nombre|default:o.territorio|default:'' }} {{ o.representante_legal|default:'' }} {{ o.presidente_nombre|default:'' }} {{ o.presidente_rut|default:'' }} {{ o.tesorero_nombre|default:'' }} {{ o.tesorero_rut|default:'' }} {{ o.secretario_nombre|default:'' }} {{ o.secretario_rut|default:'' }} {{ o.telefono_contacto|default:'' }}">{{ o.sector__nombre|default:o.territorio|default:'Organización Activa' }}{% if o.rut %} · RUT: {{ o.rut }}{% endif %}{% if o.numero_registro_pj or o.personalidad_juridica %} · P.J.: {{ o.numero_registro_pj|default:o.personalidad_juridica }}{% endif %}{% if o.registro_directiva_numero %} · Dir. N°: {{ o.registro_directiva_numero }}{% endif %}{% if o.representante_legal %} · {{ o.representante_legal }}{% endif %}</option>
                 {% endfor %}
               </datalist>
               {% if not organizaciones %}
@@ -135,6 +138,20 @@
 
             <div id="bloque-org-nueva" class="hidden pt-1">
               {% include 'gestion/includes/organizacion_form_fields.html' with p='nueva_org_' idp='nueva_org_' req='' incluir_delegacion_hidden=False %}
+            </div>
+
+            <!-- Validación de vecino representante de la directiva (Presidente, Tesorero o Secretario) -->
+            <div id="bloque-org-representante" class="space-y-1.5 pt-2.5 border-t border-blue-200/70">
+              <label for="org_representante_vecino_input" class="block text-[11px] font-bold text-slate-700">
+                Vecino representante asistente (Presidente, Tesorero o Secretario) <span class="text-[#C41230]">*</span>
+              </label>
+              <input type="text" id="org_representante_vecino_input" name="org_representante_vecino_input"
+                     list="vecinos-list" oninput="sincronizarRepresentanteOrg(this.value)" onchange="sincronizarRepresentanteOrg(this.value)"
+                     placeholder="Buscar vecino por RUT o nombre para validar cargo en directiva..."
+                     class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none font-medium" />
+              <input type="hidden" id="org_representante_vecino_id" name="org_representante_vecino_id" value="">
+              <div id="org-directiva-validacion" class="hidden rounded-xl px-3 py-2 text-[11px] font-bold"></div>
+              <p class="text-[10px] text-slate-500">Solo se permite crear la solicitud si el vecino pertenece a la junta de vecinos u organización como Presidente, Tesorero o Secretario.</p>
             </div>
           </div>
 
@@ -1118,13 +1135,25 @@
       else selectNuevoSector.removeAttribute('required');
     }
 
+    const inputOrgRep = document.getElementById('org_representante_vecino_input');
+    const hiddenOrgRep = document.getElementById('org_representante_vecino_id');
+    const boxDirValid = document.getElementById('org-directiva-validacion');
+
     if (esOrg) {
+      if (inputOrgRep) inputOrgRep.setAttribute('required', 'required');
       toggleNuevaOrgAtencion(chkNuevaOrg ? chkNuevaOrg.checked : false);
+      validarRepresentanteOrgUI();
     } else {
       if (chkNuevaOrg) chkNuevaOrg.checked = false;
       toggleNuevaOrgAtencion(false);
       if (inputOrg) inputOrg.removeAttribute('required');
       if (inputNuevaOrgNom) inputNuevaOrgNom.removeAttribute('required');
+      if (inputOrgRep) {
+        inputOrgRep.removeAttribute('required');
+        inputOrgRep.value = '';
+      }
+      if (hiddenOrgRep) hiddenOrgRep.value = '';
+      if (boxDirValid) boxDirValid.classList.add('hidden');
     }
     if (window.lucide) lucide.createIcons();
   }
@@ -1152,7 +1181,117 @@
         break;
       }
     }
+    validarRepresentanteOrgUI();
     programarBusquedaPendientes({ organizacion_id: hiddenId.value, q: val });
+  }
+
+  function _normRutDir(v) {
+    const clean = String(v || '').replace(/[^0-9kK]/g, '').toUpperCase();
+    return clean.length >= 7 ? clean : '';
+  }
+
+  function _normTxtDir(v) {
+    return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  function _obtenerDirectivaOrgSeleccionada() {
+    const chkNuevaOrg = document.getElementById('crear_nueva_org_chk');
+    if (chkNuevaOrg && chkNuevaOrg.checked) {
+      const readVal = (sel) => document.querySelector(sel)?.value?.trim() || '';
+      const readFullName = (rol) => [
+        readVal(`[name="nueva_org_${rol}_primer_nombre"]`),
+        readVal(`[name="nueva_org_${rol}_segundo_nombre"]`),
+        readVal(`[name="nueva_org_${rol}_apellido_paterno"]`),
+        readVal(`[name="nueva_org_${rol}_apellido_materno"]`),
+      ].filter(Boolean).join(' ') || readVal(`[name="nueva_org_${rol}_nombre"]`);
+      return {
+        nombre: readVal('#nueva_org_nombre') || 'la nueva organización',
+        roles: [
+          { cargo: 'Presidente', nombre: readFullName('presidente'), rut: readVal('[name="nueva_org_presidente_rut"]') },
+          { cargo: 'Tesorero', nombre: readFullName('tesorero'), rut: readVal('[name="nueva_org_tesorero_rut"]') },
+          { cargo: 'Secretario', nombre: readFullName('secretario'), rut: readVal('[name="nueva_org_secretario_rut"]') },
+        ],
+      };
+    }
+
+    const list = document.getElementById('organizaciones-list');
+    const orgId = document.getElementById('organizacion_id')?.value || '';
+    const orgTxt = (document.getElementById('organizacion_input')?.value || '').trim().toLowerCase();
+    if (!list) return null;
+    for (const opt of list.querySelectorAll('option')) {
+      if ((orgId && opt.getAttribute('data-id') === orgId) || (!orgId && orgTxt && opt.value.trim().toLowerCase() === orgTxt)) {
+        return {
+          nombre: opt.value,
+          roles: [
+            { cargo: 'Presidente', nombre: opt.dataset.presNom || '', rut: opt.dataset.presRut || '' },
+            { cargo: 'Tesorero', nombre: opt.dataset.tesNom || '', rut: opt.dataset.tesRut || '' },
+            { cargo: 'Secretario', nombre: opt.dataset.secNom || '', rut: opt.dataset.secRut || '' },
+          ],
+        };
+      }
+    }
+    return null;
+  }
+
+  function validarRepresentanteOrgUI() {
+    const chkOrg = document.getElementById('chk_representa_org');
+    const box = document.getElementById('org-directiva-validacion');
+    const repVal = (document.getElementById('org_representante_vecino_input')?.value || '').trim();
+    if (!chkOrg || !chkOrg.checked) return true;
+    if (!box) return true;
+
+    const directiva = _obtenerDirectivaOrgSeleccionada();
+    if (!directiva || !repVal) {
+      box.classList.add('hidden');
+      return false;
+    }
+
+    let repRut = '';
+    const mPar = repVal.match(/\(([^)]+)\)/);
+    if (mPar) repRut = _normRutDir(mPar[1]);
+    if (!repRut) repRut = _normRutDir(repVal);
+    const repNom = _normTxtDir(repVal.split('(')[0]);
+
+    let matchCargo = null;
+    for (const r of directiva.roles) {
+      const cNom = _normTxtDir(r.nombre);
+      const cRut = _normRutDir(r.rut);
+      if (!cNom && !cRut) continue;
+      if (repRut && cRut) {
+        if (repRut === cRut) { matchCargo = r; break; }
+        continue;
+      }
+      if (repNom && cNom && (repNom === cNom || cNom.includes(repNom) || repNom.includes(cNom))) {
+        matchCargo = r;
+        break;
+      }
+    }
+
+    box.classList.remove('hidden');
+    if (matchCargo) {
+      box.className = 'rounded-xl px-3 py-2 text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200';
+      box.textContent = `✓ Directivo verificado: ${matchCargo.nombre || repVal} — Cargo: ${matchCargo.cargo}`;
+      return true;
+    }
+    box.className = 'rounded-xl px-3 py-2 text-[11px] font-bold bg-red-50 text-[#C41230] border border-red-200';
+    box.textContent = '✕ El vecino ingresado no pertenece a la junta de vecinos / organización (Presidente, Tesorero o Secretario). No se puede crear la atención.';
+    return false;
+  }
+
+  function sincronizarRepresentanteOrg(val) {
+    const list = document.getElementById('vecinos-list');
+    const hiddenId = document.getElementById('org_representante_vecino_id');
+    if (hiddenId) hiddenId.value = '';
+    if (list && hiddenId) {
+      for (const opt of list.querySelectorAll('option')) {
+        if (opt.value === val) {
+          hiddenId.value = opt.getAttribute('data-id') || '';
+          break;
+        }
+      }
+    }
+    validarRepresentanteOrgUI();
+    programarBusquedaPendientes({ vecino_id: hiddenId ? hiddenId.value : '', q: val });
   }
 
   function toggleNuevaOrgAtencion(esNueva) {
@@ -1426,6 +1565,18 @@
     formAtencion.addEventListener('submit', function(e) {
       if (formSubmitting) {
         e.preventDefault();
+        return false;
+      }
+      const chkOrg = document.getElementById('chk_representa_org');
+      if (chkOrg && chkOrg.checked && !validarRepresentanteOrgUI()) {
+        e.preventDefault();
+        Swal.fire({
+          icon: 'error',
+          title: 'Representante no pertenece a la organización',
+          text: 'El vecino ingresado no pertenece a la junta de vecinos u organización como Presidente, Tesorero o Secretario. No se puede crear la atención.',
+          confirmButtonColor: '#C41230',
+          customClass: { popup: 'rounded-3xl font-sans' }
+        });
         return false;
       }
       formSubmitting = true;

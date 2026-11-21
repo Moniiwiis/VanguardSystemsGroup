@@ -3587,6 +3587,94 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         )
         self.assertIn(r_move_ext.status_code, (403, 404))
 
+    def test_sidebar_full_width_y_validacion_directivo_jjvv_en_atencion(self):
+        from activities.models import OrganizacionComunitaria, Vecino, AtencionCiudadana
+        from configuration.models import TipoAtencion, SubAtencion
+
+        self.client.force_login(self.user)
+
+        # 1. Al ocultar el menú lateral, btnShowSidebar va dentro de <main> y tablas rellenan 100% ancho
+        r_tubo = self.client.get(reverse('gestion_tubo'))
+        self.assertEqual(r_tubo.status_code, 200)
+        html_tubo = r_tubo.content.decode('utf-8')
+        self.assertIn('html.sgr-sidebar-collapsed main {', html_tubo)
+        self.assertIn('width: 100% !important;', html_tubo)
+        self.assertGreater(html_tubo.index('id="btnShowSidebar"'), html_tubo.index('<main '))
+
+        # 2. Validación de vecino representante de JJVV (Presidente, Tesorero o Secretario)
+        org_jjvv = OrganizacionComunitaria.objects.create(
+            nombre='JJVV Directiva Verificada',
+            tipo_organizacion='Junta de Vecinos',
+            delegacion=self.delegacion,
+            presidente_nombre='Ana Pérez',
+            presidente_rut='11.111.111-1',
+            tesorero_nombre='Luis Rojas',
+            tesorero_rut='12.345.678-5',
+            secretario_nombre='Marta Díaz',
+            secretario_rut='14.555.666-2',
+            estado='Activa',
+        )
+        vecino_pres = Vecino.objects.create(
+            nombre='Ana Pérez',
+            primer_nombre='Ana',
+            apellido_paterno='Pérez',
+            rut='11.111.111-1',
+            delegacion=self.delegacion,
+            estado='Activo',
+        )
+        vecino_no_dir = Vecino.objects.create(
+            nombre='Pedro Ajeno',
+            primer_nombre='Pedro',
+            apellido_paterno='Ajeno',
+            rut='19.222.333-4',
+            delegacion=self.delegacion,
+            estado='Activo',
+        )
+        tipo_at = TipoAtencion.objects.create(nombre='Territorial Dir', estado='Activo')
+        sub_at = SubAtencion.objects.create(tipo_atencion=tipo_at, nombre='Alumbrado', estado='Activo')
+
+        # Caso A: Vecino NO directivo intenta crear solicitud -> bloqueado
+        r_fail = self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'organizacion_id': str(org_jjvv.id),
+            'org_representante_vecino_id': str(vecino_no_dir.id),
+            'org_representante_vecino_input': f'{vecino_no_dir.nombre} ({vecino_no_dir.rut})',
+            'tipo_atencion_id': str(tipo_at.id),
+            'sub_atencion_id': str(sub_at.id),
+            'descripcion': 'Intento por vecino no directivo',
+        }, follow=True)
+        self.assertFalse(AtencionCiudadana.objects.filter(descripcion='Intento por vecino no directivo').exists())
+        self.assertContains(r_fail, 'no pertenece')
+
+        # Caso B: Representante vacío en formulario -> bloqueado
+        self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'organizacion_id': str(org_jjvv.id),
+            'org_representante_vecino_id': '',
+            'org_representante_vecino_input': '',
+            'tipo_atencion_id': str(tipo_at.id),
+            'sub_atencion_id': str(sub_at.id),
+            'descripcion': 'Intento sin representante',
+        })
+        self.assertFalse(AtencionCiudadana.objects.filter(descripcion='Intento sin representante').exists())
+
+        # Caso C: Vecino SÍ pertenece como Presidente -> permite crear solicitud
+        r_ok = self.client.post(reverse('gestion_atenciones'), {
+            'modo_vecino': 'organizacion',
+            'organizacion_id': str(org_jjvv.id),
+            'org_representante_vecino_id': str(vecino_pres.id),
+            'org_representante_vecino_input': f'{vecino_pres.nombre} ({vecino_pres.rut})',
+            'tipo_atencion_id': str(tipo_at.id),
+            'sub_atencion_id': str(sub_at.id),
+            'descripcion': 'Solicitud válida de presidenta JJVV',
+        })
+        self.assertEqual(r_ok.status_code, 302)
+        at_ok = AtencionCiudadana.objects.get(descripcion='Solicitud válida de presidenta JJVV')
+        self.assertEqual(at_ok.organizacion, org_jjvv)
+        self.assertEqual(at_ok.vecino, vecino_pres)
+        self.assertIn('Presidente', at_ok.solicitante)
+
+
 
 
 

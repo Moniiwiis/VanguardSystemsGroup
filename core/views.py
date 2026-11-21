@@ -3184,6 +3184,60 @@ def _guardar_evidencias_compromiso(compromiso, momento, imagenes, archivos):
     )
 
 
+def _verificar_directivo_organizacion(org, vecino_obj=None, texto_ingresado=''):
+    """Verifica si el vecino o texto ingresado corresponde al Presidente, Tesorero o Secretario de la organización."""
+    if not org:
+        return False, None, None
+    import re
+    import unicodedata
+
+    def _norm_rut(val):
+        limpio = ''.join(ch for ch in (val or '') if ch.isalnum()).upper()
+        return limpio if len(limpio) >= 7 else ''
+
+    def _norm_txt(val):
+        s = unicodedata.normalize('NFKD', (val or '').strip())
+        s = ''.join(ch for ch in s if not unicodedata.combining(ch))
+        return re.sub(r'\s+', ' ', s.lower()).strip()
+
+    rep_rut = _norm_rut(vecino_obj.rut if vecino_obj else '')
+    rep_nom = _norm_txt(vecino_obj.nombre if vecino_obj else '')
+
+    texto = (texto_ingresado or '').strip()
+    if texto:
+        m_par = re.search(r'\(([^)]+)\)', texto)
+        if not rep_rut and m_par:
+            rep_rut = _norm_rut(m_par.group(1))
+        if not rep_rut:
+            m_rut = re.search(r'\b\d{1,2}\.?\d{3}\.?\d{3}-[\dkK]\b|\b\d{7,8}[\dkK]\b', texto)
+            if m_rut:
+                rep_rut = _norm_rut(m_rut.group(0))
+        if not rep_nom:
+            base = texto.split('(')[0].split('·')[0].strip()
+            if base and not _norm_rut(base):
+                rep_nom = _norm_txt(base)
+
+    directivos = [
+        ('Presidente', org.presidente_nombre or '', org.presidente_rut or ''),
+        ('Tesorero', org.tesorero_nombre or '', org.tesorero_rut or ''),
+        ('Secretario', org.secretario_nombre or '', org.secretario_rut or ''),
+    ]
+    for cargo_label, nom_cargo_raw, rut_cargo_raw in directivos:
+        nom_cargo = _norm_txt(nom_cargo_raw)
+        rut_cargo = _norm_rut(rut_cargo_raw)
+        if not nom_cargo and not rut_cargo:
+            continue
+        if rep_rut and rut_cargo:
+            if rep_rut == rut_cargo:
+                return True, cargo_label, nom_cargo_raw.strip() or (vecino_obj.nombre if vecino_obj else '')
+            continue
+        if rep_rut and not rut_cargo and rut_cargo_raw:
+            continue
+        if rep_nom and nom_cargo and len(rep_nom) >= 4 and (rep_nom == nom_cargo or nom_cargo in rep_nom or rep_nom in nom_cargo):
+            return True, cargo_label, nom_cargo_raw.strip() or (vecino_obj.nombre if vecino_obj else '')
+    return False, None, None
+
+
 @login_required
 def gestion_atenciones(request):
     ctx = global_context(request)
@@ -3244,6 +3298,7 @@ def gestion_atenciones(request):
 
         vecino_obj = None
         organizacion_obj = None
+        rep_org_verificado = None
         if es_modo_org:
             organizacion_id = request.POST.get('organizacion_id', '').strip()
             crear_nueva_org = request.POST.get('crear_nueva_org', '').strip() == '1'
@@ -3265,6 +3320,50 @@ def gestion_atenciones(request):
                 messages.error(request, "Debe seleccionar una JJVV / organización existente o ingresar una nueva.")
                 return redirect('gestion_atenciones')
 
+            # Validación de vecino representante perteneciente a la directiva (Presidente, Tesorero o Secretario)
+            if ('org_representante_vecino_input' in request.POST or 'org_representante_vecino_id' in request.POST):
+                org_rep_id = request.POST.get('org_representante_vecino_id', '').strip()
+                org_rep_input = request.POST.get('org_representante_vecino_input', '').strip()
+                vecinos_del_qs = _vecinos_activos_para_delegacion(del_activa)
+                vecino_rep_obj = None
+                if org_rep_id and org_rep_id.isdigit():
+                    vecino_rep_obj = vecinos_del_qs.filter(id=int(org_rep_id)).first()
+                elif org_rep_input:
+                    if '(' in org_rep_input and ')' in org_rep_input:
+                        rut_cand = org_rep_input.split('(')[-1].replace(')', '').strip()
+                        ok_r, rut_fmt = validar_rut(rut_cand)
+                        if ok_r:
+                            vecino_rep_obj = vecinos_del_qs.filter(rut__iexact=rut_fmt).first()
+                    if not vecino_rep_obj:
+                        ok_r, rut_fmt = validar_rut(org_rep_input)
+                        if ok_r:
+                            vecino_rep_obj = vecinos_del_qs.filter(rut__iexact=rut_fmt).first()
+                    if not vecino_rep_obj:
+                        nom_cand = org_rep_input.split('(')[0].strip()
+                        vecino_rep_obj = vecinos_del_qs.filter(nombre__iexact=nom_cand).first()
+
+                if not vecino_rep_obj and not org_rep_input:
+                    messages.error(
+                        request,
+                        "Debes ingresar al vecino que asiste como representante de la organización para verificar su cargo (Presidente, Tesorero o Secretario).",
+                    )
+                    return redirect('gestion_atenciones')
+
+                es_directivo, cargo_dir, nombre_dir = _verificar_directivo_organizacion(
+                    organizacion_obj, vecino_obj=vecino_rep_obj, texto_ingresado=org_rep_input
+                )
+                if not es_directivo:
+                    messages.error(
+                        request,
+                        f"El vecino ingresado no pertenece a la junta de vecinos u organización '{organizacion_obj.nombre}' como directivo (Presidente, Tesorero o Secretario). No se puede crear la atención.",
+                    )
+                    return redirect('gestion_atenciones')
+
+                if vecino_rep_obj:
+                    vecino_obj = vecino_rep_obj
+                rep_nombre_final = (vecino_rep_obj.nombre if vecino_rep_obj else nombre_dir) or org_rep_input.split('(')[0].strip()
+                rep_org_verificado = f"{rep_nombre_final} ({cargo_dir})"
+
         if es_modo_nuevo_vec:
             vecino_obj, _, _, _, err_vec = _validar_y_crear_vecino_desde_post(
                 request, del_activa, prefix='nuevo_vecino_', allow_existing=True
@@ -3284,7 +3383,10 @@ def gestion_atenciones(request):
                 solicitante = f"{vecino_obj.nombre} ({vecino_obj.rut})"
 
         if organizacion_obj:
-            solicitante = f"{organizacion_obj.nombre} ({organizacion_obj.tipo_organizacion})"[:150]
+            if rep_org_verificado:
+                solicitante = f"{organizacion_obj.nombre} — Rep: {rep_org_verificado}"[:150]
+            else:
+                solicitante = f"{organizacion_obj.nombre} ({organizacion_obj.tipo_organizacion})"[:150]
 
         # Determinar representante asignado para la atención (acotado exclusivamente a la delegación activa)
         responsable_user = request.user
@@ -3572,7 +3674,8 @@ def gestion_atenciones(request):
             'id', 'nombre', 'tipo_organizacion', 'territorio', 'sector__nombre',
             'rut', 'numero_registro_pj', 'personalidad_juridica', 'registro_directiva_numero',
             'telefono_contacto', 'representante_legal',
-            'presidente_nombre', 'tesorero_nombre', 'secretario_nombre',
+            'presidente_nombre', 'presidente_rut', 'tesorero_nombre', 'tesorero_rut',
+            'secretario_nombre', 'secretario_rut',
         )
     )
 
