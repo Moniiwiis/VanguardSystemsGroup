@@ -204,13 +204,6 @@
     .chat-widget-mode > div.flex-1 > aside { display: none !important; }
     .chat-widget-mode > div.flex-1 > main { padding: 0 !important; gap: 0 !important; height: 100vh !important; min-height: 0 !important; }
     .chat-widget-mode .chat-layout { height: 100vh !important; min-height: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
-    #appSidebar nav {
-      scrollbar-width: thin;
-      scrollbar-color: rgba(196, 18, 48, 0.28) transparent;
-    }
-    #appSidebar nav::-webkit-scrollbar { width: 5px; }
-    #appSidebar nav::-webkit-scrollbar-thumb { background: rgba(196, 18, 48, 0.28); border-radius: 9999px; }
-    #appSidebar nav::-webkit-scrollbar-thumb:hover { background: rgba(196, 18, 48, 0.55); }
   </style>
   {% block extra_head %}{% endblock %}
 </head>
@@ -356,13 +349,13 @@
   <div id="appLayoutContainer" class="flex-1 max-w-[1920px] w-full mx-auto px-3 sm:px-5 lg:px-8 py-5 sm:py-6 flex flex-col lg:flex-row gap-5 lg:gap-6 items-start">
 
     <!-- Sidebar Navegación de Módulos (Filtrado según Perfil del Usuario) -->
-    <aside id="appSidebar" class="w-full lg:w-60 shrink-0 flex flex-col gap-5 lg:sticky lg:top-[5.25rem] lg:max-h-[calc(100vh-6.25rem)]">
+    <aside id="appSidebar" class="w-full lg:w-60 shrink-0 flex flex-col gap-5">
       
-      <!-- Menú de Módulos Organizado por Secciones (scroll interno cuando excede la altura visible) -->
-      <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-3 text-xs font-bold lg:overflow-y-auto lg:max-h-full">
+      <!-- Menú de Módulos Organizado por Secciones -->
+      <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-3 text-xs font-bold">
 
         <!-- Cabecera del mismo panel con botón Ocultar menú -->
-        <div class="flex items-center justify-between gap-2 px-2 pb-2 border-b border-slate-100 sticky top-0 bg-white z-10">
+        <div class="flex items-center justify-between gap-2 px-2 pb-2 border-b border-slate-100">
           <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Menú de módulos</span>
           <button type="button"
                   id="btnToggleSidebar"
