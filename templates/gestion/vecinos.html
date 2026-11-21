@@ -6,8 +6,8 @@
 <div class="space-y-6">
 
   <!-- Header Page Bar -->
-  <div class="bg-white rounded-3xl p-6 sm:p-7 border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
-    <div class="space-y-1">
+  <div class="bg-white rounded-3xl p-5 sm:p-7 border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-5 min-w-0">
+    <div class="space-y-1 min-w-0 flex-1">
       <div class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
         <span>Gestión Territorial</span>
         <span class="text-slate-300">/</span>
@@ -25,7 +25,7 @@
       </p>
     </div>
 
-    <div class="flex flex-wrap items-center gap-3 shrink-0">
+    <div class="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto min-w-0">
       <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl {% if delegacion_activa %}bg-red-50 text-[#C41230] border border-red-200/90{% elif delegacion_seleccionada %}bg-red-50 text-[#C41230] border border-red-200/90{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %} text-xs font-bold">
         <i data-lucide="{% if delegacion_activa or delegacion_seleccionada %}map-pin{% else %}globe{% endif %}" class="w-4 h-4"></i>
         <span>Delegación Activa: <strong>{% if delegacion_activa %}{{ delegacion_activa.nombre }}{% elif delegacion_seleccionada %}{{ delegacion_seleccionada.nombre }}{% else %}Global (Todas){% endif %}</strong></span>

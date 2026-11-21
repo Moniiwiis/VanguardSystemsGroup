@@ -6,15 +6,15 @@
 <div class="space-y-6">
 
   <!-- Header de Módulo con colores del proyecto -->
-  <div class="bg-white p-6 sm:p-7 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
-    <div class="space-y-1">
+  <div class="bg-white p-5 sm:p-7 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-5 min-w-0">
+    <div class="space-y-1 min-w-0 flex-1">
       <div class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
         <span>Gestión Territorial</span>
         <span class="text-slate-300">/</span>
         <span class="text-[#C41230]">Tubo de Compromiso</span>
       </div>
       <h1 class="font-display text-xl sm:text-2xl font-extrabold text-[#8B1D19] flex items-center gap-2.5">
-        <i data-lucide="git-pull-request" class="w-6 h-6 text-[#C41230]"></i>
+        <i data-lucide="git-pull-request" class="w-6 h-6 text-[#C41230] shrink-0"></i>
         <span>Tubo de Compromiso</span>
       </h1>
       <p class="text-xs text-slate-500 max-w-2xl leading-relaxed">
@@ -23,13 +23,7 @@
     </div>
 
     <!-- Panel de Acciones Superior -->
-    <div class="flex flex-wrap items-center gap-3 shrink-0">
-      {% if trimestre_actual_label %}
-      <div class="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold">
-        <i data-lucide="calendar" class="w-3.5 h-3.5 text-[#C41230]"></i>
-        <span>{{ trimestre_actual_label }}{% if periodo_activo_global %} · <strong class="text-emerald-700">Período: {{ periodo_activo_global }}</strong>{% endif %}</span>
-      </div>
-      {% endif %}
+    <div class="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full xl:w-auto min-w-0">
       {% if not es_admin and delegacion_activa %}
         <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-red-50 text-[#C41230] border border-red-200/90 text-xs font-bold">
           <i data-lucide="shield-check" class="w-4 h-4 text-[#C41230]"></i>
@@ -1566,7 +1560,6 @@
         <div class="space-y-1">
           <label class="block text-xs font-extrabold text-slate-700">Fecha de Compromiso <span class="text-[#C41230]">*</span></label>
           <input type="date" name="fecha_compromiso" min="{{ hoy_iso }}" required
-                 onclick="if (this.showPicker) { try { this.showPicker(); } catch(e) {} }"
                  class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono font-medium cursor-pointer bg-white focus:ring-2 focus:ring-[#C41230] focus:outline-none" />
         </div>
 

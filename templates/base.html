@@ -52,7 +52,7 @@
     }
     html.sgr-sidebar-collapsed #appLayoutContainer,
     html.sgr-sidebar-collapsed #appHeaderInner {
-      max-width: 1480px !important;
+      max-width: 1920px !important;
     }
     html.sgr-sidebar-collapsed [data-sidebar-icon-open] {
       display: none !important;
@@ -66,16 +66,32 @@
     html.sgr-sidebar-collapsed #btnShowSidebar {
       display: inline-flex !important;
     }
-    /* Tablas consistentes: al estar el menú desplegado mantienen su ancho legible con scroll horizontal */
-    @media (min-width: 768px) {
-      html:not(.sgr-sidebar-collapsed) .overflow-x-auto > table {
-        min-width: min(1180px, calc(100vw - 4rem));
-      }
+    /* Tablas adaptables a cualquier ancho con desplazamiento horizontal limpio sin desbordar tarjetas */
+    html, body {
+      max-width: 100%;
+      overflow-x: hidden;
     }
-    /* Barra de desplazamiento horizontal limpia para tablas */
+    main, aside, header, footer {
+      min-width: 0;
+      max-width: 100%;
+    }
     .overflow-x-auto {
+      max-width: 100%;
       scrollbar-width: thin;
       scrollbar-color: rgba(196, 18, 48, 0.35) rgba(15, 23, 42, 0.05);
+    }
+    @media (min-width: 1024px) {
+      html:not(.sgr-sidebar-collapsed) .overflow-x-auto > table {
+        min-width: min(1040px, 100%);
+      }
+    }
+    input[type="date"].sgr-date-picker {
+      cursor: pointer;
+      padding-right: 2.25rem !important;
+    }
+    input[type="date"].sgr-date-picker::-webkit-calendar-picker-indicator {
+      display: none !important;
+      -webkit-appearance: none;
     }
     .overflow-x-auto::-webkit-scrollbar {
       height: 8px;
@@ -187,24 +203,23 @@
 
   <!-- TopBar Oficial de la Ilustre Municipalidad de La Serena (Wireframes C3-C6) -->
   <header class="sticky top-0 z-40 shadow-md text-white" style="background: linear-gradient(90deg, #8B1D19 0%, #C41230 60%, #DB3334 100%);">
-    <div id="appHeaderInner" class="max-w-[1440px] mx-auto px-4 md:px-8 py-2.5 flex items-center justify-between gap-4">
+    <div id="appHeaderInner" class="max-w-[1920px] w-full mx-auto px-3 sm:px-5 lg:px-8 py-2.5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-4">
       
       <!-- Izquierda: Logo y Marca Institucional -->
-      <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
+      <div class="flex items-center gap-2.5 sm:gap-3 shrink-0 order-1">
         <a href="{% if permisos.es_cliente %}{% url 'portal_cliente' %}{% else %}{% url 'gestion_inicio' %}{% endif %}" class="flex items-center gap-3 shrink-0 group">
           <img src="{% static 'horizontal-blanco.svg' %}" 
                alt="La Serena — Ilustre Municipalidad" 
-               class="h-9 w-auto object-contain drop-shadow-sm"
+               class="h-8 sm:h-9 w-auto object-contain drop-shadow-sm"
                onerror="this.onerror=null; this.src=`{% static 'logo-la-serena.svg' %}`;" />
-          <span class="hidden sm:inline-block font-extrabold tracking-wider text-xs uppercase text-white/95 border-l border-white/20 pl-3">
+          <span class="hidden md:inline-block font-extrabold tracking-wider text-xs uppercase text-white/95 border-l border-white/20 pl-3">
             Sistema Municipal
           </span>
         </a>
       </div>
 
-      <!-- Centro: Distintivo de Delegación Activa según el Perfil (Requisito Crítico A2 / Wireframes) -->
-      <!-- Centro: Distintivo de Delegación Activa según el Perfil (Requisito Crítico A2 / Wireframes) -->
-      <div class="flex items-center">
+      <!-- Centro: Distintivo de Delegación Activa y Período / Trimestre debajo -->
+      <div class="flex flex-col items-center justify-center gap-1 order-3 sm:order-2 w-full sm:w-auto min-w-0">
         {% if can_switch_delegacion %}
           <div class="relative" id="delegacionDropdownContainer">
             <button type="button" 
@@ -272,10 +287,16 @@
             <span>{{ delegacion_activa.get_codigo }} | {{ delegacion_activa.nombre }}</span>
           </div>
         {% endif %}
+        {% if not permisos.es_cliente and trimestre_actual_label %}
+          <div id="topbar-periodo-badge" class="inline-flex items-center gap-1.5 bg-black/20 text-white/95 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-white/15 max-w-full">
+            <i data-lucide="calendar" class="w-3 h-3 text-amber-200 shrink-0"></i>
+            <span class="truncate">{{ trimestre_actual_label }}{% if periodo_activo_global %} · {{ periodo_activo_global }}{% endif %}</span>
+          </div>
+        {% endif %}
       </div>
 
       <!-- Derecha: Identificación de Usuario, Rol y Salir (Wireframe C3-C6) -->
-      <div class="flex items-center gap-3 shrink-0 min-w-0 text-xs">
+      <div class="flex items-center gap-3 shrink-0 min-w-0 text-xs order-2 sm:order-3">
         <a href="{% url 'perfil_usuario' %}" title="{{ usuario_nombre_corto|default:request.user.username }}" class="flex items-center gap-2 min-w-0 group hover:opacity-90 transition-opacity">
           {% if funcionario_actual and funcionario_actual.foto %}
             <img src="{{ funcionario_actual.foto.url }}" alt="{{ request.user.username }}" class="w-8 h-8 rounded-full object-cover ring-2 ring-white/40 shadow-sm shrink-0" />
@@ -317,7 +338,7 @@
   </header>
 
   <!-- Contenedor Principal (Sidebar + Contenido) -->
-  <div id="appLayoutContainer" class="flex-1 max-w-[1440px] w-full mx-auto px-4 md:px-8 py-6 flex flex-col md:flex-row gap-6 items-start">
+  <div id="appLayoutContainer" class="flex-1 max-w-[1920px] w-full mx-auto px-3 sm:px-5 lg:px-8 py-5 sm:py-6 flex flex-col lg:flex-row gap-5 lg:gap-6 items-start">
 
     <!-- Botón visible solo cuando el panel lateral está oculto para volver a mostrarlo -->
     <button type="button"
@@ -332,7 +353,7 @@
     </button>
     
     <!-- Sidebar Navegación de Módulos (Filtrado según Perfil del Usuario) -->
-    <aside id="appSidebar" class="w-full md:w-60 shrink-0 flex flex-col gap-5">
+    <aside id="appSidebar" class="w-full lg:w-60 shrink-0 flex flex-col gap-5">
       
       <!-- Menú de Módulos Organizado por Secciones -->
       <nav class="bg-white rounded-3xl p-3 shadow-sm border border-[rgba(196,18,48,0.15)] space-y-3 text-xs font-bold">
@@ -567,8 +588,8 @@
   </div>
 
   <!-- Footer Institucional Oficial -->
-  <footer class="bg-[#1B0D12] text-white border-t border-red-900/40 py-6 px-4 md:px-8 mt-auto">
-    <div class="max-w-[1440px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-red-200/70">
+  <footer class="bg-[#1B0D12] text-white border-t border-red-900/40 py-6 px-3 sm:px-5 lg:px-8 mt-auto">
+    <div class="max-w-[1920px] w-full mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-red-200/70">
       <div class="flex items-center gap-3">
         <img src="{% static 'vertical-blanco.svg' %}" 
              alt="Escudo Municipal" 
@@ -2811,33 +2832,54 @@
         }
 
         function initInputs(root = document) {
-          root.querySelectorAll('input[type="date"]:not([data-inline-cal="true"])').forEach((inp) => {
+          root.querySelectorAll('input[type="date"]').forEach((inp) => {
             if (inp.dataset.sgrCalAttached === '1') return;
             inp.dataset.sgrCalAttached = '1';
             const parent = inp.parentElement;
             if (!parent) return;
 
+            inp.classList.add('sgr-date-picker');
+            inp.removeAttribute('onclick');
+
             const outer = document.createElement('div');
             outer.className = 'w-full';
             const wrap = document.createElement('div');
-            wrap.className = 'relative flex items-center gap-1.5 w-full';
+            wrap.className = 'relative flex items-center w-full';
             parent.insertBefore(outer, inp);
             outer.appendChild(wrap);
             wrap.appendChild(inp);
 
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'sgr-cal-trigger shrink-0 px-2.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-red-50 hover:border-red-200 text-slate-600 hover:text-[#C41230] text-[11px] font-bold transition-all flex items-center gap-1';
+            btn.className = 'sgr-cal-trigger absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg text-slate-500 hover:text-[#C41230] hover:bg-red-50 transition-colors cursor-pointer';
             btn.title = 'Abrir calendario con feriados nacionales, fines de semana y trimestre';
             btn.setAttribute('aria-label', 'Abrir calendario con feriados y fines de semana');
-            btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>';
-            btn.addEventListener('click', (ev) => {
+            btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>';
+
+            const abrirDesdeCampo = (ev) => {
               ev.preventDefault();
               ev.stopPropagation();
-              if (popoverEl && !popoverEl.classList.contains('hidden') && activeInput === inp) {
+              if (ev.type === 'click' && popoverEl && !popoverEl.classList.contains('hidden') && activeInput === inp && ev.target.closest('.sgr-cal-trigger')) {
                 popoverEl.classList.add('hidden');
                 activeInput = null;
               } else {
+                openForInput(inp);
+              }
+            };
+            btn.addEventListener('click', abrirDesdeCampo);
+            inp.addEventListener('mousedown', (ev) => {
+              ev.preventDefault();
+              ev.stopPropagation();
+              openForInput(inp);
+            });
+            inp.addEventListener('click', (ev) => {
+              ev.preventDefault();
+              ev.stopPropagation();
+              openForInput(inp);
+            });
+            inp.addEventListener('keydown', (ev) => {
+              if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'ArrowDown') {
+                ev.preventDefault();
                 openForInput(inp);
               }
             });
@@ -2888,6 +2930,21 @@
       })();
 
       window.SGR_CALENDAR.initInputs(document);
+      if (window.MutationObserver && document.body) {
+        new MutationObserver((muts) => {
+          for (const mut of muts) {
+            for (const node of mut.addedNodes) {
+              if (node && node.nodeType === 1) {
+                if (node.matches && node.matches('input[type="date"]')) {
+                  window.SGR_CALENDAR.initInputs(node.parentElement || document);
+                } else if (node.querySelectorAll && node.querySelector('input[type="date"]')) {
+                  window.SGR_CALENDAR.initInputs(node);
+                }
+              }
+            }
+          }
+        }).observe(document.body, { childList: true, subtree: true });
+      }
     });
   </script>
   {% block extra_js %}{% endblock %}

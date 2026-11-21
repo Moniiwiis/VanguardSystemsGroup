@@ -2173,7 +2173,8 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertContains(resp_ini, 'Juntas de Vecinos y Organizaciones')
         self.assertNotContains(resp_ini, 'JJVV y Organizaciones')
         self.assertContains(resp_org_activa, 'Juntas de Vecinos y Organizaciones')
-        self.assertContains(resp_org_activa, 'this.showPicker')
+        self.assertContains(resp_org_activa, 'window.SGR_CALENDAR')
+        self.assertContains(resp_org_activa, 'sgr-date-picker')
 
         for mod_url in ('gestion_atenciones', 'gestion_sectores', 'gestion_vecinos', 'gestion_organizaciones'):
             resp_mod = self.client.get(reverse(mod_url))
@@ -3532,11 +3533,16 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         r_tubo_per = self.client.get(reverse('gestion_tubo') + f'?delegacion={self.delegacion.id}&periodo={periodo.id}')
         self.assertEqual(r_tubo_per.status_code, 200)
         self.assertContains(r_tubo_per, 'Compromiso futuro válido')
+        self.assertContains(r_tubo_per, 'id="topbar-periodo-badge"')
+        self.assertContains(r_tubo_per, 'max-w-[1920px]')
+        self.assertContains(r_tubo_per, 'sgr-date-picker')
+        self.assertNotContains(r_tubo_per, 'this.showPicker')
 
         # 5. Vistas y reglas de calendarios (fecha antigua vs hoy en adelante)
         self.client.force_login(self.user)
         r_at_func = self.client.get(reverse('gestion_atenciones') + f'?periodo={periodo.id}')
         self.assertContains(r_at_func, f'id="fecha_compromiso" name="fecha_compromiso" min="{hoy.isoformat()}"')
+        self.assertContains(r_at_func, 'id="topbar-periodo-badge"')
         self.assertContains(r_metas, f'id="per-new-inicio" name="fecha_inicio" min="{hoy.isoformat()}"')
         r_org = self.client.get(reverse('gestion_organizaciones'))
         self.assertEqual(r_org.status_code, 200)

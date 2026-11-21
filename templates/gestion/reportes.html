@@ -6,8 +6,8 @@
 <div class="space-y-6">
 
   <!-- Header de Módulo -->
-  <div class="bg-white p-6 sm:p-7 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
-    <div class="space-y-1">
+  <div class="bg-white p-5 sm:p-7 rounded-3xl border border-[rgba(196,18,48,0.18)] shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-5 min-w-0">
+    <div class="space-y-1 min-w-0 flex-1">
       <div class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
         <span>Gestión Municipal</span>
         <span class="text-slate-300">/</span>
@@ -26,7 +26,7 @@
     </div>
 
     <!-- Panel de Acciones Superior con colores corporativos del proyecto -->
-    <div class="flex flex-wrap items-center gap-3 shrink-0">
+    <div class="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full xl:w-auto min-w-0">
       {% if not es_admin and delegacion_activa %}
         <!-- Indicador de Contexto Territorial Fijo para Delegado / Coordinador -->
         <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-red-50 text-[#C41230] border border-red-200/90 text-xs font-bold">
