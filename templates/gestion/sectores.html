@@ -34,9 +34,9 @@
       {% endif %}
 
       <a href="?export=excel{% if q %}&q={{ q }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if delegacion_seleccionada and es_admin %}&delegacion={{ delegacion_seleccionada.id }}{% endif %}"
-         class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-2xl shadow-sm transition-all flex items-center gap-2">
-        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-        <span>Exportar Excel</span>
+         class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+        <span>Exportar a Excel</span>
       </a>
 
       {% if not permisos.es_consultor %}

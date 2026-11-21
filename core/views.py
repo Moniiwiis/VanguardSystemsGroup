@@ -5232,8 +5232,44 @@ def gestion_reportes(request):
         metas_qs, request, orden_opciones, '-id'
     )
 
+    from agenda.models import AjusteDesempenio
+    ajustes_qs = AjusteDesempenio.objects.select_related(
+        'funcionario__user', 'funcionario__delegacion', 'periodo', 'autorizador__user'
+    ).order_by('-created_at')
+    if not es_admin:
+        if del_activa:
+            ajustes_qs = ajustes_qs.filter(funcionario__delegacion=del_activa)
+        else:
+            ajustes_qs = ajustes_qs.none()
+    elif delegacion_seleccionada:
+        ajustes_qs = ajustes_qs.filter(funcionario__delegacion=delegacion_seleccionada)
+
     # Exportación a Excel/CSV respetando los permisos de delegación
-    if request.GET.get('export') == 'excel':
+    nom_del = delegacion_seleccionada.get_codigo() if delegacion_seleccionada else ('Todas' if es_admin else (del_activa.get_codigo() if del_activa else 'Delegacion'))
+    export_mode = request.GET.get('export', '').strip()
+    if export_mode == 'excel_ajustes':
+        headers = [
+            'Funcionario', 'Identificador', 'Delegación', 'Período',
+            'Concepto', '% Ajuste', 'Motivo / Justificación',
+            'Autorizado por', 'Fecha'
+        ]
+        rows = [
+            [
+                aj.funcionario.get_nombre_corto(),
+                aj.funcionario.identificador_institucional or '',
+                aj.funcionario.delegacion.nombre if aj.funcionario.delegacion else 'Global',
+                str(aj.periodo),
+                aj.concepto,
+                f"-{aj.valor_porcentaje}%",
+                aj.motivo or '',
+                str(aj.autorizador) if aj.autorizador else '',
+                aj.created_at.strftime('%d/%m/%Y'),
+            ]
+            for aj in ajustes_qs
+        ]
+        return export_to_excel_xlsx(f"Ajustes_Desempenio_{nom_del}", "Ajustes de Desempeño", headers, rows)
+
+    if export_mode == 'excel':
         headers = [
             'Ítem de Medición', 'Período', 'Delegación', 'Asignación',
             'Meta Objetivo', 'Ponderación (%)', 'Cumplimiento (%)',
@@ -5254,7 +5290,6 @@ def gestion_reportes(request):
                 f"{m.cumplimiento_ponderado()}%",
                 m.estado_semaforo()
             ])
-        nom_del = delegacion_seleccionada.get_codigo() if delegacion_seleccionada else ('Todas' if es_admin else (del_activa.get_codigo() if del_activa else 'Delegacion'))
         return export_to_excel_xlsx(f"Reportes_{nom_del}", "Reportes de Gestión", headers, rows)
 
     # Métricas y semáforos territoriales
@@ -5299,17 +5334,6 @@ def gestion_reportes(request):
     suma_cumplimiento_equipo = sum(m.cumplimiento_ponderado() for m in metas_list)
     suma_ponderacion_equipo = sum(float(m.ponderacion or 0) for m in metas_list)
     pct_equipo_global = round((suma_cumplimiento_equipo / suma_ponderacion_equipo * 100), 1) if suma_ponderacion_equipo > 0 else 0.0
-
-    # ── Ajustes de Desempeño cargados en el Semáforo por el Delegado ──
-    from agenda.models import AjusteDesempenio
-    ajustes_qs = AjusteDesempenio.objects.select_related('funcionario__user', 'periodo', 'autorizador__user').order_by('-created_at')
-    if not es_admin:
-        if del_activa:
-            ajustes_qs = ajustes_qs.filter(funcionario__delegacion=del_activa)
-        else:
-            ajustes_qs = ajustes_qs.none()
-    elif delegacion_seleccionada:
-        ajustes_qs = ajustes_qs.filter(funcionario__delegacion=delegacion_seleccionada)
 
     # Funcionarios y períodos para el modal del Delegado (filtrados estrictamente por delegación activa)
     del_objetivo_ajuste = del_activa or delegacion_seleccionada
@@ -6819,8 +6843,9 @@ def gestion_tubo(request):
     else:
         items_filtrados.sort(key=lambda it: it['created_at'], reverse=True)
 
-    # Exportación a Excel/CSV
-    if request.GET.get('export') == 'excel':
+    # Exportación a Excel/CSV independiente para Requerimientos en Tubo
+    export_mode = request.GET.get('export', '').strip()
+    if export_mode == 'excel_requerimientos' or (export_mode == 'excel' and tab != 'colaboradores'):
         headers = [
             'N° Tubo', 'Origen / Código', 'Fecha Solicitud', 'Actividad / Solicitud', 'Int/Ext',
             'Solicitante', 'Territorio / Delegación', 'Responsable',
@@ -7032,6 +7057,30 @@ def gestion_tubo(request):
         resumen_colaboradores.sort(key=lambda x: x['nombre'].lower())
     else:
         resumen_colaboradores.sort(key=lambda x: x['total'], reverse=True)
+
+    if export_mode == 'excel_colaboradores' or (export_mode == 'excel' and tab == 'colaboradores'):
+        headers = [
+            'Colaborador', 'Usuario', 'Cargo', 'Territorio / Delegación',
+            'Total Tubo', 'Ingresados', 'En Proceso', 'Pendientes',
+            'Realizados', '% Cumplimiento',
+        ]
+        rows = [
+            [
+                c['nombre'],
+                c['username'],
+                c['cargo'],
+                c['delegacion_nombre'] or 'Comunal',
+                c['total'],
+                c['ingresados'],
+                c['en_proceso'],
+                c['pendientes'],
+                c['realizados'],
+                f"{c['pct_realizado']}%",
+            ]
+            for c in resumen_colaboradores
+        ]
+        nom_del = delegacion_seleccionada.get_codigo() if delegacion_seleccionada else ('Todas' if es_admin else 'Delegacion')
+        return export_to_excel_xlsx(f"Tubo_Colaboradores_{nom_del}", "Resumen por Colaborador", headers, rows)
 
     colab_paginator = Paginator(resumen_colaboradores, page_size)
     page_obj_colab = colab_paginator.get_page(request.GET.get('page_colab', 1))

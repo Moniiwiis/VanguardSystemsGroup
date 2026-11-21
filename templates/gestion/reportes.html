@@ -35,12 +35,6 @@
         </div>
       {% endif %}
 
-      <a href="?export=excel&q={{ q }}&orden={{ orden }}{% if delegacion_seleccionada %}&delegacion={{ delegacion_seleccionada.id }}{% elif es_admin %}&delegacion=todas{% endif %}"
-         class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-slate-900 hover:bg-slate-800 text-white transition-all flex items-center gap-2 shadow-sm">
-        <i data-lucide="download" class="w-4 h-4"></i>
-        <span>Exportar Excel</span>
-      </a>
-
       <!-- Botón de Ajuste de Metas con colores institucionales -->
       <button type="button" onclick="abrirModalAjuste()"
               class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-[#C41230] hover:bg-[#8B1D19] active:bg-[#700F17] text-white shadow-md border border-red-700/50 transition-all flex items-center gap-2 cursor-pointer"
@@ -193,6 +187,11 @@
         <span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200/80">Período: {{ periodo_activo_global }}</span>
         {% endif %}
         <span class="text-[11px] font-bold text-slate-500 bg-white/80 px-3 py-1 rounded-xl border border-red-100">Total: {{ total_metas }} metas</span>
+        <a href="?export=excel&q={{ q|urlencode }}&trimestre={{ trimestre_filtro|urlencode }}&orden={{ orden|urlencode }}{% if delegacion_seleccionada %}&delegacion={{ delegacion_seleccionada.id }}{% elif es_admin %}&delegacion=todas{% endif %}"
+           class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+          <span>Exportar a Excel</span>
+        </a>
       </div>
     </div>
 
@@ -349,11 +348,18 @@
           <p class="text-[11px] text-slate-500">Días libres, vacaciones, días administrativos y licencias médicas ingresados por el Delegado</p>
         </div>
       </div>
-      <button type="button" onclick="abrirModalAjuste()"
-              class="px-4 py-2 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-2 self-start sm:self-auto cursor-pointer">
-        <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
-        <span>Ingresar Nuevo Ajuste</span>
-      </button>
+      <div class="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+        <a href="?export=excel_ajustes{% if delegacion_seleccionada %}&delegacion={{ delegacion_seleccionada.id }}{% elif es_admin %}&delegacion=todas{% endif %}"
+           class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+          <span>Exportar a Excel</span>
+        </a>
+        <button type="button" onclick="abrirModalAjuste()"
+                class="px-4 py-2 bg-[#C41230] hover:bg-[#8B1D19] text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer">
+          <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+          <span>Ingresar Nuevo Ajuste</span>
+        </button>
+      </div>
     </div>
 
     {% if ajustes_desempenio %}

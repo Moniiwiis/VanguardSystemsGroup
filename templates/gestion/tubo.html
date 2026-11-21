@@ -31,12 +31,6 @@
         </div>
       {% endif %}
 
-      <a href="?export=excel&q={{ q }}&orden={{ orden }}&tab={{ tab }}&vista={{ vista }}{% if delegacion_seleccionada %}&delegacion={{ delegacion_seleccionada.id }}{% elif es_admin %}&delegacion=todas{% endif %}"
-         class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-slate-900 hover:bg-slate-800 text-white transition-all flex items-center gap-2 shadow-sm">
-        <i data-lucide="download" class="w-4 h-4"></i>
-        <span>Exportar Excel</span>
-      </a>
-
       {% if not permisos.es_consultor %}
       {% if puede_crear_compromiso_sector %}
       <button type="button" onclick="abrirModalCompromisoSector()"
@@ -196,13 +190,20 @@
           <p class="text-[11px] text-slate-400">Filtrado por delegación, responsable y estado del compromiso</p>
         </div>
 
-        {% if filtro_estado or q or filtro_origen or filtro_responsable %}
-          <a href="?tab=requerimientos&vista={{ vista }}{% if es_admin %}&delegacion={% if delegacion_seleccionada %}{{ delegacion_seleccionada.id }}{% else %}todas{% endif %}{% endif %}"
-             class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1 self-start sm:self-auto">
-            <i data-lucide="x" class="w-3.5 h-3.5"></i>
-            <span>Limpiar todos los filtros</span>
+        <div class="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+          {% if filtro_estado or q or filtro_origen or filtro_responsable or filtro_periodo %}
+            <a href="?tab=requerimientos&vista={{ vista }}{% if es_admin %}&delegacion={% if delegacion_seleccionada %}{{ delegacion_seleccionada.id }}{% else %}todas{% endif %}{% endif %}"
+               class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              <span>Limpiar todos los filtros</span>
+            </a>
+          {% endif %}
+          <a href="?tab=requerimientos&vista={{ vista }}&q={{ q|urlencode }}&estado={{ filtro_estado|urlencode }}&origen={{ filtro_origen|urlencode }}&responsable={{ filtro_responsable|urlencode }}&periodo={{ filtro_periodo|urlencode }}&orden={{ orden|urlencode }}{% if delegacion_seleccionada %}&delegacion={{ delegacion_seleccionada.id }}{% elif es_admin %}&delegacion=todas{% endif %}&export=excel"
+             class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
+            <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+            <span>Exportar a Excel</span>
           </a>
-        {% endif %}
+        </div>
       </div>
 
       <!-- Barra de Filtros Activos -->
@@ -1010,13 +1011,20 @@
           <p class="text-[11px] text-slate-400">Distribución de compromisos asignados, pendientes y nivel de cumplimiento por funcionario</p>
         </div>
 
-        {% if q_colab or filtro_cumplimiento or orden_colab != '-total' %}
-          <a href="?tab=colaboradores{% if es_admin %}&delegacion={% if delegacion_seleccionada %}{{ delegacion_seleccionada.id }}{% else %}todas{% endif %}{% endif %}"
-             class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1 self-start sm:self-auto">
-            <i data-lucide="x" class="w-3.5 h-3.5"></i>
-            <span>Limpiar filtros</span>
+        <div class="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+          {% if q_colab or filtro_cumplimiento or orden_colab != '-total' %}
+            <a href="?tab=colaboradores{% if es_admin %}&delegacion={% if delegacion_seleccionada %}{{ delegacion_seleccionada.id }}{% else %}todas{% endif %}{% endif %}"
+               class="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              <span>Limpiar filtros</span>
+            </a>
+          {% endif %}
+          <a href="?tab=colaboradores&q_colab={{ q_colab|urlencode }}&cumplimiento={{ filtro_cumplimiento|urlencode }}&orden_colab={{ orden_colab|urlencode }}{% if delegacion_seleccionada %}&delegacion={{ delegacion_seleccionada.id }}{% elif es_admin %}&delegacion=todas{% endif %}&export=excel_colaboradores"
+             class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
+            <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+            <span>Exportar a Excel</span>
           </a>
-        {% endif %}
+        </div>
       </div>
 
       <!-- Filtros de Colaboradores -->

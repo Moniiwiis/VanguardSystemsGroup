@@ -3739,6 +3739,74 @@ class TuboCompromisoYOrganizacionesTests(TestCase):
         self.assertIn('body.chat-widget-mode .chat-layout > aside', html_widget)
         self.assertIn('height: 100vh !important;', html_widget)
 
+    def test_botones_exportar_excel_uniformes_e_independientes_por_tabla(self):
+        import openpyxl
+        admin = User.objects.create_superuser('admin_excel_unif', 'excel@example.test', 'Admin123!')
+        self.client.force_login(admin)
+
+        # 1. Todos los módulos renderizan el botón unificado "Exportar a Excel" con estilo blanco e ícono verde
+        for url in (
+            reverse('gestion_delegaciones'),
+            reverse('gestion_roles'),
+            reverse('gestion_usuarios'),
+            reverse('gestion_metas') + '?tab=items',
+            reverse('gestion_metas') + '?tab=periodos',
+            reverse('gestion_tipo_atencion'),
+            reverse('gestion_areas_apoyo'),
+            reverse('gestion_sub_atencion'),
+            reverse('gestion_reportes'),
+            reverse('gestion_tubo') + '?tab=requerimientos',
+            reverse('gestion_tubo') + '?tab=colaboradores',
+            reverse('gestion_atenciones'),
+            reverse('gestion_sectores'),
+            reverse('gestion_organizaciones'),
+            reverse('gestion_vecinos'),
+            reverse('cartas_listado'),
+        ):
+            r = self.client.get(url)
+            self.assertEqual(r.status_code, 200, f'Error cargando {url}')
+            self.assertContains(r, '<span>Exportar a Excel</span>', msg_prefix=f'Falta texto unificado en {url}')
+            self.assertContains(r, 'file-spreadsheet', msg_prefix=f'Falta icono spreadsheet en {url}')
+            self.assertContains(r, 'text-emerald-600', msg_prefix=f'Falta icono verde en {url}')
+            self.assertNotContains(r, '<span>Exportar Excel</span>', msg_prefix=f'Etiqueta antigua en {url}')
+
+        # 2. Tubo de Compromiso: exportaciones independientes para Requerimientos y Resumen por Colaborador
+        r_tubo_req = self.client.get(reverse('gestion_tubo') + '?tab=requerimientos')
+        self.assertContains(r_tubo_req, '&export=excel"')
+        self.assertNotContains(r_tubo_req, 'export=excel_colaboradores')
+
+        r_tubo_col = self.client.get(reverse('gestion_tubo') + '?tab=colaboradores&q_colab=noexiste')
+        self.assertContains(r_tubo_col, '&export=excel_colaboradores"')
+
+        xlsx_col = self.client.get(reverse('gestion_tubo') + '?tab=colaboradores&export=excel_colaboradores')
+        self.assertEqual(xlsx_col.status_code, 200)
+        self.assertIn('Tubo_Colaboradores_', xlsx_col['Content-Disposition'])
+        wb_col = openpyxl.load_workbook(BytesIO(xlsx_col.content))
+        headers_col = [cell.value for cell in wb_col.active[1]]
+        self.assertIn('Colaborador', headers_col)
+        self.assertIn('% Cumplimiento', headers_col)
+
+        xlsx_req = self.client.get(reverse('gestion_tubo') + '?tab=requerimientos&export=excel')
+        self.assertEqual(xlsx_req.status_code, 200)
+        self.assertIn('Tubo_', xlsx_req['Content-Disposition'])
+        wb_req = openpyxl.load_workbook(BytesIO(xlsx_req.content))
+        headers_req = [cell.value for cell in wb_req.active[1]]
+        self.assertIn('N° Tubo', headers_req)
+
+        # 3. Reportes: exportación independiente para Metas y para Ajustes de Desempeño
+        r_rep = self.client.get(reverse('gestion_reportes'))
+        self.assertContains(r_rep, '?export=excel&')
+        self.assertContains(r_rep, '?export=excel_ajustes')
+
+        xlsx_aj = self.client.get(reverse('gestion_reportes') + '?export=excel_ajustes')
+        self.assertEqual(xlsx_aj.status_code, 200)
+        self.assertIn('Ajustes_Desempenio_', xlsx_aj['Content-Disposition'])
+        wb_aj = openpyxl.load_workbook(BytesIO(xlsx_aj.content))
+        headers_aj = [cell.value for cell in wb_aj.active[1]]
+        self.assertIn('Concepto', headers_aj)
+        self.assertIn('% Ajuste', headers_aj)
+
+
 
 
 
